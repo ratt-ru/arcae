@@ -1,7 +1,4 @@
-#include <casacore/casa/Utilities/ValType.h>
-
 #include "casa_visitors.h"
-#include "scalar_buffer.h"
 
 class ColumnConvertVisitor : public CasaTypeVisitor {
 public:
