@@ -5,8 +5,6 @@ C++ and Python Arrow Bindings for casacore
 Rationale
 ---------
 
-It's useful to
-
 * Apache Arrow Tables have very similar structure to CASA Tables
 * It's easy to convert Arrow Tables between many different languages
 * Converting CASA Tables to Arrow in the C++ layer avoids the GIL
