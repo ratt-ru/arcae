@@ -1,3 +1,5 @@
+#include <casacore/tables/Tables.h>
+
 #include "casa_visitors.h"
 
 class ColumnConvertVisitor : public CasaTypeVisitor {

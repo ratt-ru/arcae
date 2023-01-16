@@ -1,5 +1,4 @@
 #include <casacore/tables/Tables.h>
-//#include <casacore/tables/Tables/TableColumn.h>
 
 #include <arrow/util/logging.h>  // IWYU pragma: keep
 
