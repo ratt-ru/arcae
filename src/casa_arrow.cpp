@@ -38,5 +38,5 @@ arrow::Result<std::shared_ptr<arrow::Table>> open_table(const std::string & file
     }
 
     auto schema = arrow::schema(fields);
-    return arrow::Table::Make(schema, arrays, -1);
+    return arrow::Table::Make(std::move(schema), arrays, -1);
 }
