@@ -3,6 +3,7 @@
 #include <casacore/tables/Tables.h>
 
 #include "column_convert_visitor.h"
+#include "complex_type.h"
 
 ColumnConvertVisitor::ColumnConvertVisitor(const casacore::TableColumn & column)
     : column(column) {}
@@ -51,16 +52,12 @@ arrow::Status ColumnConvertVisitor::VisitTpDouble() {
 
 arrow::Status ColumnConvertVisitor::VisitTpComplex() {
     return this->ConvertColumn<casacore::Complex>(
-        arrow::fixed_size_list(arrow::float32(), 2));
-    // return this->ConvertColumn<casacore::Complex>(
-    //     arrow::struct_({
-    //         arrow::field("real", arrow::float32(), false),
-    //         arrow::field("imag", arrow::float32(), false)}));
+        complex64());
 }
 
 arrow::Status ColumnConvertVisitor::VisitTpDComplex() {
     return this->ConvertColumn<casacore::DComplex>(
-        arrow::fixed_size_list(arrow::float64(), 2));
+        complex128());
 }
 
 arrow::Status ColumnConvertVisitor::VisitTpString() {

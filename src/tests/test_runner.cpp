@@ -7,10 +7,11 @@ int main(void) {
     auto table = result.ValueOrDie();
     // std::cout << out["UVW"] << std::endl;
     //std::cout << result.ValueOrDie()->ToString() << std::endl;
-    std::cout << table->GetColumnByName("UVW")->ToString() << std::endl;
-    std::cout << table->GetColumnByName("TIME")->ToString() << std::endl;
+    // std::cout << table->GetColumnByName("UVW")->ToString() << std::endl;
+    // std::cout << table->GetColumnByName("TIME")->ToString() << std::endl;
 
-    std::cout << table->GetColumnByName("UVW")->length() << std::endl;
-    std::cout << table->GetColumnByName("TIME")->length() << std::endl;
-    std::cout << table->num_rows() << std::endl;
+    // std::cout << table->GetColumnByName("UVW")->length() << std::endl;
+    // std::cout << table->GetColumnByName("TIME")->length() << std::endl;
+    // std::cout << table->num_rows() << std::endl;
+    std::cout << table->ToString() << std::endl;
 }
