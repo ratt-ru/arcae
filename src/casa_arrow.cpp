@@ -33,8 +33,8 @@ arrow::Result<std::shared_ptr<arrow::Table>> open_table(const std::string & file
         }
 
         auto arrow_field = std::make_shared<arrow::Field>(column_names[i], visitor.array->type());
-        fields.push_back(arrow_field);
-        arrays.push_back(std::move(visitor.array));
+        fields.emplace_back(std::move(arrow_field));
+        arrays.emplace_back(std::move(visitor.array));
     }
 
     auto schema = arrow::schema(fields);
