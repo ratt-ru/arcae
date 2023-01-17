@@ -1,3 +1,5 @@
+#include <arrow/api.h>
+
 #include <casacore/tables/Tables.h>
 
 #include "column_convert_visitor.h"
@@ -48,13 +50,17 @@ arrow::Status ColumnConvertVisitor::VisitTpDouble() {
 }
 
 arrow::Status ColumnConvertVisitor::VisitTpComplex() {
-    return arrow::Status::NotImplemented("TpComplex");
-    //return this->ConvertColumn<casacore::Complex>();
+    return this->ConvertColumn<casacore::Complex>(
+        arrow::fixed_size_list(arrow::float32(), 2));
+    // return this->ConvertColumn<casacore::Complex>(
+    //     arrow::struct_({
+    //         arrow::field("real", arrow::float32(), false),
+    //         arrow::field("imag", arrow::float32(), false)}));
 }
 
 arrow::Status ColumnConvertVisitor::VisitTpDComplex() {
-    return arrow::Status::NotImplemented("TpDComplex");
-    //return this->ConvertColumn<casacore::DComplex>();
+    return this->ConvertColumn<casacore::DComplex>(
+        arrow::fixed_size_list(arrow::float64(), 2));
 }
 
 arrow::Status ColumnConvertVisitor::VisitTpString() {

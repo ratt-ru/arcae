@@ -38,7 +38,7 @@ private:
             reinterpret_cast<T *>(buffer->mutable_data()),
             casacore::SHARE);
 
-        // Dump column data in Array Buffer
+        // Dump column data into Arrow Buffer
         scalar_column.getColumn(casa_vector);
 
         // Create a Primitive Arrow Array
@@ -55,8 +55,61 @@ private:
 
     template <typename T>
     arrow::Status ConvertArrayColumn(const std::shared_ptr<arrow::DataType> & arrow_dtype) {
-        auto scalar_column = casacore::ArrayColumn<T>(this->column);
-        return arrow::Status::OK();
+        auto array_column = casacore::ArrayColumn<T>(this->column);
+        auto column_desc = this->column.columnDesc();
+
+        if(!column_desc.ndim() >= 1) {
+            return arrow::Status::Invalid(
+                "Array ", column_desc.name(),
+                " has dimensionality of ", column_desc.ndim()
+            );
+        }
+
+        if(!column_desc.isFixedShape()) {
+            return arrow::Status::Invalid(
+                "Array ", column_desc.name(),
+                " is not a FixedShape"
+            );
+        }
+
+        auto nrows = array_column.nrow();
+        auto shape = column_desc.shape();
+        auto length = shape.product()*nrows;
+
+        // Allocate an Arrow Buffer from default Memory Pool
+        auto allocation = arrow::AllocateBuffer(length*sizeof(T), nullptr);
+
+        if(!allocation.ok()) {
+            return allocation.status();
+        }
+
+        auto buffer = std::shared_ptr<arrow::Buffer>(std::move(allocation.ValueOrDie()));
+
+        shape.append(casacore::IPosition(1, nrows));
+        // Wrap Arrow Buffer in casacore Vector
+        auto casa_array = casacore::Array<T>(
+            shape,
+            reinterpret_cast<T *>(buffer->mutable_data()),
+            casacore::SHARE);
+
+        // Dump column data into Arrow Buffer
+        array_column.getColumn(casa_array);
+
+        // Create basic array
+        auto base_array = std::make_shared<arrow::PrimitiveArray>(
+            arrow_dtype,
+            length,
+            buffer,
+            nullptr,
+            0, 0);
+
+        this->array = arrow::FixedSizeListArray::FromArrays(base_array, shape[0]).ValueOrDie();
+
+        for(std::size_t i=1; i<shape.size()-1; ++i) {
+            this->array = arrow::FixedSizeListArray::FromArrays(this->array, shape[i]).ValueOrDie();
+        }
+
+        return this->array->Validate();
     }
 
     template <typename T>
