@@ -28,11 +28,15 @@ private:
         auto complex_dtype = std::dynamic_pointer_cast<ComplexType>(dtype);
 
         if(complex_dtype) {
-            // Array of floats
+            // Array of floats/doubles
             auto child_array = std::make_shared<arrow::PrimitiveArray>(
                 complex_dtype->value_type(), 2*length, buffer,
                 nullptr, 0, 0);
 
+            // NOTE(sjperkins)
+            // Check the FixedSizeListAray layout documents
+            // https://arrow.apache.org/docs/format/Columnar.html#fixed-size-list-layout
+            // An empty child buffer {nullptr} must be provided otherwise this segfaults
             auto array_data = arrow::ArrayData::Make(
                 complex_dtype, length, {nullptr}, {child_array->data()},
                 0, 0);
