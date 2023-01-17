@@ -15,19 +15,19 @@ arrow::Status ColumnConvertVisitor::VisitTpBool() {
 }
 
 arrow::Status ColumnConvertVisitor::VisitTpChar() {
-    return this->ConvertColumn<casacore::Char>(arrow::uint8());
+    return this->ConvertColumn<casacore::Char>(arrow::int8());
 }
 
 arrow::Status ColumnConvertVisitor::VisitTpUChar() {
-    return arrow::Status::NotImplemented("TpUChar");
+    return this->ConvertColumn<casacore::uChar>(arrow::uint8());
 }
 
 arrow::Status ColumnConvertVisitor::VisitTpShort() {
-    return arrow::Status::NotImplemented("TpShort");
+    return this->ConvertColumn<casacore::Short>(arrow::int16());
 }
 
 arrow::Status ColumnConvertVisitor::VisitTpUShort() {
-    return arrow::Status::NotImplemented("TpUShort");
+    return this->ConvertColumn<casacore::uShort>(arrow::uint16());
 }
 
 arrow::Status ColumnConvertVisitor::VisitTpInt() {
@@ -51,13 +51,11 @@ arrow::Status ColumnConvertVisitor::VisitTpDouble() {
 }
 
 arrow::Status ColumnConvertVisitor::VisitTpComplex() {
-    return this->ConvertColumn<casacore::Complex>(
-        complex64());
+    return this->ConvertColumn<casacore::Complex>(complex64());
 }
 
 arrow::Status ColumnConvertVisitor::VisitTpDComplex() {
-    return this->ConvertColumn<casacore::DComplex>(
-        complex128());
+    return this->ConvertColumn<casacore::DComplex>(complex128());
 }
 
 arrow::Status ColumnConvertVisitor::VisitTpString() {
