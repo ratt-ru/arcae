@@ -36,7 +36,7 @@ private:
             // NOTE(sjperkins)
             // Check the FixedSizeListAray layout documents
             // https://arrow.apache.org/docs/format/Columnar.html#fixed-size-list-layout
-            // An empty child buffer {nullptr} must be provided otherwise this segfaults
+            // A single empty buffer {nullptr} must be provided otherwise this segfaults
             auto array_data = arrow::ArrayData::Make(
                 complex_dtype, length, {nullptr}, {child_array->data()},
                 0, 0);
