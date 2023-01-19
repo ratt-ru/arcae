@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "casa-arrow"
+version = "0.1.0"
+description = ""
+build = "build.py"
+authors = ["Simon Perkins <simon.perkins@gmail.com>"]
+readme = "README.rst"
+packages = [{include = "casa_arrow"}]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+pybind11 = "^2.10.3"
+
+[tool.poetry.group.dev.dependencies]
+ipython = "^8.8.0"
+pytest = "^7.2.1"
+
+[build-system]
+requires = ["poetry-core", "setuptools", "pyarrow", "pybind11"]
+build-backend = "poetry.core.masonry.api"

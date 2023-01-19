@@ -13,7 +13,7 @@ arrow::Result<std::shared_ptr<arrow::Table>> open_table(const std::string & file
     auto fields = arrow::FieldVector();
     auto arrays = arrow::ArrayVector();
 
-    for(auto i=0; i < table_desc.ncolumn(); ++i) {
+    for(casacore::uInt i=0; i < table_desc.ncolumn(); ++i) {
         auto table_column = casacore::TableColumn(casa_table, i);
         auto column_desc = table_column.columnDesc();
         auto visitor = ColumnConvertVisitor(table_column);

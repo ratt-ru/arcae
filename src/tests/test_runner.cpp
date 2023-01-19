@@ -13,5 +13,9 @@ int main(void) {
     // std::cout << table->GetColumnByName("UVW")->length() << std::endl;
     // std::cout << table->GetColumnByName("TIME")->length() << std::endl;
     // std::cout << table->num_rows() << std::endl;
-    std::cout << table->ToString() << std::endl;
+    // std::cout << table->ToString() << std::endl;
+
+    for(auto chunk: table->GetColumnByName("DATA")->chunks()) {
+        std::cout << chunk->ToString() << std::endl;
+    }
 }

@@ -83,7 +83,7 @@ private:
         auto array_column = casacore::ArrayColumn<T>(this->column);
         auto column_desc = this->column.columnDesc();
 
-        if(!column_desc.ndim() >= 1) {
+        if(column_desc.ndim() < 1) {
             return arrow::Status::Invalid(
                 "Array ", column_desc.name(),
                 " has dimensionality of ", column_desc.ndim()
