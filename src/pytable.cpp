@@ -13,6 +13,7 @@ PYBIND11_MODULE(pytable, m)
     arrow::py::import_pyarrow();
 
     m.def("open_table", [](std::string filename) {
+        pybind11::gil_scoped_release release;
         auto result = open_table(filename);
 
         if(!result.ok()) {
