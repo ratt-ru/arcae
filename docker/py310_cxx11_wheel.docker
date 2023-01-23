@@ -1,0 +1,136 @@
+FROM quay.io/pypa/manylinux_2_28_x86_64
+
+ENV CASACORE_VERSION 3.5.0
+ENV ARROW_VERSION 11.0.0
+
+# set python version
+ENV PYMAJOR 3
+ENV PYMINOR 10
+ENV TARGET cp${PYMAJOR}${PYMINOR}-cp${PYMAJOR}${PYMINOR}${PYUNICODE}
+
+# boost version
+ENV BOOSTMAJOR 79
+ENV BOOSTMINOR 0
+ENV BOOST 1.${BOOSTMAJOR}.${BOOSTMINOR}
+ENV BOOST_ 1_${BOOSTMAJOR}_${BOOSTMINOR}
+
+# where do we epect casacore data build time and runtime
+ENV CASACORE_DATA /usr/share/casacore/data
+
+# how many threads to use for compiling
+ENV THREADS 4
+
+# install the EPEL repository
+RUN dnf config-manager --set-enabled powertools
+RUN dnf -y install epel-release
+
+# install rpms
+RUN yum install -y flex cfitsio-devel blas-devel lapack-devel ncurses-devel readline-devel fftw-devel wcslib-devel gsl-devel
+
+# download other source code
+WORKDIR /tmp
+RUN curl http://www.iausofa.org/2015_0209_F/sofa_f-20150209_a.tar.gz --output /tmp/sofa.tgz
+RUN curl ftp://ftp.astron.nl/outgoing/Measures/WSRT_Measures.ztar --output /tmp/measures.tgz
+RUN curl https://boostorg.jfrog.io/artifactory/main/release/${BOOST}/source/boost_${BOOST_}.tar.bz2 -L --output /tmp/boost.tar.bz2
+RUN curl http://github.com/casacore/casacore/tarball/v${CASACORE_VERSION} -L --output /tmp/casascore.tar.gz
+# NOTE(sjperkins): Remove once manylinux_2_28 arrow build is available
+RUN curl http://github.com/apache/arrow/tarball/apache-arrow-${ARROW_VERSION} -L --output /tmp/arrow.tar.gz
+
+RUN mkdir /build
+
+WORKDIR /build
+RUN mkdir -p ${CASACORE_DATA}
+WORKDIR ${CASACORE_DATA}
+RUN tar zxvf /tmp/measures.tgz
+
+# install and configure sofa and measures
+WORKDIR /build
+RUN tar zxvf /tmp/sofa.tgz
+WORKDIR /build/sofa/20150209_a/f77/src
+RUN make -j${THREADS}
+
+# setup boost
+WORKDIR /build
+RUN tar jxvf /tmp/boost.tar.bz2
+WORKDIR /build/boost_${BOOST_}
+RUN ./bootstrap.sh --prefix=/opt/boost \
+    --with-libraries=python \
+    --with-python=/opt/python/${TARGET}/bin/python \
+    --with-python-version=${PYMAJOR}.${PYMINOR} \
+    --with-python-root=/opt/python/${TARGET}
+RUN ./b2 -j${THREADS} \
+    define=_GLIBCXX_USE_CXX11_ABI=1 \
+    cxxflags="-fPIC -I/opt/python/${TARGET}/include/python${PYMAJOR}.${PYMINOR}${PYUNICODE}/" \
+    link=static,shared install
+
+# casacore wants numpy
+RUN /opt/python/${TARGET}/bin/pip install numpy==1.23.5
+
+# set up casacore
+RUN mkdir -p /code/casacore/build
+WORKDIR /code/casacore
+RUN tar xfz /tmp/casascore.tar.gz --strip-components=1
+RUN useradd -ms /bin/bash casacore
+RUN chown -R casacore.casacore /code/casacore
+USER casacore
+WORKDIR /code/casacore/build
+RUN cmake .. \
+    -DCMAKE_CXX_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=1" \
+    -DPython3_ROOT_DIR=/opt/python/${TARGET} \
+    -DPython3_EXECUTABLE=/opt/python/${TARGET}/bin/python3 \
+    -DPython3_LIBRARY=/opt/boost/lib/libboost_python${PYMAJOR}${PYMINOR}.so \
+    -DPython3_INCLUDE_DIR=/opt/python/${TARGET}/include/python${PYMAJOR}.${PYMINOR}${PYUNICODE}/ \
+    -DSOFA_ROOT_DIR=/build \
+    -DBUILD_TESTING=OFF \
+    -DDATA_DIR=${CASACORE_DATA} \
+    -DPORTABLE=TRUE \
+    -DCMAKE_INSTALL_PREFIX=/usr/local
+RUN make -j${THREADS}
+USER root
+RUN make install
+
+RUN dnf install -y ninja-build
+
+# setup boost
+WORKDIR /build
+RUN tar jxvf /tmp/boost.tar.bz2
+WORKDIR /build/boost_${BOOST_}
+RUN ./bootstrap.sh \
+    --with-python=/opt/python/${TARGET}/bin/python \
+    --with-python-version=${PYMAJOR}.${PYMINOR} \
+    --with-python-root=/opt/python/${TARGET}
+RUN ./b2 -j${THREADS} \
+    define=_GLIBCXX_USE_CXX11_ABI=1 \
+    cxxflags="-fPIC -I/opt/python/${TARGET}/include/python${PYMAJOR}.${PYMINOR}${PYUNICODE}/" \
+    link=static,shared install
+
+
+# NOTE(sjperkins): Remove once manylinux_2_28 arrow build is available
+RUN mkdir -p /code/arrow/cpp/build
+WORKDIR /code/arrow/
+RUN tar xfz /tmp/arrow.tar.gz --strip-components=1
+WORKDIR /code/arrow/cpp/build
+RUN cmake .. --preset ninja-release-python
+RUN cmake --build .
+
+
+
+
+# RUN dnf install -y epel-release || sudo dnf install -y oracle-epel-release-el$(cut -d: -f5 /etc/system-release-cpe | cut -d. -f1) || sudo dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-$(cut -d: -f5 /etc/system-release-cpe | cut -d. -f1).noarch.rpm
+# RUN dnf install -y https://apache.jfrog.io/artifactory/arrow/almalinux/$(cut -d: -f5 /etc/system-release-cpe | cut -d. -f1)/apache-arrow-release-latest.rpm
+# RUN dnf config-manager --set-enabled epel || :
+# RUN dnf config-manager --set-enabled powertools || :
+# RUN dnf config-manager --set-enabled crb || :
+# RUN dnf config-manager --set-enabled ol$(cut -d: -f5 /etc/system-release-cpe | cut -d. -f1)_codeready_builder || :
+# RUN dnf config-manager --set-enabled codeready-builder-for-rhel-$(cut -d: -f5 /etc/system-release-cpe | cut -d. -f1)-rhui-rpms || :
+# RUN subscription-manager repos --enable codeready-builder-for-rhel-$(cut -d: -f5 /etc/system-release-cpe | cut -d. -f1)-$(arch)-rpms || :
+# RUN dnf install -y arrow-devel # For C++
+# RUN dnf install -y arrow-glib-devel # For GLib (C)
+# RUN dnf install -y arrow-dataset-devel # For Apache Arrow Dataset C++
+# RUN dnf install -y arrow-dataset-glib-devel # For Apache Arrow Dataset GLib (C)
+# RUN dnf install -y arrow-flight-devel # For Apache Arrow Flight C++
+# RUN dnf install -y arrow-flight-glib-devel # For Apache Arrow Flight GLib (C)
+# RUN dnf install -y gandiva-devel # For Apache Gandiva C++
+# RUN dnf install -y gandiva-glib-devel # For Apache Gandiva GLib (C)
+# RUN dnf install -y parquet-devel # For Apache Parquet C++
+# RUN dnf install -y parquet-glib-devel # For Apache Parquet GLib (C)
