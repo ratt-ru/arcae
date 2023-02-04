@@ -26,6 +26,16 @@ def test_pytable(arrow_table):
 
 @pytest.fixture
 def variable_table(tmp_path):
+    try:
+        import pyrap.tables as pt
+    except ImportError as e:
+        raise RuntimeError("Can't install pyrap.tables as "
+            "the bundled shared objects are compiled with "
+            "-D_GLIBCXX_USE_CXX11_ABI=0, while the kernsuite "
+            "shared objects are compiled with "
+            "-D_GLIBCXX_USE_CXX11_ABI=1") from e
+
+
     column = "FOO"
     nrow = 10
 
