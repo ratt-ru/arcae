@@ -6,9 +6,9 @@
 #include "column_convert_visitor.h"
 
 arrow::Result<std::shared_ptr<arrow::Table>> open_table(const std::string & filename) {
-    // if(!casacore::Table::isReadable(filename, false)) {
-    //     return arrow::Status::Invalid(filename, " is not a valid Table");
-    // }
+    if(!casacore::Table::isReadable(filename, false)) {
+        return arrow::Status::Invalid(filename, " is not a valid Table");
+    }
 
     auto casa_table = casacore::Table(filename);
     auto table_desc = casa_table.tableDesc();
