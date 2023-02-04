@@ -6,7 +6,7 @@
 #include "complex_type.h"
 
 ColumnConvertVisitor::ColumnConvertVisitor(const casacore::TableColumn & column)
-    : column(column) {}
+    : column(column), column_desc(column.columnDesc()) {}
 
 arrow::Status ColumnConvertVisitor::VisitTpBool() {
     // TODO(sjperkins)
@@ -59,7 +59,8 @@ arrow::Status ColumnConvertVisitor::VisitTpDComplex() {
 }
 
 arrow::Status ColumnConvertVisitor::VisitTpString() {
-    return this->ConvertColumn<casacore::String>(arrow::utf8());
+    return arrow::Status::NotImplemented("TpString");
+    //return this->ConvertColumn<casacore::String>(arrow::utf8());
 }
 
 arrow::Status ColumnConvertVisitor::VisitTpQuantity() {
