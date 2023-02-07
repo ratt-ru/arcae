@@ -196,11 +196,9 @@ private:
 
         // Read data into the values buffer
         for(casacore::uInt row=0; row < nrows; ++row) {
-            if(!arrow::bit_util::GetBit(nulls->data(), row)) {
-                continue;
-            }
-
-            if(products[row][ndim - 1] == 0) {
+            // Ignore nulls and empty rows
+            if(!arrow::bit_util::GetBit(nulls->data(), row) ||
+               products[row][ndim - 1] == 0) {
                 continue;
             }
 
