@@ -1,3 +1,5 @@
+#include <algorithm>
+
 #include <casacore/tables/Tables.h>
 
 #include <arrow/util/logging.h>  // IWYU pragma: keep
@@ -245,9 +247,18 @@ private:
         //    dim_sizes = [10, 10]
         //    offsets = [0] + cumsum(1*[10] + 1*[10])
         for(int d=ndim-1; d >= 0; --d) {
-            arrow::Int32Builder builder;
+            // Precompute size of offsets for buffer allocation
+            int32_t noffsets = std::accumulate(products.begin(), products.end(), 1,
+                [d](auto i, const auto & v) { return i + (d >= 1 ? v[d - 1] : 1); });
+
+            ARROW_ASSIGN_OR_RAISE(
+                auto offset_buffer,
+                arrow::AllocateBuffer(noffsets*sizeof(noffsets), pool));
+
+            int32_t * optr = reinterpret_cast<int32_t *>(offset_buffer->mutable_data());
             int32_t running_offset = 0;
-            ARROW_RETURN_NOT_OK(builder.Append(running_offset));
+            int32_t o = 0;
+            optr[o++] = running_offset;
 
             for(auto row=0; row < nrows; ++row) {
                 auto repeats = d >= 1 ? products[row][d - 1] : 1;
@@ -255,12 +266,13 @@ private:
 
                 for(auto r=0; r < repeats; ++r) {
                     running_offset += dim_size;
-                    ARROW_RETURN_NOT_OK(builder.Append(running_offset));
+                    optr[o++] += running_offset;
                 }
             }
 
-            std::shared_ptr<arrow::Array> offsets;
-            ARROW_RETURN_NOT_OK(builder.Finish(&offsets));
+            assert(o == noffsets);
+            auto offsets = std::make_shared<arrow::PrimitiveArray>(
+                arrow::int32(), noffsets, std::move(offset_buffer));
             ARROW_ASSIGN_OR_RAISE(values, arrow::ListArray::FromArrays(*offsets, *values));
             // NOTE(sjperkins): Perhaps remove this for performance
             ARROW_RETURN_NOT_OK(values->Validate());
