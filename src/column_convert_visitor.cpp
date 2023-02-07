@@ -5,8 +5,10 @@
 #include "column_convert_visitor.h"
 #include "complex_type.h"
 
-ColumnConvertVisitor::ColumnConvertVisitor(const casacore::TableColumn & column)
-    : column(column), column_desc(column.columnDesc()) {}
+ColumnConvertVisitor::ColumnConvertVisitor(
+    const casacore::TableColumn & column,
+    arrow::MemoryPool * pool)
+    : column(column), column_desc(column.columnDesc()), pool(pool) {}
 
 arrow::Status ColumnConvertVisitor::VisitTpBool() {
     // TODO(sjperkins)

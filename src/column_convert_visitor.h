@@ -41,9 +41,13 @@ public:
     const casacore::TableColumn & column;
     const casacore::ColumnDesc & column_desc;
     std::shared_ptr<arrow::Array> array;
+    arrow::MemoryPool * pool;
+
 
 public:
-    explicit ColumnConvertVisitor(const casacore::TableColumn & column);
+    explicit ColumnConvertVisitor(
+        const casacore::TableColumn & column,
+        arrow::MemoryPool * pool=arrow::default_memory_pool());
     virtual ~ColumnConvertVisitor() = default;
 
 #define VISIT(CASA_TYPE) \
@@ -90,8 +94,7 @@ private:
         auto nrows = scalar_column.nrow();
         auto length = nrows;
 
-        // Allocate an Arrow Buffer from default Memory Pool
-        auto allocation = arrow::AllocateBuffer(nrows*sizeof(T), nullptr);
+        auto allocation = arrow::AllocateBuffer(nrows*sizeof(T), pool);
         ARROW_RETURN_NOT_OK(allocation);
 
         auto buffer = std::shared_ptr<arrow::Buffer>(std::move(allocation.ValueOrDie()));
@@ -119,7 +122,7 @@ private:
         auto length = shape.product()*nrows;
 
         // Allocate an Arrow Buffer from default Memory Pool
-        auto allocation = arrow::AllocateBuffer(length*sizeof(T), nullptr);
+        auto allocation = arrow::AllocateBuffer(length*sizeof(T), pool);
         ARROW_RETURN_NOT_OK(allocation);
         auto buffer = std::shared_ptr<arrow::Buffer>(std::move(allocation.ValueOrDie()));
 
@@ -150,7 +153,7 @@ private:
         auto nrows = array_column.nrow();
         auto ndim = column_desc.ndim();
 
-        ARROW_ASSIGN_OR_RAISE(auto nulls, arrow::AllocateBitmap(nrows, nullptr));
+        ARROW_ASSIGN_OR_RAISE(auto nulls, arrow::AllocateBitmap(nrows, pool));
         std::vector<casacore::IPosition> shapes(nrows, casacore::IPosition(ndim, 0));
         std::vector<casacore::IPosition> products(nrows, casacore::IPosition(ndim, 0));
         int64_t nelements = 0;
@@ -185,7 +188,7 @@ private:
             }
         }
 
-        ARROW_ASSIGN_OR_RAISE(auto buffer, arrow::AllocateBuffer(nelements*sizeof(T), nullptr));
+        ARROW_ASSIGN_OR_RAISE(auto buffer, arrow::AllocateBuffer(nelements*sizeof(T), pool));
         auto * buffer_ptr = reinterpret_cast<T *>(buffer->mutable_data());
         casacore::uInt element = 0;
 
@@ -262,7 +265,7 @@ private:
         ARROW_ASSIGN_OR_RAISE(this->array, arrow::ListArray::FromArrays(
             *list_array->offsets(),
             *list_array->values(),
-            nullptr,
+            pool,
             nulls,
             null_count));
 
