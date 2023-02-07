@@ -173,7 +173,7 @@ private:
                 // invert this for sanities sake
                 for(auto d=0; d<ndim; ++d) {
                     shapes[row][ndim - d - 1] = casa_shape[d];
-                    products[row][ndim -d - 1] = casa_shape[d];
+                    products[row][ndim - d - 1] = casa_shape[d];
                 }
 
                 for(auto d=1; d<ndim; ++d) {
@@ -218,29 +218,42 @@ private:
             std::shared_ptr<arrow::Array> values,
             MakeArrowArray<T>(std::move(buffer), arrow_dtype, nelements));
 
-        // NOTE(sjperkins): See this worked case
-        // bases = [reduce(mul, s[:d], 1) for s in shapes]
-        // dim_sizes = [s[d] for s in shapes]
+        // NOTE(sjperkins)
+        // See https://arrow.apache.org/docs/format/Columnar.html#variable-size-list-layout
+        // At this stage we have a flat array of values that we wish to arrange
+        // into a nested structure. It needs to be built from the fastest changing
+        // dimension towards the slowest changing dimension. This is accomplished by
+        // creating offsets for each nested layer. The dimension size at each layer
+        // must be repeated by the product of the previous elements in the shape.
 
-        // shapes = [(10, 5), (10, 3)]
-        // For d==1
-        // bases = [10, 10]
-        // dim_sizes = [5, 3]
-        // offsets = [0] + cumsum(10*[5] + 10*[3])
-        // For d==0
-        // bases = [1, 1]
-        // dim_sizes = [10, 10]
-        // offsets = [0] + cumsum(1*[10] + 1*[10])
+        // See this worked case
+        // for d in reversed(range(ndim))
+        //    repeats = [reduce(mul, s[:d], 1) for s in shapes]
+        //    dim_sizes = [s[d] for s in shapes]
+
+        //    shapes = [(10, 5, 2), (10, 3, 4)]
+        //    For d==2
+        //    repeats = [50, 30]
+        //    dim_sizes = [2, 4]
+        //    offsets = [0] + cumsum(50*[2] + 30*[4])
+        //    For d==1
+        //    repeats = [10, 10]
+        //    dim_sizes = [5, 3]
+        //    offsets = [0] + cumsum(10*[5] + 10*[3])
+        //    For d==0
+        //    repeats = [1, 1]
+        //    dim_sizes = [10, 10]
+        //    offsets = [0] + cumsum(1*[10] + 1*[10])
         for(int d=ndim-1; d >= 0; --d) {
             arrow::Int32Builder builder;
             int32_t running_offset = 0;
             ARROW_RETURN_NOT_OK(builder.Append(running_offset));
 
             for(auto row=0; row < nrows; ++row) {
-                auto base = d >= 1 ? products[row][d - 1] : 1;
+                auto repeats = d >= 1 ? products[row][d - 1] : 1;
                 auto dim_size = shapes[row][d];
 
-                for(auto b=0; b < base; ++b) {
+                for(auto r=0; r < repeats; ++r) {
                     running_offset += dim_size;
                     ARROW_RETURN_NOT_OK(builder.Append(running_offset));
                 }
@@ -261,7 +274,7 @@ private:
 
         // NOTE(sjperkins)
         // Directly adding nulls to the underlying list_array->data()
-        // doesn't seem to work
+        // doesn't seem to work, recreate the array with nulls and null_count
         ARROW_ASSIGN_OR_RAISE(this->array, arrow::ListArray::FromArrays(
             *list_array->offsets(),
             *list_array->values(),
