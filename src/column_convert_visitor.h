@@ -146,59 +146,126 @@ private:
 
     template <typename T>
     arrow::Status ConvertVariableArrayColumn(const std::shared_ptr<arrow::DataType> & arrow_dtype) {
-       auto array_column = casacore::ArrayColumn<T>(this->column);
+        auto array_column = casacore::ArrayColumn<T>(this->column);
         auto nrows = array_column.nrow();
+        auto ndim = column_desc.ndim();
 
-        ARROW_ASSIGN_OR_RAISE(auto offset_buffer, arrow::AllocateBuffer((nrows + 1)*sizeof(int32_t), nullptr));
         ARROW_ASSIGN_OR_RAISE(auto nulls, arrow::AllocateBitmap(nrows, nullptr));
-        int32_t * offset_ptr = reinterpret_cast<int32_t *>(offset_buffer->mutable_data());
-        offset_ptr[0] = 0;
-        std::vector<casacore::IPosition> shapes;
-        casacore::uInt nelements = 0;
-
+        std::vector<casacore::IPosition> shapes(nrows, casacore::IPosition(ndim, 0));
+        std::vector<casacore::IPosition> products(nrows, casacore::IPosition(ndim, 0));
+        int64_t nelements = 0;
+        int64_t null_count = 0;
 
         // Iterate over each table row to determine
         // (1) null bitmap
-        // (2) shape of each row
+        // (2) offsets between number of elements in each row
         for(casacore::uInt row=0; row < nrows; ++row) {
             bool is_defined = array_column.isDefined(row);
             arrow::bit_util::SetBitTo(nulls->mutable_data(), row, is_defined);
 
             if(is_defined) {
-                auto column_shape = array_column.shape(row);
-                shapes.push_back(column_shape);
-                nelements += column_shape.product();
-            } else {
-                shapes.push_back(casacore::IPosition(column_desc.ndim(), 0));
-            }
+                auto casa_shape = array_column.shape(row);
 
-            offset_ptr[row + 1] = nelements;
+                // CASA stores shapes in Fortran ordering,
+                // invert this for sanities sake
+                for(auto d=0; d<ndim; ++d) {
+                    shapes[row][ndim - d - 1] = casa_shape[d];
+                    products[row][ndim -d - 1] = casa_shape[d];
+                }
+
+                for(auto d=1; d<ndim; ++d) {
+                    products[row][d] *= products[row][d - 1];
+                }
+
+                nelements += products[row][ndim - 1];
+
+            } else {
+                shapes[row] = casacore::IPosition(ndim, 0);
+                null_count += 1;
+            }
         }
 
-        auto offsets = std::make_shared<arrow::Int32Array>(nrows + 1, std::move(offset_buffer));
         ARROW_ASSIGN_OR_RAISE(auto buffer, arrow::AllocateBuffer(nelements*sizeof(T), nullptr));
         auto * buffer_ptr = reinterpret_cast<T *>(buffer->mutable_data());
         casacore::uInt element = 0;
 
+        // Read data into the values buffer
         for(casacore::uInt row=0; row < nrows; ++row) {
-            const auto & shape = shapes[row];
-            auto shape_product = shape.product();
-
-            if(shape_product == 0) {
+            if(!arrow::bit_util::GetBit(nulls->data(), row)) {
                 continue;
             }
 
+            if(products[row][ndim - 1] == 0) {
+                continue;
+            }
+
+            // Create a casa Array that wraps the buffer at this
+            // row location and read data into it.
             auto casa_array = casacore::Array<T>(
-                shape,
+                array_column.shape(row),
                 buffer_ptr + element,
                 casacore::SHARE);
 
             array_column.get(row, casa_array);
-            element += shape_product;
+            element += products[row][ndim - 1];
         }
 
-        ARROW_ASSIGN_OR_RAISE(auto values, MakeArrowArray<T>(std::move(buffer), arrow_dtype, nelements));
-        ARROW_ASSIGN_OR_RAISE(this->array, arrow::ListArray::FromArrays(*offsets, *values, nullptr, nulls));
+        // Create a flat array of values
+        ARROW_ASSIGN_OR_RAISE(
+            std::shared_ptr<arrow::Array> values,
+            MakeArrowArray<T>(std::move(buffer), arrow_dtype, nelements));
+
+        // NOTE(sjperkins): See this worked case
+        // bases = [reduce(mul, s[:d], 1) for s in shapes]
+        // dim_sizes = [s[d] for s in shapes]
+
+        // shapes = [(10, 5), (10, 3)]
+        // For d==1
+        // bases = [10, 10]
+        // dim_sizes = [5, 3]
+        // offsets = [0] + cumsum(10*[5] + 10*[3])
+        // For d==0
+        // bases = [1, 1]
+        // dim_sizes = [10, 10]
+        // offsets = [0] + cumsum(1*[10] + 1*[10])
+        for(int d=ndim-1; d >= 0; --d) {
+            arrow::Int32Builder builder;
+            int32_t running_offset = 0;
+            ARROW_RETURN_NOT_OK(builder.Append(running_offset));
+
+            for(auto row=0; row < nrows; ++row) {
+                auto base = d >= 1 ? products[row][d - 1] : 1;
+                auto dim_size = shapes[row][d];
+
+                for(auto b=0; b < base; ++b) {
+                    running_offset += dim_size;
+                    ARROW_RETURN_NOT_OK(builder.Append(running_offset));
+                }
+            }
+
+            std::shared_ptr<arrow::Array> offsets;
+            ARROW_RETURN_NOT_OK(builder.Finish(&offsets));
+            ARROW_ASSIGN_OR_RAISE(values, arrow::ListArray::FromArrays(*offsets, *values));
+            // NOTE(sjperkins): Perhaps remove this for performance
+            ARROW_RETURN_NOT_OK(values->Validate());
+        }
+
+        auto list_array = std::dynamic_pointer_cast<arrow::ListArray>(values);
+
+        if(list_array == nullptr) {
+            return arrow::Status::Invalid("Unable to cast final array to arrow::ListArray");
+        }
+
+        // NOTE(sjperkins)
+        // Directly adding nulls to the underlying list_array->data()
+        // doesn't seem to work
+        ARROW_ASSIGN_OR_RAISE(this->array, arrow::ListArray::FromArrays(
+            *list_array->offsets(),
+            *list_array->values(),
+            nullptr,
+            nulls,
+            null_count));
+
         return this->array->Validate();
     }
 
