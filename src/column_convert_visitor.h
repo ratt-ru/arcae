@@ -173,17 +173,13 @@ private:
 
                 // CASA stores shapes in Fortran ordering,
                 // invert this for sanities sake
-                for(auto d=0; d<ndim; ++d) {
-                    shapes[row][ndim - d - 1] = casa_shape[d];
-                    products[row][ndim - d - 1] = casa_shape[d];
-                }
-
-                for(auto d=1; d<ndim; ++d) {
-                    products[row][d] *= products[row][d - 1];
-                }
+                std::reverse_copy(casa_shape.begin(), casa_shape.end(), shapes[row].begin());
+                std::reverse_copy(casa_shape.begin(), casa_shape.end(), products[row].begin());
+                // Cumulative product
+                std::partial_sum(products[row].begin(), products[row].end(), products[row].begin(),
+                                 [](auto i, auto v) { return i * v; });
 
                 nelements += products[row][ndim - 1];
-
             } else {
                 shapes[row] = casacore::IPosition(ndim, 0);
                 null_count += 1;
