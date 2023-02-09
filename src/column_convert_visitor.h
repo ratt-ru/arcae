@@ -378,7 +378,7 @@ private:
 
                 for(auto r=0; r < repeats; ++r) {
                     running_offset += dim_size;
-                    optr[o++] += running_offset;
+                    optr[o++] = running_offset;
                 }
             }
 
