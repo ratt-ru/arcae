@@ -65,20 +65,17 @@ private:
 
             for(casacore::uInt row=0; row < column.nrow(); ++row) {
                 if(column.isDefined(row)) {
+                    if(!fixed) {
+                        (*shapes)[row] = column.shape(row);
+                    }
+
                     auto array = column.get(row);
                     for(auto & string: array) {
                         builder.Append(string);
                         nelements += 1;
-
-                        if(!fixed) {
-                            (*shapes)[row] = column.shape(row);
-                        }
                     }
-                } else {
-                    builder.AppendNull();
                 }
             }
-
         } else {
             return arrow::Status::Invalid("Unknown column type for ", column_desc.name());
         }
