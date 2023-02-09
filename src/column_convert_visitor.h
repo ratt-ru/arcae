@@ -265,11 +265,11 @@ private:
             }
 
             // Sanity checks
-            if(shapes.size() != column.nrow()) {
+            if(shapes->size() != column.nrow()) {
                 return arrow::Status::Invalid("shapes.size() != column.nrow()");
             }
 
-            if(products.size() != column.nrow()) {
+            if(products->size() != column.nrow()) {
                 return arrow::Status::Invalid("products.size() != column.nrow()");
             }
         }
@@ -298,10 +298,10 @@ private:
         this->array = std::get<0>(result);
         auto shape = column_desc.shape();
 
-        this->array = arrow::FixedSizeListArray::FromArrays(this->array, shape[0]).ValueOrDie();
+        ARROW_ASSIGN_OR_RAISE(this->array, arrow::FixedSizeListArray::FromArrays(this->array, shape[0]));
 
         for(std::size_t i=1; i < shape.size() - 1; ++i) {
-            this->array = arrow::FixedSizeListArray::FromArrays(this->array, shape[i]).ValueOrDie();
+            ARROW_ASSIGN_OR_RAISE(this->array, arrow::FixedSizeListArray::FromArrays(this->array, shape[i]));
         }
 
         return this->array->Validate();
