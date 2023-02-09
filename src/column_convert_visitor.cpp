@@ -68,6 +68,10 @@ arrow::Status ColumnConvertVisitor::VisitTpQuantity() {
     return arrow::Status::NotImplemented("TpQuantity");
 }
 
+arrow::Status ColumnConvertVisitor::VisitTpRecord() {
+    return arrow::Status::NotImplemented("TpRecord");
+}
+
 arrow::Status ColumnConvertVisitor::VisitTpTable() {
     return arrow::Status::NotImplemented("TpTable");
 }

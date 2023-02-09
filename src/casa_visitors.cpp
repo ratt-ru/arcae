@@ -30,6 +30,8 @@ arrow::Status CasaTypeVisitor::Visit(const casacore::DataType & dtype) {
             return VisitTpString();
         case casacore::DataType::TpQuantity:
             return VisitTpQuantity();
+        case casacore::DataType::TpRecord:
+            return VisitTpRecord();
         case casacore::DataType::TpTable:
             return VisitTpTable();
         default:

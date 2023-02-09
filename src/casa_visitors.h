@@ -24,6 +24,7 @@ class CasaArrayVisitor {
   VISIT(TpDComplex) \
   VISIT(TpString) \
   VISIT(TpQuantity) \
+  VISIT(TpRecord) \
   VISIT(TpTable)
 
 
