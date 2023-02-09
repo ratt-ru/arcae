@@ -37,14 +37,13 @@ private:
         std::unique_ptr<ShapeVectorType>>>
     MakeArrowStringArray(ColumnType & column, const std::shared_ptr<arrow::DataType> & arrow_dtype)
     {
-        // Handle string cases with Arrow StringBuilders
-
         if(arrow_dtype != arrow::utf8()) {
             return arrow::Status::Invalid(
                 arrow_dtype->ToString(),
                 "incompatible with casacore::String");
         }
 
+        // Handle string cases with Arrow StringBuilders
         arrow::StringBuilder builder;
         int64_t nelements = 0;
         std::unique_ptr<ShapeVectorType> shapes;
@@ -55,21 +54,19 @@ private:
                 nelements += 1;
             }
         } else if constexpr(std::is_same<ColumnType, casacore::ArrayColumn<DT>>::value) {
-            auto fixed = column_desc.isFixedShape();
-
-            if(!fixed) {
-                shapes = std::make_unique<ShapeVectorType>(
-                    column.nrow(),
-                    casacore::IPosition(column_desc.ndim(), 0));
+            if(!column_desc.isFixedShape()) {
+                auto default_shape = casacore::IPosition(column_desc.ndim(), 0);
+                shapes = std::make_unique<ShapeVectorType>(column.nrow(), std::move(default_shape));
             }
 
             for(casacore::uInt row=0; row < column.nrow(); ++row) {
                 if(column.isDefined(row)) {
-                    if(!fixed) {
-                        (*shapes)[row] = column.shape(row);
+                    auto array = column.get(row);
+
+                    if(!column_desc.isFixedShape()) {
+                        (*shapes)[row] = array.shape();
                     }
 
-                    auto array = column.get(row);
                     for(auto & string: array) {
                         builder.Append(string);
                         nelements += 1;
@@ -81,7 +78,6 @@ private:
         }
 
         ARROW_ASSIGN_OR_RAISE(auto array, builder.Finish());
-
         return std::make_tuple(std::move(array), std::move(shapes));
     }
 
