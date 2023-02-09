@@ -313,12 +313,13 @@ private:
         std::shared_ptr<arrow::Buffer> nulls;
         int64_t null_counts;
 
-        auto column = casacore::ArrayColumn<T>(this->column);
+        using CT = casacore::ArrayColumn<T>;
+        auto column = CT(this->column);
         auto ndim = column_desc.ndim();
 
         ARROW_ASSIGN_OR_RAISE(
             std::tie(values, shape_ptr, product_ptr, nulls, null_counts),
-            (MakeArrowArrayNew<decltype(column), T>(column, arrow_dtype)));
+            (MakeArrowArrayNew<CT, T>(column, arrow_dtype)));
 
         if(!shape_ptr) {
             return arrow::Status::Invalid("shapes not provided");
