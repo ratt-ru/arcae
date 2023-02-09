@@ -251,7 +251,7 @@ private:
             ARROW_ASSIGN_OR_RAISE(std::tie(array, shapes), (MakeArrowPrimitiveArrayArray<ColumnType, DT>(column, arrow_dtype)));
         }
 
-        if(shapes.get() != nullptr) {
+        if(shapes) {
             // Convert shape from Fortran order to C order.
             for(auto & s: *shapes) {
                 std::reverse(s.begin(), s.end());
