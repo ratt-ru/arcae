@@ -263,6 +263,15 @@ private:
             for(auto & p: *products) {
                 std::partial_sum(p.begin(), p.end(), p.begin(), [](auto i, auto v) { return i * v; });
             }
+
+            // Sanity checks
+            if(shapes.size() != column.nrow()) {
+                return arrow::Status::Invalid("shapes.size() != column.nrow()");
+            }
+
+            if(products.size() != column.nrow()) {
+                return arrow::Status::Invalid("products.size() != column.nrow()");
+            }
         }
 
         return std::make_tuple(
@@ -323,14 +332,6 @@ private:
 
         ShapeVectorType & shapes = *shape_ptr;
         ShapeVectorType & products = *product_ptr;
-
-        if(shapes.size() != column.nrow()) {
-            return arrow::Status::Invalid("shapes.size() != column.nrow()");
-        }
-
-        if(products.size() != column.nrow()) {
-            return arrow::Status::Invalid("products.size() != column.nrow()");
-        }
 
         // NOTE(sjperkins)
         // See https://arrow.apache.org/docs/format/Columnar.html#variable-size-list-layout
