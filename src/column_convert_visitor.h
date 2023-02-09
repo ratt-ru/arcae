@@ -296,12 +296,10 @@ private:
         auto column = CT(this->column);
         ARROW_ASSIGN_OR_RAISE(auto result, (MakeArrowArrayNew<CT, T>(column, arrow_dtype)));
         this->array = std::get<0>(result);
-        auto shape = column_desc.shape();
 
-        ARROW_ASSIGN_OR_RAISE(this->array, arrow::FixedSizeListArray::FromArrays(this->array, shape[0]));
-
-        for(std::size_t i=1; i < shape.size() - 1; ++i) {
-            ARROW_ASSIGN_OR_RAISE(this->array, arrow::FixedSizeListArray::FromArrays(this->array, shape[i]));
+        // Fortran ordering
+        for(auto dim_size: column_desc.shape()) {
+            ARROW_ASSIGN_OR_RAISE(this->array, arrow::FixedSizeListArray::FromArrays(this->array, dim_size));
         }
 
         return this->array->Validate();
