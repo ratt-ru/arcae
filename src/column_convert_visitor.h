@@ -8,43 +8,15 @@
 #include "complex_type.h"
 
 
-
-enum ColumnType {
-    ArrayColumn,
-    ScalarColumn,
-    VariableColumn,
-};
-
-template <ColumnType CT, typename T> arrow::Status
-MakeArrowArray(const std::shared_ptr<arrow::DataType> & arrow_dtype)
-{
-    if constexpr(std::is_same<T, casacore::String>::value) {
-        if(arrow_dtype != arrow::utf8()) {
-            return arrow::Status::Invalid(
-                arrow_dtype->ToString(),
-                "incompatible with casacore::String");
-        }
-    }
-
-    if constexpr(CT == ArrayColumn) {
-        return arrow::Status::OK();
-    } else if constexpr(CT == ScalarColumn) {
-        return arrow::Status::OK();
-    } else if constexpr(CT == VariableColumn) {
-        return arrow::Status::OK();
-    } else {
-        return arrow::Status::Invalid("blah");
-    }
-}
-
-
 class ColumnConvertVisitor : public CasaTypeVisitor {
+public:
+    using ShapeVectorType = std::vector<casacore::IPosition>;
+
 public:
     const casacore::TableColumn & column;
     const casacore::ColumnDesc & column_desc;
     std::shared_ptr<arrow::Array> array;
     arrow::MemoryPool * pool;
-
 
 public:
     explicit ColumnConvertVisitor(
@@ -59,18 +31,183 @@ public:
 #undef VISIT
 
 private:
-    template <typename T>
-    arrow::Result<std::shared_ptr<arrow::Array>> MakeArrowArray(
-        std::shared_ptr<arrow::Buffer> buffer,
-        const std::shared_ptr<arrow::DataType> & dtype,
-        int64_t length)
+    template <typename ColumnType, typename DT>
+    arrow::Result<std::tuple<
+        std::shared_ptr<arrow::Array>,
+        std::unique_ptr<ShapeVectorType>>>
+    MakeArrowStringArray(ColumnType & column, const std::shared_ptr<arrow::DataType> & arrow_dtype)
     {
-        auto complex_dtype = std::dynamic_pointer_cast<ComplexType>(dtype);
+        // Handle string cases with Arrow StringBuilders
 
+        if(arrow_dtype != arrow::utf8()) {
+            return arrow::Status::Invalid(
+                arrow_dtype->ToString(),
+                "incompatible with casacore::String");
+        }
+
+        arrow::StringBuilder builder;
+        int64_t nelements = 0;
+        std::unique_ptr<ShapeVectorType> shapes;
+
+        if constexpr(std::is_same<ColumnType, casacore::ScalarColumn<DT>>::value) {
+            for(auto & s: column.getColumn()) {
+                builder.Append(s);
+                nelements += 1;
+            }
+        } else if constexpr(std::is_same<ColumnType, casacore::ArrayColumn<DT>>::value) {
+            auto fixed = column_desc.isFixedShape();
+
+            if(!fixed) {
+                shapes = std::make_unique<ShapeVectorType>(
+                    column.nrow(),
+                    casacore::IPosition(column_desc.ndim(), 0));
+            }
+
+            for(casacore::uInt row=0; row < column.nrow(); ++row) {
+                if(column.isDefined(row)) {
+                    auto array = column.get(row);
+                    for(auto & string: array) {
+                        builder.Append(string);
+                        nelements += 1;
+
+                        if(!fixed) {
+                            (*shapes)[row] = column.shape(row);
+                        }
+                    }
+                } else {
+                    builder.AppendNull();
+                }
+            }
+
+        } else {
+            return arrow::Status::Invalid("Unknown column type for ", column_desc.name());
+        }
+
+        ARROW_ASSIGN_OR_RAISE(auto array, builder.Finish());
+
+        return std::make_tuple(std::move(array), std::move(shapes));
+    }
+
+    template <typename DT>
+    arrow::Result<std::tuple<std::shared_ptr<arrow::Buffer>, int64_t>>
+    MakeVectorBuffer(casacore::ScalarColumn<DT> & column, const std::shared_ptr<arrow::DataType> & arrow_dtype)
+    {
+        ARROW_ASSIGN_OR_RAISE(auto allocation, arrow::AllocateBuffer(column.nrow()*sizeof(DT), pool));
+        auto buffer = std::shared_ptr<arrow::Buffer>(std::move(allocation));
+
+        // Wrap Arrow Buffer in casacore Vector
+        auto casa_vector = casacore::Vector<DT>(
+            casacore::IPosition(1, column.nrow()),
+            reinterpret_cast<DT *>(buffer->mutable_data()),
+            casacore::SHARE);
+
+        // Dump column data into Arrow Buffer
+        column.getColumn(casa_vector);
+
+        return std::make_tuple(std::move(buffer), column.nrow());
+    }
+
+    template <typename DT>
+    arrow::Result<std::tuple<std::shared_ptr<arrow::Buffer>, int64_t>>
+    MakeFixedArrayBuffer(casacore::ArrayColumn<DT> & column, const std::shared_ptr<arrow::DataType> & arrow_dtype)
+    {
+        // Fixed shape Array
+        auto shape = column_desc.shape();
+        int64_t nelements = shape.product()*column.nrow();
+
+        // Allocate an Arrow Buffer from default Memory Pool
+        ARROW_ASSIGN_OR_RAISE(auto allocation, arrow::AllocateBuffer(nelements*sizeof(DT), pool));
+        auto buffer = std::shared_ptr<arrow::Buffer>(std::move(allocation));
+
+        shape.append(casacore::IPosition(1, column.nrow()));
+
+        auto array = casacore::Array<DT>(
+            shape,
+            reinterpret_cast<DT *>(buffer->mutable_data()),
+            casacore::SHARE);
+
+        // Dump column data into Arrow Buffer
+        column.getColumn(array);
+
+        return std::make_tuple(std::move(buffer), nelements);
+    }
+
+    template <typename DT>
+    arrow::Result<std::tuple<
+        std::shared_ptr<arrow::Buffer>,
+        int64_t,
+        std::unique_ptr<ShapeVectorType>>>
+    MakeVariableArrayBuffer(casacore::ArrayColumn<DT> & column, const std::shared_ptr<arrow::DataType> & arrow_dtype)
+    {
+        int64_t nelements = 0;
+
+        // Variably shaped. Two passes
+        // First, determine the number of elements in the Array
+        auto shapes = std::make_unique<ShapeVectorType>(
+            column.nrow(),
+            casacore::IPosition(column_desc.ndim(), 0));
+
+        for(casacore::uInt row=0; row < column.nrow(); ++row) {
+            if(column.isDefined(row)) {
+                (*shapes)[row] = column.shape(row);
+                nelements += (*shapes)[row].product();
+            }
+        }
+
+        // Allocate an Arrow Buffer from default Memory Pool
+        ARROW_ASSIGN_OR_RAISE(auto allocation, arrow::AllocateBuffer(nelements*sizeof(DT), pool));
+        auto buffer = std::shared_ptr<arrow::Buffer>(std::move(allocation));
+        auto * buffer_ptr = reinterpret_cast<DT *>(buffer->mutable_data());
+        casacore::uInt offset = 0;
+
+        // Secondly dump data into the buffer
+        for(casacore::uInt row=0; row < column.nrow(); ++row) {
+            auto product = (*shapes)[row].product();
+            if(column.isDefined(row) && product > 0) {
+                auto array = casacore::Array<DT>(
+                    (*shapes)[row],
+                    buffer_ptr + offset, casacore::SHARE);
+                column.get(row, array);
+                offset += product;
+            }
+        }
+
+        return std::make_tuple(std::move(buffer), nelements, std::move(shapes));
+    }
+
+    template <typename ColumnType, typename DT>
+    arrow::Result<std::tuple<
+        std::shared_ptr<arrow::Array>,
+        std::unique_ptr<ShapeVectorType>>>
+    MakeArrowPrimitiveArrayArray(ColumnType & column, const std::shared_ptr<arrow::DataType> & arrow_dtype)
+    {
+        std::unique_ptr<ShapeVectorType> shapes;
+        int64_t nelements = 0;
+
+        // Construct a buffer
+        std::shared_ptr<arrow::Buffer> buffer;
+
+        if constexpr(std::is_same<ColumnType, casacore::ScalarColumn<DT>>::value) {
+            ARROW_ASSIGN_OR_RAISE(std::tie(buffer, nelements), (MakeVectorBuffer<DT>(column, arrow_dtype)));
+        } else if constexpr(std::is_same<ColumnType, casacore::ArrayColumn<DT>>::value) {
+            if(column_desc.isFixedShape()) {
+                ARROW_ASSIGN_OR_RAISE(std::tie(buffer, nelements), (MakeFixedArrayBuffer<DT>(column, arrow_dtype)));
+            } else {
+                ARROW_ASSIGN_OR_RAISE(std::tie(buffer, nelements, shapes), (MakeVariableArrayBuffer<DT>(column, arrow_dtype)));
+            }
+        } else {
+            return arrow::Status::Invalid("Unknown column type for ", column_desc.name());
+        }
+
+        auto complex_dtype = std::dynamic_pointer_cast<ComplexType>(arrow_dtype);
+
+        // At this point we have a buffer of nelements
         if(complex_dtype) {
+            // Complex values are merely FixedListArrays of pairs float/double
+
             // Array of floats/doubles
             auto child_array = std::make_shared<arrow::PrimitiveArray>(
-                complex_dtype->value_type(), 2*length, buffer,
+                complex_dtype->value_type(), 2*nelements, buffer,
                 nullptr, 0, 0);
 
             // NOTE(sjperkins)
@@ -78,71 +215,90 @@ private:
             // https://arrow.apache.org/docs/format/Columnar.html#fixed-size-list-layout
             // A single empty buffer {nullptr} must be provided otherwise this segfaults
             auto array_data = arrow::ArrayData::Make(
-                complex_dtype, length, {nullptr}, {child_array->data()},
+                complex_dtype, nelements, {nullptr}, {child_array->data()},
                 0, 0);
 
-            return complex_dtype->MakeArray(array_data);
-        } else if(dtype == arrow::utf8()) {
-            return nullptr;
+            array = complex_dtype->MakeArray(array_data);
         } else {
-            return std::make_shared<arrow::PrimitiveArray>(
-                dtype, length, buffer, nullptr, 0, 0);
+            array = std::make_shared<arrow::PrimitiveArray>(arrow_dtype, nelements, buffer, nullptr, 0, 0);
         }
+
+        return std::make_tuple(std::move(array), std::move(shapes));
+    }
+
+    using CreateReturnType = std::tuple<
+        std::shared_ptr<arrow::Array>,
+        std::unique_ptr<ShapeVectorType>,
+        std::unique_ptr<ShapeVectorType>,
+        std::shared_ptr<arrow::Buffer>,
+        int64_t>;
+
+    template <typename ColumnType, typename DT>
+    arrow::Result<CreateReturnType>
+    MakeArrowArrayNew(ColumnType & column, const std::shared_ptr<arrow::DataType> & arrow_dtype)
+    {
+        std::shared_ptr<arrow::Array> array;
+        std::unique_ptr<ShapeVectorType> shapes;
+        std::unique_ptr<ShapeVectorType> products;
+        int64_t null_counts = 0;
+
+        // Create the null bitmap
+        ARROW_ASSIGN_OR_RAISE(auto nulls, arrow::AllocateBitmap(column.nrow(), pool));
+
+        for(casacore::uInt row=0; row < column.nrow(); ++row) {
+            auto is_defined = column.isDefined(row);
+            arrow::bit_util::SetBitTo(nulls->mutable_data(), row, is_defined);
+            null_counts += is_defined ? 0 : 1;
+        }
+
+        // Now create the flattened array of values for this column
+        if constexpr(std::is_same<DT, casacore::String>::value) {
+            ARROW_ASSIGN_OR_RAISE(std::tie(array, shapes), (MakeArrowStringArray<ColumnType, DT>(column, arrow_dtype)));
+        } else {
+            ARROW_ASSIGN_OR_RAISE(std::tie(array, shapes), (MakeArrowPrimitiveArrayArray<ColumnType, DT>(column, arrow_dtype)));
+        }
+
+        if(shapes.get() != nullptr) {
+            // Convert shape from Fortran order to C order.
+            for(auto & s: *shapes) {
+                std::reverse(s.begin(), s.end());
+            }
+
+            products = std::make_unique<ShapeVectorType>(*shapes);
+
+            // Cumulative product in C order
+            for(auto & p: *products) {
+                std::partial_sum(p.begin(), p.end(), p.begin(), [](auto i, auto v) { return i * v; });
+            }
+        }
+
+        return std::make_tuple(
+            std::move(array),
+            std::move(shapes), std::move(products),
+            std::move(nulls), null_counts);
     }
 
     template <typename T>
     arrow::Status ConvertScalarColumn(const std::shared_ptr<arrow::DataType> & arrow_dtype) {
-        auto scalar_column = casacore::ScalarColumn<T>(this->column);
-        auto nrows = scalar_column.nrow();
-        auto length = nrows;
-
-        auto allocation = arrow::AllocateBuffer(nrows*sizeof(T), pool);
-        ARROW_RETURN_NOT_OK(allocation);
-
-        auto buffer = std::shared_ptr<arrow::Buffer>(std::move(allocation.ValueOrDie()));
-
-        // Wrap Arrow Buffer in casacore Vector
-        auto casa_vector = casacore::Vector<T>(
-            casacore::IPosition(1, length),
-            reinterpret_cast<T *>(buffer->mutable_data()),
-            casacore::SHARE);
-
-        // Dump column data into Arrow Buffer
-        scalar_column.getColumn(casa_vector);
-
-        ARROW_ASSIGN_OR_RAISE(this->array, MakeArrowArray<T>(buffer, arrow_dtype, length));
-
+        using CT = casacore::ScalarColumn<T>;
+        auto column = CT(this->column);
+        ARROW_ASSIGN_OR_RAISE(auto result, (MakeArrowArrayNew<CT, T>(column, arrow_dtype)));
+        this->array = std::get<0>(result);
         // Indicate success/failure
         return this->array->Validate();
     }
 
     template <typename T>
     arrow::Status ConvertFixedArrayColumn(const std::shared_ptr<arrow::DataType> & arrow_dtype) {
-        auto array_column = casacore::ArrayColumn<T>(this->column);
-        auto nrows = array_column.nrow();
+        using CT = casacore::ArrayColumn<T>;
+        auto column = CT(this->column);
+        ARROW_ASSIGN_OR_RAISE(auto result, (MakeArrowArrayNew<CT, T>(column, arrow_dtype)));
+        this->array = std::get<0>(result);
         auto shape = column_desc.shape();
-        auto length = shape.product()*nrows;
 
-        // Allocate an Arrow Buffer from default Memory Pool
-        auto allocation = arrow::AllocateBuffer(length*sizeof(T), pool);
-        ARROW_RETURN_NOT_OK(allocation);
-        auto buffer = std::shared_ptr<arrow::Buffer>(std::move(allocation.ValueOrDie()));
+        this->array = arrow::FixedSizeListArray::FromArrays(this->array, shape[0]).ValueOrDie();
 
-        shape.append(casacore::IPosition(1, nrows));
-        // Wrap Arrow Buffer in casacore Vector
-        auto casa_array = casacore::Array<T>(
-            shape,
-            reinterpret_cast<T *>(buffer->mutable_data()),
-            casacore::SHARE);
-
-        // Dump column data into Arrow Buffer
-        array_column.getColumn(casa_array);
-
-        ARROW_ASSIGN_OR_RAISE(auto base_array, MakeArrowArray<T>(buffer, arrow_dtype, length));
-
-        this->array = arrow::FixedSizeListArray::FromArrays(base_array, shape[0]).ValueOrDie();
-
-        for(std::size_t i=1; i<shape.size()-1; ++i) {
+        for(std::size_t i=1; i < shape.size() - 1; ++i) {
             this->array = arrow::FixedSizeListArray::FromArrays(this->array, shape[i]).ValueOrDie();
         }
 
@@ -151,68 +307,37 @@ private:
 
     template <typename T>
     arrow::Status ConvertVariableArrayColumn(const std::shared_ptr<arrow::DataType> & arrow_dtype) {
-        auto array_column = casacore::ArrayColumn<T>(this->column);
-        auto nrows = array_column.nrow();
+        std::shared_ptr<arrow::Array> values;
+        std::unique_ptr<ShapeVectorType> shape_ptr;
+        std::unique_ptr<ShapeVectorType> product_ptr;
+        std::shared_ptr<arrow::Buffer> nulls;
+        int64_t null_counts;
+
+        auto column = casacore::ArrayColumn<T>(this->column);
         auto ndim = column_desc.ndim();
 
-        ARROW_ASSIGN_OR_RAISE(auto nulls, arrow::AllocateBitmap(nrows, pool));
-        std::vector<casacore::IPosition> shapes(nrows, casacore::IPosition(ndim, 0));
-        std::vector<casacore::IPosition> products(nrows, casacore::IPosition(ndim, 0));
-        int64_t nelements = 0;
-        int64_t null_count = 0;
-
-        // Iterate over each table row to determine
-        // (1) null bitmap
-        // (2) offsets between number of elements in each row
-        for(casacore::uInt row=0; row < nrows; ++row) {
-            bool is_defined = array_column.isDefined(row);
-            arrow::bit_util::SetBitTo(nulls->mutable_data(), row, is_defined);
-
-            if(is_defined) {
-                auto casa_shape = array_column.shape(row);
-
-                // CASA stores shapes in Fortran ordering,
-                // invert this for sanities sake
-                std::reverse_copy(casa_shape.begin(), casa_shape.end(), shapes[row].begin());
-                std::reverse_copy(casa_shape.begin(), casa_shape.end(), products[row].begin());
-                // Cumulative product
-                std::partial_sum(products[row].begin(), products[row].end(), products[row].begin(),
-                                 [](auto i, auto v) { return i * v; });
-
-                nelements += products[row][ndim - 1];
-            } else {
-                shapes[row] = casacore::IPosition(ndim, 0);
-                null_count += 1;
-            }
-        }
-
-        ARROW_ASSIGN_OR_RAISE(auto buffer, arrow::AllocateBuffer(nelements*sizeof(T), pool));
-        auto * buffer_ptr = reinterpret_cast<T *>(buffer->mutable_data());
-        casacore::uInt element = 0;
-
-        // Read data into the values buffer
-        for(casacore::uInt row=0; row < nrows; ++row) {
-            // Ignore nulls and empty rows
-            if(!arrow::bit_util::GetBit(nulls->data(), row) ||
-               products[row][ndim - 1] == 0) {
-                continue;
-            }
-
-            // Create a casa Array that wraps the buffer at this
-            // row location and read data into it.
-            auto casa_array = casacore::Array<T>(
-                array_column.shape(row),
-                buffer_ptr + element,
-                casacore::SHARE);
-
-            array_column.get(row, casa_array);
-            element += products[row][ndim - 1];
-        }
-
-        // Create a flat array of values
         ARROW_ASSIGN_OR_RAISE(
-            std::shared_ptr<arrow::Array> values,
-            MakeArrowArray<T>(std::move(buffer), arrow_dtype, nelements));
+            std::tie(values, shape_ptr, product_ptr, nulls, null_counts),
+            (MakeArrowArrayNew<decltype(column), T>(column, arrow_dtype)));
+
+        if(!shape_ptr) {
+            return arrow::Status::Invalid("shapes not provided");
+        }
+
+        if(!product_ptr) {
+            return arrow::Status::Invalid("products not provided");
+        }
+
+        ShapeVectorType & shapes = *shape_ptr;
+        ShapeVectorType & products = *product_ptr;
+
+        if(shapes.size() != column.nrow()) {
+            return arrow::Status::Invalid("shapes.size() != column.nrow()");
+        }
+
+        if(products.size() != column.nrow()) {
+            return arrow::Status::Invalid("products.size() != column.nrow()");
+        }
 
         // NOTE(sjperkins)
         // See https://arrow.apache.org/docs/format/Columnar.html#variable-size-list-layout
@@ -254,7 +379,7 @@ private:
             int32_t o = 0;
             optr[o++] = running_offset;
 
-            for(auto row=0; row < nrows; ++row) {
+            for(casacore::uInt row=0; row < column.nrow(); ++row) {
                 auto repeats = d >= 1 ? products[row][d - 1] : 1;
                 auto dim_size = shapes[row][d];
 
@@ -286,7 +411,7 @@ private:
             *list_array->values(),
             pool,
             nulls,
-            null_count));
+            null_counts));
 
         return this->array->Validate();
     }

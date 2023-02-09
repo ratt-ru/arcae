@@ -61,8 +61,7 @@ arrow::Status ColumnConvertVisitor::VisitTpDComplex() {
 }
 
 arrow::Status ColumnConvertVisitor::VisitTpString() {
-    return arrow::Status::NotImplemented("TpString");
-    //return this->ConvertColumn<casacore::String>(arrow::utf8());
+    return this->ConvertColumn<casacore::String>(arrow::utf8());
 }
 
 arrow::Status ColumnConvertVisitor::VisitTpQuantity() {
