@@ -233,16 +233,6 @@ private:
         std::shared_ptr<arrow::Array> array;
         std::unique_ptr<ShapeVectorType> shapes;
         std::unique_ptr<ShapeVectorType> products;
-        int64_t null_counts = 0;
-
-        // Create the null bitmap
-        ARROW_ASSIGN_OR_RAISE(auto nulls, arrow::AllocateBitmap(column.nrow(), pool));
-
-        for(casacore::uInt row=0; row < column.nrow(); ++row) {
-            auto is_defined = column.isDefined(row);
-            arrow::bit_util::SetBitTo(nulls->mutable_data(), row, is_defined);
-            null_counts += is_defined ? 0 : 1;
-        }
 
         // Now create the flattened array of values for this column
         if constexpr(std::is_same<DT, casacore::String>::value) {
@@ -251,8 +241,19 @@ private:
             ARROW_ASSIGN_OR_RAISE(std::tie(array, shapes), (MakeArrowPrimitiveArrayArray<ColumnType, DT>(column, arrow_dtype)));
         }
 
+        // Determine nulls and null counts at the row level
+        int64_t null_counts = 0;
+        ARROW_ASSIGN_OR_RAISE(auto nulls, arrow::AllocateBitmap(column.nrow(), pool));
+
+        for(casacore::uInt row=0; row < column.nrow(); ++row) {
+            auto is_defined = column.isDefined(row);
+            arrow::bit_util::SetBitTo(nulls->mutable_data(), row, is_defined);
+            null_counts += is_defined ? 0 : 1;
+        }
+
+        // If we have shapes at this point, convert from Fortran to C order
+        // and calculate the associated cumulative product
         if(shapes) {
-            // Convert shape from Fortran order to C order.
             for(auto & s: *shapes) {
                 std::reverse(s.begin(), s.end());
             }
@@ -274,8 +275,7 @@ private:
             }
         }
 
-        return std::make_tuple(
-            std::move(array),
+        return std::make_tuple(std::move(array),
             std::move(shapes), std::move(products),
             std::move(nulls), null_counts);
     }
