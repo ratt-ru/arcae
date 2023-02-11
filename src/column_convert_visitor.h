@@ -251,18 +251,20 @@ private:
             null_counts += is_defined ? 0 : 1;
         }
 
-        // If we have shapes at this point, convert from Fortran to C order
-        // and calculate the associated cumulative product
+        // If we have shapes at this point,
+        // calculate the cumulative product for each dimension
         if(shapes) {
-            for(auto & s: *shapes) {
-                std::reverse(s.begin(), s.end());
-            }
+            products = std::make_unique<ShapeVectorType>(
+                column.nrow(),
+                casacore::IPosition(column_desc.ndim(), 1));
 
-            products = std::make_unique<ShapeVectorType>(*shapes);
+            for(casacore::uInt row=0; row < column.nrow(); ++row) {
+                const auto & shape = (*shapes)[row];
+                auto & product = (*products)[row];
 
-            // Cumulative product in C order
-            for(auto & p: *products) {
-                std::partial_sum(p.begin(), p.end(), p.begin(), [](auto i, auto v) { return i * v; });
+                for(ssize_t d=column_desc.ndim() - 2; d >= 0; --d) {
+                    product[d] *= product[d + 1] * shape[d + 1];
+                }
             }
 
             // Sanity checks
@@ -341,27 +343,29 @@ private:
         // must be repeated by the product of the previous elements in the shape.
 
         // See this worked case
-        // for d in reversed(range(ndim))
-        //    repeats = [reduce(mul, s[:d], 1) for s in shapes]
-        //    dim_sizes = [s[d] for s in shapes]
+        //    Here, we use casacore's FORTRAN ordering for shapes
+        //    repeats = [reduce(mul, s[d+1:], 1) for s, d in enumerate(shapes_]
+        //    dim_sizes = [s[d] for d, s in enumerate(shapes)]
 
-        //    shapes = [(10, 5, 2), (10, 3, 4)]
-        //    For d==2
+        //    shapes = [(2, 5, 10), (4, 3, 10)]
+        //    products = [(50, 10, 1), (30, 10, 1)]
+        //    For d == 0
         //    repeats = [50, 30]
         //    dim_sizes = [2, 4]
         //    offsets = [0] + cumsum(50*[2] + 30*[4])
-        //    For d==1
+        //    For d == 1
         //    repeats = [10, 10]
         //    dim_sizes = [5, 3]
-        //    offsets = [0] + cumsum(10*[5] + 10*[3])
-        //    For d==0
+        //    offsets = [0] + cumsum(10*[5] + 10+[3])
+        //    For d == 2
         //    repeats = [1, 1]
         //    dim_sizes = [10, 10]
-        //    offsets = [0] + cumsum(1*[10] + 1*[10])
-        for(int d=ndim-1; d >= 0; --d) {
+        //    offsets = [0] + cumsum((1*[10] + 1*[10]))
+
+        for(int d=0; d < ndim; ++d) {
             // Precompute size of offsets for buffer allocation
             int32_t noffsets = std::accumulate(products.begin(), products.end(), 1,
-                [d](auto i, const auto & v) { return i + (d >= 1 ? v[d - 1] : 1); });
+                [d](auto i, const auto & v) { return i + v[d]; });
 
             ARROW_ASSIGN_OR_RAISE(
                 auto offset_buffer,
@@ -373,7 +377,7 @@ private:
             optr[o++] = running_offset;
 
             for(casacore::uInt row=0; row < column.nrow(); ++row) {
-                auto repeats = d >= 1 ? products[row][d - 1] : 1;
+                auto repeats = products[row][d];
                 auto dim_size = shapes[row][d];
 
                 for(auto r=0; r < repeats; ++r) {
@@ -383,6 +387,7 @@ private:
             }
 
             assert(o == noffsets);
+            assert(optr[o - 1] == column.nrow());
             auto offsets = std::make_shared<arrow::PrimitiveArray>(
                 arrow::int32(), noffsets, std::move(offset_buffer));
             ARROW_ASSIGN_OR_RAISE(values, arrow::ListArray::FromArrays(*offsets, *values));
