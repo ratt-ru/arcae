@@ -75,5 +75,5 @@ arrow::Result<std::shared_ptr<arrow::Table>> open_table(const std::string & file
         {CASA_ARROW_METADATA}, {json_oss.str()});
 
     auto schema = arrow::schema(fields, table_metadata);
-    return arrow::Table::Make(std::move(schema), arrays, -1);
+    return arrow::Table::Make(std::move(schema), arrays, casa_table.nrow());
 }
