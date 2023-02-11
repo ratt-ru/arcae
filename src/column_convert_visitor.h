@@ -222,7 +222,6 @@ private:
     using CreateReturnType = std::tuple<
         std::shared_ptr<arrow::Array>,
         std::unique_ptr<ShapeVectorType>,
-        std::unique_ptr<ShapeVectorType>,
         std::shared_ptr<arrow::Buffer>,
         int64_t>;
 
@@ -254,32 +253,14 @@ private:
         // If we have shapes at this point,
         // calculate the cumulative product for each dimension
         if(shapes) {
-            products = std::make_unique<ShapeVectorType>(
-                column.nrow(),
-                casacore::IPosition(column_desc.ndim(), 1));
-
-            for(casacore::uInt row=0; row < column.nrow(); ++row) {
-                const auto & shape = (*shapes)[row];
-                auto & product = (*products)[row];
-
-                for(ssize_t d=column_desc.ndim() - 2; d >= 0; --d) {
-                    product[d] *= product[d + 1] * shape[d + 1];
-                }
-            }
-
             // Sanity checks
             if(shapes->size() != column.nrow()) {
                 return arrow::Status::Invalid("shapes.size() != column.nrow()");
             }
-
-            if(products->size() != column.nrow()) {
-                return arrow::Status::Invalid("products.size() != column.nrow()");
-            }
         }
 
-        return std::make_tuple(std::move(array),
-            std::move(shapes), std::move(products),
-            std::move(nulls), null_counts);
+        return std::make_tuple(std::move(array), std::move(shapes),
+                               std::move(nulls), null_counts);
     }
 
     template <typename T>
@@ -311,7 +292,6 @@ private:
     arrow::Status ConvertVariableArrayColumn(const std::shared_ptr<arrow::DataType> & arrow_dtype) {
         std::shared_ptr<arrow::Array> values;
         std::unique_ptr<ShapeVectorType> shape_ptr;
-        std::unique_ptr<ShapeVectorType> product_ptr;
         std::shared_ptr<arrow::Buffer> nulls;
         int64_t null_counts;
 
@@ -320,19 +300,14 @@ private:
         auto ndim = column_desc.ndim();
 
         ARROW_ASSIGN_OR_RAISE(
-            std::tie(values, shape_ptr, product_ptr, nulls, null_counts),
+            std::tie(values, shape_ptr, nulls, null_counts),
             (MakeArrowArrayNew<CT, T>(column, arrow_dtype)));
 
         if(!shape_ptr) {
             return arrow::Status::Invalid("shapes not provided");
         }
 
-        if(!product_ptr) {
-            return arrow::Status::Invalid("products not provided");
-        }
-
         ShapeVectorType & shapes = *shape_ptr;
-        ShapeVectorType & products = *product_ptr;
 
         // NOTE(sjperkins)
         // See https://arrow.apache.org/docs/format/Columnar.html#variable-size-list-layout
@@ -361,6 +336,18 @@ private:
         //    repeats = [1, 1]
         //    dim_sizes = [10, 10]
         //    offsets = [0] + cumsum((1*[10] + 1*[10]))
+
+        // Compute the products
+        auto products = ShapeVectorType(column.nrow(), casacore::IPosition(column_desc.ndim(), 1));
+
+        for(casacore::uInt row=0; row < column.nrow(); ++row) {
+            const auto & shape = shapes[row];
+            auto & product = products[row];
+
+            for(ssize_t d=column_desc.ndim() - 2; d >= 0; --d) {
+                product[d] *= product[d + 1] * shape[d + 1];
+            }
+        }
 
         for(int d=0; d < ndim; ++d) {
             // Precompute size of offsets for buffer allocation
