@@ -172,7 +172,7 @@ private:
     arrow::Result<std::tuple<
         std::shared_ptr<arrow::Array>,
         std::unique_ptr<ShapeVectorType>>>
-    MakeArrowPrimitiveArrayArray(ColumnType & column, const std::shared_ptr<arrow::DataType> & arrow_dtype)
+    MakeArrowPrimitiveArray(ColumnType & column, const std::shared_ptr<arrow::DataType> & arrow_dtype)
     {
         std::unique_ptr<ShapeVectorType> shapes;
         int64_t nelements = 0;
@@ -237,7 +237,7 @@ private:
         if constexpr(std::is_same<DT, casacore::String>::value) {
             ARROW_ASSIGN_OR_RAISE(std::tie(array, shapes), (MakeArrowStringArray<ColumnType, DT>(column, arrow_dtype)));
         } else {
-            ARROW_ASSIGN_OR_RAISE(std::tie(array, shapes), (MakeArrowPrimitiveArrayArray<ColumnType, DT>(column, arrow_dtype)));
+            ARROW_ASSIGN_OR_RAISE(std::tie(array, shapes), (MakeArrowPrimitiveArray<ColumnType, DT>(column, arrow_dtype)));
         }
 
         // Determine nulls and null counts at the row level
