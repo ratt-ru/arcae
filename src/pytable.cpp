@@ -3,7 +3,6 @@
 
 #include <arrow/python/pyarrow.h>
 
-#include "casa_arrow.h"
 #include "safe_table_proxy.h"
 #include "type_converters.h"
 

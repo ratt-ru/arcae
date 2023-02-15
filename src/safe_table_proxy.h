@@ -9,7 +9,6 @@
 #include <arrow/util/logging.h>  // IWYU pragma: keep
 #include <arrow/util/thread_pool.h>
 
-#include "casa_arrow.h"
 #include "column_convert_visitor.h"
 
 
