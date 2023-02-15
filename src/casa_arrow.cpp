@@ -15,6 +15,7 @@ static const std::string CASA_ARROW_METADATA = "__casa_arrow_metadata__";
 static const std::string CASA_DESCRIPTOR = "__casa_descriptor__";
 
 
+/// @brief Constrains Table access to an arrow::ThreadPool containing a single thread.
 class SafeTableProxy {
 public:
     using TableFuture = arrow::Future<std::shared_ptr<casacore::TableProxy>>;
