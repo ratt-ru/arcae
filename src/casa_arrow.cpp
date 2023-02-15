@@ -15,7 +15,7 @@ static const std::string CASA_ARROW_METADATA = "__casa_arrow_metadata__";
 static const std::string CASA_DESCRIPTOR = "__casa_descriptor__";
 
 
-class ThreadedTableProxy : casacore::TableProxy {
+class SafeTableProxy {
 public:
     using TableFuture = arrow::Future<std::shared_ptr<casacore::TableProxy>>;
 
@@ -23,11 +23,11 @@ private:
     TableFuture table_future;
     std::shared_ptr<arrow::internal::ThreadPool> io_pool;
 protected:
-    ThreadedTableProxy() {};
+    SafeTableProxy() {};
 
 public:
-    static arrow::Result<std::shared_ptr<ThreadedTableProxy>> Make(const casacore::String & filename) {
-        auto proxy = std::shared_ptr<ThreadedTableProxy>(new ThreadedTableProxy());
+    static arrow::Result<std::shared_ptr<SafeTableProxy>> Make(const casacore::String & filename) {
+        auto proxy = std::shared_ptr<SafeTableProxy>(new SafeTableProxy());
 
         ARROW_ASSIGN_OR_RAISE(proxy->io_pool, arrow::internal::ThreadPool::Make(1));
 
@@ -138,7 +138,7 @@ public:
 };
 
 arrow::Result<std::shared_ptr<arrow::Table>> open_table(const std::string & filename) {
-    ARROW_ASSIGN_OR_RAISE(auto test_proxy, ThreadedTableProxy::Make(filename));
+    ARROW_ASSIGN_OR_RAISE(auto test_proxy, SafeTableProxy::Make(filename));
     ARROW_ASSIGN_OR_RAISE(auto nrow, test_proxy->nrow());
     return test_proxy->read_table(0, nrow);
 }
