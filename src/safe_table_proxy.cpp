@@ -4,6 +4,17 @@
 #define SAFE_TABLE_FUNCTOR(functor) \
     return arrow::DeferNotOk(this->io_pool->Submit((functor))).result()
 
+SafeTableProxy::~SafeTableProxy() {
+    // Enqueue a future closing the TableProxy and wait for it to finish
+    auto future = arrow::DeferNotOk(io_pool->Submit([this]() {
+        ARROW_ASSIGN_OR_RAISE(auto table_proxy, this->table_future.result());
+        table_proxy->close();
+        return arrow::Status::OK();
+    }));
+
+    io_pool->Shutdown(true);
+};
+
 
 arrow::Result<std::shared_ptr<SafeTableProxy>>
 SafeTableProxy::Make(const casacore::String & filename) {
