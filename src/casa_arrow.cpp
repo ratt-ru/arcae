@@ -43,7 +43,6 @@ public:
                 filename, record, casacore::Table::TableOption::Old);
         }));
 
-        future.Wait();
         ARROW_RETURN_NOT_OK(future.result());
         proxy->table_future = std::move(future);
 
