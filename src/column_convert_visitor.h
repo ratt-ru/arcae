@@ -14,6 +14,8 @@ public:
 
 public:
     const casacore::TableColumn & column;
+    casacore::uInt startrow;
+    casacore::uInt nrow;
     const casacore::ColumnDesc & column_desc;
     std::shared_ptr<arrow::Array> array;
     arrow::MemoryPool * pool;
@@ -21,6 +23,8 @@ public:
 public:
     explicit ColumnConvertVisitor(
         const casacore::TableColumn & column,
+        casacore::uInt startrow,
+        casacore::uInt nrow,
         arrow::MemoryPool * pool=arrow::default_memory_pool());
     virtual ~ColumnConvertVisitor() = default;
 
@@ -49,22 +53,28 @@ private:
         std::unique_ptr<ShapeVectorType> shapes;
 
         if constexpr(std::is_same<ColumnType, casacore::ScalarColumn<DT>>::value) {
-            for(auto & s: column.getColumn()) {
-                builder.Append(s);
-                nelements += 1;
+            try {
+                auto strings = column.getColumnRange(casacore::Slice(startrow, nrow));
+
+                for(auto & s: strings) {
+                    builder.Append(s);
+                    nelements += 1;
+                }
+            } catch(std::exception & e) {
+                return arrow::Status::Invalid("MakeArrowStringArray ", column_desc.name(), " ", e.what());
             }
         } else if constexpr(std::is_same<ColumnType, casacore::ArrayColumn<DT>>::value) {
             if(!column_desc.isFixedShape()) {
                 auto default_shape = casacore::IPosition(column_desc.ndim(), 0);
-                shapes = std::make_unique<ShapeVectorType>(column.nrow(), std::move(default_shape));
+                shapes = std::make_unique<ShapeVectorType>(nrow, std::move(default_shape));
             }
 
-            for(casacore::uInt row=0; row < column.nrow(); ++row) {
+            for(casacore::uInt row=startrow; row < nrow; ++row) {
                 if(column.isDefined(row)) {
                     auto array = column.get(row);
 
                     if(!column_desc.isFixedShape()) {
-                        (*shapes)[row] = array.shape();
+                        (*shapes)[row - startrow] = array.shape();
                     }
 
                     for(auto & string: array) {
@@ -85,19 +95,23 @@ private:
     arrow::Result<std::tuple<std::shared_ptr<arrow::Buffer>, int64_t>>
     MakeVectorBuffer(casacore::ScalarColumn<DT> & column, const std::shared_ptr<arrow::DataType> & arrow_dtype)
     {
-        ARROW_ASSIGN_OR_RAISE(auto allocation, arrow::AllocateBuffer(column.nrow()*sizeof(DT), pool));
+        ARROW_ASSIGN_OR_RAISE(auto allocation, arrow::AllocateBuffer(nrow*sizeof(DT), pool));
         auto buffer = std::shared_ptr<arrow::Buffer>(std::move(allocation));
 
         // Wrap Arrow Buffer in casacore Vector
         auto casa_vector = casacore::Vector<DT>(
-            casacore::IPosition(1, column.nrow()),
+            casacore::IPosition(1, nrow),
             reinterpret_cast<DT *>(buffer->mutable_data()),
             casacore::SHARE);
 
-        // Dump column data into Arrow Buffer
-        column.getColumn(casa_vector);
+        // Dump column data into Arrow
+        try {
+            column.getColumnRange(casacore::Slice(startrow, nrow, 1), casa_vector);
+        } catch(std::exception & e) {
+            return arrow::Status::Invalid("MakeVectorBuffer ", column_desc.name(), " ", e.what());
+        }
 
-        return std::make_tuple(std::move(buffer), column.nrow());
+        return std::make_tuple(std::move(buffer), nrow);
     }
 
     template <typename DT>
@@ -106,13 +120,13 @@ private:
     {
         // Fixed shape Array
         auto shape = column_desc.shape();
-        int64_t nelements = shape.product()*column.nrow();
+        shape.append(casacore::IPosition(1, nrow));
+        int64_t nelements = shape.product();
 
         // Allocate an Arrow Buffer from default Memory Pool
         ARROW_ASSIGN_OR_RAISE(auto allocation, arrow::AllocateBuffer(nelements*sizeof(DT), pool));
         auto buffer = std::shared_ptr<arrow::Buffer>(std::move(allocation));
 
-        shape.append(casacore::IPosition(1, column.nrow()));
 
         auto array = casacore::Array<DT>(
             shape,
@@ -120,7 +134,11 @@ private:
             casacore::SHARE);
 
         // Dump column data into Arrow Buffer
-        column.getColumn(array);
+        try {
+            column.getColumnRange(casacore::Slice(startrow, nrow, 1), array);
+        } catch(std::exception & e) {
+            return arrow::Status::Invalid("MakeFixedArrayBuffer ", column_desc.name(), " ", e.what());
+        }
 
         return std::make_tuple(std::move(buffer), nelements);
     }
@@ -137,13 +155,13 @@ private:
         // Variably shaped. Two passes
         // First, determine the number of elements in the Array
         auto shapes = std::make_unique<ShapeVectorType>(
-            column.nrow(),
+            nrow,
             casacore::IPosition(column_desc.ndim(), 0));
 
-        for(casacore::uInt row=0; row < column.nrow(); ++row) {
+        for(casacore::uInt row=startrow; row < nrow; ++row) {
             if(column.isDefined(row)) {
-                (*shapes)[row] = column.shape(row);
-                nelements += (*shapes)[row].product();
+                (*shapes)[row - startrow] = column.shape(row);
+                nelements += (*shapes)[row - startrow].product();
             }
         }
 
@@ -154,13 +172,17 @@ private:
         casacore::uInt offset = 0;
 
         // Secondly dump data into the buffer
-        for(casacore::uInt row=0; row < column.nrow(); ++row) {
-            auto product = (*shapes)[row].product();
+        for(casacore::uInt row=startrow; row < nrow; ++row) {
+            auto product = (*shapes)[row - startrow].product();
             if(column.isDefined(row) && product > 0) {
                 auto array = casacore::Array<DT>(
-                    (*shapes)[row],
+                    (*shapes)[row - startrow],
                     buffer_ptr + offset, casacore::SHARE);
-                column.get(row, array);
+                try {
+                   column.get(row, array);
+                } catch(std::exception & e) {
+                    return arrow::Status::Invalid("MakeVariableArrayBuffer ", column_desc.name(), " ", e.what());
+                }
                 offset += product;
             }
         }
@@ -242,9 +264,9 @@ private:
 
         // Determine nulls and null counts at the row level
         int64_t null_counts = 0;
-        ARROW_ASSIGN_OR_RAISE(auto nulls, arrow::AllocateBitmap(column.nrow(), pool));
+        ARROW_ASSIGN_OR_RAISE(auto nulls, arrow::AllocateBitmap(nrow, pool));
 
-        for(casacore::uInt row=0; row < column.nrow(); ++row) {
+        for(casacore::uInt row=startrow; row < nrow; ++row) {
             auto is_defined = column.isDefined(row);
             arrow::bit_util::SetBitTo(nulls->mutable_data(), row, is_defined);
             null_counts += is_defined ? 0 : 1;
@@ -254,8 +276,8 @@ private:
         // calculate the cumulative product for each dimension
         if(shapes) {
             // Sanity checks
-            if(shapes->size() != column.nrow()) {
-                return arrow::Status::Invalid("shapes.size() != column.nrow()");
+            if(shapes->size() != nrow) {
+                return arrow::Status::Invalid("shapes.size() != nrow");
             }
         }
 
@@ -338,11 +360,11 @@ private:
         //    offsets = [0] + cumsum((1*[10] + 1*[10]))
 
         // Compute the products
-        auto products = ShapeVectorType(column.nrow(), casacore::IPosition(column_desc.ndim(), 1));
+        auto products = ShapeVectorType(nrow, casacore::IPosition(column_desc.ndim(), 1));
 
-        for(casacore::uInt row=0; row < column.nrow(); ++row) {
-            const auto & shape = shapes[row];
-            auto & product = products[row];
+        for(casacore::uInt row=startrow; row < nrow; ++row) {
+            const auto & shape = shapes[row - startrow];
+            auto & product = products[row - startrow];
 
             for(ssize_t d=column_desc.ndim() - 2; d >= 0; --d) {
                 product[d] *= product[d + 1] * shape[d + 1];
@@ -363,9 +385,9 @@ private:
             int32_t o = 0;
             optr[o++] = running_offset;
 
-            for(casacore::uInt row=0; row < column.nrow(); ++row) {
-                auto repeats = products[row][d];
-                auto dim_size = shapes[row][d];
+            for(casacore::uInt row=startrow; row < nrow; ++row) {
+                auto repeats = products[row - startrow][d];
+                auto dim_size = shapes[row - startrow][d];
 
                 for(auto r=0; r < repeats; ++r) {
                     running_offset += dim_size;
@@ -374,7 +396,7 @@ private:
             }
 
             assert(o == noffsets);
-            assert(optr[o - 1] == column.nrow());
+            assert(optr[o - 1] == nrow);
             auto offsets = std::make_shared<arrow::PrimitiveArray>(
                 arrow::int32(), noffsets, std::move(offset_buffer));
             ARROW_ASSIGN_OR_RAISE(values, arrow::ListArray::FromArrays(*offsets, *values));

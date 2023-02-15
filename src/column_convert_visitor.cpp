@@ -7,8 +7,12 @@
 
 ColumnConvertVisitor::ColumnConvertVisitor(
     const casacore::TableColumn & column,
+    casacore::uInt startrow,
+    casacore::uInt nrow,
     arrow::MemoryPool * pool)
-    : column(column), column_desc(column.columnDesc()), pool(pool) {}
+    : column(column), startrow(startrow), nrow(nrow),
+      column_desc(column.columnDesc()), pool(pool)
+      {}
 
 arrow::Status ColumnConvertVisitor::VisitTpBool() {
     // TODO(sjperkins)

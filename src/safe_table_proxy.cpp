@@ -30,11 +30,23 @@ SafeTableProxy::Make(const casacore::String & filename) {
 
 arrow::Result<std::shared_ptr<arrow::Table>>
 SafeTableProxy::read_table(casacore::uInt startrow, casacore::uInt nrow) const {
-    SAFE_TABLE_FUNCTOR([this]() -> arrow::Result<std::shared_ptr<arrow::Table>> {
+    SAFE_TABLE_FUNCTOR(([this, startrow, nrow]() -> arrow::Result<std::shared_ptr<arrow::Table>> {
         ARROW_ASSIGN_OR_RAISE(auto table_proxy, this->table_future.result());
         auto & casa_table = table_proxy->table();
         auto table_desc = casa_table.tableDesc();
         auto column_names = table_desc.columnNames();
+        auto startrow_ = startrow;
+        auto nrow_ = nrow;
+
+
+        if(startrow_ >= casa_table.nrow()) {
+            startrow_ = casa_table.nrow();
+            nrow_ = 0;
+        }
+
+        if(startrow_ + nrow_ >= casa_table.nrow()) {
+            nrow_ = std::min(casa_table.nrow(), casa_table.nrow() - startrow_);
+        }
 
         auto fields = arrow::FieldVector();
         auto arrays = arrow::ArrayVector();
@@ -44,7 +56,7 @@ SafeTableProxy::read_table(casacore::uInt startrow, casacore::uInt nrow) const {
         for(casacore::uInt i=0; i < table_desc.ncolumn(); ++i) {
             auto table_column = casacore::TableColumn(casa_table, i);
             auto column_desc = table_column.columnDesc();
-            auto visitor = ColumnConvertVisitor(table_column);
+            auto visitor = ColumnConvertVisitor(table_column, startrow_, nrow_);
             auto visit_status = visitor.Visit(column_desc.dataType());
 
             if(!visit_status.ok()) {
@@ -88,8 +100,8 @@ SafeTableProxy::read_table(casacore::uInt startrow, casacore::uInt nrow) const {
             {CASA_ARROW_METADATA}, {json_oss.str()});
 
         auto schema = arrow::schema(fields, table_metadata);
-        return arrow::Table::Make(std::move(schema), arrays, casa_table.nrow());
-    });
+        return arrow::Table::Make(std::move(schema), arrays, nrow);
+    }));
 }
 
 
