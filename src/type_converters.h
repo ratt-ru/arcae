@@ -5,6 +5,7 @@
 
 #include <arrow/api.h>
 
+#include "safe_table_proxy.h"
 #include "complex_type.h"
 
 namespace PYBIND11_NAMESPACE {
@@ -13,7 +14,7 @@ namespace detail {
 template <typename AT>
 struct arrow_array_caster {
 public:
-    PYBIND11_TYPE_CASTER(std::shared_ptr<AT>, _("pyarrow::Array"));
+    PYBIND11_TYPE_CASTER(std::shared_ptr<AT>, _("arrow::Array"));
 
     bool load(handle src, bool) {
         PyObject * object = src.ptr();

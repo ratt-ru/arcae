@@ -7,22 +7,35 @@ import pytest
 
 from casa_arrow import pytable
 
-@pytest.fixture(scope="module")
-def arrow_table():
-    return pytable.open_table("/home/simon/data/WSRT_polar.MS_p0")
 
 @pytest.mark.xfail(reason="https://github.com/apache/arrow/issues/32291 and https://github.com/apache/arrow/pull/10565#issuecomment-885786527")
-def test_complex_type_access_fail(arrow_table):
+def test_complex_type_access_fail():
+    T = pytable.SafeTableProxy("/home/simon/data/WSRT_polar.MS_p0")
+    arrow_table = T.read_table(0, T.nrow())
     data = arrow_table.column("DATA")
     weight = arrow_table.column("WEIGHT")
     flag_cat = arrow_table.column("FLAG_CATEGORY")
-    print(data[0])
-    print(weight)
-    print(flag_cat)
 
-def test_pytable(arrow_table):
-    uvw = arrow_table.column("UVW")
-    print(uvw[16])
+@pytest.mark.parametrize("table_path, table_name", [
+    ("/home/simon/data/WSRT_polar.MS_p0", "MAIN"),
+    ("/home/simon/data/WSRT_polar.MS_p0::ANTENNA", "ANTENNA"),
+    ("/home/simon/data/WSRT_polar.MS_p0::FEED", "FEED"),
+    ("/home/simon/data/WSRT_polar.MS_p0::POLARIZATION", "POLARIZATION"),
+    ("/home/simon/data/WSRT_polar.MS_p0::SPECTRAL_WINDOW", "SPECTRAL_WINDOW"),
+
+    ("/home/simon/data/HLTau_B6cont.calavg.tav300s", "MAIN"),
+    ("/home/simon/data/HLTau_B6cont.calavg.tav300s::ANTENNA", "ANTENNA"),
+    ("/home/simon/data/HLTau_B6cont.calavg.tav300s::FEED", "FEED"),
+    ("/home/simon/data/HLTau_B6cont.calavg.tav300s::POLARIZATION", "POLARIZATION"),
+    ("/home/simon/data/HLTau_B6cont.calavg.tav300s::SPECTRAL_WINDOW", "SPECTRAL_WINDOW"),
+
+], ids=lambda id: "X" if id.startswith("/") else id)
+def test_parquet_write(tmp_path, table_path, table_name):
+    T = pytable.SafeTableProxy("/home/simon/data/WSRT_polar.MS_p0")
+    arrow_table = T.read_table(0, T.nrow())
+    import pyarrow.parquet as pq
+    print(arrow_table)
+    pq.write_table(arrow_table, str(tmp_path / f"{table_name}.parquet"))
 
 @pytest.fixture
 def variable_table(tmp_path):
@@ -65,6 +78,8 @@ def variable_table(tmp_path):
     return table_name
 
 def test_variable_column():
-    arrow_table = pytable.open_table("/home/simon/code/casa-arrow/casa_arrow/tests/test.table")
+    T = pytable.SafeTableProxy("/home/simon/code/casa-arrow/casa_arrow/tests/table3.table")
+    arrow_table = T.read_table(0, T.nrow())
     foo = arrow_table.column("FOO")
     assert len(foo) == 10
+    print(foo)
