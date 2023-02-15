@@ -26,6 +26,7 @@ protected:
 
 public:
     static arrow::Result<std::shared_ptr<SafeTableProxy>> Make(const casacore::String & filename);
+    arrow::Result<std::shared_ptr<arrow::Table>> read_table() const;
     arrow::Result<std::shared_ptr<arrow::Table>> read_table(casacore::uInt startrow, casacore::uInt nrow) const;
     arrow::Result<std::vector<std::string>> columns() const;
     arrow::Result<casacore::uInt> ncolumns() const;

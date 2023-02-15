@@ -29,6 +29,12 @@ SafeTableProxy::Make(const casacore::String & filename) {
 }
 
 arrow::Result<std::shared_ptr<arrow::Table>>
+SafeTableProxy::read_table(void) const {
+    ARROW_ASSIGN_OR_RAISE(auto n, nrow());
+    return read_table(0, n);
+}
+
+arrow::Result<std::shared_ptr<arrow::Table>>
 SafeTableProxy::read_table(casacore::uInt startrow, casacore::uInt nrow) const {
     SAFE_TABLE_FUNCTOR(([this, startrow, nrow]() -> arrow::Result<std::shared_ptr<arrow::Table>> {
         ARROW_ASSIGN_OR_RAISE(auto table_proxy, this->table_future.result());
