@@ -24,6 +24,7 @@ PYBIND11_MODULE(pytable, m)
     .def("read_table", [](const SafeTableProxy & table)
         { py::gil_scoped_release rgil; return table.read_table().ValueOrDie(); })
     .def("read_table", [](const SafeTableProxy & table, casacore::uInt startrow, casacore::uInt nrow)
-        { py::gil_scoped_release rgil; return table.read_table(startrow, nrow).ValueOrDie() ;}
-    );
+        { py::gil_scoped_release rgil; return table.read_table(startrow, nrow).ValueOrDie(); })
+    .def("close", [](SafeTableProxy & table)
+        { py::gil_scoped_release rgil; table.close().ValueOrDie(); });
 }

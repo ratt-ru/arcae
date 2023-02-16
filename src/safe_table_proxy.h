@@ -16,11 +16,17 @@ static const std::string CASA_ARROW_METADATA = "__casa_arrow_metadata__";
 static const std::string CASA_DESCRIPTOR = "__casa_descriptor__";
 
 
+/// @class SafeTableProxy
 /// @brief Constrains Table access to an arrow::ThreadPool containing a single thread.
 class SafeTableProxy {
 private:
     arrow::Future<std::shared_ptr<casacore::TableProxy>> table_future;
     std::shared_ptr<arrow::internal::ThreadPool> io_pool;
+    bool is_closed;
+
+private:
+    arrow::Status FailIfClosed() const;
+
 protected:
     SafeTableProxy() {};
 
@@ -33,4 +39,6 @@ public:
     arrow::Result<std::vector<std::string>> columns() const;
     arrow::Result<casacore::uInt> ncolumns() const;
     arrow::Result<casacore::uInt> nrow() const;
+
+    arrow::Result<bool> close();
 };
