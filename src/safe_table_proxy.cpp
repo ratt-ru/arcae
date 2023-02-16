@@ -164,12 +164,14 @@ SafeTableProxy::nrow() const {
 arrow::Result<bool>
 SafeTableProxy::close() {
     if(!is_closed) {
-        std::shared_ptr<void> _(nullptr, [this](...){ this->is_closed = true; });
+        std::shared_ptr<void> defer_close(nullptr, [this](...){ this->is_closed = true; });
 
         SAFE_TABLE_FUNCTOR([this]() -> arrow::Result<bool> {
             ARROW_ASSIGN_OR_RAISE(auto table_proxy, this->table_future.result());
             table_proxy->close();
             return true;
         });
+    } else {
+        return false;
     }
 }
