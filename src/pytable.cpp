@@ -10,7 +10,7 @@ namespace py = pybind11;
 
 
 template<typename T> struct unwrap_result {};
-template<typename VT> struct unwrap_result<arrow::Result<VT>> { using type = VT ;};
+template<typename T> struct unwrap_result<arrow::Result<T>> { using type = T ;};
 template<typename T> using unwrap_result_t = typename unwrap_result<T>::type;
 
 template <class F, class... Args>
