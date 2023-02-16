@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 import numpy as np
 # import pyrap.tables as pt
@@ -29,9 +30,9 @@ def test_complex_type_access_fail():
     ("/home/simon/data/HLTau_B6cont.calavg.tav300s::POLARIZATION", "POLARIZATION"),
     ("/home/simon/data/HLTau_B6cont.calavg.tav300s::SPECTRAL_WINDOW", "SPECTRAL_WINDOW"),
 
-], ids=lambda id: "X" if id.startswith("/") else id)
+], ids=lambda id: Path(id).stem if id.startswith("/") else id)
 def test_parquet_write(tmp_path, table_path, table_name):
-    T = pytable.SafeTableProxy("/home/simon/data/WSRT_polar.MS_p0")
+    T = pytable.SafeTableProxy(table_path)
     arrow_table = T.read_table(0, T.nrow())
     import pyarrow.parquet as pq
     print(arrow_table)
