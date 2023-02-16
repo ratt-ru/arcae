@@ -24,7 +24,10 @@ SafeTableProxy::Make(const casacore::String & filename) {
     auto proxy = std::shared_ptr<SafeTableProxy>(new SafeTableProxy());
     ARROW_ASSIGN_OR_RAISE(proxy->io_pool, arrow::internal::ThreadPool::Make(1));
 
-    auto future = arrow::DeferNotOk(proxy->io_pool->Submit([&]() {
+    // Indicate the table is closed so that if construction fails, we don't try to close it
+    proxy->is_closed = true;
+
+    auto future = arrow::DeferNotOk(proxy->io_pool->Submit([&]() -> arrow::Result<std::shared_ptr<casacore::TableProxy>> {
         casacore::Record record;
         casacore::TableLock lock(casacore::TableLock::LockOption::AutoNoReadLocking);
 
@@ -32,8 +35,12 @@ SafeTableProxy::Make(const casacore::String & filename) {
         record.define("internal", lock.interval());
         record.define("maxwait", casacore::Int(lock.maxWait()));
 
-        return std::make_shared<casacore::TableProxy>(
-            filename, record, casacore::Table::TableOption::Old);
+        try {
+            return std::make_shared<casacore::TableProxy>(
+                filename, record, casacore::Table::TableOption::Old);
+        } catch(std::exception & e) {
+            return arrow::Status::Invalid("Error opening ", filename);
+        }
     }));
 
     ARROW_RETURN_NOT_OK(future.result());
