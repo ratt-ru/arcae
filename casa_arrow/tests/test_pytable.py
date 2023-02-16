@@ -11,7 +11,7 @@ from casa_arrow import pytable
 
 @pytest.mark.xfail(reason="https://github.com/apache/arrow/issues/32291 and https://github.com/apache/arrow/pull/10565#issuecomment-885786527")
 def test_complex_type_access_fail():
-    T = pytable.SafeTableProxy("/home/simon/data/WSRT_polar.MS_p0")
+    T = pytable.Table("/home/simon/data/WSRT_polar.MS_p0")
     arrow_table = T.read_table(0, T.nrow())
     data = arrow_table.column("DATA")
     weight = arrow_table.column("WEIGHT")
@@ -32,7 +32,7 @@ def test_complex_type_access_fail():
 
 ], ids=lambda id: Path(id).stem if id.startswith("/") else id)
 def test_parquet_write(tmp_path, table_path, table_name):
-    T = pytable.SafeTableProxy(table_path)
+    T = pytable.Table(table_path)
     arrow_table = T.read_table(0, T.nrow())
     import pyarrow.parquet as pq
     print(arrow_table)
@@ -79,8 +79,40 @@ def variable_table(tmp_path):
     return table_name
 
 def test_variable_column():
-    T = pytable.SafeTableProxy("/home/simon/code/casa-arrow/casa_arrow/tests/table3.table")
+    T = pytable.Table("/home/simon/code/casa-arrow/casa_arrow/tests/table3.table")
     arrow_table = T.read_table(0, T.nrow())
     foo = arrow_table.column("FOO")
     assert len(foo) == 10
     print(foo)
+
+
+
+def test_segfault():
+    T = pytable.Table("blah")
+
+def test_duckdb():
+    from casa_arrow import pytable
+    T = pytable.Table("/home/simon/data/WSRT_polar.MS_p0")
+    import duckdb
+    import pyarrow as pa
+    import pyarrow.dataset as pad
+
+    observation = pad.dataset("/tmp/pytest-of-simon/pytest-current/test_parquet_write_HLTau_B6con0/")
+    con = duckdb.connect()
+
+    query = con.execute(f"SELECT TIME, ANTENNA1, ANTENNA2, DATA FROM observation "
+                        f"WHERE ANTENNA1 >= 0 AND ANTENNA1 < 2 AND "
+                        f"ANTENNA2 >= 2 AND ANTENNA2 <=3")
+    rbr = query.fetch_record_batch()
+
+    chunks = []
+
+    while True:
+        try:
+            chunks.append(rbr.read_next_batch())
+        except StopIteration:
+            break
+
+    data = pa.Table.from_batches(chunks)
+    import ipdb; ipdb.set_trace()
+

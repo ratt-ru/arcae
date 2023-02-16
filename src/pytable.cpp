@@ -8,23 +8,42 @@
 
 namespace py = pybind11;
 
+
+template<typename T> struct unwrap_result {};
+template<typename VT> struct unwrap_result<arrow::Result<VT>> { using type = VT ;};
+template<typename T> using unwrap_result_t = typename unwrap_result<T>::type;
+
+template <class F, class... Args>
+unwrap_result_t<std::invoke_result_t<F, Args...>>
+result_wrapper(F && f, Args &&... args)
+{
+    py::gil_scoped_release();
+    auto result = std::invoke(std::forward<F>(f), std::forward<Args>(args)...);
+
+    if(!result.ok()) {
+        throw py::value_error(result.status().ToString());
+    }
+
+    return result.ValueOrDie();
+}
+
 PYBIND11_MODULE(pytable, m)
 {
     arrow::py::import_pyarrow();
 
-    pybind11::class_<SafeTableProxy, std::shared_ptr<SafeTableProxy>>(m, "SafeTableProxy")
+    pybind11::class_<SafeTableProxy, std::shared_ptr<SafeTableProxy>>(m, "Table")
     .def(py::init([](std::string filename)
-        { py::gil_scoped_release rgil; return SafeTableProxy::Make(filename).ValueOrDie(); }))
+        { return result_wrapper(&SafeTableProxy::Make, filename); }))
     .def("nrow", [](const SafeTableProxy & table)
-        { py::gil_scoped_release rgil; return table.nrow().ValueOrDie(); })
+        { return result_wrapper(&SafeTableProxy::nrow, table); })
     .def("columns", [](const SafeTableProxy & table)
-        { py::gil_scoped_release rgil; return table.columns().ValueOrDie(); })
+        { return result_wrapper(&SafeTableProxy::columns, table); })
     .def("ncolumns", [](const SafeTableProxy & table)
-        { py::gil_scoped_release rgil; return table.ncolumns().ValueOrDie(); })
+        { return result_wrapper(&SafeTableProxy::ncolumns, table); })
     .def("read_table", [](const SafeTableProxy & table)
-        { py::gil_scoped_release rgil; return table.read_table().ValueOrDie(); })
+        { return result_wrapper([&]() { return table.read_table(); }); })
     .def("read_table", [](const SafeTableProxy & table, casacore::uInt startrow, casacore::uInt nrow)
-        { py::gil_scoped_release rgil; return table.read_table(startrow, nrow).ValueOrDie(); })
+        { return result_wrapper([&]() { return table.read_table(startrow, nrow); }); })
     .def("close", [](SafeTableProxy & table)
-        { py::gil_scoped_release rgil; table.close().ValueOrDie(); });
+        { return result_wrapper(&SafeTableProxy::close, table); });
 }
