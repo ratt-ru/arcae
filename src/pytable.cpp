@@ -27,7 +27,7 @@ result_wrapper(F && f, Args &&... args)
     return result.ValueOrDie();
 }
 
-PYBIND11_MODULE(pytable, m)
+PYBIND11_MODULE(_pytable, m)
 {
     arrow::py::import_pyarrow();
 

@@ -1,7 +1,6 @@
 from typing import Dict, Any
 
 def build(setup_kwargs: Dict[str, Any]):
-    import os
     from glob import glob
     import numpy as np
     import pyarrow as pa
@@ -21,15 +20,13 @@ def build(setup_kwargs: Dict[str, Any]):
 
     ext_modules = [
         Pybind11Extension(
-            "casa_arrow.pytable",
+            "casa_arrow._pytable",
             list(sorted(glob("src/*.cpp"))),  # Sort source files for reproducibility
             include_dirs=include_dirs,
             library_dirs=library_dirs,
             extra_compile_args=["--std=c++17", "-D_GLIBCXX_USE_CXX11_ABI=1"],
             extra_link_args=["--std=c++17", "-D_GLIBCXX_USE_CXX11_ABI=1"],
-            #extra_link_args = ["-Wl,-rpath=../../pyarrow"],
             libraries=libraries,
-            runtime_library_dirs=library_dirs,
         ),
     ]
 

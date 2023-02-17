@@ -6,12 +6,12 @@ import numpy as np
 
 import pytest
 
-from casa_arrow import pytable
+from casa_arrow import Table
 
 
 @pytest.mark.xfail(reason="https://github.com/apache/arrow/issues/32291 and https://github.com/apache/arrow/pull/10565#issuecomment-885786527")
 def test_complex_type_access_fail():
-    T = pytable.Table("/home/simon/data/WSRT_polar.MS_p0")
+    T = Table("/home/simon/data/WSRT_polar.MS_p0")
     arrow_table = T.read_table(0, T.nrow())
     data = arrow_table.column("DATA")
     weight = arrow_table.column("WEIGHT")
@@ -32,7 +32,7 @@ def test_complex_type_access_fail():
 
 ], ids=lambda id: Path(id).stem if id.startswith("/") else id)
 def test_parquet_write(tmp_path, table_path, table_name):
-    T = pytable.Table(table_path)
+    T = Table(table_path)
     arrow_table = T.read_table(0, T.nrow())
     import pyarrow.parquet as pq
     print(arrow_table)
@@ -79,7 +79,7 @@ def variable_table(tmp_path):
     return table_name
 
 def test_variable_column():
-    T = pytable.Table("/home/simon/code/casa-arrow/casa_arrow/tests/table3.table")
+    T = Table("/home/simon/code/casa-arrow/casa_arrow/tests/table3.table")
     arrow_table = T.read_table(0, T.nrow())
     foo = arrow_table.column("FOO")
     assert len(foo) == 10
@@ -88,11 +88,10 @@ def test_variable_column():
 
 
 def test_segfault():
-    T = pytable.Table("blah")
+    T = Table("blah")
 
 def test_duckdb():
-    from casa_arrow import pytable
-    T = pytable.Table("/home/simon/data/WSRT_polar.MS_p0")
+    T = Table("/home/simon/data/WSRT_polar.MS_p0")
     import duckdb
     import pyarrow as pa
     import pyarrow.dataset as pad
