@@ -24,7 +24,7 @@ SafeTableProxy::Make(const casacore::String & filename) {
     auto proxy = std::shared_ptr<SafeTableProxy>(new SafeTableProxy());
     ARROW_ASSIGN_OR_RAISE(proxy->io_pool, arrow::internal::ThreadPool::Make(1));
 
-    // Indicate the table is closed so that if construction fails, we don't try to close it
+    // Mark as closed so that if construction fails, we don't try to close it
     proxy->is_closed = true;
 
     auto future = arrow::DeferNotOk(proxy->io_pool->Submit([&]() -> arrow::Result<std::shared_ptr<casacore::TableProxy>> {
@@ -131,7 +131,7 @@ SafeTableProxy::read_table(casacore::uInt startrow, casacore::uInt nrow) const {
             {CASA_ARROW_METADATA}, {json_oss.str()});
 
         auto schema = arrow::schema(fields, table_metadata);
-        return arrow::Table::Make(std::move(schema), arrays, nrow);
+        return arrow::Table::Make(std::move(schema), arrays, nrow_);
     }));
 }
 
