@@ -17,7 +17,7 @@ public:
   explicit ComplexType(const std::shared_ptr<DataType>& storage_type)
     : ExtensionType(fixed_size_list(storage_type, 2)) {}
 
-  std::shared_ptr<arrow::DataType> value_type(void) {
+  std::shared_ptr<arrow::DataType> value_type(void) const {
     return arrow::internal::checked_cast<const arrow::FixedSizeListType*>(this->storage_type().get())->value_type();
   }
 };
@@ -58,10 +58,10 @@ class ComplexDoubleArray : public arrow::ExtensionArray {
   using arrow::ExtensionArray::ExtensionArray;
 };
 
-class ComplexDoubleType : public arrow::ExtensionType {
+class ComplexDoubleType : public ComplexType {
  public:
   explicit ComplexDoubleType()
-      : arrow::ExtensionType(arrow::float64()) {}
+      : ComplexType(arrow::float64()) {}
 
   std::string name() const override {
     return "complex128";

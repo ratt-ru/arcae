@@ -457,6 +457,25 @@ tomli = {version = ">=1.0.0", markers = "python_version < \"3.11\""}
 testing = ["argcomplete", "hypothesis (>=3.56)", "mock", "nose", "pygments (>=2.7.2)", "requests", "xmlschema"]
 
 [[package]]
+name = "python-casacore"
+version = "3.5.2"
+description = "A wrapper around CASACORE, the radio astronomy library"
+category = "dev"
+optional = false
+python-versions = "*"
+files = [
+    {file = "python_casacore-3.5.2-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:e58723013dd1f4b456ca3cc9485df8a7949bd20cc81050835458fb03fdfac47d"},
+    {file = "python_casacore-3.5.2-cp36-cp36m-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:c62b08e01af9d93829a771869bf1d0e42c5e44c2abc1217e3485714ed7b321f4"},
+    {file = "python_casacore-3.5.2-cp37-cp37m-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:ff9251e0cac9cf69db27d4b3ccaa2aacf38005856b704cf4806e2c3e44eeed66"},
+    {file = "python_casacore-3.5.2-cp38-cp38-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:702dade7a21069158839a74d9bbb770cb95bd1c1d9f4d54a79db1e4a71d01b5a"},
+    {file = "python_casacore-3.5.2-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:69adea36329d913c350d7e9c8e0cb78fafbefed044c188081d7d1bcdda072425"},
+]
+
+[package.dependencies]
+numpy = "*"
+six = "*"
+
+[[package]]
 name = "six"
 version = "1.16.0"
 description = "Python 2 and 3 compatibility utilities"
@@ -531,4 +550,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.8"
-content-hash = "36353cd911723446eb0b0ec5bfe4a5b27e6465541bac75832a8a135945853658"
+content-hash = "41278e3ad65fdc52060e30868cb21947b3b90d216055d65a2b26ebcf52d072b7"
