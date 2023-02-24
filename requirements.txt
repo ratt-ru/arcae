@@ -1,0 +1,7 @@
+cython>=0.29.33,<0.30.0
+numpy>=1.24.1,<2.0.0
+pyarrow @ https://ratt-public-data.s3.af-south-1.amazonaws.com/wheels/pyarrow-12.0.0.dev13242%2Bgdbb4473-cp38-cp38-manylinux_2_28_x86_64.whl
+pytest>=7.2.1,<8.0.0
+python-casacore>=3.5.2,<4.0.0
+requests
+appdirs

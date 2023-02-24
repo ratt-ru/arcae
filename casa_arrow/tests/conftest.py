@@ -1,8 +1,67 @@
 import multiprocessing as mp
 import os
+from pathlib import Path
+from hashlib import sha256
 
+from appdirs import user_cache_dir
 import numpy as np
+import requests
+import tarfile
 import pytest
+
+TAU_MS = "HLTau_B6cont.calavg.tav300s"
+TAU_MS_TAR = f"{TAU_MS}.tar.xz"
+TAU_MS_TAR_HASH = "fc2ce9261817dfd88bbdd244c8e9e58ae0362173938df6ef2a587b1823147f70"
+DATA_URL = f"https://ratt-public-data.s3.af-south-1.amazonaws.com/test-data/{TAU_MS_TAR}"
+
+
+
+
+def download_tau_ms(tau_ms_tar):
+    if tau_ms_tar.exists():
+        with open(tau_ms_tar, "rb") as f:
+            digest = sha256()
+
+            while data := f.read(2**20):
+                digest.update(data)
+
+            if digest.hexdigest() == TAU_MS_TAR_HASH:
+                return
+
+            tau_ms_tar.unlink(missing_ok=True)
+            raise ValueError(
+                f"sha256 digest '{digest.hexdigest()}' "
+                f"of {tau_ms_tar} does not match "
+                f"{TAU_MS_TAR_HASH}"
+            )
+    else:
+        response = requests.get(DATA_URL)
+
+        with open(tau_ms_tar, "wb") as fout:
+            digest = sha256()
+            digest.update(response.content)
+
+            if digest.hexdigest() != TAU_MS_TAR_HASH:
+                raise ValueError(
+                    f"SHA256 digest mismatch for {DATA_URL}. "
+                    f"{digest.hexdigest()} != {TAU_MS_TAR_HASH}")
+
+            fout.write(response.content)
+
+
+@pytest.fixture(scope="function")
+def tau_ms(tmp_path_factory):
+    cache_dir = Path(user_cache_dir("casa-arrow")) / "test-data"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    tau_ms_tar = cache_dir / TAU_MS_TAR
+
+    download_tau_ms(tau_ms_tar)
+    msdir = tmp_path_factory.mktemp("taums")
+
+    with tarfile.open(tau_ms_tar) as tar:
+        tar.extractall(msdir)
+
+    yield str(msdir / TAU_MS)
 
 
 def generate_column_cases_table(path):

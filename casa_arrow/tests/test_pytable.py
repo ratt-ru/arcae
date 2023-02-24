@@ -10,22 +10,15 @@ import pytest
 from casa_arrow.arrow_tables import Table
 
 
-@pytest.mark.parametrize("table_path, table_name", [
-    ("/home/simon/data/WSRT_polar.MS_p0", "MAIN"),
-    ("/home/simon/data/WSRT_polar.MS_p0::ANTENNA", "ANTENNA"),
-    ("/home/simon/data/WSRT_polar.MS_p0::FEED", "FEED"),
-    ("/home/simon/data/WSRT_polar.MS_p0::POLARIZATION", "POLARIZATION"),
-    ("/home/simon/data/WSRT_polar.MS_p0::SPECTRAL_WINDOW", "SPECTRAL_WINDOW"),
-
-    ("/home/simon/data/HLTau_B6cont.calavg.tav300s", "MAIN"),
-    ("/home/simon/data/HLTau_B6cont.calavg.tav300s::ANTENNA", "ANTENNA"),
-    ("/home/simon/data/HLTau_B6cont.calavg.tav300s::FEED", "FEED"),
-    ("/home/simon/data/HLTau_B6cont.calavg.tav300s::POLARIZATION", "POLARIZATION"),
-    ("/home/simon/data/HLTau_B6cont.calavg.tav300s::SPECTRAL_WINDOW", "SPECTRAL_WINDOW"),
-
-], ids=lambda id: Path(id).stem if id.startswith("/") else id)
-def test_parquet_write(tmp_path, table_path, table_name):
-    T = Table(table_path).read_table()
+@pytest.mark.parametrize("table_suffix, table_name", [
+    ("", "MAIN"),
+    ("::ANTENNA", "ANTENNA"),
+    ("::FEED", "FEED"),
+    ("::POLARIZATION", "POLARIZATION"),
+    ("::SPECTRAL_WINDOW", "SPECTRAL_WINDOW"),
+])
+def test_parquet_write(tmp_path, tau_ms, table_suffix, table_name):
+    T = Table(f"{tau_ms}{table_suffix}").read_table()
     pq.write_table(T, str(tmp_path / f"{table_name}.parquet"))
 
 def test_column_cases(column_case_table, capfd):
@@ -61,8 +54,8 @@ def test_column_cases(column_case_table, capfd):
     assert "Ignoring UNCONSTRAINED" in captured.err
 
 def test_duckdb():
-    T = Table("/home/simon/data/WSRT_polar.MS_p0")
     duckdb = pytest.importorskip("duckdb")
+    T = Table("/home/simon/data/WSRT_polar.MS_p0")
     import pyarrow as pa
     import pyarrow.dataset as pad
 

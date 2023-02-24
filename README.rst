@@ -5,36 +5,51 @@ C++ and Python Arrow Bindings for casacore
 Rationale
 ---------
 
-* Apache Arrow Tables have very similar structure to CASA Tables
+* The structure of Apache Arrow Tables is highly similar to that of CASA Tables
 * It's easy to convert Arrow Tables between many different languages
 * Converting CASA Tables to Arrow in the C++ layer avoids the GIL
-* It also gives us access to CASA astronometric routines.
+* Once in Apache Arrow format, it is easy to store data in modern, cloud-native disk formats such as parquet and orc.
+* Access to non thread-safe CASA Tables is constrained to a ThreadPool containing a single thread
+* It also allows us to write astrometric routines in C++, potentially side-stepping thread-safety and GIL issues with the CASA Measures server.
 
 Building
 --------
 
-* Install casacore C++ libraries and headers, most easily done by installing KERN
-* Install Apache Arrow libraries, following instructions for C++ `here <https://arrow.apache.org/install/>`_.
-* Install cmake
+This guide is targeted at Ubuntu 20.04, mostly because it provides an easy
+install of casacore via kernsuite.
+This guide can be adapted to other OS's if you're willing to build casacore yourself.
+This software should be built with the new C++11 ABI.
 
-.. code-block:: bash
+* Install casacore C++ libraries and headers via `kernsuite <https://kernsuite.info/installation/>`_.
 
-    $ mkdir build
-    $ cd build
-    $ cmake ..
-    $ cmake --build .
+  .. code-block:: bash
 
+    $ sudo apt install casacore-dev
 
-Then, the following should convert an MS table to an Arrow table and print it.
+  Note this installs a version of casacore built with the new C++11 ABI: `-D_GLIBCXX_USE_CXX11_ABI=1``
 
-.. code-block:: bash
+* Create a Python 3.8 virtual environment and built the Cython extension
 
-    $ src/tests/test_runner
+  .. code-block:: bash
+
+    $ virtualenv -p python3.8 ~/venv/carrow
+    $ source ~/venv/carrow/bin/activate
+    (carrow) $ pip install -U pip setuptools wheel
+    (carrow) $ pip install -r requirements.txt
+    (carrow) $ python setup.py build_ext --inplace
+
+* Run the test cases
+
+  .. code-block::
+
+    (carrow) $ py.test -s -vvv
+
 
 Limitations
 -----------
 
-* Only converts ScalarColumns at present (ANTENNA1, TIME)
-* FixedShape ArrayColumns (DATA, FLAG, UVW) should be easy enough
-* Variably shaped columns are completely possibly to represent with Arrow ListTypes!
+Some edge cases have not yet been implemented, but could be with some thought.
 
+* Not yet able to handle columns with unconstrained rank (ndim == -1).
+* Not yet able to handle TpRecord columns. Probably easiest to convert these rows to json and store as a string.
+* Not yet able to handle TpQuantity columns. Possible to represent as a run-time parametric Arrow DataType.
