@@ -7,10 +7,12 @@ Rationale
 
 * The structure of Apache Arrow Tables is highly similar to that of CASA Tables
 * It's easy to convert Arrow Tables between many different languages
-* Converting CASA Tables to Arrow in the C++ layer avoids the GIL
 * Once in Apache Arrow format, it is easy to store data in modern, cloud-native disk formats such as parquet and orc.
+* Converting CASA Tables to Arrow in the C++ layer avoids the GIL
 * Access to non thread-safe CASA Tables is constrained to a ThreadPool containing a single thread
-* It also allows us to write astrometric routines in C++, potentially side-stepping thread-safety and GIL issues with the CASA Measures server.
+* It also allows us to write astrometric routines in C++, potentially side-stepping thread-safety
+  and GIL issues with the CASA Measures server.
+
 
 Building
 --------
@@ -26,9 +28,9 @@ This software should be built with the new C++11 ABI.
 
     $ sudo apt install casacore-dev
 
-  Note this installs a version of casacore built with the new C++11 ABI: `-D_GLIBCXX_USE_CXX11_ABI=1``
+  Note this installs a version of casacore built with the new C++11 ABI: `-D_GLIBCXX_USE_CXX11_ABI=1`
 
-* Create a Python 3.8 virtual environment and built the Cython extension
+* Create a Python 3.8 virtual environment and built the Cython extension.
 
   .. code-block:: bash
 
@@ -38,6 +40,8 @@ This software should be built with the new C++11 ABI.
     (carrow) $ pip install -r requirements.txt
     (carrow) $ python setup.py build_ext --inplace
 
+* Note that `requirements.txt` contains a custom Python 3.8 pyarrow manylinux_2_28 wheel
+  built with `-D_GLIBCXX_USE_CXX11_ABI=1`
 * Run the test cases
 
   .. code-block::
