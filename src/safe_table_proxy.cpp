@@ -39,7 +39,7 @@ SafeTableProxy::Make(const casacore::String & filename) {
             return std::make_shared<casacore::TableProxy>(
                 filename, record, casacore::Table::TableOption::Old);
         } catch(std::exception & e) {
-            return arrow::Status::Invalid("Error opening ", filename);
+            return arrow::Status::Invalid(e.what());
         }
     }));
 
