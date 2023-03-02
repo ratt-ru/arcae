@@ -18,12 +18,7 @@ ENV BOOST_ 1_${BOOSTMAJOR}_${BOOSTMINOR}
 ENV CASACORE_DATA /usr/share/casacore/data
 
 # how many threads to use for compiling
-ENV THREADS 4
-
-# install the EPEL repository
-RUN yum install -y dnf
-#RUN dnf config-manager --set-enabled powertools
-#RUN dnf -y install epel-release
+ENV THREADS 8
 
 # install rpms
 RUN yum install -y flex cfitsio-devel blas-devel lapack-devel ncurses-devel readline-devel fftw-devel wcslib-devel gsl-devel
@@ -34,8 +29,6 @@ RUN curl http://www.iausofa.org/2015_0209_F/sofa_f-20150209_a.tar.gz --output /t
 RUN curl ftp://ftp.astron.nl/outgoing/Measures/WSRT_Measures.ztar --output /tmp/measures.tgz
 RUN curl https://boostorg.jfrog.io/artifactory/main/release/${BOOST}/source/boost_${BOOST_}.tar.bz2 -L --output /tmp/boost.tar.bz2
 RUN curl http://github.com/casacore/casacore/tarball/v${CASACORE_VERSION} -L --output /tmp/casascore.tar.gz
-# NOTE(sjperkins): Remove once manylinux_2_28 arrow build is available
-RUN curl http://github.com/apache/arrow/tarball/apache-arrow-${ARROW_VERSION} -L --output /tmp/arrow.tar.gz
 
 RUN mkdir /build
 
