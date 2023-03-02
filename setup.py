@@ -9,26 +9,25 @@ import numpy as np
 import pyarrow as pa
 
 
-packages = ['casa_arrow', 'casa_arrow.tests']
+packages = ["casa_arrow", "casa_arrow.tests"]
 
-package_data = \
-{'': ['*']}
+package_data = {"": ["*"]}
 
 setup_kwargs = {
-    'name': 'casa-arrow',
-    'version': '0.1.0',
-    'description': '',
-    'long_description': "C++ and Python Arrow Bindings for casacore",
-    'author': 'Simon Perkins',
-    'author_email': 'simon.perkins@gmail.com',
-    'maintainer': 'None',
-    'maintainer_email': 'None',
-    'url': 'None',
-    'packages': packages,
-    'package_data': package_data,
-    'python_requires': '>=3.8,<4.0',
+    "name": "casa-arrow",
+    "version": "0.1.0",
+    "description": "",
+    "long_description": "C++ and Python Arrow Bindings for casacore",
+    "author": "Simon Perkins",
+    "author_email": "simon.perkins@gmail.com",
+    "maintainer": "None",
+    "maintainer_email": "None",
+    "url": "None",
+    "packages": packages,
+    "package_data": package_data,
+    "python_requires": ">=3.8,<4.0",
+    "setup_requires": ["pyarrow == 11.0.0"],
 }
-
 
 
 def build(setup_kwargs: Dict[str, Any]):
@@ -43,7 +42,6 @@ def build(setup_kwargs: Dict[str, Any]):
         print(f"include_dirs={include_dirs}", file=f)
         print(f"library_dirs={library_dirs}", file=f)
         print(f"libraries={libraries}", file=f)
-
 
     ext_modules = cythonize("casa_arrow/arrow_tables.pyx")
 
