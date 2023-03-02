@@ -55,7 +55,7 @@ def build(setup_kwargs: Dict[str, Any]):
         ext.sources.extend(list(sorted(glob("src/*.cpp"))))
 
         if os.name == "posix":
-            ext.extra_compile_args.extend(["--std=c++17", "-D_GLIBCXX_USE_CXX11_ABI=1"])
+            ext.extra_compile_args.extend(["--std=c++17"])
 
     setup_kwargs.update(
         {

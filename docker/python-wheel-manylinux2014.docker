@@ -60,7 +60,6 @@ RUN ./bootstrap.sh --prefix=/opt/boost \
     --with-python-version=${PYMAJOR}.${PYMINOR} \
     --with-python-root=/opt/python/${TARGET}
 RUN ./b2 -j${THREADS} \
-    define=_GLIBCXX_USE_CXX11_ABI=0 \
     cxxflags="-fPIC -I/opt/python/${TARGET}/include/python${PYMAJOR}.${PYMINOR}${PYUNICODE}/" \
     link=static,shared install
 
@@ -76,7 +75,6 @@ RUN chown -R casacore.casacore /code/casacore
 USER casacore
 WORKDIR /code/casacore/build
 RUN cmake .. \
-    -DCMAKE_CXX_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=0" \
     -DPython3_ROOT_DIR=/opt/python/${TARGET} \
     -DPython3_EXECUTABLE=/opt/python/${TARGET}/bin/python3 \
     -DPython3_LIBRARY=/opt/boost/lib/libboost_python${PYMAJOR}${PYMINOR}.so \
