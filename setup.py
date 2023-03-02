@@ -14,10 +14,6 @@ packages = ['casa_arrow', 'casa_arrow.tests']
 package_data = \
 {'': ['*']}
 
-install_requires = \
-['cython>=0.29.33,<0.30.0',
- 'numpy>=1.24.1,<2.0.0']
-
 setup_kwargs = {
     'name': 'casa-arrow',
     'version': '0.1.0',
@@ -30,7 +26,6 @@ setup_kwargs = {
     'url': 'None',
     'packages': packages,
     'package_data': package_data,
-    'install_requires': install_requires,
     'python_requires': '>=3.8,<4.0',
 }
 
