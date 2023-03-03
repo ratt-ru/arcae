@@ -85,4 +85,5 @@ ADD . /code/casa-arrow
 WORKDIR /code/casa-arrow
 RUN /opt/python/${TARGET}/bin/python -m pip install -U pip wheel setuptools auditwheel build patchelf
 RUN /opt/python/${TARGET}/bin/python -m build --wheel
-RUN auditwheel repair dist/* --plat=manylinux2014_x86_64 --exclude libarrow_python.so --exclude libarrow.so.1100
+RUN mkdir -p /wheels
+RUN auditwheel repair dist/* -w /wheels --plat=manylinux2014_x86_64 --exclude libarrow_python.so --exclude libarrow.so.1100
