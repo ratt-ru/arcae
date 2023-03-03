@@ -1,36 +1,14 @@
 # -*- coding: utf-8 -*-
 from glob import glob
 import os
-from setuptools import setup
-from typing import Dict, Any
+from setuptools import setup, find_packages
 
 from Cython.Build import cythonize
 import numpy as np
 import pyarrow as pa
 
 
-packages = ["casa_arrow", "casa_arrow.tests"]
-
-package_data = {"": ["*"]}
-
-setup_kwargs = {
-    "name": "casa-arrow",
-    "version": "0.1.0",
-    "description": "",
-    "long_description": "C++ and Python Arrow Bindings for casacore",
-    "author": "Simon Perkins",
-    "author_email": "simon.perkins@gmail.com",
-    "maintainer": "None",
-    "maintainer_email": "None",
-    "url": "None",
-    "packages": packages,
-    "package_data": package_data,
-    "python_requires": ">=3.8,<4.0",
-    "setup_requires": ["pyarrow == 11.0.0"],
-}
-
-
-def build(setup_kwargs: Dict[str, Any]):
+def create_extensions():
     casa_libs = ["casa_derivedmscal", "casa_meas", "casa_ms", "casa_tables"]
 
     pa.create_library_symlinks()
@@ -55,14 +33,13 @@ def build(setup_kwargs: Dict[str, Any]):
         if os.name == "posix":
             ext.extra_compile_args.extend(["--std=c++17"])
 
-    setup_kwargs.update(
-        {
+    root = "casa_arrow"
+
+    return {
             "ext_modules": ext_modules,
-            "zip_safe": False,
-        }
-    )
+            "packages": [root] + [f"{root}.{item}" for item in find_packages(where=root)],
+            "include_package_data": True,
+     }
 
 
-build(setup_kwargs)
-
-setup(**setup_kwargs)
+setup(**create_extensions())
