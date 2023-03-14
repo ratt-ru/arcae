@@ -131,7 +131,14 @@ SafeTableProxy::read_table(casacore::uInt startrow, casacore::uInt nrow) const {
             {CASA_ARROW_METADATA}, {json_oss.str()});
 
         auto schema = arrow::schema(fields, table_metadata);
-        return arrow::Table::Make(std::move(schema), arrays, nrow_);
+        auto table = arrow::Table::Make(std::move(schema), arrays, nrow_);
+        auto status = table->Validate();
+
+        if(status.ok()) {
+            return table;
+        } else {
+            return status;
+        }
     }));
 }
 
