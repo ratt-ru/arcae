@@ -61,7 +61,7 @@ def tau_ms(tmp_path_factory):
     with tarfile.open(tau_ms_tar) as tar:
         tar.extractall(msdir)
 
-    yield str(msdir / TAU_MS)
+    return str(msdir / TAU_MS)
 
 
 def generate_column_cases_table(path):
@@ -196,10 +196,8 @@ def column_case_table(tmp_path_factory):
     # Generate casa table in a spawned process, otherwise
     # the pyrap.tables casacore libraries will be loaded in
     # and interfere with system casacore libraries
-    mp.set_start_method('spawn')
-
     path = tmp_path_factory.mktemp("column_cases")
 
-    with mp.Pool(1) as pool:
+    with mp.get_context("spawn").Pool(1) as pool:
         result = pool.apply_async(generate_column_cases_table, (str(path),))
         return result.get()
