@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from glob import glob
 import os
-from setuptools import setup, find_packages
+from setuptools import setup, find_packages, Extension
 
 from Cython.Build import cythonize
 import numpy as np
@@ -21,7 +21,8 @@ def create_extensions():
         print(f"library_dirs={library_dirs}", file=f)
         print(f"libraries={libraries}", file=f)
 
-    ext_modules = cythonize("casa_arrow/arrow_tables.pyx")
+    ext_modules = [Extension("casa_arrow._arrow_tables", ["casa_arrow/*.pyx"])]
+    ext_modules = cythonize(ext_modules)
 
     for ext in ext_modules:
         # The Numpy C headers are currently required
