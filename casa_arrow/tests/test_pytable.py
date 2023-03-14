@@ -7,7 +7,7 @@ import pyarrow.parquet as pq
 
 import pytest
 
-from casa_arrow.arrow_tables import Table
+from casa_arrow._arrow_tables import Table
 
 
 @pytest.mark.parametrize("table_suffix, table_name", [
