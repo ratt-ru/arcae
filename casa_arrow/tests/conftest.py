@@ -69,6 +69,22 @@ def tau_ms(tau_ms_tar, tmp_path_factory):
     return str(msdir / TAU_MS)
 
 
+@pytest.fixture(scope="session")
+def partitioned_dataset(tau_ms, tmp_path_factory):
+    from casa_arrow._arrow_tables import Table
+    import pyarrow as pa
+    import pyarrow.dataset as pad
+
+    dsdir = tmp_path_factory.mktemp("partition-dataset")
+
+    AT = Table(tau_ms).read_table()
+    partition_fields = [AT.schema.field(c) for c in ("FIELD_ID", "DATA_DESC_ID")]
+    partition = pad.partitioning(pa.schema(partition_fields), flavor="hive")
+    pad.write_dataset(AT, dsdir, partitioning=partition, format="parquet")
+
+    return dsdir
+
+
 def generate_column_cases_table(path):
     import pyrap.tables as pt
     nrow = 3
