@@ -49,14 +49,19 @@ def download_tau_ms(tau_ms_tar):
             fout.write(response.content)
 
 
-@pytest.fixture(scope="function")
-def tau_ms(tmp_path_factory):
+@pytest.fixture(scope="session")
+def tau_ms_tar():
     cache_dir = Path(user_cache_dir("casa-arrow")) / "test-data"
     cache_dir.mkdir(parents=True, exist_ok=True)
     tau_ms_tar = cache_dir / TAU_MS_TAR
 
     download_tau_ms(tau_ms_tar)
-    msdir = tmp_path_factory.mktemp("taums")
+    return tau_ms_tar
+
+
+@pytest.fixture(scope="module")
+def tau_ms(tau_ms_tar, tmp_path_factory):
+    msdir = tmp_path_factory.mktemp("tau-ms")
 
     with tarfile.open(tau_ms_tar) as tar:
         tar.extractall(msdir)
