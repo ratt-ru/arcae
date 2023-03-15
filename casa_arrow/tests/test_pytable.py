@@ -1,8 +1,6 @@
-import os
-from pathlib import Path
-
 import numpy as np
 import pyarrow as pa
+import pyarrow.dataset as pad
 import pyarrow.parquet as pq
 
 import pytest
@@ -53,13 +51,26 @@ def test_column_cases(column_case_table, capfd):
     assert "UNCONSTRAINED" not in T.column_names
     assert "Ignoring UNCONSTRAINED" in captured.err
 
-def test_duckdb():
-    duckdb = pytest.importorskip("duckdb")
-    T = Table("/home/simon/data/WSRT_polar.MS_p0")
-    import pyarrow as pa
-    import pyarrow.dataset as pad
 
-    observation = pad.dataset("/tmp/pytest-of-simon/pytest-current/test_parquet_write_HLTau_B6con0/")
+def test_dataset_predicates(tau_ms, tmp_path):
+    pq.write_table(Table(tau_ms).read_table(), str(tmp_path / f"MAIN.parquet"))
+    dataset = pad.dataset(tmp_path)
+    predicate = ((pad.field("ANTENNA1") >= 0) & (pad.field("ANTENNA1") < 2) &
+                 (pad.field("ANTENNA2") >= 2) & (pad.field("ANTENNA2") <= 3))
+
+    T = dataset.to_table(filter=predicate)
+    antenna1 = T.column("ANTENNA1").to_numpy()
+    antenna2 = T.column("ANTENNA2").to_numpy()
+
+    assert np.all(antenna1 >= 0) and np.all(antenna1 < 2)
+    assert np.all(antenna2 >= 2) and np.all(antenna2 <= 3)
+
+
+def test_duckdb(tau_ms, tmp_path):
+    duckdb = pytest.importorskip("duckdb")
+    pq.write_table(Table(tau_ms).read_table(), str(tmp_path / f"MAIN.parquet"))
+
+    observation = pad.dataset(tmp_path)  # noqa
     con = duckdb.connect()
 
     query = con.execute(f"SELECT TIME, ANTENNA1, ANTENNA2, DATA FROM observation "
@@ -75,4 +86,10 @@ def test_duckdb():
         except StopIteration:
             break
 
-    data = pa.Table.from_batches(chunks)
+    query_table = pa.Table.from_batches(chunks)
+    antenna1 = query_table.column("ANTENNA1").to_numpy()
+    antenna2 = query_table.column("ANTENNA2").to_numpy()
+
+    assert np.all(antenna1 >= 0) and np.all(antenna1 < 2)
+    assert np.all(antenna2 >= 2) and np.all(antenna2 <= 3)
+

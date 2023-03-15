@@ -59,7 +59,7 @@ def tau_ms_tar():
     return tau_ms_tar
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="session")
 def tau_ms(tau_ms_tar, tmp_path_factory):
     msdir = tmp_path_factory.mktemp("tau-ms")
 
