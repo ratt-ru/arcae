@@ -111,7 +111,7 @@ SafeTableProxy::to_arrow(casacore::uInt startrow, casacore::uInt nrow) const {
                 {CASA_ARROW_METADATA}, {json_oss.str()});
             auto arrow_field = std::make_shared<arrow::Field>(
                 column_names[i], visitor.array->type(),
-                true, column_metadata);
+                true, std::move(column_metadata));
             fields.emplace_back(std::move(arrow_field));
             arrays.emplace_back(std::move(visitor.array));
         }
@@ -126,7 +126,7 @@ SafeTableProxy::to_arrow(casacore::uInt startrow, casacore::uInt nrow) const {
         auto table_metadata = arrow::KeyValueMetadata::Make(
             {CASA_ARROW_METADATA}, {json_oss.str()});
 
-        auto schema = arrow::schema(fields, table_metadata);
+        auto schema = arrow::schema(fields, std::move(table_metadata));
         auto table = arrow::Table::Make(std::move(schema), arrays, nrow_);
         auto status = table->Validate();
 
