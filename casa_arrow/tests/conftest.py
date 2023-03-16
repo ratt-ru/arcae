@@ -86,7 +86,6 @@ def partitioned_dataset(tau_ms, tmp_path_factory):
 def generate_column_cases_table(path):
     import pyrap.tables as pt
     import numpy as np
-    nrow = 3
 
     # Table descriptor
     table_desc = [
@@ -193,6 +192,7 @@ def generate_column_cases_table(path):
 
     table_desc = pt.maketabdesc(table_desc)
     table_name = os.path.join(path, "test.table")
+    nrow = 3
 
     with pt.table(table_name, table_desc, nrow=nrow, ack=False) as T:
         for i in range(nrow):
@@ -206,7 +206,10 @@ def generate_column_cases_table(path):
 
         T.putcell("UNCONSTRAINED", 0, np.full((2, 3, 4), 0))
         T.putcell("UNCONSTRAINED", 1, np.full((4, 3), 1))
-        T.putcell("UNCONSTRAINED", 1, 1)
+        T.putcell("UNCONSTRAINED", 2, 2)
+
+        for i in range(nrow):  # Sanity check
+            assert T.iscelldefined("UNCONSTRAINED", i)
 
     return table_name
 
