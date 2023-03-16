@@ -11,13 +11,14 @@ TAU_MS = "HLTau_B6cont.calavg.tav300s"
 TAU_MS_TAR = f"{TAU_MS}.tar.xz"
 TAU_MS_TAR_HASH = "fc2ce9261817dfd88bbdd244c8e9e58ae0362173938df6ef2a587b1823147f70"
 DATA_URL = f"https://ratt-public-data.s3.af-south-1.amazonaws.com/test-data/{TAU_MS_TAR}"
+DATA_CHUNK_SIZE = 2**20
 
 def download_tau_ms(tau_ms_tar):
     if tau_ms_tar.exists():
         with open(tau_ms_tar, "rb") as f:
             digest = sha256()
 
-            while data := f.read(2**20):
+            while data := f.read(DATA_CHUNK_SIZE):
                 digest.update(data)
 
             if digest.hexdigest() == TAU_MS_TAR_HASH:
@@ -28,19 +29,19 @@ def download_tau_ms(tau_ms_tar):
                 f"SHA256 digest mismatch for {tau_ms_tar}. "
                 f"{digest.hexdigest()} != {TAU_MS_TAR_HASH}")
     else:
-        response = requests.get(DATA_URL)
+        response = requests.get(DATA_URL, stream=True)
 
         with open(tau_ms_tar, "wb") as fout:
             digest = sha256()
-            digest.update(response.content)
+
+            for data in response.iter_content(chunk_size=DATA_CHUNK_SIZE):
+                digest.update(data)
+                fout.write(data)
 
             if digest.hexdigest() != TAU_MS_TAR_HASH:
                 raise ValueError(
                     f"SHA256 digest mismatch for {DATA_URL}. "
                     f"{digest.hexdigest()} != {TAU_MS_TAR_HASH}")
-
-            fout.write(response.content)
-
 
 @pytest.fixture(scope="session")
 def tau_ms_tar():
