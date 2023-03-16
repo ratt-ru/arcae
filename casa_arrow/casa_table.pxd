@@ -39,3 +39,6 @@ cdef extern from "../src/complex_type.h" nogil:
 
     cdef cppclass CComplexFloatArray" ComplexFloatArray":
         pass
+
+    shared_ptr[CDataType] complex64()
+    shared_ptr[CDataType] complex128()

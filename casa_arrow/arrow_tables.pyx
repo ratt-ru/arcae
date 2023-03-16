@@ -29,6 +29,8 @@ from casa_arrow.casa_table cimport (CCasaTable,
                                     CComplexFloatArray,
                                     CComplexDoubleType,
                                     CComplexFloatType,
+                                    complex64,
+                                    complex128,
                                     UINT_MAX)
 
 
@@ -56,14 +58,14 @@ cdef class ComplexDoubleArray(ExtensionArray):
 
 cdef class ComplexDoubleType(ComplexType):
     def __init__(self):
-        ComplexType.init(self, <shared_ptr[CDataType]>make_shared[CComplexDoubleType]())
+        ComplexType.init(self, complex128())
 
     def __arrow_ext_class__(self):
         return ComplexDoubleArray
 
 cdef class ComplexFloatType(ComplexType):
     def __init__(self):
-        ComplexType.init(self, <shared_ptr[CDataType]>make_shared[CComplexFloatType]())
+        ComplexType.init(self, complex64())
 
     def __arrow_ext_class__(self):
         return ComplexFloatArray
