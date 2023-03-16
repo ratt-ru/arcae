@@ -84,11 +84,11 @@ cdef class Table:
         with nogil:
             self.c_table = GetResultValue(CCasaTable.Make(cfilename))
 
-    def read_table(self, unsigned int startrow=0, unsigned int nrow=UINT_MAX):
+    def to_arrow(self, unsigned int startrow=0, unsigned int nrow=UINT_MAX):
         cdef shared_ptr[CTable] ctable
 
         with nogil:
-            ctable = GetResultValue(deref(self.c_table).read_table(startrow, nrow))
+            ctable = GetResultValue(deref(self.c_table).to_arrow(startrow, nrow))
 
         return pyarrow_wrap_table(ctable)
 

@@ -19,12 +19,12 @@ from casa_arrow._arrow_tables import Table
 ])
 def test_parquet_write(tmp_path, tau_ms, table_suffix, table_name):
     """ Test conversion of a representative MS and some of its subtables to parquet format """
-    T = Table(f"{tau_ms}{table_suffix}").read_table()
+    T = Table(f"{tau_ms}{table_suffix}").to_arrow()
     pq.write_table(T, str(tmp_path / f"{table_name}.parquet"))
 
 def test_column_cases(column_case_table, capfd):
     """ Test code paths """
-    T = Table(column_case_table).read_table()
+    T = Table(column_case_table).to_arrow()
 
     assert T.column("VARIABLE").to_pylist() == [
         [[[0, 0]], [[0, 0]], [[0, 0]]],
