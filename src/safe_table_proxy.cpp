@@ -12,11 +12,7 @@ SafeTableProxy::~SafeTableProxy() {
 
 
 arrow::Status SafeTableProxy::FailIfClosed() const {
-    if(is_closed) {
-        return arrow::Status::Invalid("Table is closed");
-    } else {
-        return arrow::Status::OK();
-    }
+    return is_closed ? arrow::Status::Invalid("Table is closed") : arrow::Status::OK();
 }
 
 arrow::Result<std::shared_ptr<SafeTableProxy>>

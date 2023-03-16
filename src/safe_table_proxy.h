@@ -25,7 +25,7 @@ private:
     bool is_closed;
 
 private:
-    arrow::Status FailIfClosed() const;
+    inline arrow::Status FailIfClosed() const;
 
 protected:
     SafeTableProxy() {};
