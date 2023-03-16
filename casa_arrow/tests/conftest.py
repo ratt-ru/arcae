@@ -3,8 +3,6 @@ import os
 from pathlib import Path
 from hashlib import sha256
 
-from appdirs import user_cache_dir
-import numpy as np
 import requests
 import tarfile
 import pytest
@@ -51,6 +49,7 @@ def download_tau_ms(tau_ms_tar):
 
 @pytest.fixture(scope="session")
 def tau_ms_tar():
+    from appdirs import user_cache_dir
     cache_dir = Path(user_cache_dir("casa-arrow")) / "test-data"
     cache_dir.mkdir(parents=True, exist_ok=True)
     tau_ms_tar = cache_dir / TAU_MS_TAR
@@ -71,13 +70,13 @@ def tau_ms(tau_ms_tar, tmp_path_factory):
 
 @pytest.fixture(scope="session")
 def partitioned_dataset(tau_ms, tmp_path_factory):
-    from casa_arrow._arrow_tables import Table
+    import casa_arrow as ca
     import pyarrow as pa
     import pyarrow.dataset as pad
 
     dsdir = tmp_path_factory.mktemp("partition-dataset")
 
-    AT = Table(tau_ms).to_arrow()
+    AT = ca.table(tau_ms).to_arrow()
     partition_fields = [AT.schema.field(c) for c in ("FIELD_ID", "DATA_DESC_ID")]
     partition = pad.partitioning(pa.schema(partition_fields), flavor="hive")
     pad.write_dataset(AT, dsdir, partitioning=partition,
@@ -90,6 +89,7 @@ def partitioned_dataset(tau_ms, tmp_path_factory):
 
 def generate_column_cases_table(path):
     import pyrap.tables as pt
+    import numpy as np
     nrow = 3
 
     # Table descriptor
