@@ -80,7 +80,10 @@ def partitioned_dataset(tau_ms, tmp_path_factory):
     AT = Table(tau_ms).to_arrow()
     partition_fields = [AT.schema.field(c) for c in ("FIELD_ID", "DATA_DESC_ID")]
     partition = pad.partitioning(pa.schema(partition_fields), flavor="hive")
-    pad.write_dataset(AT, dsdir, partitioning=partition, format="parquet")
+    pad.write_dataset(AT, dsdir, partitioning=partition,
+                      max_rows_per_group=25000,
+                      max_rows_per_file=25000,
+                      format="parquet")
 
     return dsdir
 
