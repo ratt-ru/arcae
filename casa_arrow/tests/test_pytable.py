@@ -80,10 +80,8 @@ def test_dataset_predicates(partitioned_dataset):
     antenna1 = T.column("ANTENNA1").to_numpy()
     antenna2 = T.column("ANTENNA2").to_numpy()
 
-    assert antenna1.size > 0 and antenna2.size > 0
-    assert np.all(antenna1 >= 0) and np.all(antenna1 < 2)
-    assert np.all(antenna2 >= 2) and np.all(antenna2 <= 3)
-
+    assert antenna1.size > 0 and np.all((antenna1 >= 0) & (antenna1 < 2))
+    assert antenna2.size > 0 and np.all((antenna2 >= 2) & (antenna2 <= 3))
 
 def test_duckdb(partitioned_dataset):
     """ Illustrate integation between dataset and duckdb"""
@@ -108,7 +106,5 @@ def test_duckdb(partitioned_dataset):
     antenna1 = query_table.column("ANTENNA1").to_numpy()
     antenna2 = query_table.column("ANTENNA2").to_numpy()
 
-    assert antenna1.size > 0 and antenna2.size > 0
-    assert np.all(antenna1 >= 0) and np.all(antenna1 < 2)
-    assert np.all(antenna2 >= 2) and np.all(antenna2 <= 3)
-
+    assert antenna1.size > 0 and np.all((antenna1 >= 0) & (antenna1 < 2))
+    assert antenna2.size > 0 and np.all((antenna2 >= 2) & (antenna2 <= 3))
