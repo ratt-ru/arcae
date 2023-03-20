@@ -78,8 +78,6 @@ SafeTableProxy::to_arrow(casacore::uInt startrow, casacore::uInt nrow) const {
         auto fields = arrow::FieldVector();
         auto arrays = arrow::ArrayVector();
 
-        std::ostringstream json_oss;
-
         for(casacore::uInt i=0; i < table_desc.ncolumn(); ++i) {
             auto table_column = casacore::TableColumn(casa_table, i);
             auto column_desc = table_column.columnDesc();
@@ -100,7 +98,7 @@ SafeTableProxy::to_arrow(casacore::uInt startrow, casacore::uInt nrow) const {
             }
 
 
-            json_oss.seekp(0);
+            std::ostringstream json_oss;
             casacore::JsonOut column_json(json_oss);
 
             column_json.start();
@@ -116,7 +114,7 @@ SafeTableProxy::to_arrow(casacore::uInt startrow, casacore::uInt nrow) const {
             arrays.emplace_back(std::move(visitor.array));
         }
 
-        json_oss.seekp(0);
+        std::ostringstream json_oss;
         casacore::JsonOut table_json(json_oss);
 
         table_json.start();
