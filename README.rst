@@ -17,8 +17,7 @@ Rationale
 Building
 --------
 
-This guide is targeted at Ubuntu 20.04, mostly because it provides an easy
-install of casacore via kernsuite.
+This guide is targeted at Ubuntu 20.04, mostly because it provides an easy install of casacore via kernsuite.
 This guide can be adapted to other OS's if you're willing to build casacore yourself.
 This software should be built with the new C++11 ABI.
 
@@ -41,8 +40,9 @@ This software should be built with the new C++11 ABI.
     (carrow) $ python setup.py build_ext --inplace
 
 * Note that `requirements.txt` contains a custom Python 3.8 pyarrow manylinux_2_28 wheel
-  built with `-D_GLIBCXX_USE_CXX11_ABI=1`. This repository requires some functionality
-  not present in Arrow 11.0.0, but which will be included in Arrow 12.0.0.
+  built with `-D_GLIBCXX_USE_CXX11_ABI=1`.
+  This repository requires some functionality not present in Arrow 11.0.0, but which will be included in Arrow 12.0.0.
+* Infrastructure for building manylinux2014 wheels has been developed, which will be published on pypi in due time.
 * Run the test cases
 
   .. code-block::
