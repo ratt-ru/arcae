@@ -404,23 +404,21 @@ private:
             ARROW_RETURN_NOT_OK(values->Validate());
         }
 
-        auto list_array = std::dynamic_pointer_cast<arrow::ListArray>(values);
+        if(auto list_array = std::dynamic_pointer_cast<arrow::ListArray>(values)) {
+            // NOTE(sjperkins)
+            // Directly adding nulls to the underlying list_array->data()
+            // doesn't seem to work, recreate the array with nulls and null_count
+            ARROW_ASSIGN_OR_RAISE(this->array, arrow::ListArray::FromArrays(
+                *list_array->offsets(),
+                *list_array->values(),
+                pool,
+                nulls,
+                null_counts));
 
-        if(list_array == nullptr) {
+            return this->array->Validate();
+        } else {
             return arrow::Status::Invalid("Unable to cast final array to arrow::ListArray");
         }
-
-        // NOTE(sjperkins)
-        // Directly adding nulls to the underlying list_array->data()
-        // doesn't seem to work, recreate the array with nulls and null_count
-        ARROW_ASSIGN_OR_RAISE(this->array, arrow::ListArray::FromArrays(
-            *list_array->offsets(),
-            *list_array->values(),
-            pool,
-            nulls,
-            null_counts));
-
-        return this->array->Validate();
     }
 
     template <typename T>
