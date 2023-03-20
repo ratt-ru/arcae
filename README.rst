@@ -49,11 +49,33 @@ This software should be built with the new C++11 ABI.
     (carrow) $ py.test -s -vvv
 
 
+
+Usage
+-----
+
+.. code-block:: python
+
+  import casa_arrow as ca
+  import pyarrow as pa
+
+  casa_table = ca.table("/path/to/measurementset.ms")
+  arrow_table = casa_table.to_arrow()        # read entire column
+  arrow_table = casa_table.to_arrow(10, 20)  # startrow, nrow
+  assert isinstance(arrow_table, pa.Table)
+  time = arrow_table.column("TIME").to_numpy()
+  data = arrow_table.column("DATA").to_numpy()   # arrays of object arrays
+
 Limitations
 -----------
 
 Some edge cases have not yet been implemented, but could be with some thought.
 
-* Not yet able to handle columns with unconstrained rank (ndim == -1).
-* Not yet able to handle TpRecord columns. Probably easiest to convert these rows to json and store as a string.
+* Not yet able to handle columns with unconstrained rank (ndim == -1). Probably simplest to convert these rows to json and store as a string.
+* Not yet able to handle TpRecord columns. Probably simplest to convert these rows to json and store as a string.
 * Not yet able to handle TpQuantity columns. Possible to represent as a run-time parametric Arrow DataType.
+* `to_numpy()` conversion of nested lists produces nested numpy arrays, instead of tensors.
+  This is `possible <daskms_ext_types_>`_ but requires some changes to how
+  `C++ Extension Types are exposed in Python <arrow_python_expose_cpp_ext_types_>`_.
+
+.. _daskms_ext_types: https://github.com/ratt-ru/dask-ms/blob/1ff73ce3a60ea6479e40fc8cf440fd8d077e3d26/daskms/experimental/arrow/extension_types.py#L120-L152
+.. _arrow_python_expose_cpp_ext_types: https://github.com/apache/arrow/issues/33997
