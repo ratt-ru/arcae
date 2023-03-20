@@ -53,17 +53,38 @@ This software should be built with the new C++11 ABI.
 Usage
 -----
 
-.. code-block:: python
+Example Usage:
 
-  import casa_arrow as ca
-  import pyarrow as pa
+  .. code-block:: python
 
-  casa_table = ca.table("/path/to/measurementset.ms")
-  arrow_table = casa_table.to_arrow()        # read entire column
-  arrow_table = casa_table.to_arrow(10, 20)  # startrow, nrow
-  assert isinstance(arrow_table, pa.Table)
-  time = arrow_table.column("TIME").to_numpy()
-  data = arrow_table.column("DATA").to_numpy()   # arrays of object arrays
+    import json
+    from pprint import pprint
+
+    import casa_arrow as ca
+    import pandas as pd
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    # Obtain (partial) Apache Arrow Table from a CASA Table
+    casa_table = ca.table("/path/to/measurementset.ms")
+    arrow_table = casa_table.to_arrow()        # read entire table
+    arrow_table = casa_table.to_arrow(10, 20)  # startrow, nrow
+    assert isinstance(arrow_table, pa.Table)
+
+    # Print JSON-encoded Table and Column keywords
+    pprint(json.loads(AT.schema.metadata[b"__casa_arrow_metadata__"]))
+    pprint(json.loads(AT.schema.field("DATA").metadata[b"__casa_arrow_metadata__"]))
+
+    # Extract Arrow Table columns into numpy arrays
+    time = arrow_table.column("TIME").to_numpy()
+    data = arrow_table.column("DATA").to_numpy()   # currently, arrays of object arrays, overly slow and memory hungry
+    df = arrow_table.to_pandas()                   # currently slow, memory hungry due to arrays of object arrays
+
+    # Write Arrow Table to parquet file
+    pq.write_table(arrow_table, "measurementset.parquet")
+
+
+See the test cases for further use cases.
 
 Limitations
 -----------
