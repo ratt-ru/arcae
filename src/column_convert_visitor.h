@@ -272,10 +272,8 @@ private:
             null_counts += is_defined ? 0 : 1;
         }
 
-        // If we have shapes at this point,
-        // calculate the cumulative product for each dimension
+        // Sanity check if we have shapes at this point
         if(shapes) {
-            // Sanity checks
             if(shapes->size() != nrow) {
                 return arrow::Status::Invalid("shapes.size() != nrow");
             }
