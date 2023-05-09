@@ -1,5 +1,7 @@
+#ifndef CASA_ARROW_COMPLEX_TYPE_H
+#define CASA_ARROW_COMPLEX_TYPE_H
+
 // Complex Number Extension Type
-#pragma once
 
 #include <arrow/extension_type.h>
 
@@ -87,3 +89,5 @@ class ComplexDoubleType : public ComplexType {
     return "";
   }
 };
+
+#endif

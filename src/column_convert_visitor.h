@@ -1,3 +1,6 @@
+#ifndef CASA_ARROW_COLUMN_CONVERT_VISITOR_H
+#define CASA_ARROW_COLUMN_CONVERT_VISITOR_H
+
 #include <algorithm>
 
 #include <casacore/tables/Tables.h>
@@ -479,3 +482,5 @@ private:
             "Conversion of ", column_desc.name(), " failed.");
     }
 };
+
+#endif

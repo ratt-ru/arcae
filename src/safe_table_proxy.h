@@ -1,6 +1,5 @@
-#pragma once
-
-#include <sstream>
+#ifndef CASA_ARROW_SAFE_TABLE_PROXY_H
+#define CASA_ARROW_SAFE_TABLE_PROXY_H
 
 #include <casacore/tables/Tables.h>
 #include <casacore/tables/Tables/TableProxy.h>
@@ -11,10 +10,8 @@
 
 #include "column_convert_visitor.h"
 
-
-static const std::string CASA_ARROW_METADATA = "__casa_arrow_metadata__";
-static const std::string CASA_DESCRIPTOR = "__casa_descriptor__";
-
+static constexpr char CASA_ARROW_METADATA[]  = "__casa_arrow_metadata__";
+static constexpr char CASA_DESCRIPTOR[]  = "__casa_descriptor__";
 
 /// @class SafeTableProxy
 /// @brief Constrains Table access to an arrow::ThreadPool containing a single thread.
@@ -42,3 +39,5 @@ public:
 
     arrow::Result<bool> close();
 };
+
+#endif
