@@ -1,4 +1,6 @@
 #include <memory>
+#include <sstream>
+
 
 #include "safe_table_proxy.h"
 

@@ -1,3 +1,6 @@
+#ifndef CASA_ARROW_CASA_VISITORS_H
+#define CASA_ARROW_CASA_VISITORS_H
+
 #include <casacore/casa/Utilities/DataType.h>
 
 #include <arrow/api.h>
@@ -47,3 +50,4 @@ class CasaTypeVisitor {
   #undef VISIT
 };
 
+#endif
