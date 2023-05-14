@@ -12,6 +12,11 @@ cdef extern from "<climits>" nogil:
     cdef unsigned int UINT_MAX
 
 
+cdef extern from "../src/configuration.h" nogil:
+    cdef cppclass CConfig" Configuration":
+        void Set(string key, string value)
+        CResult[string] Get(string key)
+
 cdef extern from "../src/safe_table_proxy.h" nogil:
     cdef cppclass CCasaTable" SafeTableProxy":
         @staticmethod
