@@ -9,6 +9,7 @@
 
 #include "casa_visitors.h"
 #include "complex_type.h"
+#include "service_locator.h"
 
 
 class ColumnConvertVisitor : public CasaTypeVisitor {
@@ -201,6 +202,7 @@ private:
     {
         std::unique_ptr<ShapeVectorType> shapes;
         int64_t nelements = 0;
+        auto & config = ServiceLocator::configuration();
 
         // Construct a buffer
         std::shared_ptr<arrow::Buffer> buffer;
@@ -228,15 +230,19 @@ private:
                 complex_dtype->value_type(), 2*nelements, buffer,
                 nullptr, 0, 0);
 
-            // NOTE(sjperkins)
-            // Check the FixedSizeListAray layout documents
-            // https://arrow.apache.org/docs/format/Columnar.html#fixed-size-list-layout
-            // A single empty buffer {nullptr} must be provided otherwise this segfaults
-            auto array_data = arrow::ArrayData::Make(
-                complex_dtype, nelements, {nullptr}, {child_array->data()},
-                0, 0);
+            if(config.GetDefault("complex_data_types", "true") == "true") {
+                // NOTE(sjperkins)
+                // Check the FixedSizeListAray layout documents
+                // https://arrow.apache.org/docs/format/Columnar.html#fixed-size-list-layout
+                // A single empty buffer {nullptr} must be provided otherwise this segfaults
+                auto array_data = arrow::ArrayData::Make(
+                    complex_dtype, nelements, {nullptr}, {child_array->data()},
+                    0, 0);
 
-            array = complex_dtype->MakeArray(array_data);
+                array = complex_dtype->MakeArray(array_data);
+            } else {
+                ARROW_ASSIGN_OR_RAISE(array, arrow::FixedSizeListArray::FromArrays(child_array, 2));
+            }
         } else {
             array = std::make_shared<arrow::PrimitiveArray>(arrow_dtype, nelements, buffer, nullptr, 0, 0);
         }
