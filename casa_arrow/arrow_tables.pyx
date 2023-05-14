@@ -1,13 +1,15 @@
 # distutils: language = c++
 # cython: language_level = 3
 
+from collections import Iterable
 import cython
 from cython.operator cimport dereference as deref
-import pyarrow as pa
 
 from libcpp.memory cimport dynamic_pointer_cast, shared_ptr
 from libcpp.string cimport string
 from libcpp.vector cimport vector
+
+import pyarrow as pa
 from pyarrow.includes.common cimport *
 from pyarrow.includes.libarrow cimport *
 
@@ -103,3 +105,22 @@ cdef class Table:
 
     def columns(self):
         return [frombytes(s) for s in GetResultValue(self.c_table.get().columns())]
+
+    def partition(self, columns):
+        if isinstance(columns, str):
+            columns = [columns]
+
+        if (not isinstance(columns, Iterable) or
+            not all(isinstance(s, str) for s in columns)):
+                raise TypeError(f"type(columns) {columns} must be a str "
+                                f"or a list of str")
+
+        vs_cols: vector[string] = [tobytes(c) for c in columns]
+        result = []
+
+        for v in GetResultValue(self.c_table.get().partition(vs_cols)):
+            table: Table = Table.__new__(Table)
+            table.c_table = v
+            result.append(table)
+
+        return result
