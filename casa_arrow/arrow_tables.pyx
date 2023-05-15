@@ -86,11 +86,19 @@ cdef class Table:
         with nogil:
             self.c_table = GetResultValue(CCasaTable.Make(cfilename))
 
-    def to_arrow(self, unsigned int startrow=0, unsigned int nrow=UINT_MAX):
-        cdef shared_ptr[CTable] ctable
+    def to_arrow(self, unsigned int startrow=0, unsigned int nrow=UINT_MAX, columns: list[str] | str = None):
+        cdef:
+            shared_ptr[CTable] ctable
+            vector[string] cpp_columns
+
+        if isinstance(columns, str):
+            columns = [columns]
+
+        if columns:
+            cpp_columns = [tobytes(c) for c in columns]
 
         with nogil:
-            ctable = GetResultValue(deref(self.c_table).to_arrow(startrow, nrow))
+            ctable = GetResultValue(deref(self.c_table).to_arrow(startrow, nrow, cpp_columns))
 
         return pyarrow_wrap_table(ctable)
 
@@ -107,6 +115,8 @@ cdef class Table:
         return [frombytes(s) for s in GetResultValue(self.c_table.get().columns())]
 
     def partition(self, columns):
+        cdef vector[shared_ptr[CCasaTable]] vector_result
+
         if isinstance(columns, str):
             columns = [columns]
 
@@ -115,10 +125,13 @@ cdef class Table:
                 raise TypeError(f"type(columns) {columns} must be a str "
                                 f"or a list of str")
 
-        vs_cols: vector[string] = [tobytes(c) for c in columns]
+        cpp_columns: vector[string] = [tobytes(c) for c in columns]
         result = []
 
-        for v in GetResultValue(self.c_table.get().partition(vs_cols)):
+        with nogil:
+            vector_result = GetResultValue(self.c_table.get().partition(cpp_columns))
+
+        for v in vector_result:
             table: Table = Table.__new__(Table)
             table.c_table = v
             result.append(table)

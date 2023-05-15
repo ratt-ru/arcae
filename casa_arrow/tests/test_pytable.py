@@ -21,6 +21,18 @@ def test_parquet_write(tmp_path, tau_ms, table_suffix, table_name):
     T = ca.table(f"{tau_ms}{table_suffix}").to_arrow()
     pq.write_table(T, str(tmp_path / f"{table_name}.parquet"))
 
+
+def test_column_selection(column_case_table):
+    T = ca.table(column_case_table).to_arrow(0, 1)
+    assert sorted(T.column_names) == ["FIXED", "FIXED_STRING", "SCALAR", "SCALAR_STRING", "VARIABLE", "VARIABLE_STRING"]
+
+    T = ca.table(column_case_table).to_arrow(0, 1, "VARIABLE")
+    assert T.column_names == ["VARIABLE"]
+
+    T = ca.table(column_case_table).to_arrow(0, 1, ["VARIABLE", "FIXED"])
+    assert sorted(T.column_names) == ["FIXED", "VARIABLE"]
+
+
 def test_column_cases(column_case_table, capfd):
     """ Test code paths """
     T = ca.table(column_case_table).to_arrow()
