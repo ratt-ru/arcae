@@ -84,25 +84,23 @@ def test_table_partitioning(sorting_table):
         time = P.to_arrow().column("TIME")
         assert time.sort() != time
 
-def test_table_partitioning_and_sorting(sorting_table):
-    T = ca.table(sorting_table)
+@pytest.mark.parametrize("sort_keys", [
+    "TIME",
+    ["ANTENNA1", "ANTENNA2", "TIME"],
+    ["ANTENNA1", "ANTENNA2"],
+    ["TIME", "ANTENNA1", "ANTENNA2"]
+])
+def test_table_partitioning_and_sorting(sorting_table, sort_keys):
+    partitions = ca.table(sorting_table).partition(["FIELD_ID", "DATA_DESC_ID"], sort_keys)
 
-    # Explicitly sort partitions by TIME
-    partitions = T.partition(["FIELD_ID", "DATA_DESC_ID"], "TIME")
-
-    for P in partitions:
-        time = P.to_arrow().column("TIME")
-        assert time.sort() == time
-
-    # Explicitly sort partitions by TIME
-    sort_keys = ["ANTENNA1", "ANTENNA2", "TIME"]
-    partitions = T.partition(["FIELD_ID", "DATA_DESC_ID"], sort_keys)
+    if isinstance(sort_keys, str):
+        sort_keys = [sort_keys]
 
     for P in partitions:
         arrow = P.to_arrow()
         D = {k: arrow.column(k).to_numpy() for k in sort_keys}
-
         idx = np.lexsort(tuple(D[k] for k in reversed(sort_keys)))
+
         for k in sort_keys:
             assert_array_equal(D[k], D[k][idx])
 
