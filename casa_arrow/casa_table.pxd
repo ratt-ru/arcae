@@ -22,6 +22,7 @@ cdef extern from "../src/safe_table_proxy.h" nogil:
         CResult[unsigned int] nrow " SafeTableProxy::nrow"()
         CResult[unsigned int] ncolumns " SafeTableProxy::ncolumns"()
         CResult[vector[string]] columns " SafeTableProxy::columns"()
+        CResult[vector[shared_ptr[CCasaTable]]] partition " SafeTableProxy::partition"(const vector[string] & columns)
 
 cdef extern from "../src/complex_type.h" nogil:
     cdef cppclass CComplexType" ComplexType"(CExtensionType):

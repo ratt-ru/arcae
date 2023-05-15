@@ -55,6 +55,14 @@ def test_column_cases(column_case_table, capfd):
     assert "Ignoring UNCONSTRAINED" in captured.err
 
 
+def test_table_partitioning(tau_ms):
+    T = ca.table(tau_ms)
+    partitions = T.partition("DATA_DESC_ID")
+    assert len(partitions) == 4
+    ddids = sum((p.to_arrow().column("DATA_DESC_ID").unique().tolist() for p in partitions), [])
+    assert ddids == [0, 1, 2, 3]
+
+
 def test_print_dataset_structure(partitioned_dataset):
     """ Print the directory stucture of the partitioned dataset """
     partitioned_dataset = str(partitioned_dataset)
