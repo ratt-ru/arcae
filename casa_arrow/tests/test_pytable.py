@@ -68,6 +68,19 @@ def test_column_cases(column_case_table, capfd):
     assert "Ignoring UNCONSTRAINED" in captured.err
 
 
+def test_partial_read(sorting_table):
+    """ Tests that partial reads work """
+    T = ca.table(sorting_table)
+    full = T.to_arrow()
+    nrows = [1, 2, 3, 4]
+    assert sum(nrows) == len(full) == 10
+
+    start = 0
+
+    for nrow in nrows:
+        assert full.take(list(range(start, start + nrow))) == T.to_arrow(start, nrow)
+        start += nrow
+
 def test_table_partitioning(sorting_table):
     T = ca.table(sorting_table)
 

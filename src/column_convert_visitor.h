@@ -19,6 +19,7 @@ public:
     const casacore::TableColumn & column;
     casacore::uInt startrow;
     casacore::uInt nrow;
+    casacore::uInt endrow;
     const casacore::ColumnDesc & column_desc;
     std::shared_ptr<arrow::Array> array;
     arrow::MemoryPool * pool;
@@ -72,7 +73,7 @@ private:
                 shapes = std::make_unique<ShapeVectorType>(nrow, std::move(default_shape));
             }
 
-            for(casacore::uInt row=startrow; row < nrow; ++row) {
+            for(casacore::uInt row=startrow; row < endrow; ++row) {
                 if(column.isDefined(row)) {
                     auto array = column.get(row);
 
@@ -138,7 +139,7 @@ private:
 
         // Dump column data into Arrow Buffer
         try {
-            column.getColumnRange(casacore::Slice(startrow, nrow, 1), array);
+            column.getColumnRange(casacore::Slice(startrow, nrow), array);
         } catch(std::exception & e) {
             return arrow::Status::Invalid("MakeFixedArrayBuffer ", column_desc.name(), " ", e.what());
         }
@@ -161,7 +162,7 @@ private:
             nrow,
             casacore::IPosition(column_desc.ndim(), 0));
 
-        for(casacore::uInt row=startrow; row < nrow; ++row) {
+        for(casacore::uInt row=startrow; row < endrow; ++row) {
             if(column.isDefined(row)) {
                 (*shapes)[row - startrow] = column.shape(row);
                 nelements += (*shapes)[row - startrow].product();
@@ -175,7 +176,7 @@ private:
         casacore::uInt offset = 0;
 
         // Secondly dump data into the buffer
-        for(casacore::uInt row=startrow; row < nrow; ++row) {
+        for(casacore::uInt row=startrow; row < endrow; ++row) {
             auto product = (*shapes)[row - startrow].product();
             if(column.isDefined(row) && product > 0) {
                 auto array = casacore::Array<DT>(
@@ -269,9 +270,9 @@ private:
         int64_t null_counts = 0;
         ARROW_ASSIGN_OR_RAISE(auto nulls, arrow::AllocateBitmap(nrow, pool));
 
-        for(casacore::uInt row=startrow; row < nrow; ++row) {
+        for(casacore::uInt row=startrow; row < endrow; ++row) {
             auto is_defined = column.isDefined(row);
-            arrow::bit_util::SetBitTo(nulls->mutable_data(), row, is_defined);
+            arrow::bit_util::SetBitTo(nulls->mutable_data(), row - startrow, is_defined);
             null_counts += is_defined ? 0 : 1;
         }
 
@@ -293,7 +294,7 @@ private:
         ARROW_ASSIGN_OR_RAISE(auto result, (MakeArrowArrayNew<CT, T>(column, arrow_dtype)));
         this->array = std::get<0>(result);
         // Indicate success/failure
-        return this->array->Validate();
+        return this->array->ValidateFull();
     }
 
     template <typename T>
@@ -308,7 +309,7 @@ private:
             ARROW_ASSIGN_OR_RAISE(this->array, arrow::FixedSizeListArray::FromArrays(this->array, dim_size));
         }
 
-        return this->array->Validate();
+        return this->array->ValidateFull();
     }
 
     template <typename T>
@@ -363,7 +364,7 @@ private:
         // Compute the products
         auto products = ShapeVectorType(nrow, casacore::IPosition(column_desc.ndim(), 1));
 
-        for(casacore::uInt row=startrow; row < nrow; ++row) {
+        for(casacore::uInt row=startrow; row < endrow; ++row) {
             const auto & shape = shapes[row - startrow];
             auto & product = products[row - startrow];
 
@@ -374,7 +375,7 @@ private:
 
         for(int d=0; d < ndim; ++d) {
             // Precompute size of offsets for buffer allocation
-            int32_t noffsets = std::accumulate(products.begin(), products.end(), 1,
+            unsigned int noffsets = std::accumulate(products.begin(), products.end(), 1,
                 [d](auto i, const auto & v) { return i + v[d]; });
 
             ARROW_ASSIGN_OR_RAISE(
@@ -382,11 +383,11 @@ private:
                 arrow::AllocateBuffer(noffsets*sizeof(noffsets), pool));
 
             int32_t * optr = reinterpret_cast<int32_t *>(offset_buffer->mutable_data());
-            int32_t running_offset = 0;
-            int32_t o = 0;
+            unsigned int running_offset = 0;
+            unsigned int o = 0;
             optr[o++] = running_offset;
 
-            for(casacore::uInt row=startrow; row < nrow; ++row) {
+            for(casacore::uInt row=startrow; row < endrow; ++row) {
                 auto repeats = products[row - startrow][d];
                 auto dim_size = shapes[row - startrow][d];
 
@@ -402,7 +403,7 @@ private:
                 arrow::int32(), noffsets, std::move(offset_buffer));
             ARROW_ASSIGN_OR_RAISE(values, arrow::ListArray::FromArrays(*offsets, *values));
             // NOTE(sjperkins): Perhaps remove this for performance
-            ARROW_RETURN_NOT_OK(values->Validate());
+            ARROW_RETURN_NOT_OK(values->ValidateFull());
         }
 
         if(auto list_array = std::dynamic_pointer_cast<arrow::ListArray>(values)) {
@@ -416,7 +417,7 @@ private:
                 nulls,
                 null_counts));
 
-            return this->array->Validate();
+            return this->array->ValidateFull();
         } else {
             return arrow::Status::Invalid("Unable to cast final array to arrow::ListArray");
         }
