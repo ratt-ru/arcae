@@ -8,24 +8,31 @@
 
 #include "safe_table_proxy.h"
 
+
+using ::casacore::Record;
+using ::casacore::Table;
+using ::casacore::TableColumn;
+using ::casacore::TableIterProxy;
+using ::casacore::TableLock;
+
 #define SAFE_TABLE_FUNCTOR(functor) \
     return arrow::DeferNotOk(this->io_pool->Submit((functor))).result()
 
-arrow::Status SafeTableProxy::FailIfClosed() const {
-    return is_closed ? arrow::Status::Invalid("Table is closed") : arrow::Status::OK();
+Status SafeTableProxy::FailIfClosed() const {
+    return is_closed ? Status::Invalid("Table is closed") : Status::OK();
 }
 
 Result<std::shared_ptr<SafeTableProxy>>
 SafeTableProxy::Make(const casacore::String & filename) {
     auto proxy = std::shared_ptr<SafeTableProxy>(new SafeTableProxy());
-    ARROW_ASSIGN_OR_RAISE(proxy->io_pool, arrow::internal::ThreadPool::Make(1));
+    ARROW_ASSIGN_OR_RAISE(proxy->io_pool, ThreadPool::Make(1));
 
     // Mark as closed so that if construction fails, we don't try to close it
     proxy->is_closed = true;
 
     auto future = arrow::DeferNotOk(proxy->io_pool->Submit([&]() -> Result<std::shared_ptr<TableProxy>> {
-        casacore::Record record;
-        casacore::TableLock lock(casacore::TableLock::LockOption::AutoNoReadLocking);
+        Record record;
+        TableLock lock(TableLock::LockOption::AutoNoReadLocking);
 
         record.define("option", "usernoread");
         record.define("internal", lock.interval());
@@ -33,9 +40,9 @@ SafeTableProxy::Make(const casacore::String & filename) {
 
         try {
             return std::make_shared<TableProxy>(
-                filename, record, casacore::Table::TableOption::Old);
+                filename, record, Table::TableOption::Old);
         } catch(std::exception & e) {
-            return arrow::Status::Invalid(e.what());
+            return Status::Invalid(e.what());
         }
     }));
 
@@ -47,21 +54,14 @@ SafeTableProxy::Make(const casacore::String & filename) {
 }
 
 Result<std::shared_ptr<arrow::Table>>
-SafeTableProxy::to_arrow(void) const {
-    ARROW_RETURN_NOT_OK(FailIfClosed());
-    ARROW_ASSIGN_OR_RAISE(auto n, nrow());
-    return to_arrow(0, n);
-}
-
-Result<std::shared_ptr<arrow::Table>>
-SafeTableProxy::to_arrow(casacore::uInt startrow, casacore::uInt nrow) const {
+SafeTableProxy::to_arrow(casacore::uInt startrow, casacore::uInt nrow, const std::vector<std::string> & columns) const {
     ARROW_RETURN_NOT_OK(FailIfClosed());
 
-    SAFE_TABLE_FUNCTOR(([this, startrow, nrow]() -> Result<std::shared_ptr<arrow::Table>> {
+    SAFE_TABLE_FUNCTOR(([this, startrow, nrow, &columns]() -> Result<std::shared_ptr<arrow::Table>> {
         ARROW_ASSIGN_OR_RAISE(auto table_proxy, this->table_future.result());
         auto & casa_table = table_proxy->table();
         auto table_desc = casa_table.tableDesc();
-        auto column_names = table_desc.columnNames();
+        auto column_names = columns.size() == 0 ? table_desc.columnNames() : casacore::Vector<casacore::String>(columns);
         auto startrow_ = startrow;
         auto nrow_ = nrow;
 
@@ -78,25 +78,31 @@ SafeTableProxy::to_arrow(casacore::uInt startrow, casacore::uInt nrow) const {
         auto fields = arrow::FieldVector();
         auto arrays = arrow::ArrayVector();
 
-        for(casacore::uInt i=0; i < table_desc.ncolumn(); ++i) {
-            auto table_column = casacore::TableColumn(casa_table, i);
+        for(casacore::uInt i=0; i < column_names.size(); ++i) {
+            auto column_name = column_names[i];
+
+            if(!table_desc.isColumn(column_name)) {
+                ARROW_LOG(WARNING) << column_name << " is not a valid column";
+                continue;
+            }
+
+            auto table_column = TableColumn(casa_table, column_name);
             auto column_desc = table_column.columnDesc();
             auto visitor = ColumnConvertVisitor(table_column, startrow_, nrow_);
             auto visit_status = visitor.Visit(column_desc.dataType());
 
             if(!visit_status.ok()) {
                 ARROW_LOG(WARNING)
-                    << "Ignoring " << column_desc.name() << " " << visit_status;
+                    << "Ignoring " << column_name << " " << visit_status;
                 continue;
             }
 
             if(!visitor.array) {
                 ARROW_LOG(ERROR)
-                    << "Ignoring " << column_desc.name()
+                    << "Ignoring " << column_name
                     << ". Arrow array not created by Visitor";
                 continue;
             }
-
 
             std::ostringstream json_oss;
             casacore::JsonOut column_json(json_oss);
@@ -108,7 +114,7 @@ SafeTableProxy::to_arrow(casacore::uInt startrow, casacore::uInt nrow) const {
             auto column_metadata = arrow::KeyValueMetadata::Make(
                 {CASA_ARROW_METADATA}, {json_oss.str()});
             auto arrow_field = std::make_shared<arrow::Field>(
-                column_names[i], visitor.array->type(),
+                column_name, visitor.array->type(),
                 true, std::move(column_metadata));
             fields.emplace_back(std::move(arrow_field));
             arrays.emplace_back(std::move(visitor.array));
@@ -179,7 +185,7 @@ SafeTableProxy::partition(const std::vector<std::string> & columns) const {
         auto casa_cols = casacore::Vector<casacore::String>(columns);
         std::vector<std::shared_ptr<SafeTableProxy>> result;
         auto partition_proxy = std::make_shared<TableProxy>();
-        auto iter = casacore::TableIterProxy(*table_proxy, casa_cols, "a", "q");
+        auto iter = TableIterProxy(*table_proxy, casa_cols, "a", "q");
 
         while(iter.nextPart(*partition_proxy)) {
             auto stp = std::shared_ptr<SafeTableProxy>(new SafeTableProxy());

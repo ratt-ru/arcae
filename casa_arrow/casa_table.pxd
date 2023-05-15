@@ -18,7 +18,7 @@ cdef extern from "../src/safe_table_proxy.h" nogil:
         CResult[shared_ptr[CCasaTable]] Make" SafeTableProxy::Make"(const string & filename)
         CResult[bool] close" SafeTableProxy::close"()
 
-        CResult[shared_ptr[CTable]] to_arrow " SafeTableProxy::to_arrow"(unsigned int startrow, unsigned int nrow)
+        CResult[shared_ptr[CTable]] to_arrow " SafeTableProxy::to_arrow"(unsigned int startrow, unsigned int nrow, const vector[string] & columns)
         CResult[unsigned int] nrow " SafeTableProxy::nrow"()
         CResult[unsigned int] ncolumns " SafeTableProxy::ncolumns"()
         CResult[vector[string]] columns " SafeTableProxy::columns"()

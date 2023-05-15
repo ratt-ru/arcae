@@ -1,6 +1,8 @@
 #ifndef CASA_ARROW_SAFE_TABLE_PROXY_H
 #define CASA_ARROW_SAFE_TABLE_PROXY_H
 
+#include <climits>
+
 #include <casacore/tables/Tables.h>
 #include <casacore/tables/Tables/TableProxy.h>
 
@@ -13,6 +15,7 @@ static constexpr char CASA_DESCRIPTOR[]  = "__casa_descriptor__";
 
 using ::casacore::TableProxy;
 using ::arrow::Future;
+using ::arrow::Status;
 using ::arrow::Result;
 using ::arrow::internal::ThreadPool;
 
@@ -25,7 +28,7 @@ private:
     bool is_closed;
 
 private:
-    inline arrow::Status FailIfClosed() const;
+    inline Status FailIfClosed() const;
 
 protected:
     SafeTableProxy() {};
@@ -34,8 +37,7 @@ public:
     virtual ~SafeTableProxy() { close(); };
 
     static Result<std::shared_ptr<SafeTableProxy>> Make(const casacore::String & filename);
-    Result<std::shared_ptr<arrow::Table>> to_arrow() const;
-    Result<std::shared_ptr<arrow::Table>> to_arrow(casacore::uInt startrow, casacore::uInt nrow) const;
+    Result<std::shared_ptr<arrow::Table>> to_arrow(casacore::uInt startrow=0, casacore::uInt nrow=UINT_MAX, const std::vector<std::string> & columns = {}) const;
     Result<std::vector<std::string>> columns() const;
     Result<casacore::uInt> ncolumns() const;
     Result<casacore::uInt> nrow() const;
