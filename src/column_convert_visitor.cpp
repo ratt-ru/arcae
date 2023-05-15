@@ -12,8 +12,10 @@ ColumnConvertVisitor::ColumnConvertVisitor(
     arrow::MemoryPool * pool)
     : column(column), startrow(startrow), nrow(nrow),
       endrow(startrow + nrow),
-      column_desc(column.columnDesc()), pool(pool)
-      {}
+      column_desc(column.columnDesc()), pool(pool) {
+
+    assert(endrow <= column_desc.nrow());
+}
 
 arrow::Status ColumnConvertVisitor::VisitTpBool() {
     // TODO(sjperkins)

@@ -39,6 +39,9 @@ public:
 #undef VISIT
 
 private:
+    inline casacore::uInt local_row(casacore::uInt row) { return row - startrow; }
+
+
     template <typename ColumnType, typename DT>
     arrow::Result<std::tuple<
         std::shared_ptr<arrow::Array>,
@@ -78,7 +81,7 @@ private:
                     auto array = column.get(row);
 
                     if(!column_desc.isFixedShape()) {
-                        (*shapes)[row - startrow] = array.shape();
+                        (*shapes)[local_row(row)] = array.shape();
                     }
 
                     for(auto & string: array) {
@@ -164,8 +167,8 @@ private:
 
         for(casacore::uInt row=startrow; row < endrow; ++row) {
             if(column.isDefined(row)) {
-                (*shapes)[row - startrow] = column.shape(row);
-                nelements += (*shapes)[row - startrow].product();
+                (*shapes)[local_row(row)] = column.shape(row);
+                nelements += (*shapes)[local_row(row)].product();
             }
         }
 
@@ -177,10 +180,10 @@ private:
 
         // Secondly dump data into the buffer
         for(casacore::uInt row=startrow; row < endrow; ++row) {
-            auto product = (*shapes)[row - startrow].product();
+            auto product = (*shapes)[local_row(row)].product();
             if(column.isDefined(row) && product > 0) {
                 auto array = casacore::Array<DT>(
-                    (*shapes)[row - startrow],
+                    (*shapes)[local_row(row)],
                     buffer_ptr + offset, casacore::SHARE);
                 try {
                    column.get(row, array);
@@ -272,7 +275,7 @@ private:
 
         for(casacore::uInt row=startrow; row < endrow; ++row) {
             auto is_defined = column.isDefined(row);
-            arrow::bit_util::SetBitTo(nulls->mutable_data(), row - startrow, is_defined);
+            arrow::bit_util::SetBitTo(nulls->mutable_data(), local_row(row), is_defined);
             null_counts += is_defined ? 0 : 1;
         }
 
@@ -365,8 +368,8 @@ private:
         auto products = ShapeVectorType(nrow, casacore::IPosition(column_desc.ndim(), 1));
 
         for(casacore::uInt row=startrow; row < endrow; ++row) {
-            const auto & shape = shapes[row - startrow];
-            auto & product = products[row - startrow];
+            const auto & shape = shapes[local_row(row)];
+            auto & product = products[local_row(row)];
 
             for(ssize_t d=column_desc.ndim() - 2; d >= 0; --d) {
                 product[d] *= product[d + 1] * shape[d + 1];
@@ -388,8 +391,8 @@ private:
             optr[o++] = running_offset;
 
             for(casacore::uInt row=startrow; row < endrow; ++row) {
-                auto repeats = products[row - startrow][d];
-                auto dim_size = shapes[row - startrow][d];
+                auto repeats = products[local_row(row)][d];
+                auto dim_size = shapes[local_row(row)][d];
 
                 for(auto r=0; r < repeats; ++r) {
                     running_offset += dim_size;
