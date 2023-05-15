@@ -86,10 +86,13 @@ cdef class Table:
         with nogil:
             self.c_table = GetResultValue(CCasaTable.Make(cfilename))
 
-    def to_arrow(self, unsigned int startrow=0, unsigned int nrow=UINT_MAX, columns: list[str] = None):
+    def to_arrow(self, unsigned int startrow=0, unsigned int nrow=UINT_MAX, columns: list[str] | str = None):
         cdef:
             shared_ptr[CTable] ctable
             vector[string] cpp_columns
+
+        if isinstance(columns, str):
+            columns = [columns]
 
         if columns:
             cpp_columns = [tobytes(c) for c in columns]
