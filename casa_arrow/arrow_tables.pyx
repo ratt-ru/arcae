@@ -114,8 +114,11 @@ cdef class Table:
     def columns(self):
         return [frombytes(s) for s in GetResultValue(self.c_table.get().columns())]
 
-    def partition(self, columns):
+    def partition(self, columns, sort_columns=None):
         cdef vector[shared_ptr[CCasaTable]] vector_result
+
+        if isinstance(sort_columns, str):
+            sort_columns = [sort_columns]
 
         if isinstance(columns, str):
             columns = [columns]
@@ -126,10 +129,11 @@ cdef class Table:
                                 f"or a list of str")
 
         cpp_columns: vector[string] = [tobytes(c) for c in columns]
+        cpp_sort_columns: vector[string] = [] if sort_columns is None else [tobytes(c) for c in sort_columns]
         result = []
 
         with nogil:
-            vector_result = GetResultValue(self.c_table.get().partition(cpp_columns))
+            vector_result = GetResultValue(self.c_table.get().partition(cpp_columns, cpp_sort_columns))
 
         for v in vector_result:
             table: Table = Table.__new__(Table)

@@ -1,6 +1,7 @@
 import os
 
 import numpy as np
+from numpy.testing import assert_array_equal
 import pyarrow as pa
 import pyarrow.dataset as pad
 import pyarrow.parquet as pq
@@ -67,12 +68,43 @@ def test_column_cases(column_case_table, capfd):
     assert "Ignoring UNCONSTRAINED" in captured.err
 
 
-def test_table_partitioning(tau_ms):
-    T = ca.table(tau_ms)
-    partitions = T.partition("DATA_DESC_ID")
-    assert len(partitions) == 4
+def test_table_partitioning(sorting_table):
+    T = ca.table(sorting_table)
+
+    partitions = T.partition(["FIELD_ID", "DATA_DESC_ID"])
+    assert len(partitions) == 3
     ddids = sum((p.to_arrow().column("DATA_DESC_ID").unique().tolist() for p in partitions), [])
-    assert ddids == [0, 1, 2, 3]
+    assert ddids == [0, 0, 1]
+
+    fields = sum((p.to_arrow().column("FIELD_ID").unique().tolist() for p in partitions), [])
+    assert fields == [0, 1, 2]
+
+    # Partitions are not sorted in TIME
+    for P in partitions:
+        time = P.to_arrow().column("TIME")
+        assert time.sort() != time
+
+def test_table_partitioning_and_sorting(sorting_table):
+    T = ca.table(sorting_table)
+
+    # Explicitly sort partitions by TIME
+    partitions = T.partition(["FIELD_ID", "DATA_DESC_ID"], "TIME")
+
+    for P in partitions:
+        time = P.to_arrow().column("TIME")
+        assert time.sort() == time
+
+    # Explicitly sort partitions by TIME
+    sort_keys = ["ANTENNA1", "ANTENNA2", "TIME"]
+    partitions = T.partition(["FIELD_ID", "DATA_DESC_ID"], sort_keys)
+
+    for P in partitions:
+        arrow = P.to_arrow()
+        D = {k: arrow.column(k).to_numpy() for k in sort_keys}
+
+        idx = np.lexsort(tuple(D[k] for k in reversed(sort_keys)))
+        for k in sort_keys:
+            assert_array_equal(D[k], D[k][idx])
 
 
 def test_print_dataset_structure(partitioned_dataset):

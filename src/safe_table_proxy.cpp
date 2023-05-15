@@ -176,19 +176,34 @@ SafeTableProxy::nrow() const {
 }
 
 Result<std::vector<std::shared_ptr<SafeTableProxy>>>
-SafeTableProxy::partition(const std::vector<std::string> & columns) const {
+SafeTableProxy::partition(
+    const std::vector<std::string> & partition_columns,
+    const std::vector<std::string> & sort_columns) const {
+
+    if(partition_columns.size() == 0) {
+        return Status::Invalid("No partitioning columns provided");
+    }
+
     ARROW_RETURN_NOT_OK(FailIfClosed());
 
-    SAFE_TABLE_FUNCTOR(([this, &columns]() -> Result<std::vector<std::shared_ptr<SafeTableProxy>>> {
+    SAFE_TABLE_FUNCTOR(([this, &partition_columns, &sort_columns]() -> Result<std::vector<std::shared_ptr<SafeTableProxy>>> {
         ARROW_ASSIGN_OR_RAISE(auto table_proxy, this->table_future.result());
 
-        auto casa_cols = casacore::Vector<casacore::String>(columns);
+        casacore::Block<casacore::String> casa_sort_cols(sort_columns.size());
+        for(casacore::uInt i=0; i < sort_columns.size(); ++i)
+            { casa_sort_cols[i] = sort_columns[i]; }
+
+        auto casa_part_cols = casacore::Vector<casacore::String>(partition_columns);
         std::vector<std::shared_ptr<SafeTableProxy>> result;
         auto partition_proxy = std::make_shared<TableProxy>();
-        auto iter = TableIterProxy(*table_proxy, casa_cols, "a", "q");
+        auto iter = TableIterProxy(*table_proxy, casa_part_cols, "a", "q");
 
         while(iter.nextPart(*partition_proxy)) {
             auto stp = std::shared_ptr<SafeTableProxy>(new SafeTableProxy());
+            if(casa_sort_cols.size() > 0) {
+                partition_proxy = std::make_shared<TableProxy>(partition_proxy->table().sort(casa_sort_cols));
+            }
+
             stp->table_future = Future<std::shared_ptr<TableProxy>>::MakeFinished(std::move(partition_proxy));
             stp->io_pool = this->io_pool;
             stp->is_closed = false;

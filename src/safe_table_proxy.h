@@ -37,11 +37,16 @@ public:
     virtual ~SafeTableProxy() { close(); };
 
     static Result<std::shared_ptr<SafeTableProxy>> Make(const casacore::String & filename);
-    Result<std::shared_ptr<arrow::Table>> to_arrow(casacore::uInt startrow=0, casacore::uInt nrow=UINT_MAX, const std::vector<std::string> & columns = {}) const;
+    Result<std::shared_ptr<arrow::Table>> to_arrow(
+        casacore::uInt startrow=0,
+        casacore::uInt nrow=UINT_MAX,
+        const std::vector<std::string> & columns = {}) const;
     Result<std::vector<std::string>> columns() const;
     Result<casacore::uInt> ncolumns() const;
     Result<casacore::uInt> nrow() const;
-    Result<std::vector<std::shared_ptr<SafeTableProxy>>> partition(const std::vector<std::string> & columns) const;
+    Result<std::vector<std::shared_ptr<SafeTableProxy>>> partition(
+        const std::vector<std::string> & partition_columns={},
+        const std::vector<std::string> & sort_columns={}) const;
 
     Result<bool> close();
 };
