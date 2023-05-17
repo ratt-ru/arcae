@@ -1,6 +1,7 @@
 import os
 
 import numpy as np
+from numpy.testing import assert_array_equal
 import pyarrow as pa
 import pyarrow.dataset as pad
 import pyarrow.parquet as pq
@@ -20,6 +21,18 @@ def test_parquet_write(tmp_path, tau_ms, table_suffix, table_name):
     """ Test conversion of a representative MS and some of its subtables to parquet format """
     T = ca.table(f"{tau_ms}{table_suffix}").to_arrow()
     pq.write_table(T, str(tmp_path / f"{table_name}.parquet"))
+
+
+def test_column_selection(column_case_table):
+    T = ca.table(column_case_table).to_arrow(0, 1)
+    assert sorted(T.column_names) == ["FIXED", "FIXED_STRING", "SCALAR", "SCALAR_STRING", "VARIABLE", "VARIABLE_STRING"]
+
+    T = ca.table(column_case_table).to_arrow(0, 1, "VARIABLE")
+    assert T.column_names == ["VARIABLE"]
+
+    T = ca.table(column_case_table).to_arrow(0, 1, ["VARIABLE", "FIXED"])
+    assert sorted(T.column_names) == ["FIXED", "VARIABLE"]
+
 
 def test_column_cases(column_case_table, capfd):
     """ Test code paths """
@@ -53,6 +66,56 @@ def test_column_cases(column_case_table, capfd):
     captured = capfd.readouterr()
     assert "UNCONSTRAINED" not in T.column_names
     assert "Ignoring UNCONSTRAINED" in captured.err
+
+
+def test_partial_read(sorting_table):
+    """ Tests that partial reads work """
+    T = ca.table(sorting_table)
+    full = T.to_arrow()
+    nrows = [1, 2, 3, 4]
+    assert sum(nrows) == len(full) == 10
+
+    start = 0
+
+    for nrow in nrows:
+        assert full.take(list(range(start, start + nrow))) == T.to_arrow(start, nrow)
+        start += nrow
+
+def test_table_partitioning(sorting_table):
+    T = ca.table(sorting_table)
+
+    partitions = T.partition(["FIELD_ID", "DATA_DESC_ID"])
+    assert len(partitions) == 3
+    ddids = sum((p.to_arrow().column("DATA_DESC_ID").unique().tolist() for p in partitions), [])
+    assert ddids == [0, 0, 1]
+
+    fields = sum((p.to_arrow().column("FIELD_ID").unique().tolist() for p in partitions), [])
+    assert fields == [0, 1, 2]
+
+    # Partitions are not sorted in TIME
+    for P in partitions:
+        time = P.to_arrow().column("TIME")
+        assert time.sort() != time
+
+@pytest.mark.parametrize("sort_keys", [
+    "TIME",
+    ["ANTENNA1", "ANTENNA2", "TIME"],
+    ["ANTENNA1", "ANTENNA2"],
+    ["TIME", "ANTENNA1", "ANTENNA2"]
+])
+def test_table_partitioning_and_sorting(sorting_table, sort_keys):
+    partitions = ca.table(sorting_table).partition(["FIELD_ID", "DATA_DESC_ID"], sort_keys)
+
+    if isinstance(sort_keys, str):
+        sort_keys = [sort_keys]
+
+    for P in partitions:
+        arrow = P.to_arrow()
+        D = {k: arrow.column(k).to_numpy() for k in sort_keys}
+        idx = np.lexsort(tuple(D[k] for k in reversed(sort_keys)))
+
+        for k in sort_keys:
+            assert_array_equal(D[k], D[k][idx])
 
 
 def test_print_dataset_structure(partitioned_dataset):

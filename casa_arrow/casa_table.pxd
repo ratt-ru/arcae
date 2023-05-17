@@ -23,10 +23,11 @@ cdef extern from "../src/safe_table_proxy.h" nogil:
         CResult[shared_ptr[CCasaTable]] Make" SafeTableProxy::Make"(const string & filename)
         CResult[bool] close" SafeTableProxy::close"()
 
-        CResult[shared_ptr[CTable]] to_arrow " SafeTableProxy::to_arrow"(unsigned int startrow, unsigned int nrow)
+        CResult[shared_ptr[CTable]] to_arrow " SafeTableProxy::to_arrow"(unsigned int startrow, unsigned int nrow, const vector[string] & columns)
         CResult[unsigned int] nrow " SafeTableProxy::nrow"()
         CResult[unsigned int] ncolumns " SafeTableProxy::ncolumns"()
         CResult[vector[string]] columns " SafeTableProxy::columns"()
+        CResult[vector[shared_ptr[CCasaTable]]] partition " SafeTableProxy::partition"(const vector[string] & partition_columns, const vector[string] & sort_columns)
 
 cdef extern from "../src/complex_type.h" nogil:
     cdef cppclass CComplexType" ComplexType"(CExtensionType):
