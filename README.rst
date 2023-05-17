@@ -87,6 +87,61 @@ Example Usage:
 
 See the test cases for further use cases.
 
+
+Exporting Measurement Sets to Arrow Parquet Datasets
+----------------------------------------------------
+
+An export script is available:
+
+.. code-block:: bash
+
+  $ casa-arrow export /path/to/the.ms --nrow 50000
+  $ tree output.arrow/
+  output.arrow/
+  ├── ANTENNA
+  │   └── data0.parquet
+  ├── DATA_DESCRIPTION
+  │   └── data0.parquet
+  ├── FEED
+  │   └── data0.parquet
+  ├── FIELD
+  │   └── data0.parquet
+  ├── MAIN
+  │   └── FIELD_ID=0
+  │       └── PROCESSOR_ID=0
+  │           ├── DATA_DESC_ID=0
+  │           │   ├── data0.parquet
+  │           │   ├── data1.parquet
+  │           │   ├── data2.parquet
+  │           │   └── data3.parquet
+  │           ├── DATA_DESC_ID=1
+  │           │   ├── data0.parquet
+  │           │   ├── data1.parquet
+  │           │   ├── data2.parquet
+  │           │   └── data3.parquet
+  │           ├── DATA_DESC_ID=2
+  │           │   ├── data0.parquet
+  │           │   ├── data1.parquet
+  │           │   ├── data2.parquet
+  │           │   └── data3.parquet
+  │           └── DATA_DESC_ID=3
+  │               ├── data0.parquet
+  │               ├── data1.parquet
+  │               ├── data2.parquet
+  │               └── data3.parquet
+  ├── OBSERVATION
+  │   └── data0.parquet
+
+
+This data can be loaded into an Arrow Dataset:
+
+.. code-block:: python
+
+    >>> import pyarrow as pa
+    >>> import pyarrow.dataset as pad
+    >>> main_ds = pad.dataset("output.arrow/MAIN")
+    >>> spw_ds = pad.dataset("output.arrow/SPECTRAL_WINDOW")
+
 Limitations
 -----------
 
