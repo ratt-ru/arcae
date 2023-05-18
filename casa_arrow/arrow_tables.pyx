@@ -26,11 +26,13 @@ from pyarrow.lib cimport (
 from pyarrow.lib import (tobytes, frombytes)
 
 from casa_arrow.casa_table cimport (CCasaTable,
+                                    CConfiguration,
                                     CComplexType,
                                     CComplexDoubleArray,
                                     CComplexFloatArray,
                                     CComplexDoubleType,
                                     CComplexFloatType,
+                                    CServiceLocator,
                                     complex64,
                                     complex128,
                                     UINT_MAX)
@@ -141,3 +143,38 @@ cdef class Table:
             result.append(table)
 
         return result
+
+
+cdef class Configuration:
+    @staticmethod
+    def get_default(key: str, default: str):
+        c_key: string = tobytes(key)
+        c_default: string = tobytes(default)
+
+        with nogil:
+            config: cython.pointer(Configuration) = &CServiceLocator.configuration()
+            result: string = config.GetDefault(c_key, c_default)
+
+        return frombytes(result)
+
+    @staticmethod
+    def get(key: str):
+        c_key: string = tobytes(key)
+
+        with nogil:
+            config: cython.pointer(Configuration) = &CServiceLocator.configuration()
+            result: CResult[string] = config.Get(c_key)
+
+        if result.ok():
+            return frombytes(GetResultValue(result))
+
+        raise KeyError(key)
+
+    @staticmethod
+    def set(key: str, value: str):
+        c_key: string = tobytes(key)
+        c_value: string = tobytes(value)
+
+        with nogil:
+            config: cython.pointer(Configuration) = &CServiceLocator.configuration()
+            config.Set(c_key, c_value)

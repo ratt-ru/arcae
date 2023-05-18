@@ -12,10 +12,16 @@ cdef extern from "<climits>" nogil:
     cdef unsigned int UINT_MAX
 
 
+cdef extern from "../src/service_locator.h" nogil:
+    cdef cppclass CServiceLocator" ServiceLocator":
+        @staticmethod
+        CConfiguration & configuration" ServiceLocator::configuration"()
+
 cdef extern from "../src/configuration.h" nogil:
-    cdef cppclass CConfig" Configuration":
-        void Set(string key, string value)
-        CResult[string] Get(string key)
+    cdef cppclass CConfiguration" Configuration":
+        void Set" Configuration::Set"(string key, string value)
+        CResult[string] Get" Configuration::Get"(string key)
+        string GetDefault" Configuration::GetDefault"(string key, string default_value)
 
 cdef extern from "../src/safe_table_proxy.h" nogil:
     cdef cppclass CCasaTable" SafeTableProxy":
