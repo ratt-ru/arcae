@@ -2,9 +2,12 @@
 # cython: language_level = 3
 
 from collections import Iterable
+from collections.abc import MutableMapping
 import cython
 from cython.operator cimport dereference as deref
 
+from libcpp cimport bool
+from libcpp.map cimport map
 from libcpp.memory cimport dynamic_pointer_cast, shared_ptr
 from libcpp.string cimport string
 from libcpp.vector cimport vector
@@ -145,24 +148,12 @@ cdef class Table:
         return result
 
 
-cdef class Configuration:
-    @staticmethod
-    def get_default(key: str, default: str):
-        c_key: string = tobytes(key)
-        c_default: string = tobytes(default)
-
-        with nogil:
-            config: cython.pointer(Configuration) = &CServiceLocator.configuration()
-            result: string = config.GetDefault(c_key, c_default)
-
-        return frombytes(result)
-
-    @staticmethod
-    def get(key: str):
+class Configuration(MutableMapping):
+    def __getitem__(self, key: str):
         c_key: string = tobytes(key)
 
         with nogil:
-            config: cython.pointer(Configuration) = &CServiceLocator.configuration()
+            config: cython.pointer(CConfiguration) = &CServiceLocator.configuration()
             result: CResult[string] = config.Get(c_key)
 
         if result.ok():
@@ -170,11 +161,33 @@ cdef class Configuration:
 
         raise KeyError(key)
 
-    @staticmethod
-    def set(key: str, value: str):
+    def __setitem__(self, key: str, item: str):
         c_key: string = tobytes(key)
-        c_value: string = tobytes(value)
+        c_item: string = tobytes(item)
 
         with nogil:
-            config: cython.pointer(Configuration) = &CServiceLocator.configuration()
-            config.Set(c_key, c_value)
+            config: cython.pointer(CConfiguration) = &CServiceLocator.configuration()
+            config.Set(c_key, c_item)
+
+    def __delitem__(self, key: str):
+        c_key: string = tobytes(key)
+
+        with nogil:
+            config: cython.pointer(CConfiguration) = &CServiceLocator.configuration()
+            result: CResult[bool] = config.Delete(c_key)
+
+        if not result.ok():
+            raise KeyError(key)
+
+    def __iter__(self):
+        with nogil:
+            config: cython.pointer(CConfiguration) = &CServiceLocator.configuration()
+            keys: vector[string] = config.GetKeys()
+
+        return iter([frombytes(k) for k in keys])
+
+    def __len__(self):
+        with nogil:
+            config: cython.pointer(CConfiguration) = &CServiceLocator.configuration()
+
+        return config.Size()

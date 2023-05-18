@@ -1,10 +1,7 @@
 #include "configuration.h"
 
-void Configuration::Set(std::string key, std::string value) {
-    kvmap_[key] = value;
-}
 
-arrow::Result<std::string> Configuration::Get(std::string key) const {
+arrow::Result<std::string> Configuration::Get(const std::string & key) const {
     auto it = kvmap_.find(key);
 
     if(it == kvmap_.end()) {
@@ -14,12 +11,25 @@ arrow::Result<std::string> Configuration::Get(std::string key) const {
     }
 }
 
-std::string Configuration::GetDefault(std::string key, std::string default_value) const {
+
+std::string Configuration::GetDefault(const std::string & key, std::string default_value) const {
     auto it = kvmap_.find(key);
 
     if(it == kvmap_.end()) {
         return std::move(default_value);
     } else {
         return it->second;
+    }
+}
+
+
+arrow::Result<bool> Configuration::Delete(const std::string & key) {
+    auto it = kvmap_.find(key);
+
+    if(it == kvmap_.end()) {
+        return arrow::Status::KeyError(key);
+    } else {
+        kvmap_.erase(it);
+        return true;
     }
 }

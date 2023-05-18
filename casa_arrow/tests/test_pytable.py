@@ -175,13 +175,26 @@ def test_duckdb(partitioned_dataset):
 
 def test_config():
     from casa_arrow._arrow_tables import Configuration
-    Configuration.set("blah", "foo")
-    Configuration.set("pants", "hello")
-    assert Configuration.get("pants") == "hello"
+    config = Configuration()
+    config["blah"] = "foo"
+    assert config["blah"] == "foo"
+    assert len(config) == 1
+
+    config["qux"] = "bar"
+    assert config["qux"] == "bar"
+    assert len(config) == 2
 
     try:
-        Configuration.get("I dont exist")
+        config["foo"] == "bar"
     except KeyError as e:
-        assert "I dont exist" == e.args[0]
+        assert "foo" in e.args[0]
 
-    assert Configuration.get_default("not exist", "ghostly") == "ghostly"
+    assert config.get("foo") is None
+    assert config.get("foo", "bar") == "bar"
+
+    assert list(config.items()) == [("blah", "foo"), ("qux", "bar")]
+
+    try:
+        config["foo"] = 1
+    except TypeError as e:
+        assert "(expected str, got int)" in e.args[0]

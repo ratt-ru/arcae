@@ -2,6 +2,7 @@
 # cython: language_level = 3
 
 from libcpp cimport bool
+from libcpp.map cimport map
 from libcpp.string cimport string
 from libcpp.vector cimport vector
 from libcpp.memory import shared_ptr
@@ -19,9 +20,12 @@ cdef extern from "../src/service_locator.h" nogil:
 
 cdef extern from "../src/configuration.h" nogil:
     cdef cppclass CConfiguration" Configuration":
-        void Set" Configuration::Set"(string key, string value)
-        CResult[string] Get" Configuration::Get"(string key)
-        string GetDefault" Configuration::GetDefault"(string key, string default_value)
+        void Set" Configuration::Set"(const string & key, string value)
+        CResult[string] Get" Configuration::Get"(const string & key)
+        CResult[bool] Delete" Configuration::Delete"(const string & key)
+        vector[string] GetKeys" Configuration::GetKeys"()
+        size_t Size" Configuration::Size"()
+
 
 cdef extern from "../src/safe_table_proxy.h" nogil:
     cdef cppclass CCasaTable" SafeTableProxy":
