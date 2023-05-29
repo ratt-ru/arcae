@@ -34,7 +34,12 @@ protected:
     SafeTableProxy() {};
 
 public:
-    virtual ~SafeTableProxy() { close(); };
+    virtual ~SafeTableProxy() {
+        auto result = close();
+        if(!result.ok()) {
+            ARROW_LOG(WARNING) << "Error closing file " << result.status();
+        }
+    };
 
     static Result<std::shared_ptr<SafeTableProxy>> Make(const casacore::String & filename);
     Result<std::shared_ptr<arrow::Table>> to_arrow(
