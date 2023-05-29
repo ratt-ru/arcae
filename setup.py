@@ -1,9 +1,7 @@
-# -*- coding: utf-8 -*-
-from glob import glob
 import os
-from setuptools import setup, find_packages, Extension
+from skbuild import setup
 
-from Cython.Build import cythonize
+# from Cython.Build import cythonize
 import numpy as np
 import pyarrow as pa
 
@@ -29,7 +27,6 @@ def create_extensions():
         ext.include_dirs.extend(include_dirs)
         ext.libraries.extend(libraries)
         ext.library_dirs.extend(library_dirs)
-        ext.sources.extend(list(sorted(glob("src/*.cpp"))))
 
         if os.name == "posix":
             ext.extra_compile_args.extend(["--std=c++17"])
@@ -42,5 +39,24 @@ def create_extensions():
             "include_package_data": True,
      }
 
+if VCPKG_ROOT := os.environ.get("VCPKG_ROOT"):
+    toolchain = os.path.join(VCPKG_ROOT, "scripts", "buildsystems", "vcpkg.cmake")
 
-setup(**create_extensions())
+    if not os.path.exists(toolchain):
+        raise ValueError("Toolchain {toolchain} does not exist")
+else:
+    raise ValueError("VCPKG_ROOT not set")
+
+
+pa.create_library_symlinks()
+
+CMAKE_ARGS = [
+    f"-DPYARROW_INCLUDE={pa.get_include()}",
+    f"-DPYARROW_LIBDIRS={' '.join(pa.get_library_dirs())}",
+    f"-DPYARROW_LIBS={' '.join(pa.get_libraries())}",
+    f"-DCMAKE_TOOLCHAIN_FILE={toolchain}"]
+
+setup(
+    packages=["casa_arrow"],
+    cmake_args=CMAKE_ARGS
+)

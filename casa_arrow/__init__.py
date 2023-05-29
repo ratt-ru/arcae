@@ -2,6 +2,8 @@
 import pyarrow as pa  # noqa
 from typing import TYPE_CHECKING
 
+__version__ = "0.1.0"
+
 if TYPE_CHECKING:
     from casa_arrow._arrow_tables import Table
 
