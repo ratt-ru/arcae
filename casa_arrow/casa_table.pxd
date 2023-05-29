@@ -2,6 +2,7 @@
 # cython: language_level = 3
 
 from libcpp cimport bool
+from libcpp.map cimport map
 from libcpp.string cimport string
 from libcpp.vector cimport vector
 from libcpp.memory import shared_ptr
@@ -10,6 +11,20 @@ from pyarrow.includes.libarrow cimport *
 
 cdef extern from "<climits>" nogil:
     cdef unsigned int UINT_MAX
+
+
+cdef extern from "../src/service_locator.h" nogil:
+    cdef cppclass CServiceLocator" ServiceLocator":
+        @staticmethod
+        CConfiguration & configuration" ServiceLocator::configuration"()
+
+cdef extern from "../src/configuration.h" nogil:
+    cdef cppclass CConfiguration" Configuration":
+        void Set" Configuration::Set"(const string & key, string value)
+        CResult[string] Get" Configuration::Get"(const string & key)
+        CResult[bool] Delete" Configuration::Delete"(const string & key)
+        vector[string] GetKeys" Configuration::GetKeys"()
+        size_t Size" Configuration::Size"()
 
 
 cdef extern from "../src/safe_table_proxy.h" nogil:

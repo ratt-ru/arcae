@@ -171,3 +171,30 @@ def test_duckdb(partitioned_dataset):
 
     assert antenna1.size > 0 and np.all((antenna1 >= 0) & (antenna1 < 2))
     assert antenna2.size > 0 and np.all((antenna2 >= 2) & (antenna2 <= 3))
+
+
+def test_config():
+    from casa_arrow._arrow_tables import Configuration
+    config = Configuration()
+    config["blah"] = "foo"
+    assert config["blah"] == "foo"
+    assert len(config) == 1
+
+    config["qux"] = "bar"
+    assert config["qux"] == "bar"
+    assert len(config) == 2
+
+    try:
+        config["foo"] == "bar"
+    except KeyError as e:
+        assert "foo" in e.args[0]
+
+    assert config.get("foo") is None
+    assert config.get("foo", "bar") == "bar"
+
+    assert list(config.items()) == [("blah", "foo"), ("qux", "bar")]
+
+    try:
+        config["foo"] = 1
+    except TypeError as e:
+        assert "(expected str, got int)" in e.args[0]
