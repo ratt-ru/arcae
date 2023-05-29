@@ -64,7 +64,7 @@ private:
                 auto strings = column.getColumnRange(casacore::Slice(startrow, nrow));
 
                 for(auto & s: strings) {
-                    builder.Append(s);
+                    ARROW_RETURN_NOT_OK(builder.Append(s));
                     nelements += 1;
                 }
             } catch(std::exception & e) {
@@ -85,7 +85,7 @@ private:
                     }
 
                     for(auto & string: array) {
-                        builder.Append(string);
+                        ARROW_RETURN_NOT_OK(builder.Append(string));
                         nelements += 1;
                     }
                 }
