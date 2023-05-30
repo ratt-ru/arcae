@@ -51,6 +51,8 @@ else:
 pa.create_library_symlinks()
 
 CMAKE_ARGS = [
+    " -DCMAKE_VERBOSE_MAKEFILE=ON",
+    f"-DNUMPY_INCLUDE={np.get_include()}",
     f"-DPYARROW_INCLUDE={pa.get_include()}",
     f"-DPYARROW_LIBDIRS={' '.join(pa.get_library_dirs())}",
     f"-DPYARROW_LIBS={' '.join(pa.get_libraries())}",
