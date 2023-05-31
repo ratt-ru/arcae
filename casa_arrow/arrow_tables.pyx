@@ -1,8 +1,7 @@
 # distutils: language = c++
 # cython: language_level = 3
 
-from collections import Iterable
-from collections.abc import MutableMapping
+from collections.abc import Iterable, MutableMapping
 import cython
 from cython.operator cimport dereference as deref
 
