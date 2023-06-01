@@ -44,7 +44,7 @@ ColumnConvertVisitor::MakeArrowPrimitiveArray(
         } else if(auto pos = convert_strategy.find("list"); pos == 0) {
             arrow::Int32Builder builder(pool);
             ARROW_RETURN_NOT_OK(builder.Reserve(nelements + 1));
-            for(auto i=0; i < nelements + 1; ++i)
+            for(decltype(nelements) i=0; i < nelements + 1; ++i)
                 { ARROW_RETURN_NOT_OK(builder.Append(2*i)); }
             ARROW_ASSIGN_OR_RAISE(auto offsets, builder.Finish());
             return arrow::ListArray::FromArrays(*offsets, *child_array);

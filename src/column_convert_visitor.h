@@ -149,9 +149,6 @@ private:
             int64_t null_counts) {
 
         auto column = casacore::ArrayColumn<T>(this->column);
-        auto nelements = std::accumulate(
-                shapes.begin(), shapes.end(), casacore::uInt(0),
-                [](auto i, const auto & s) { return i + s.product(); });
 
         if constexpr(std::is_same<T, casacore::String>::value) {
             // Handle string cases with Arrow StringBuilders
@@ -166,6 +163,9 @@ private:
             }
             ARROW_ASSIGN_OR_RAISE(this->array, builder.Finish());
         } else {
+            auto nelements = std::accumulate(
+                    shapes.begin(), shapes.end(), casacore::uInt(0),
+                    [](auto i, const auto & s) { return i + s.product(); });
             ARROW_ASSIGN_OR_RAISE(auto allocation, arrow::AllocateBuffer(nelements*sizeof(T), pool));
             auto buffer = std::shared_ptr<Buffer>(std::move(allocation));
             auto * buf_ptr = reinterpret_cast<T *>(buffer->mutable_data());

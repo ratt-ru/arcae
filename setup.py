@@ -21,7 +21,7 @@ def create_extensions():
         print(f"library_dirs={library_dirs}", file=f)
         print(f"libraries={libraries}", file=f)
 
-    ext_modules = [Extension("casa_arrow._arrow_tables", ["casa_arrow/*.pyx"])]
+    ext_modules = [Extension("casa_arrow.arrow_tables", ["casa_arrow/*.pyx"])]
     ext_modules = cythonize(ext_modules)
 
     for ext in ext_modules:
