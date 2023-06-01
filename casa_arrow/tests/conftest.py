@@ -277,3 +277,43 @@ def column_case_table(tmp_path_factory):
     with mp.get_context("spawn").Pool(1) as pool:
         result = pool.apply_async(generate_column_cases_table, (str(path),))
         return result.get()
+
+
+def generate_complex_case_table(path):
+    import numpy as np
+    import pyrap.tables as pt
+
+    table_desc = [
+        {
+            "desc": {
+                "_c_order": True,
+                "comment": "COMPLEX column",
+                "dataManagerGroup": "",
+                "dataManagerType": "",
+                "keywords": {},
+                "ndim": 2,
+                "maxlen": 0,
+                "shape": [2, 4],
+                "option": 0,
+                "valueType": "dcomplex",
+            },
+            "name": "COMPLEX",
+        }]
+
+    table_desc = pt.maketabdesc(table_desc)
+    table_name = os.path.join(path, "test.table")
+    nrow = 3
+
+    with pt.table(table_name, table_desc, nrow=nrow, ack=False) as T:
+        for i in range(nrow):
+            T.putcell("COMPLEX", i, np.full((2, 4), i))
+
+    return table_name
+
+@pytest.fixture
+def complex_case_table(tmp_path_factory):
+    path = tmp_path_factory.mktemp("complex_cases")
+
+    with mp.get_context("spawn").Pool(1) as pool:
+        result = pool.apply_async(generate_complex_case_table, (str(path),))
+        return result.get()

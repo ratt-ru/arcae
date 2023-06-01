@@ -68,6 +68,28 @@ def test_column_cases(column_case_table, capfd):
     assert "Ignoring UNCONSTRAINED" in captured.err
 
 
+def test_complex_cases(complex_case_table):
+    from casa_arrow.arrow_tables import ComplexDoubleType
+    from casa_arrow import config
+
+    table = ca.table(complex_case_table)
+
+    with config.set(**{"casa.convert.strategy": "fixed complex"}):
+        T = table.to_arrow()
+        assert T.column("COMPLEX").type == pa.list_(pa.list_(ComplexDoubleType(), 4), 2)
+
+    with config.set(**{"casa.convert.strategy": "fixed"}):
+        T = table.to_arrow()
+        assert T.column("COMPLEX").type == pa.list_(pa.list_(pa.list_(pa.float64(), 2), 4), 2)
+
+    with config.set(**{"casa.convert.strategy": "list complex"}):
+        T = table.to_arrow()
+        assert T.column("COMPLEX").type == pa.list_(pa.list_(ComplexDoubleType()))
+
+    with config.set(**{"casa.convert.strategy": "list"}):
+        T = table.to_arrow()
+        assert T.column("COMPLEX").type == pa.list_(pa.list_(pa.list_(pa.float64())))
+
 def test_partial_read(sorting_table):
     """ Tests that partial reads work """
     T = ca.table(sorting_table)
@@ -174,7 +196,7 @@ def test_duckdb(partitioned_dataset):
 
 
 def test_config():
-    from casa_arrow._arrow_tables import Configuration
+    from casa_arrow.arrow_tables import Configuration
     config = Configuration()
     config["blah"] = "foo"
     assert config["blah"] == "foo"
