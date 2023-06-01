@@ -9,9 +9,11 @@
 
 #include "casa_visitors.h"
 #include "complex_type.h"
+#include "service_locator.h"
 
 using ::arrow::Buffer;
 using ::arrow::DataType;
+using ::arrow::Result;
 using ::arrow::Status;
 
 using ::casacore::IPosition;
@@ -53,29 +55,10 @@ private:
         return Status::Invalid(arrow_dtype->ToString(), " incompatible with casacore::String");
     }
 
-    std::shared_ptr<arrow::Array> MakeArrowPrimitiveArray(
+    Result<std::shared_ptr<arrow::Array>> MakeArrowPrimitiveArray(
             const std::shared_ptr<Buffer> & buffer,
             casacore::uInt nelements,
-            const std::shared_ptr<DataType> & arrow_dtype) {
-
-        if(auto complex_dtype = std::dynamic_pointer_cast<ComplexType>(arrow_dtype)) {
-            auto child_array = arrow::PrimitiveArray(complex_dtype->value_type(),
-                                                     2*nelements, buffer, nullptr, 0, 0);
-            // NOTE(sjperkins)
-            // Check the FixedSizeListAray layout documents
-            // https://arrow.apache.org/docs/format/Columnar.html#fixed-size-list-layout
-            // A single empty buffer {nullptr} must be provided otherwise this segfaults
-            auto array_data = arrow::ArrayData::Make(
-                complex_dtype, nelements, {nullptr}, {child_array.data()},
-                0, 0);
-
-            return complex_dtype->MakeArray(std::move(array_data));
-
-        } else {
-            return std::make_shared<arrow::PrimitiveArray>(
-                arrow_dtype, nelements, buffer, nullptr, 0, 0);
-        }
-    }
+            const std::shared_ptr<DataType> & arrow_dtype);
 
     template <typename T>
     Status ConvertScalarColumn(const std::shared_ptr<DataType> & arrow_dtype) {
@@ -108,7 +91,7 @@ private:
                 return Status::Invalid("ConvertScalarColumn ", column_desc.name(), " ", e.what());
             }
 
-            this->array = MakeArrowPrimitiveArray(buffer, nrow, arrow_dtype);
+            ARROW_ASSIGN_OR_RAISE(this->array, MakeArrowPrimitiveArray(buffer, nrow, arrow_dtype));
         }
 
         return this->array->ValidateFull();
@@ -147,7 +130,7 @@ private:
                 return Status::Invalid("MakeFixedArrayBuffer ", column_desc.name(), " ", e.what());
             }
 
-            this->array = MakeArrowPrimitiveArray(buffer, nelements, arrow_dtype);
+            ARROW_ASSIGN_OR_RAISE(this->array, MakeArrowPrimitiveArray(buffer, nelements, arrow_dtype));
         }
 
         // Fortran ordering
@@ -166,9 +149,6 @@ private:
             int64_t null_counts) {
 
         auto column = casacore::ArrayColumn<T>(this->column);
-        auto nelements = std::accumulate(
-                shapes.begin(), shapes.end(), casacore::uInt(0),
-                [](auto i, const auto & s) { return i + s.product(); });
 
         if constexpr(std::is_same<T, casacore::String>::value) {
             // Handle string cases with Arrow StringBuilders
@@ -183,6 +163,9 @@ private:
             }
             ARROW_ASSIGN_OR_RAISE(this->array, builder.Finish());
         } else {
+            auto nelements = std::accumulate(
+                    shapes.begin(), shapes.end(), casacore::uInt(0),
+                    [](auto i, const auto & s) { return i + s.product(); });
             ARROW_ASSIGN_OR_RAISE(auto allocation, arrow::AllocateBuffer(nelements*sizeof(T), pool));
             auto buffer = std::shared_ptr<Buffer>(std::move(allocation));
             auto * buf_ptr = reinterpret_cast<T *>(buffer->mutable_data());
@@ -211,7 +194,7 @@ private:
                                        column_desc.name());
             }
 
-            this->array = MakeArrowPrimitiveArray(buffer, nelements, arrow_dtype);
+            ARROW_ASSIGN_OR_RAISE(this->array, MakeArrowPrimitiveArray(buffer, nelements, arrow_dtype));
         }
 
         // NOTE(sjperkins)
@@ -243,17 +226,17 @@ private:
         //    offsets = [0] + cumsum((1*[10] + 1*[10]))
 
 
-        auto ndim = column_desc.ndim();
 
         // Compute the products
-        auto products = std::vector<IPosition>(nrow, IPosition(column_desc.ndim(), 1));
+        auto ndim = column_desc.ndim();
+        auto products = std::vector<IPosition>(nrow, IPosition(ndim, 1));
 
         for(casacore::uInt row=startrow; row < endrow; ++row) {
             auto lrow = local_row(row);
             const auto & shape = shapes[lrow];
             auto & product = products[lrow];
 
-            for(ssize_t d=ndim - 2; d >= 0; --d) {
+            for(int d=ndim - 2; d >= 0; --d) {
                 product[d] *= product[d + 1] * shape[d + 1];
             }
         }
@@ -263,33 +246,25 @@ private:
             unsigned int noffsets = std::accumulate(products.begin(), products.end(), 1,
                 [d](auto i, const auto & p) { return i + p[d]; });
 
-            ARROW_ASSIGN_OR_RAISE(
-                auto offset_buffer,
-                arrow::AllocateBuffer(noffsets*sizeof(noffsets), pool));
-
-            int32_t * optr = reinterpret_cast<int32_t *>(offset_buffer->mutable_data());
+            arrow::Int32Builder builder(pool);
             unsigned int running_offset = 0;
-            unsigned int o = 0;
-            optr[o++] = running_offset;
+            unsigned int o = 1;
+            ARROW_RETURN_NOT_OK(builder.Reserve(noffsets));
+            ARROW_RETURN_NOT_OK(builder.Append(running_offset));
 
             for(casacore::uInt row=startrow; row < endrow; ++row) {
                 auto repeats = products[local_row(row)][d];
                 auto dim_size = shapes[local_row(row)][d];
 
-                for(auto r=0; r < repeats; ++r) {
+                for(auto r=0; r < repeats; ++r, ++o) {
                     running_offset += dim_size;
-                    optr[o++] = running_offset;
+                    ARROW_RETURN_NOT_OK(builder.Append(running_offset));
                 }
             }
 
-            if(o != noffsets) {
-                return Status::Invalid("o != noffsets "
-                                       "during conversion of variably shaped column ",
-                                       column_desc.name());
-            }
+            if(o != noffsets) { return arrow::Status::Invalid("o != noffsets"); }
 
-            auto offsets = std::make_shared<arrow::PrimitiveArray>(
-                arrow::int32(), noffsets, std::move(offset_buffer));
+            ARROW_ASSIGN_OR_RAISE(auto offsets, builder.Finish());
             ARROW_ASSIGN_OR_RAISE(this->array, arrow::ListArray::FromArrays(*offsets, *this->array));
             // NOTE(sjperkins): Perhaps remove this for performance
             ARROW_RETURN_NOT_OK(this->array->ValidateFull());
@@ -351,7 +326,11 @@ private:
 
         assert(column_desc.ndim() >= 1);
 
-        if(column_desc.isFixedShape()) {
+        auto & config = ServiceLocator::configuration();
+        auto convert_method = config.GetDefault("casa.convert.strategy", "fixed");
+        auto list_convert = convert_method.find("list") == 0;
+
+        if(!list_convert && column_desc.isFixedShape()) {
             return ConvertFixedArrayColumn<T>(arrow_dtype, column_desc.shape());
         }
 
@@ -375,13 +354,12 @@ private:
 
         // No nulls and all shapes are equal, we can represent this with a
         // fixed shape list
-        if(null_counts == 0 && shapes_equal) {
+        if(!list_convert && null_counts == 0 && shapes_equal) {
             return ConvertFixedArrayColumn<T>(arrow_dtype, shapes[0]);
         }
 
         return ConvertVariableArrayColumn<T>(arrow_dtype, shapes, nulls, null_counts);
     }
 };
-
 
 #endif
