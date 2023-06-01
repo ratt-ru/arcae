@@ -166,7 +166,8 @@ private:
             int64_t null_counts) {
 
         auto column = casacore::ArrayColumn<T>(this->column);
-        auto nelements = std::accumulate(shapes.begin(), shapes.end(), 0,
+        auto nelements = std::accumulate(
+                shapes.begin(), shapes.end(), casacore::uInt(0),
                 [](auto i, const auto & s) { return i + s.product(); });
 
         if constexpr(std::is_same<T, casacore::String>::value) {
@@ -281,8 +282,8 @@ private:
                 }
             }
 
-            if(o != noffsets || optr[o - 1] != nrow) {
-                return Status::Invalid("o != noffsets || optr[o - 1] != nrow "
+            if(o != noffsets) {
+                return Status::Invalid("o != noffsets "
                                        "during conversion of variably shaped column ",
                                        column_desc.name());
             }
