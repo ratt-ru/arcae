@@ -1,6 +1,7 @@
 import os
 from os.path import join as pjoin
 from skbuild import setup
+from setuptools import find_packages
 
 import numpy as np
 import pyarrow as pa
@@ -33,7 +34,7 @@ CMAKE_ARGS = [
     f"-DVCPKG_HOST_TRIPLET=x64-linux-dynamic-cxx17-abi0",
     f"-S {CI_VCPKG_PATH}"]
 setup(
-    packages=["casa_arrow"],
+    packages=find_packages(),
     cmake_args=CMAKE_ARGS,
-    cmake_source_dir=CI_VCPKG_PATH
+    cmake_source_dir=CI_VCPKG_PATH,
 )
