@@ -13,12 +13,12 @@ cdef extern from "<climits>" nogil:
     cdef unsigned int UINT_MAX
 
 
-cdef extern from "../src/service_locator.h" nogil:
+cdef extern from "../cpp/service_locator.h" nogil:
     cdef cppclass CServiceLocator" ServiceLocator":
         @staticmethod
         CConfiguration & configuration" ServiceLocator::configuration"()
 
-cdef extern from "../src/configuration.h" nogil:
+cdef extern from "../cpp/configuration.h" nogil:
     cdef cppclass CConfiguration" Configuration":
         void Set" Configuration::Set"(const string & key, string value)
         CResult[string] Get" Configuration::Get"(const string & key)
@@ -27,7 +27,7 @@ cdef extern from "../src/configuration.h" nogil:
         size_t Size" Configuration::Size"()
 
 
-cdef extern from "../src/safe_table_proxy.h" nogil:
+cdef extern from "../cpp/safe_table_proxy.h" nogil:
     cdef cppclass CCasaTable" SafeTableProxy":
         @staticmethod
         CResult[shared_ptr[CCasaTable]] Make" SafeTableProxy::Make"(const string & filename)
@@ -39,7 +39,7 @@ cdef extern from "../src/safe_table_proxy.h" nogil:
         CResult[vector[string]] columns " SafeTableProxy::columns"()
         CResult[vector[shared_ptr[CCasaTable]]] partition " SafeTableProxy::partition"(const vector[string] & partition_columns, const vector[string] & sort_columns)
 
-cdef extern from "../src/complex_type.h" nogil:
+cdef extern from "../cpp/complex_type.h" nogil:
     cdef cppclass CComplexType" ComplexType"(CExtensionType):
         shared_ptr[CDataType] value_type" ComplexType::value_type"()
         string extension_name()

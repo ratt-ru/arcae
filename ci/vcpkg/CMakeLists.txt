@@ -33,12 +33,12 @@ message(PYARROW_LIBS: ${PYARROW_LIBS})
 message(PYARROW_LIBDIRS: ${PYARROW_LIBDIRS})
 
 add_library(core OBJECT
-    ../../src/casa_visitors.cpp
-    ../../src/column_convert_visitor.cpp
-    ../../src/complex_type.cpp
-    ../../src/configuration.cpp
-    ../../src/service_locator.cpp
-    ../../src/safe_table_proxy.cpp)
+    ../../cpp/casa_visitors.cpp
+    ../../cpp/column_convert_visitor.cpp
+    ../../cpp/complex_type.cpp
+    ../../cpp/configuration.cpp
+    ../../cpp/service_locator.cpp
+    ../../cpp/safe_table_proxy.cpp)
 
 target_link_libraries(core PkgConfig::casacore)
 target_include_directories(core PUBLIC PkgConfig::casacore)
@@ -48,7 +48,7 @@ set_property(TARGET core PROPERTY POSITION_INDEPENDENT_CODE 1)
 add_cython_target(arrow_tables ../../casa_arrow/arrow_tables.pyx CXX)
 message("CYTHON table ${arrow_tables}")
 add_library(arrow_tables MODULE ${arrow_tables} $<TARGET_OBJECTS:core>)
-target_include_directories(arrow_tables PUBLIC ../../src)
+target_include_directories(arrow_tables PUBLIC ../../cpp)
 target_link_libraries(arrow_tables ${PYARROW_LIB})
 set_property(TARGET arrow_tables PROPERTY POSITION_INDEPENDENT_CODE 1)
 python_extension_module(arrow_tables)
