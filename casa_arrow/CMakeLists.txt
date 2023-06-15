@@ -27,4 +27,4 @@ foreach(PYARROW_LIB ${_PYARROW_LIBS})
     target_link_libraries(arrow_tables ${PYARROW_LIB})
 endforeach()
 
-install(TARGETS arrow_tables LIBRARY DESTINATION .)
+install(TARGETS arrow_tables LIBRARY DESTINATION casa_arrow)
