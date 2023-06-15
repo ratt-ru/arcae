@@ -1,10 +1,19 @@
 include(FetchContent)
 
-FetchContent_Declare(
-    vcpkg
-    URL https://github.com/microsoft/vcpkg/archive/1ba9a2591f15af5900f2ce2b3e2bf31771e3ac48.tar.gz)
+file(READ "${CMAKE_SOURCE_DIR}/.env" ENV_FILE)
+string(REGEX MATCH "[ \t]*VCPKG_SHA1[ \t]*=[ \t]*([0-9a-f]*)" IGNORED ${ENV_FILE})
 
+if(NOT DEFINED CMAKE_MATCH_1)
+    message(FATAL_ERROR "Unable to find VCPKG=version in ${CMAKE_SOURCE_DIR}/.env")
+endif()
+
+set(VCPKG_URL "https://github.com/microsoft/vcpkg/archive/${CMAKE_MATCH_1}.tar.gz")
+message("VCPKG_VERSION=${CMAKE_MATCH_1}")
+message("VCPKG_URL=${VCPKG_URL}")
+
+FetchContent_Declare(vcpkg URL ${VCPKG_URL})
 FetchContent_MakeAvailable(vcpkg)
+
 set(CMAKE_TOOLCHAIN_FILE "${vcpkg_SOURCE_DIR}/scripts/buildsystems/vcpkg.cmake" CACHE FILEPATH "")
 set(VCPKG_MANIFEST_DIR "${CMAKE_SOURCE_DIR}/vcpkg")
 
