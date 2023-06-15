@@ -33,7 +33,7 @@ jobs:
 
       - name: Get VCPKG SHA1
         id: vcpkg-sha1
-        run: echo "sha1=$(grep VCPKG_SHA1 .env)" >> $GITHUB_OUTPUT
+        run: echo "sha1=$(grep VCPKG_SHA1 .env | cut -d '=' -f2)" >> $GITHUB_OUTPUT
         shell: bash
 
       - name: Create VCPKG binary asset folder
