@@ -36,6 +36,9 @@ jobs:
         run: echo "sha1=$(grep VCPKG_SHA1 .env)" >> $GITHUB_OUTPUT
         shell: bash
 
+      - name: Create VCPKG binary asset folder
+        run: mkdir -p $VCPKG_DEFAULT_BINARY_CACHE
+
       - name: Cache VCPKG binary assets
         id: cache-vcpkg
         uses: actions/cache@v3
