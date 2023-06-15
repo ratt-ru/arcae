@@ -28,8 +28,6 @@ jobs:
 
       - name: Checkout source
         uses: actions/checkout@v3
-        with:
-          fetch-depth: 1
 
       - name: Get VCPKG SHA1
         id: vcpkg-sha1
@@ -37,14 +35,14 @@ jobs:
         shell: bash
 
       - name: Create VCPKG binary asset folder
-        run: mkdir -p $VCPKG_DEFAULT_BINARY_CACHE
+        run: mkdir -p ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
 
       - name: Cache VCPKG binary assets
         id: cache-vcpkg
         uses: actions/cache@v3
         with:
           key: vcpkg-cache-${{ steps.vcpkg-sha1.outputs.sha1 }}-${{ hashfiles('vcpkg/**') }}
-          path: $VCPKG_DEFAULT_BINARY_CACHE
+          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
 
       - name: Build Binary Wheel
         run: python -m build --wheel
