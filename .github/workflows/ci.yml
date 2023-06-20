@@ -11,6 +11,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        python-version: ["3.8"]
         python-abi: ["cp38"]
         buildplat:
           - [ubuntu-20.04, manylinux_x86_64]
