@@ -13,7 +13,7 @@ jobs:
       matrix:
         python-abi: ["cp38"]
         buildplat:
-          - [ubuntu-20.04, manylinux2014]
+          - [ubuntu-20.04, manylinux_x86_64]
 
     steps:
       - name: Set up Python ${{ matrix.python-version }}
