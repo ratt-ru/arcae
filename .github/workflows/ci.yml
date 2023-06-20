@@ -24,7 +24,7 @@ jobs:
 
       - name: Upgrade pip and install build
         run: >
-          python -m pip install -U pip cibuildwheel
+          python -m pip install -U pip
 
       - name: Checkout source
         uses: actions/checkout@v3
@@ -48,3 +48,4 @@ jobs:
         uses: pypa/cibuildwheel@0ecddd92b62987d7a2ae8911f4bb8ec9e2e4496a # v2.13.1
         env:
           CIBW_BUILD: ${{ matrix.python-abi }}-${{ matrix.buildplat[1] }}
+          CIBW_BUILD_FRONTEND: build
