@@ -63,10 +63,9 @@ index 7e48b3ff2..45a781bce 100644
 +    FILE "${CMAKE_CURRENT_BINARY_DIR}/cmake/${PROJECT_NAME}Targets.cmake"
 +    NAMESPACE ${namespace}::
 +)
-+
+ 
  # Show summary.
  message (STATUS "CMAKE_SYSTEM .......... = ${CMAKE_SYSTEM}")
- message (STATUS "CMAKE_BUILD_TYPE ...... = ${CMAKE_BUILD_TYPE}")
 diff --git a/Config.cmake.in b/Config.cmake.in
 new file mode 100644
 index 000000000..8c9ad12aa
