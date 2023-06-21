@@ -60,7 +60,7 @@ vcpkg_cmake_configure(
 
 vcpkg_cmake_install()
 vcpkg_fixup_pkgconfig()
-vcpkg_fixup_cmake()
+vcpkg_cmake_config_fixup()
 
 vcpkg_install_copyright(FILE_LIST "${src}/COPYING")
 file(REMOVE_RECURSE "${CURRENT_PACKAGES_DIR}/debug/include")
