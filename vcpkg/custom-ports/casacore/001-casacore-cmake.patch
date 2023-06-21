@@ -1,5 +1,5 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 7e48b3ff2..a45b499de 100644
+index 7e48b3ff2..45a781bce 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -196,13 +196,13 @@ if (NOT CMAKE_BUILD_TYPE)
@@ -22,10 +22,16 @@ index 7e48b3ff2..a45b499de 100644
  
  # Ensure clang is not complaining about unused arguments.
  if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-@@ -550,6 +550,38 @@ CONFIGURE_FILE("casacore.pc.in" "casacore.pc" @ONLY)
- set(CASA_PKGCONFIG_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}/lib/pkgconfig")
- INSTALL(FILES "${CMAKE_CURRENT_BINARY_DIR}/casacore.pc" DESTINATION "${CASA_PKGCONFIG_INSTALL_PREFIX}")
+@@ -547,8 +547,41 @@ endforeach (module)
  
+ # Install pkg-config support file
+ CONFIGURE_FILE("casacore.pc.in" "casacore.pc" @ONLY)
+-set(CASA_PKGCONFIG_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}/lib/pkgconfig")
+-INSTALL(FILES "${CMAKE_CURRENT_BINARY_DIR}/casacore.pc" DESTINATION "${CASA_PKGCONFIG_INSTALL_PREFIX}")
++# set(CASA_PKGCONFIG_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}/lib/pkgconfig")
++# INSTALL(FILES "${CMAKE_CURRENT_BINARY_DIR}/casacore.pc" DESTINATION "${CASA_PKGCONFIG_INSTALL_PREFIX}")
++INSTALL(FILES "${CMAKE_CURRENT_BINARY_DIR}/casacore.pc" DESTINATION lib/pkgconfig)
++
 +# generate and install export file
 +install(EXPORT casacore
 +    FILE "${PROJECT_NAME}Targets.cmake"
