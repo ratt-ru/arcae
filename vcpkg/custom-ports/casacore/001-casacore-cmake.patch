@@ -1,5 +1,5 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 7e48b3ff2..becb806ca 100644
+index 7e48b3ff2..a45b499de 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -196,13 +196,13 @@ if (NOT CMAKE_BUILD_TYPE)
@@ -22,8 +22,58 @@ index 7e48b3ff2..becb806ca 100644
  
  # Ensure clang is not complaining about unused arguments.
  if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+@@ -550,6 +550,38 @@ CONFIGURE_FILE("casacore.pc.in" "casacore.pc" @ONLY)
+ set(CASA_PKGCONFIG_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}/lib/pkgconfig")
+ INSTALL(FILES "${CMAKE_CURRENT_BINARY_DIR}/casacore.pc" DESTINATION "${CASA_PKGCONFIG_INSTALL_PREFIX}")
+ 
++# generate and install export file
++install(EXPORT casacore
++    FILE "${PROJECT_NAME}Targets.cmake"
++    NAMESPACE ${namespace}::
++    DESTINATION cmake
++)
++
++include(CMakePackageConfigHelpers)
++
++# generate the version file for the config file
++write_basic_package_version_file(
++    "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
++    VERSION "${version}"
++    COMPATIBILITY AnyNewerVersion
++)
++# create config file
++configure_package_config_file(${CMAKE_CURRENT_SOURCE_DIR}/Config.cmake.in
++    "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Config.cmake"
++    INSTALL_DESTINATION cmake
++)
++# install config files
++install(FILES
++    "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Config.cmake"
++    "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
++    DESTINATION cmake
++)
++# generate the export targets for the build tree
++export(EXPORT casacore
++    FILE "${CMAKE_CURRENT_BINARY_DIR}/cmake/${PROJECT_NAME}Targets.cmake"
++    NAMESPACE ${namespace}::
++)
++
+ # Show summary.
+ message (STATUS "CMAKE_SYSTEM .......... = ${CMAKE_SYSTEM}")
+ message (STATUS "CMAKE_BUILD_TYPE ...... = ${CMAKE_BUILD_TYPE}")
+diff --git a/Config.cmake.in b/Config.cmake.in
+new file mode 100644
+index 000000000..8c9ad12aa
+--- /dev/null
++++ b/Config.cmake.in
+@@ -0,0 +1,5 @@
++@PACKAGE_INIT@
++
++include("${CMAKE_CURRENT_LIST_DIR}/@PROJECT_NAME@Targets.cmake")
++
++check_required_components(@PROJECT_NAME@)
 diff --git a/casa/CMakeLists.txt b/casa/CMakeLists.txt
-index 5e8c1bd97..1b2a20022 100644
+index 5e8c1bd97..d78a6174b 100644
 --- a/casa/CMakeLists.txt
 +++ b/casa/CMakeLists.txt
 @@ -15,7 +15,9 @@ set (
@@ -45,6 +95,14 @@ index 5e8c1bd97..1b2a20022 100644
  dl
  ${CASACORE_ARCH_LIBS}
  )
+@@ -268,6 +271,7 @@ add_subdirectory (apps)
+ 
+ install (
+ TARGETS casa_casa
++EXPORT casacore
+ RUNTIME DESTINATION bin
+ LIBRARY DESTINATION lib${LIB_SUFFIX}
+ ARCHIVE DESTINATION lib${LIB_SUFFIX}
 diff --git a/cmake/FindFFTW3.cmake b/cmake/FindFFTW3.cmake
 index 886f3bebb..66d117674 100644
 --- a/cmake/FindFFTW3.cmake
@@ -221,8 +279,32 @@ index 4f4d31bf5..000000000
 -  ENDIF(GSL_FIND_REQUIRED)
 -ENDIF(GSL_LIBRARIES)
 -
+diff --git a/coordinates/CMakeLists.txt b/coordinates/CMakeLists.txt
+index 7ef92b148..b9123ab69 100644
+--- a/coordinates/CMakeLists.txt
++++ b/coordinates/CMakeLists.txt
+@@ -25,6 +25,7 @@ Coordinates/TabularCoordinate.cc
+ target_link_libraries (casa_coordinates casa_fits ${WCSLIB_LIBRARIES} ${CASACORE_ARCH_LIBS})
+ 
+ install (TARGETS casa_coordinates
++EXPORT casacore
+ RUNTIME DESTINATION bin
+ LIBRARY DESTINATION lib${LIB_SUFFIX}
+ ARCHIVE DESTINATION lib${LIB_SUFFIX}
+diff --git a/derivedmscal/CMakeLists.txt b/derivedmscal/CMakeLists.txt
+index 23c16aee7..6d3a28aaa 100644
+--- a/derivedmscal/CMakeLists.txt
++++ b/derivedmscal/CMakeLists.txt
+@@ -13,6 +13,7 @@ DerivedMC/UDFMSCal.cc
+ target_link_libraries (casa_derivedmscal casa_ms ${CASACORE_ARCH_LIBS})
+ 
+ install (TARGETS casa_derivedmscal
++EXPORT casacore
+ RUNTIME DESTINATION bin
+ LIBRARY DESTINATION lib${LIB_SUFFIX}
+ ARCHIVE DESTINATION lib${LIB_SUFFIX}
 diff --git a/fits/CMakeLists.txt b/fits/CMakeLists.txt
-index 2104c5612..cb2ad1d0d 100644
+index 2104c5612..42e2e86ee 100644
 --- a/fits/CMakeLists.txt
 +++ b/fits/CMakeLists.txt
 @@ -24,7 +24,8 @@ FITS/blockio.cc
@@ -235,6 +317,14 @@ index 2104c5612..cb2ad1d0d 100644
  
  add_subdirectory (apps)
  
+@@ -32,6 +33,7 @@ add_subdirectory (apps)
+ add_subdirectory (FITS/test ${EXCL_ALL})
+ 
+ install (TARGETS casa_fits
++EXPORT casacore
+ RUNTIME DESTINATION bin
+ LIBRARY DESTINATION lib${LIB_SUFFIX}
+ ARCHIVE DESTINATION lib${LIB_SUFFIX}
 diff --git a/fits/apps/CMakeLists.txt b/fits/apps/CMakeLists.txt
 index 578ee92d7..691ef87c9 100644
 --- a/fits/apps/CMakeLists.txt
@@ -245,6 +335,181 @@ index 578ee92d7..691ef87c9 100644
 -target_link_libraries (fits2table casa_fits ${CASACORE_ARCH_LIBS})
 +target_link_libraries (fits2table casa_fits ${CASACORE_ARCH_LIBS} ${ZLIB_LIBRARIES})
  install(TARGETS fits2table DESTINATION bin)
+diff --git a/images/CMakeLists.txt b/images/CMakeLists.txt
+index 85af2b8fc..d496e9953 100644
+--- a/images/CMakeLists.txt
++++ b/images/CMakeLists.txt
+@@ -75,6 +75,7 @@ add_subdirectory (apps)
+ 
+ install (
+ TARGETS casa_images
++EXPORT casacore
+ RUNTIME DESTINATION bin
+ LIBRARY DESTINATION lib${LIB_SUFFIX}
+ ARCHIVE DESTINATION lib${LIB_SUFFIX}
+diff --git a/lattices/CMakeLists.txt b/lattices/CMakeLists.txt
+index 45ffaa17d..13afbc5f8 100644
+--- a/lattices/CMakeLists.txt
++++ b/lattices/CMakeLists.txt
+@@ -68,6 +68,7 @@ ${CASACORE_ARCH_LIBS}
+ )
+ 
+ install (TARGETS casa_lattices
++EXPORT casacore
+ RUNTIME DESTINATION bin
+ LIBRARY DESTINATION lib${LIB_SUFFIX}
+ ARCHIVE DESTINATION lib${LIB_SUFFIX}
+diff --git a/meas/CMakeLists.txt b/meas/CMakeLists.txt
+index c3266bcf8..ed4314751 100644
+--- a/meas/CMakeLists.txt
++++ b/meas/CMakeLists.txt
+@@ -24,6 +24,7 @@ MeasUDF/Register.cc
+ target_link_libraries (casa_meas casa_measures)
+ 
+ install (TARGETS casa_meas
++EXPORT casacore
+ RUNTIME DESTINATION bin
+ LIBRARY DESTINATION lib${LIB_SUFFIX}
+ ARCHIVE DESTINATION lib${LIB_SUFFIX}
+diff --git a/measures/CMakeLists.txt b/measures/CMakeLists.txt
+index 63ca4817a..0d39da69c 100644
+--- a/measures/CMakeLists.txt
++++ b/measures/CMakeLists.txt
+@@ -75,6 +75,7 @@ add_subdirectory (apps)
+ 
+ install (
+ TARGETS casa_measures
++EXPORT casacore
+ RUNTIME DESTINATION bin
+ LIBRARY DESTINATION lib${LIB_SUFFIX}
+ ARCHIVE DESTINATION lib${LIB_SUFFIX}
+diff --git a/mirlib/CMakeLists.txt b/mirlib/CMakeLists.txt
+index 0703a5d1d..46f26840f 100644
+--- a/mirlib/CMakeLists.txt
++++ b/mirlib/CMakeLists.txt
+@@ -22,6 +22,7 @@ target_link_libraries (casa_mirlib casa_casa ${CASACORE_ARCH_LIBS})
+ 
+ install (
+ TARGETS casa_mirlib
++EXPORT casacore
+ RUNTIME DESTINATION bin
+ LIBRARY DESTINATION lib${LIB_SUFFIX}
+ ARCHIVE DESTINATION lib${LIB_SUFFIX}
+diff --git a/ms/CMakeLists.txt b/ms/CMakeLists.txt
+index f7fcfa053..dcad9e7c1 100644
+--- a/ms/CMakeLists.txt
++++ b/ms/CMakeLists.txt
+@@ -1,5 +1,5 @@
+ #
+-# CASA MeasurementSets 
++# CASA MeasurementSets
+ #
+ 
+ set (
+@@ -168,6 +168,7 @@ ${CASACORE_ARCH_LIBS}
+ add_subdirectory (apps)
+ 
+ install (TARGETS casa_ms
++EXPORT casacore
+ RUNTIME DESTINATION bin
+ LIBRARY DESTINATION lib${LIB_SUFFIX}
+ ARCHIVE DESTINATION lib${LIB_SUFFIX}
+diff --git a/msfits/CMakeLists.txt b/msfits/CMakeLists.txt
+index 28f1884a2..85a312ad0 100644
+--- a/msfits/CMakeLists.txt
++++ b/msfits/CMakeLists.txt
+@@ -30,6 +30,7 @@ add_subdirectory (apps)
+ 
+ install (
+ TARGETS casa_msfits
++EXPORT casacore
+ LIBRARY DESTINATION lib${LIB_SUFFIX}
+ ARCHIVE DESTINATION lib${LIB_SUFFIX}
+ LIBRARY PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
+diff --git a/python/CMakeLists-cmake3.14.txt b/python/CMakeLists-cmake3.14.txt
+index 7c981f734..1ce6b4d6c 100644
+--- a/python/CMakeLists-cmake3.14.txt
++++ b/python/CMakeLists-cmake3.14.txt
+@@ -63,6 +63,7 @@ Converters/PycArray.tcc
+ target_link_libraries (casa_python casa_casa ${PYTHON2_Boost_LIBRARIES} ${PYTHON2_LIBRARIES} ${CASACORE_ARCH_LIBS})
+ 
+ install (TARGETS casa_python
++EXPORT casacore
+ RUNTIME DESTINATION bin
+ LIBRARY DESTINATION lib${LIB_SUFFIX}
+ ARCHIVE DESTINATION lib${LIB_SUFFIX}
+diff --git a/python/CMakeLists-older-cmake.txt b/python/CMakeLists-older-cmake.txt
+index 96411e7d9..e145da3bb 100644
+--- a/python/CMakeLists-older-cmake.txt
++++ b/python/CMakeLists-older-cmake.txt
+@@ -90,6 +90,7 @@ Converters/PycArray.tcc
+ target_link_libraries (casa_python casa_casa ${PYTHON2_Boost_LIBRARIES} ${PYTHON2_LIBRARIES} ${CASACORE_ARCH_LIBS})
+ 
+ install (TARGETS casa_python
++EXPORT casacore
+ RUNTIME DESTINATION bin
+ LIBRARY DESTINATION lib${LIB_SUFFIX}
+ ARCHIVE DESTINATION lib${LIB_SUFFIX}
+diff --git a/python3/CMakeLists-cmake3.14.txt b/python3/CMakeLists-cmake3.14.txt
+index 26d5ca533..35b458e1b 100644
+--- a/python3/CMakeLists-cmake3.14.txt
++++ b/python3/CMakeLists-cmake3.14.txt
+@@ -54,6 +54,7 @@ add_library (casa_python3
+ target_link_libraries (casa_python3 casa_casa ${PYTHON3_Boost_LIBRARIES} ${PYTHON3_LIBRARIES})
+ 
+ install (TARGETS casa_python3
++EXPORT casacore
+ RUNTIME DESTINATION bin
+ LIBRARY DESTINATION lib${LIB_SUFFIX}
+ ARCHIVE DESTINATION lib${LIB_SUFFIX}
+diff --git a/python3/CMakeLists-older-cmake.txt b/python3/CMakeLists-older-cmake.txt
+index 8a42cc905..5fe0999ca 100644
+--- a/python3/CMakeLists-older-cmake.txt
++++ b/python3/CMakeLists-older-cmake.txt
+@@ -84,6 +84,7 @@ add_library (casa_python3
+ target_link_libraries (casa_python3 casa_casa ${PYTHON3_Boost_LIBRARIES} ${PYTHON3_LIBRARIES})
+ 
+ install (TARGETS casa_python3
++EXPORT casacore
+ RUNTIME DESTINATION bin
+ LIBRARY DESTINATION lib${LIB_SUFFIX}
+ ARCHIVE DESTINATION lib${LIB_SUFFIX}
+diff --git a/scimath/CMakeLists.txt b/scimath/CMakeLists.txt
+index 77b4f70ec..85deae634 100644
+--- a/scimath/CMakeLists.txt
++++ b/scimath/CMakeLists.txt
+@@ -54,6 +54,7 @@ else (FFTW3_FOUND)
+ endif (FFTW3_FOUND)
+ 
+ install (TARGETS casa_scimath
++EXPORT casacore
+ RUNTIME DESTINATION bin
+ LIBRARY DESTINATION lib${LIB_SUFFIX}
+ ARCHIVE DESTINATION lib${LIB_SUFFIX}
+diff --git a/scimath_f/CMakeLists.txt b/scimath_f/CMakeLists.txt
+index 69bd4d757..8e6aa8d8a 100644
+--- a/scimath_f/CMakeLists.txt
++++ b/scimath_f/CMakeLists.txt
+@@ -50,6 +50,7 @@ target_link_libraries (casa_scimath_f casa_tables ${LAPACK_LIBRARIES} ${BLAS_LIB
+ 
+ install (
+ TARGETS casa_scimath_f
++EXPORT casacore
+ LIBRARY DESTINATION lib${LIB_SUFFIX}
+ ARCHIVE DESTINATION lib${LIB_SUFFIX}
+ LIBRARY PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
+diff --git a/tables/CMakeLists.txt b/tables/CMakeLists.txt
+index 9c012552d..7a66af6a2 100644
+--- a/tables/CMakeLists.txt
++++ b/tables/CMakeLists.txt
+@@ -228,6 +228,7 @@ endif(MPI_FOUND)
+ add_subdirectory (apps)
+ 
+ install (TARGETS casa_tables
++EXPORT casacore
+ RUNTIME DESTINATION bin
+ LIBRARY DESTINATION lib${LIB_SUFFIX}
+ ARCHIVE DESTINATION lib${LIB_SUFFIX}
 diff --git a/tables/Dysco/uvector.h b/tables/Dysco/uvector.h
 index 139bd035e..9828461b8 100644
 --- a/tables/Dysco/uvector.h

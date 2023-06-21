@@ -37,9 +37,6 @@ if(${USE_ADIOS2} STREQUAL "ON")
     message(FATAL_ERROR "Adios2 Support not available")
 endif()
 
-# casacore does not export cmake config https://github.com/casacore/casacore/issues/82
-# only pkg-config files https://github.com/casacore/casacore/pull/1202
-# However, we still need to fixup cmake files exported by vcpkg
 # This works around vcpkg_fixup_cmake searching for a non-existent ${debug_share} directory
 if(NOT DEFINED VCPKG_BUILD_TYPE OR VCPKG_BUILD_TYPE STREQUAL "debug")
     if(NOT EXISTS "${CURRENT_PACKAGES_DIR}/debug/share/${PORT}")
