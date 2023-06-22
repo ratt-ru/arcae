@@ -4,17 +4,11 @@ find_package(Cython REQUIRED)
 
 pkg_check_modules(casacore REQUIRED IMPORTED_TARGET casacore)
 
-list(APPEND CMAKE_INSTALL_RPATH ${PYTHON_SITE_PACKAGES_DIR}/casa_arrow/lib)
-
 add_cython_target(arrow_tables arrow_tables.pyx CXX)
 message("CYTHON table ${arrow_tables}")
 add_library(arrow_tables MODULE ${arrow_tables})
-target_link_libraries(arrow_tables
-    $<TARGET_FILE_BASE_NAME:casaarrowcore>
-    PkgConfig::casacore)
-target_link_directories(arrow_tables PUBLIC
-    $<TARGET_FILE_DIR:casaarrowcore>
-    ${PYARROW_LIBDIRS})
+target_link_libraries(arrow_tables casaarrowcore PkgConfig::casacore)
+target_link_directories(arrow_tables PUBLIC ${PYARROW_LIBDIRS})
 target_include_directories(arrow_tables PUBLIC
     PkgConfig::casacore ${PYARROW_INCLUDE} ${NUMPY_INCLUDE}
     ${CMAKE_SOURCE_DIR}/cpp)
@@ -29,8 +23,5 @@ foreach(PYARROW_LIB ${_PYARROW_LIBS})
     target_link_libraries(arrow_tables ${PYARROW_LIB})
 endforeach()
 
-message(VCPKG_INSTALLED_DIR "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/lib")
-install(DIRECTORY "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/lib"  DESTINATION casa_arrow)
-message(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_RPATH}")
 install(TARGETS arrow_tables LIBRARY DESTINATION casa_arrow/lib)
 
