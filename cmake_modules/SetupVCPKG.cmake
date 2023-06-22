@@ -1,5 +1,6 @@
 include(FetchContent)
 
+# Read the environment file and extract the sha1 and sha256 sum
 file(READ "${CMAKE_SOURCE_DIR}/.env" ENV_FILE)
 string(REGEX MATCH "[ \t]*VCPKG_SHA1[ \t]*=[ \t]*([0-9a-f]*)" IGNORED ${ENV_FILE})
 
@@ -19,25 +20,45 @@ endif()
 
 set(VCPKG_HASH ${CMAKE_MATCH_1})
 
-FetchContent_Declare(vcpkg
-    URL ${VCPKG_URL}
-    URL_HASH SHA256=${VCPKG_HASH}
-    SOURCE_DIR ${CMAKE_SOURCE_DIR}/vcpkg/source)
+# Discover or infer the source directory where vcpkg will be decompressed
+if(DEFINED $ENV{VCPKG_SOURCE_DIR})
+    set(VCPKG_SOURCE_DIR "$ENV{VCPKG_SOURCE_DIR}")
+else()
+    set(VCPKG_SOURCE_DIR "${CMAKE_SOURCE_DIR}/vcpkg/source")
+endif()
+
+# Download and decompress vcpkg
+FetchContent_Declare(vcpkg URL ${VCPKG_URL} URL_HASH SHA256=${VCPKG_HASH} SOURCE_DIR ${VCPKG_SOURCE_DIR})
 FetchContent_MakeAvailable(vcpkg)
 
-set(CMAKE_TOOLCHAIN_FILE "${vcpkg_SOURCE_DIR}/scripts/buildsystems/vcpkg.cmake" CACHE FILEPATH "")
-set(VCPKG_MANIFEST_DIR "${CMAKE_SOURCE_DIR}/vcpkg")
-set(VCPKG_INSTALLED_DIR "${CMAKE_SOURCE_DIR}/vcpkg/installed")
-
-set(VCPKG_OVERLAY_TRIPLETS "${VCPKG_MANIFEST_DIR}/custom-triplets")
-set(VCPKG_OVERLAY_PORTS "${VCPKG_MANIFEST_DIR}/custom-ports/casacore")
-if(UNIX)
-    set(VCPKG_TARGET_TRIPLET "x64-linux-dynamic-cxx17-abi0")
+# Discover or infer vcpkg's installation directory
+if(DEFINED $ENV{VCPKG_INSTALLED_DIR})
+    set(VCPKG_INSTALLED_DIR $ENV{VCPKG_INSTALLED_DIR})
 else()
-    message(FATAL_ERROR "Only unix currently supported")
+    set(VCPKG_INSTALLED_DIR "${CMAKE_SOURCE_DIR}/vcpkg/installed")
+endif()
+
+# Set the vcpkg manifest directory and toolchain
+set(VCPKG_MANIFEST_DIR "${CMAKE_SOURCE_DIR}/vcpkg")
+set(CMAKE_TOOLCHAIN_FILE "${vcpkg_SOURCE_DIR}/scripts/buildsystems/vcpkg.cmake" CACHE FILEPATH "")
+
+set(VCPKG_OVERLAY_TRIPLETS "${VCPKG_MANIFEST_DIR}/overlay-triplets")
+set(VCPKG_OVERLAY_PORTS "${VCPKG_MANIFEST_DIR}/overlay-ports/casacore")
+
+# Discover or infer the vcpkg target triplet
+if(NOT DEFINED $ENV{VCPKG_TARGET_TRIPLET})
+    if(UNIX)
+        set(VCPKG_TARGET_TRIPLET "x64-linux-dynamic-cxx17-abi0")
+    else()
+        message(FATAL_ERROR "Only unix currently supported")
+    endif()
 endif()
 
 message("CMAKE_TOOLCHAIN_FILE: ${CMAKE_TOOLCHAIN_FILE}")
+message("VCPKG_SOURCE_DIR: ${VCPKG_SOURCE_DIR}")
+message("VCPKG_INSTALLED_DIR: ${VCPKG_INSTALLED_DIR}")
+message("VCPKG_MANIFEST_DIR: ${VCPKG_MANIFEST_DIR}")
+message("CMAKE_TOOLCHAIN_FILE: ${CMAKE_TOOLCHAIN_FILE}")
 message("VCPKG_OVERLAY_TRIPLETS: ${VCPKG_OVERLAY_TRIPLETS}")
 message("VCPKG_OVERLAY_PORTS: ${VCPKG_OVERLAY_PORTS}")
-message("VCPKG_MANIFEST_DIR ${VCPKG_MANIFEST_DIR}")
+message("VCPKG_TARGET_TRIPLET: ${VCPKG_TARGET_TRIPLET}")
