@@ -3,7 +3,7 @@ name: Continuous Integration
 on: [push, pull_request]
 env:
   VCPKG_DEFAULT_BINARY_CACHE: /tmp/vcpkg-archives
-  VCPKG_INSTALL_DIR: /tmp/vcpkg_installed
+  VCPKG_INSTALLED_DIR: /tmp/vcpkg_installed
 
 jobs:
   build:
@@ -52,7 +52,7 @@ jobs:
           CIBW_BUILD_FRONTEND: build
           CIBW_BEFORE_ALL_LINUX: yum install -y zip flex bison gcc-gfortran
           CIBW_ENVIRONMENT_LINUX: >
-            VCPKG_DEFAULT_BINARY_CACHE=/host/$VCPKG_DEFAULT_BINARY_CACHE
+            VCPKG_DEFAULT_BINARY_CACHE=/host/${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
             VCPKG_TARGET_TRIPLET=${{ matrix.buildplat[2] }}
             VCPKG_INSTALLED_DIR=${{ env.VCPKG_INSTALLED_DIR }}
           CIBW_REPAIR_WHEEL_COMMAND: >
