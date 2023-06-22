@@ -19,7 +19,10 @@ endif()
 
 set(VCPKG_HASH ${CMAKE_MATCH_1})
 
-FetchContent_Declare(vcpkg URL ${VCPKG_URL} URL_HASH SHA256=${VCPKG_HASH})
+FetchContent_Declare(vcpkg
+    URL ${VCPKG_URL}
+    URL_HASH SHA256=${VCPKG_HASH}
+    SOURCE_DIR ${CMAKE_SOURCE_DIR}/vcpkg/source)
 FetchContent_MakeAvailable(vcpkg)
 
 set(CMAKE_TOOLCHAIN_FILE "${vcpkg_SOURCE_DIR}/scripts/buildsystems/vcpkg.cmake" CACHE FILEPATH "")
