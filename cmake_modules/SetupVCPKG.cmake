@@ -27,6 +27,7 @@ FetchContent_MakeAvailable(vcpkg)
 
 set(CMAKE_TOOLCHAIN_FILE "${vcpkg_SOURCE_DIR}/scripts/buildsystems/vcpkg.cmake" CACHE FILEPATH "")
 set(VCPKG_MANIFEST_DIR "${CMAKE_SOURCE_DIR}/vcpkg")
+set(VCPKG_INSTALLED_DIR "${CMAKE_SOURCE_DIR}/vcpkg/installed")
 
 set(VCPKG_OVERLAY_TRIPLETS "${VCPKG_MANIFEST_DIR}/custom-triplets")
 set(VCPKG_OVERLAY_PORTS "${VCPKG_MANIFEST_DIR}/custom-ports/casacore")
