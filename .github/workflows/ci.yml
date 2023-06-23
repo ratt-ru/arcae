@@ -55,6 +55,6 @@ jobs:
             VCPKG_DEFAULT_BINARY_CACHE=/host/${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
             VCPKG_TARGET_TRIPLET=${{ matrix.buildplat[2] }}
             VCPKG_INSTALLED_DIR=${{ env.VCPKG_INSTALLED_DIR }}
-          CIBW_REPAIR_WHEEL_COMMAND: >
             LD_LIBRARY_PATH=${{ env.VCPKG_INSTALLED_DIR }}/${{ matrix.buildplat[2] }}/lib
+          CIBW_REPAIR_WHEEL_COMMAND_LINUX: >
             auditwheel repair -w {dest_dir} {wheel} --exclude libarrow_python.so --exclude libarrow.so.1200
