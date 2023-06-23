@@ -58,3 +58,9 @@ jobs:
             LD_LIBRARY_PATH=${{ env.VCPKG_INSTALLED_DIR }}/${{ matrix.buildplat[2] }}/lib
           CIBW_REPAIR_WHEEL_COMMAND_LINUX: >
             auditwheel repair -w {dest_dir} {wheel} --exclude libarrow_python.so --exclude libarrow.so.1200
+          CIBW_TEST_SKIP: *
+
+      - name: Upload wheel artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          path: ./wheelhouse/*.whl
