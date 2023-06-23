@@ -12,7 +12,6 @@ target_link_directories(arrow_tables PUBLIC ${PYARROW_LIBDIRS})
 target_include_directories(arrow_tables PUBLIC
     PkgConfig::casacore ${PYARROW_INCLUDE} ${NUMPY_INCLUDE}
     ${CMAKE_SOURCE_DIR}/cpp)
-set_property(TARGET arrow_tables PROPERTY POSITION_INDEPENDENT_CODE 1)
 target_compile_options(arrow_tables PUBLIC "-D_GLIBCXX_USE_CXX11_ABI=0")
 python_extension_module(arrow_tables)
 
@@ -23,5 +22,8 @@ foreach(PYARROW_LIB ${_PYARROW_LIBS})
     target_link_libraries(arrow_tables ${PYARROW_LIB})
 endforeach()
 
-install(TARGETS arrow_tables LIBRARY DESTINATION casa_arrow/lib)
+set_target_properties(arrow_tables PROPERTIES
+    POSITION_INDEPENDENT_CODE 1)
+
+install(TARGETS arrow_tables LIBRARY DESTINATION ${CASAARROW_LIB_INSTALL_PATH})
 

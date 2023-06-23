@@ -12,6 +12,9 @@ add_library(casaarrowcore SHARED
 target_link_directories(casaarrowcore PUBLIC ${PYARROW_LIBDIRS})
 target_link_libraries(casaarrowcore PkgConfig::casacore arrow)
 target_include_directories(casaarrowcore PUBLIC PkgConfig::casacore ${PYARROW_INCLUDE})
-set_property(TARGET casaarrowcore PROPERTY POSITION_INDEPENDENT_CODE 1)
 target_compile_options(casaarrowcore PUBLIC "-D_GLIBCXX_USE_CXX11_ABI=0")
-install(TARGETS casaarrowcore LIBRARY DESTINATION casa_arrow/lib)
+
+set_target_properties(casaarrowcore PROPERTIES
+    POSITION_INDEPENDENT_CODE 1)
+
+install(TARGETS casaarrowcore LIBRARY DESTINATION ${CASAARROW_LIB_INSTALL_PATH})
