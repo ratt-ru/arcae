@@ -21,7 +21,7 @@ endif()
 set(VCPKG_HASH ${CMAKE_MATCH_1})
 
 # Discover or infer the source directory where vcpkg will be decompressed
-if(DEFINED $ENV{VCPKG_SOURCE_DIR})
+if(DEFINED ENV{VCPKG_SOURCE_DIR})
     set(VCPKG_SOURCE_DIR "$ENV{VCPKG_SOURCE_DIR}")
 else()
     set(VCPKG_SOURCE_DIR "${CMAKE_SOURCE_DIR}/vcpkg/source")
@@ -32,7 +32,7 @@ FetchContent_Declare(vcpkg URL ${VCPKG_URL} URL_HASH SHA256=${VCPKG_HASH} SOURCE
 FetchContent_MakeAvailable(vcpkg)
 
 # Discover or infer vcpkg's installation directory
-if(DEFINED $ENV{VCPKG_INSTALLED_DIR})
+if(DEFINED ENV{VCPKG_INSTALLED_DIR})
     set(VCPKG_INSTALLED_DIR $ENV{VCPKG_INSTALLED_DIR})
 else()
     set(VCPKG_INSTALLED_DIR "${CMAKE_SOURCE_DIR}/vcpkg/installed")
@@ -46,7 +46,9 @@ set(VCPKG_OVERLAY_TRIPLETS "${VCPKG_MANIFEST_DIR}/overlay-triplets")
 set(VCPKG_OVERLAY_PORTS "${VCPKG_MANIFEST_DIR}/overlay-ports/casacore")
 
 # Discover or infer the vcpkg target triplet
-if(NOT DEFINED $ENV{VCPKG_TARGET_TRIPLET})
+if(DEFINED ENV{VCPKG_TARGET_TRIPLET})
+    set(VCPKG_TARGET_TRIPLET $ENV{VCPKG_TARGET_TRIPLET})
+else()
     if(UNIX)
         set(VCPKG_TARGET_TRIPLET "x64-linux-dynamic-cxx17-abi0")
     else()
