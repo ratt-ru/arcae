@@ -73,6 +73,6 @@ jobs:
 
       - name: Install and test wheel
         run: |
-          virtualenv /venv
-          source /venv/bin/activate && pip install ./wheelhouse/*.whl[test]
-          source /venv/bin/activate && py.test -s -vvv --pyargs casa_arrow
+          virtualenv ${{ github.workspace }}/venv
+          source ${{ github.workspace }}/venv/bin/activate && pip install ./wheelhouse/*.whl[test]
+          source ${{ github.workspace }}/venv/bin/activate && py.test -s -vvv --pyargs casa_arrow
