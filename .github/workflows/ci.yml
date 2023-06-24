@@ -12,20 +12,20 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.8"]
-        python-abi: ["cp38"]
+        python:
+          - ["3.8", "cp38"]
         buildplat:
           - [ubuntu-20.04, manylinux_x86_64, x64-linux-dynamic-cxx17-abi0]
 
     steps:
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Set up Python ${{ matrix.python[0] }}
         uses: actions/setup-python@v4
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: ${{ matrix.python[0] }}
 
       - name: Upgrade pip and install build
         run: >
-          python -m pip install -U pip
+          python -m pip install -U pip virtualenv
 
       - name: Checkout source
         uses: actions/checkout@v3
@@ -52,7 +52,7 @@ jobs:
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.13.1
         env:
-          CIBW_BUILD: ${{ matrix.python-abi }}-${{ matrix.buildplat[1] }}
+          CIBW_BUILD: ${{ matrix.python[1] }}-${{ matrix.buildplat[1] }}
           CIBW_BUILD_FRONTEND: build
           CIBW_BEFORE_ALL_LINUX: yum install -y zip flex bison gcc-gfortran
           CIBW_ENVIRONMENT_LINUX: >
@@ -63,8 +63,16 @@ jobs:
           CIBW_REPAIR_WHEEL_COMMAND_LINUX: >
             auditwheel repair -w {dest_dir} {wheel} --exclude libarrow_python.so --exclude libarrow.so.1200
           CIBW_TEST_SKIP: "*"
+          CIBW_TEST_EXTRAS: test
+          CIBW_TEST_COMMAND: py.test -s -vvv {project}/casa_arrow
 
       - name: Upload wheel artifacts
         uses: actions/upload-artifact@v3
         with:
           path: ./wheelhouse/*.whl
+
+      - name: Install and test wheel
+        run: |
+          virtualenv /venv
+          source /venv/bin/activate && pip install ./wheelhouse/*.whl[test]
+          source /venv/bin/activate && py.test -s -vvv --pyargs casa_arrow
