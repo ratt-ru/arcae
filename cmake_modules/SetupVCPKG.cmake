@@ -39,7 +39,7 @@ else()
 endif()
 
 # Set the vcpkg manifest directory and toolchain
-set(VCPKG_MANIFEST_DIR "${CMAKE_SOURCE_DIR}/vcpkg")
+set(VCPKG_MANIFEST_DIR "${CMAKE_SOURCE_DIR}/vcpkg/manifest")
 set(CMAKE_TOOLCHAIN_FILE "${vcpkg_SOURCE_DIR}/scripts/buildsystems/vcpkg.cmake" CACHE FILEPATH "")
 
 set(VCPKG_OVERLAY_TRIPLETS "${VCPKG_MANIFEST_DIR}/overlay-triplets")
