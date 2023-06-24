@@ -43,8 +43,8 @@ endif()
 set(VCPKG_MANIFEST_DIR "${CMAKE_SOURCE_DIR}/vcpkg/manifest")
 set(CMAKE_TOOLCHAIN_FILE "${vcpkg_SOURCE_DIR}/scripts/buildsystems/vcpkg.cmake" CACHE FILEPATH "")
 
-set(VCPKG_OVERLAY_TRIPLETS "${VCPKG_MANIFEST_DIR}/overlay-triplets")
-set(VCPKG_OVERLAY_PORTS "${VCPKG_MANIFEST_DIR}/overlay-ports/casacore")
+set(VCPKG_OVERLAY_TRIPLETS "${CMAKE_SOURCE_DIR}/vcpkg/overlay-triplets")
+set(VCPKG_OVERLAY_PORTS "${CMAKE_SOURCE_DIR}/vcpkg/overlay-ports/casacore")
 
 # Discover or infer the vcpkg target triplet
 if(DEFINED ENV{VCPKG_TARGET_TRIPLET})
