@@ -75,6 +75,9 @@ jobs:
           path: ./wheelhouse/*.whl
 
       - name: Install and test wheel
+        # python-casacore doesn't have a 3.11 wheel yet
+        # https://github.com/ratt-ru/casa-arrow/issues/26
+        if: ${{ contains('3.8 3.9 3.10', matrix.python[0]) }}
         run: |
           cd $HOME
           virtualenv $HOME/venv
