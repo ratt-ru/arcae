@@ -42,7 +42,11 @@ jobs:
         id: cache-vcpkg
         uses: actions/cache@v3
         with:
-          key: vcpkg-cache-${{ steps.vcpkg-sha1.outputs.sha1 }}-${{ hashfiles('vcpkg/**') }}
+          key: "vcpkg-cache-\
+            ${{ matrix.buildplat[1] }}-\
+            ${{ matrix.buildplat[2] }}-\
+            ${{ hashfiles('.env', 'vcpkg/manifest/vcpkg.json', 'vcpkg/overlay-ports/*', \
+                          format('vcpkg/overlay-triplets/{0}.cmake', matrix.buildplat[2])) }}"
           path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
 
       - name: Build wheels
