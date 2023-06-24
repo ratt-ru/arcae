@@ -14,6 +14,9 @@ jobs:
       matrix:
         python:
           - ["3.8", "cp38"]
+          - ["3.9", "cp39"]
+          - ["3.10", "cp310"]
+          - ["3.11", "cp311"]
         buildplat:
           - [ubuntu-20.04, manylinux_x86_64, x64-linux-dynamic-cxx17-abi0]
 
@@ -64,7 +67,7 @@ jobs:
             auditwheel repair -w {dest_dir} {wheel} --exclude libarrow_python.so --exclude libarrow.so.1200
           CIBW_TEST_SKIP: "*"
           CIBW_TEST_EXTRAS: test
-          CIBW_TEST_COMMAND: py.test -s -vvv {project}/casa_arrow
+          CIBW_TEST_COMMAND: py.test -s -vvv --pyargs casa_arrow
 
       - name: Upload wheel artifacts
         uses: actions/upload-artifact@v3
