@@ -49,7 +49,7 @@ jobs:
                           format('vcpkg/overlay-triplets/{0}.cmake', matrix.buildplat[2])) }}"
           path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
 
-      - name: Build wheels
+      - name: Run cibuildwheel
         uses: pypa/cibuildwheel@v2.13.1
         env:
           CIBW_BUILD: ${{ matrix.python[1] }}-${{ matrix.buildplat[1] }}
@@ -74,5 +74,5 @@ jobs:
       - name: Install and test wheel
         run: |
           virtualenv ${{ github.workspace }}/venv
-          source ${{ github.workspace }}/venv/bin/activate && pip install ./wheelhouse/*.whl[test]
+          source ${{ github.workspace }}/venv/bin/activate && pip install --find-links=wheelhouse casa-arrow[test]
           source ${{ github.workspace }}/venv/bin/activate && py.test -s -vvv --pyargs casa_arrow
