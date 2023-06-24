@@ -8,6 +8,7 @@ if(NOT DEFINED CMAKE_MATCH_1)
     message(FATAL_ERROR "Unable to find VCPKG_SHA1=version in ${CMAKE_SOURCE_DIR}/.env")
 endif()
 
+# Download VCPKG at the desired SHA1
 set(VCPKG_URL "https://github.com/microsoft/vcpkg/archive/${CMAKE_MATCH_1}.tar.gz")
 message("VCPKG_VERSION=${CMAKE_MATCH_1}")
 message("VCPKG_URL=${VCPKG_URL}")
