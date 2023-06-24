@@ -73,6 +73,7 @@ jobs:
 
       - name: Install and test wheel
         run: |
-          virtualenv ${{ github.workspace }}/venv
-          source ${{ github.workspace }}/venv/bin/activate && pip install --find-links=wheelhouse casa-arrow[test]
-          source ${{ github.workspace }}/venv/bin/activate && py.test -s -vvv --pyargs casa_arrow
+          cd $HOME
+          virtualenv $HOME/venv
+          source $HOME/venv/bin/activate && pip install --find-links=wheelhouse casa-arrow[test]
+          source $HOME/venv/bin/activate && py.test -s -vvv --pyargs casa_arrow
