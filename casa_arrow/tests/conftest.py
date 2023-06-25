@@ -132,8 +132,7 @@ def sorting_table(tmp_path_factory):
     path = tmp_path_factory.mktemp("column_cases")
 
     with mp.get_context("spawn").Pool(1) as pool:
-        result = pool.apply_async(generate_sorting_table, (str(path),))
-        return result.get()
+        return pool.apply(generate_sorting_table, (str(path),))
 
 
 def generate_column_cases_table(path):
@@ -275,8 +274,7 @@ def column_case_table(tmp_path_factory):
     path = tmp_path_factory.mktemp("column_cases")
 
     with mp.get_context("spawn").Pool(1) as pool:
-        result = pool.apply_async(generate_column_cases_table, (str(path),))
-        return result.get()
+        return pool.apply(generate_column_cases_table, (str(path),))
 
 
 def generate_complex_case_table(path):
@@ -315,5 +313,4 @@ def complex_case_table(tmp_path_factory):
     path = tmp_path_factory.mktemp("complex_cases")
 
     with mp.get_context("spawn").Pool(1) as pool:
-        result = pool.apply_async(generate_complex_case_table, (str(path),))
-        return result.get()
+        return pool.apply(generate_complex_case_table, (str(path),))
