@@ -266,7 +266,7 @@ def casa_table_at_path(factory, path):
         try:
             return pool.apply(factory, (str(path),))
         except ImportError as e:
-            if e.msg == "No module named 'pyrap.tables":
+            if e.msg == "No module named 'pyrap'":
                 pytest.skip("python-casacore isn't available")
             else:
                 raise
