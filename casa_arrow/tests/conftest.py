@@ -84,7 +84,7 @@ def partitioned_dataset(tau_ms, tmp_path_factory):
 
 
 def generate_sorting_table(path):
-    import pyrap.tables as pt
+    pt = pytest.importorskip("pyrap.tables")
     table_name = os.path.join(str(path), "test.ms")
 
     create_table_query = f"""
@@ -137,7 +137,7 @@ def sorting_table(tmp_path_factory):
 
 
 def generate_column_cases_table(path):
-    import pyrap.tables as pt
+    pt = pytest.importorskip("pyrap.tables")
     import numpy as np
 
     # Table descriptor
@@ -281,7 +281,7 @@ def column_case_table(tmp_path_factory):
 
 def generate_complex_case_table(path):
     import numpy as np
-    import pyrap.tables as pt
+    pt = pytest.importorskip("pyrap.tables")
 
     table_desc = [
         {
