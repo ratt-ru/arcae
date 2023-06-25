@@ -84,7 +84,7 @@ def partitioned_dataset(tau_ms, tmp_path_factory):
 
 
 def generate_sorting_table(path):
-    pt = pytest.importorskip("pyrap.tables")
+    import pyrap.tables as pt
     table_name = os.path.join(str(path), "test.ms")
 
     create_table_query = f"""
@@ -126,17 +126,12 @@ def generate_sorting_table(path):
 
 @pytest.fixture
 def sorting_table(tmp_path_factory):
-    # Generate casa table in a spawned process, otherwise
-    # the pyrap.tables casacore libraries will be loaded in
-    # and interfere with casa_arrow/system casacore libraries
-    path = tmp_path_factory.mktemp("column_cases")
-
-    with mp.get_context("spawn").Pool(1) as pool:
-        return pool.apply(generate_sorting_table, (str(path),))
+    return casa_table_at_path(generate_sorting_table,
+                              tmp_path_factory.mktemp("column_cases"))
 
 
 def generate_column_cases_table(path):
-    pt = pytest.importorskip("pyrap.tables")
+    import pyrap.tables as pt
     import numpy as np
 
     # Table descriptor
@@ -266,20 +261,25 @@ def generate_column_cases_table(path):
     return table_name
 
 
+def casa_table_at_path(factory, path):
+    with mp.get_context("spawn").Pool(1) as pool:
+        try:
+            return pool.apply(factory, (str(path),))
+        except ImportError as e:
+            if e.msg == "No module named 'pyrap.tables":
+                pytest.skip("python-casacore isn't available")
+            else:
+                raise
+
+
 @pytest.fixture
 def column_case_table(tmp_path_factory):
-    # Generate casa table in a spawned process, otherwise
-    # the pyrap.tables casacore libraries will be loaded in
-    # and interfere with casa_arrow/system casacore libraries
-    path = tmp_path_factory.mktemp("column_cases")
-
-    with mp.get_context("spawn").Pool(1) as pool:
-        return pool.apply(generate_column_cases_table, (str(path),))
-
+    return casa_table_at_path(generate_column_cases_table,
+                              tmp_path_factory.mktemp("column_cases"))
 
 def generate_complex_case_table(path):
     import numpy as np
-    pt = pytest.importorskip("pyrap.tables")
+    import pyrap.tables as pt
 
     table_desc = [
         {
@@ -310,7 +310,5 @@ def generate_complex_case_table(path):
 
 @pytest.fixture
 def complex_case_table(tmp_path_factory):
-    path = tmp_path_factory.mktemp("complex_cases")
-
-    with mp.get_context("spawn").Pool(1) as pool:
-        return pool.apply(generate_complex_case_table, (str(path),))
+    return casa_table_at_path(generate_complex_case_table,
+                              tmp_path_factory.mktemp("complex_cases"))
