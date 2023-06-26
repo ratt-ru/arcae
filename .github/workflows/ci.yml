@@ -44,7 +44,7 @@ jobs:
       matrix:
         # https://peps.python.org/pep-0425
         python:
-          # version
+          # python version, cpython tag
           - ["3.8", "cp38"]
           - ["3.9", "cp39"]
           - ["3.10", "cp310"]
