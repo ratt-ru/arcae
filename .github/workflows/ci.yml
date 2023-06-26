@@ -60,8 +60,7 @@ jobs:
           python-version: ${{ matrix.python[0] }}
 
       - name: Upgrade pip and install virtualenv
-        run: >
-          python -m pip install -U pip virtualenv
+        run: python -m pip install -U pip virtualenv
 
       - name: Checkout source
         uses: actions/checkout@v3
@@ -74,8 +73,8 @@ jobs:
         uses: actions/cache@v3
         with:
           key: "vcpkg-cache-\
-            ${{ matrix.platform[0] }}-\
-            ${{ matrix.platform[2] }}-\
+            [${{ matrix.platform[0] }}]-\
+            [${{ matrix.platform[2] }}]-\
             ${{ hashfiles('.env', 'vcpkg/manifest/vcpkg.json', 'vcpkg/overlay-ports/*', \
                           format('vcpkg/overlay-triplets/{0}.cmake', matrix.platform[2])) }}"
           path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
