@@ -4,9 +4,11 @@ on: [push, pull_request]
 env:
   VCPKG_DEFAULT_BINARY_CACHE: /tmp/vcpkg-archives
   VCPKG_INSTALLED_DIR: /tmp/vcpkg_installed
+  ARTIFACT_NAME: distribution
 
 jobs:
   build-sdist:
+    name: Build Source Distribution
     runs-on: ubuntu-latest
     if: "!contains(github.event.head_commit.message, '[skip ci]')"
     strategy:
@@ -30,10 +32,11 @@ jobs:
       - name: Upload wheel artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: dist
+          name: ${{ env.ARTIFACT_NAME }}
           path: ./dist/*.tar.gz
 
   build-wheels:
+    name: Build Binary Wheels
     runs-on: ubuntu-latest
     if: "!contains(github.event.head_commit.message, '[skip ci]')"
     strategy:
@@ -97,7 +100,7 @@ jobs:
       - name: Upload wheel artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: dist
+          name: ${{ env.ARTIFACT_NAME }}
           path: ./wheelhouse/*.whl
 
       - name: Install and test wheel
@@ -108,14 +111,20 @@ jobs:
           source $HOME/venv/bin/activate && py.test -s -vvv --pyargs casa_arrow
 
   upload-to-pypi:
+    name: Upload release to PyPI
     needs: [build-sdist, build-wheels]
     runs-on: ubuntu-latest
     steps:
-      - name: Download wheel artifacts
+      - name: Download distribution artifacts
         uses: actions/download-artifact@v3
         with:
-          name: dist
+          name: ${{ env.ARTIFACT_NAME }}
           path: ~/dist
 
       - name: List wheels
         run: ls -lh ~/dist
+
+    # TODO(sjperkins): Enable this
+    # - name: Publish package distributions to PyPI
+    #   if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags')
+    #   uses: pypa/gh-action-pypi-publish@release/v1
