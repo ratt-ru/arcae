@@ -51,7 +51,7 @@ jobs:
           - ["3.11", "cp311"]
         platform:
           # platform tag, manylinux tag, vcpkg triplet
-          - [manylinux_x86_64, manylinux2014, x64-linux-dynamic-cxx17-abi0]
+          - [manylinux_x86_64, manylinux2014, x64-linux-dynamic-cxx17-abi0-rel]
 
     steps:
       - name: Set up Python ${{ matrix.python[0] }}
