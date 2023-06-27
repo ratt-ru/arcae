@@ -1,0 +1,136 @@
+name: Continuous Integration
+
+on:
+  push:
+    branches:
+    - master
+  pull_request:
+  schedule:
+    - cron: '30 2 * * 1' # Every Monday @ 2h30am UTC
+
+env:
+  VCPKG_DEFAULT_BINARY_CACHE: /tmp/vcpkg-archives
+  VCPKG_INSTALLED_DIR: /tmp/vcpkg_installed
+  ARTIFACT_NAME: distribution
+
+jobs:
+  build-sdist:
+    name: Build Source Distribution
+    runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    strategy:
+      matrix:
+        python: ["3.8"]
+    steps:
+      - name: Set up Python ${{ matrix.python }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Upgrade pip and install build
+        run: python -m pip install -U pip build
+
+      - name: Checkout source
+        uses: actions/checkout@v3
+
+      - name: Build source distribution
+        run: python -m build --sdist
+
+      - name: Upload wheel artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: ./dist/*.tar.gz
+
+  build-wheels:
+    name: Build and Test Binary Wheels
+    runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    strategy:
+      fail-fast: false
+      matrix:
+        # https://peps.python.org/pep-0425
+        python:
+          # python version, cpython tag
+          - ["3.8", "cp38"]
+          - ["3.9", "cp39"]
+          - ["3.10", "cp310"]
+          - ["3.11", "cp311"]
+        platform:
+          # platform tag, manylinux tag, vcpkg triplet
+          - [manylinux_x86_64, manylinux2014, x64-linux-dynamic-cxx17-abi0-rel]
+
+    steps:
+      - name: Set up Python ${{ matrix.python[0] }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python[0] }}
+
+      - name: Upgrade pip and install virtualenv
+        run: python -m pip install -U pip virtualenv
+
+      - name: Checkout source
+        uses: actions/checkout@v3
+
+      - name: Create VCPKG binary asset folder
+        run: mkdir -p ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+
+      - name: Cache VCPKG binary assets
+        id: cache-vcpkg
+        uses: actions/cache@v3
+        with:
+          key: "vcpkg-cache-\
+            [${{ matrix.platform[0] }}]-\
+            [${{ matrix.platform[2] }}]-\
+            ${{ hashfiles('.env', 'vcpkg/manifest/vcpkg.json', 'vcpkg/overlay-ports/*', \
+                          format('vcpkg/overlay-triplets/{0}.cmake', matrix.platform[2])) }}"
+          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+
+      - name: Run cibuildwheel
+        uses: pypa/cibuildwheel@v2.13.1
+        env:
+          CIBW_BUILD: ${{ matrix.python[1] }}-${{ matrix.platform[0] }}
+          CIBW_BUILD_FRONTEND: build
+          CIBW_BEFORE_ALL_LINUX: yum install -y zip flex bison gcc-gfortran
+          CIBW_ENVIRONMENT_LINUX: >
+            VCPKG_DEFAULT_BINARY_CACHE=/host/${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+            VCPKG_TARGET_TRIPLET=${{ matrix.platform[2] }}
+            VCPKG_INSTALLED_DIR=${{ env.VCPKG_INSTALLED_DIR }}
+            LD_LIBRARY_PATH=${{ env.VCPKG_INSTALLED_DIR }}/${{ matrix.platform[2] }}/lib
+          CIBW_REPAIR_WHEEL_COMMAND_LINUX: >
+            auditwheel repair -w {dest_dir} {wheel} --exclude libarrow_python.so --exclude libarrow.so.1200
+          CIBW_TEST_SKIP: "*"
+          CIBW_TEST_EXTRAS: test
+          CIBW_TEST_COMMAND: py.test -s -vvv --pyargs casa_arrow
+
+      - name: Upload wheel artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: ./wheelhouse/*.whl
+
+      - name: Install and test wheel
+        run: |
+          cd $HOME
+          virtualenv $HOME/venv
+          source $HOME/venv/bin/activate && pip install --find-links=${{ github.workspace }}/wheelhouse casa-arrow[test]
+          source $HOME/venv/bin/activate && py.test -s -vvv --pyargs casa_arrow
+
+  upload-to-pypi:
+    name: Upload release to PyPI
+    needs: [build-sdist, build-wheels]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download distribution artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: ~/dist
+
+      - name: List wheels
+        run: ls -lh ~/dist
+
+    # TODO(sjperkins): Enable this
+    # - name: Publish package distributions to PyPI
+    #   if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags')
+    #   uses: pypa/gh-action-pypi-publish@release/v1

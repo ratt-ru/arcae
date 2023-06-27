@@ -126,14 +126,8 @@ def generate_sorting_table(path):
 
 @pytest.fixture
 def sorting_table(tmp_path_factory):
-    # Generate casa table in a spawned process, otherwise
-    # the pyrap.tables casacore libraries will be loaded in
-    # and interfere with casa_arrow/system casacore libraries
-    path = tmp_path_factory.mktemp("column_cases")
-
-    with mp.get_context("spawn").Pool(1) as pool:
-        result = pool.apply_async(generate_sorting_table, (str(path),))
-        return result.get()
+    return casa_table_at_path(generate_sorting_table,
+                              tmp_path_factory.mktemp("column_cases"))
 
 
 def generate_column_cases_table(path):
@@ -267,17 +261,15 @@ def generate_column_cases_table(path):
     return table_name
 
 
+def casa_table_at_path(factory, path):
+    with mp.get_context("spawn").Pool(1) as pool:
+        return pool.apply(factory, (str(path),))
+
+
 @pytest.fixture
 def column_case_table(tmp_path_factory):
-    # Generate casa table in a spawned process, otherwise
-    # the pyrap.tables casacore libraries will be loaded in
-    # and interfere with casa_arrow/system casacore libraries
-    path = tmp_path_factory.mktemp("column_cases")
-
-    with mp.get_context("spawn").Pool(1) as pool:
-        result = pool.apply_async(generate_column_cases_table, (str(path),))
-        return result.get()
-
+    return casa_table_at_path(generate_column_cases_table,
+                              tmp_path_factory.mktemp("column_cases"))
 
 def generate_complex_case_table(path):
     import numpy as np
@@ -312,8 +304,5 @@ def generate_complex_case_table(path):
 
 @pytest.fixture
 def complex_case_table(tmp_path_factory):
-    path = tmp_path_factory.mktemp("complex_cases")
-
-    with mp.get_context("spawn").Pool(1) as pool:
-        result = pool.apply_async(generate_complex_case_table, (str(path),))
-        return result.get()
+    return casa_table_at_path(generate_complex_case_table,
+                              tmp_path_factory.mktemp("complex_cases"))
