@@ -263,13 +263,7 @@ def generate_column_cases_table(path):
 
 def casa_table_at_path(factory, path):
     with mp.get_context("spawn").Pool(1) as pool:
-        try:
-            return pool.apply(factory, (str(path),))
-        except ImportError as e:
-            if e.msg == "No module named 'pyrap'":
-                pytest.skip("python-casacore isn't available")
-            else:
-                raise
+        return pool.apply(factory, (str(path),))
 
 
 @pytest.fixture
