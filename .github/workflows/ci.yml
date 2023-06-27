@@ -1,6 +1,11 @@
 name: Continuous Integration
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+    - master
+  pull_request:
+
 env:
   VCPKG_DEFAULT_BINARY_CACHE: /tmp/vcpkg-archives
   VCPKG_INSTALLED_DIR: /tmp/vcpkg_installed
