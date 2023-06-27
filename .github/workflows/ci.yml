@@ -5,6 +5,8 @@ on:
     branches:
     - master
   pull_request:
+  schedule:
+    - cron: '30 2 * * 1' # Every Monday @ 2h30am UTC
 
 env:
   VCPKG_DEFAULT_BINARY_CACHE: /tmp/vcpkg-archives
