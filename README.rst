@@ -14,42 +14,18 @@ Rationale
   and GIL issues with the CASA Measures server.
 
 
-Building
---------
+Build Wheel Locally
+-------------------
 
-This guide is targeted at Ubuntu 20.04, mostly because it provides an easy install of casacore via kernsuite.
-This guide can be adapted to other OS's if you're willing to build casacore yourself.
-This software should be built with the new C++11 ABI.
+In the user or, a virtual environment:
 
-* Install `kernsuite <https://kernsuite.info/installation/>`_ and then casacore C++ libraries and headers:
+.. code-block:: python
 
-  .. code-block:: bash
+  $ pip install -U pip cibuildwheel
+  $ bash scripts/run_cbuildwheel.sh 3.10
 
-    $ sudo apt install casacore-dev
-
-  Note this installs a version of casacore built with the new C++11 ABI: `-D_GLIBCXX_USE_CXX11_ABI=1`
-
-* Create a Python 3.8 virtual environment and built the Cython extension.
-
-  .. code-block:: bash
-
-    $ virtualenv -p python3.8 ~/venv/carrow
-    $ source ~/venv/carrow/bin/activate
-    (carrow) $ pip install -U pip setuptools wheel
-    (carrow) $ pip install -r requirements.txt
-    (carrow) $ python setup.py build_ext --inplace
-
-* Note that `requirements.txt` contains a custom Python 3.8 pyarrow manylinux_2_28 wheel
-  built with `-D_GLIBCXX_USE_CXX11_ABI=1`.
-  This repository requires some functionality not present in Arrow 11.0.0, but which will be included in Arrow 12.0.0.
-* Infrastructure for building manylinux2014 wheels has been developed, which will be published on pypi in due time.
-* Run the test cases
-
-  .. code-block::
-
-    (carrow) $ py.test -s -vvv
-
-
+.. warning::
+  Only linux wheels are currently supported.
 
 Usage
 -----
