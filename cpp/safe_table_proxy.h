@@ -10,7 +10,7 @@
 
 #include "column_convert_visitor.h"
 
-static constexpr char CASA_ARROW_METADATA[]  = "__casa_arrow_metadata__";
+static constexpr char CASA_ARROW_METADATA[]  = "__arcae_metadata__";
 static constexpr char CASA_DESCRIPTOR[]  = "__casa_descriptor__";
 
 using ::casacore::TableProxy;

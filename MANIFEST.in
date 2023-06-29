@@ -1,1 +1,1 @@
-recursive-exclude casa_arrow *.cpp
+recursive-exclude arcae *.cpp

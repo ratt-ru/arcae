@@ -8,7 +8,7 @@ from rich.console import Group
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TimeElapsedColumn, TextColumn
 
-import casa_arrow as ca
+import arcae as ca
 import pyarrow.parquet as pq
 
 
@@ -115,7 +115,7 @@ class MSExporter:
         subtables = []
 
         try:
-            meta = json.loads(metadata[b"__casa_arrow_metadata__"])
+            meta = json.loads(metadata[b"__arcae_metadata__"])
             casa_kw = meta["__casa_descriptor__"]["_keywords_"]
         except KeyError:
             pass

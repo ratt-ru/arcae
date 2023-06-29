@@ -100,8 +100,8 @@ jobs:
           CIBW_REPAIR_WHEEL_COMMAND_LINUX: >
             auditwheel repair -w {dest_dir} {wheel} --exclude libarrow_python.so --exclude libarrow.so.1200
           CIBW_TEST_SKIP: "*"
-          CIBW_TEST_EXTRAS: test
-          CIBW_TEST_COMMAND: py.test -s -vvv --pyargs casa_arrow
+          CIBW_TEST_EXTRAS:
+          CIBW_TEST_COMMAND: python -c 'from arcae.lib.arrow_tables import Table'
 
       - name: Upload wheel artifacts
         uses: actions/upload-artifact@v3
@@ -113,8 +113,8 @@ jobs:
         run: |
           cd $HOME
           virtualenv $HOME/venv
-          source $HOME/venv/bin/activate && pip install --find-links=${{ github.workspace }}/wheelhouse casa-arrow[test]
-          source $HOME/venv/bin/activate && py.test -s -vvv --pyargs casa_arrow
+          source $HOME/venv/bin/activate && pip install --find-links=${{ github.workspace }}/wheelhouse arcae[test]
+          source $HOME/venv/bin/activate && py.test -s -vvv --pyargs arcae
 
   upload-to-pypi:
     name: Upload release to PyPI

@@ -37,7 +37,7 @@ Example Usage:
     import json
     from pprint import pprint
 
-    import casa_arrow as ca
+    import arcae as ca
     import pandas as pd
     import pyarrow as pa
     import pyarrow.parquet as pq
@@ -49,8 +49,8 @@ Example Usage:
     assert isinstance(arrow_table, pa.Table)
 
     # Print JSON-encoded Table and Column keywords
-    pprint(json.loads(AT.schema.metadata[b"__casa_arrow_metadata__"]))
-    pprint(json.loads(AT.schema.field("DATA").metadata[b"__casa_arrow_metadata__"]))
+    pprint(json.loads(AT.schema.metadata[b"__arcae_metadata__"]))
+    pprint(json.loads(AT.schema.field("DATA").metadata[b"__arcae_metadata__"]))
 
     # Extract Arrow Table columns into numpy arrays
     time = arrow_table.column("TIME").to_numpy()
@@ -71,7 +71,7 @@ An export script is available:
 
 .. code-block:: bash
 
-  $ casa-arrow export /path/to/the.ms --nrow 50000
+  $ arcae export /path/to/the.ms --nrow 50000
   $ tree output.arrow/
   output.arrow/
   ├── ANTENNA

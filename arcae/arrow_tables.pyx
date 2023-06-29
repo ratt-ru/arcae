@@ -27,7 +27,7 @@ from pyarrow.lib cimport (
 
 from pyarrow.lib import (tobytes, frombytes)
 
-from casa_arrow.casa_table cimport (CCasaTable,
+from arcae.casa_tables cimport (CCasaTable,
                                     CConfiguration,
                                     CComplexType,
                                     CComplexDoubleArray,

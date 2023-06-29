@@ -7,7 +7,7 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake_modules)
 set(CMAKE_INSTALL_RPATH "$ORIGIN")
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
-set(CASAARROW_LIB_INSTALL_PATH ${CMAKE_INSTALL_PREFIX}/casa_arrow/lib)
+set(CASAARROW_LIB_INSTALL_PATH ${CMAKE_INSTALL_PREFIX}/arcae/lib)
 
 include(FindPyArrow)
 include(SetupVCPKG)
@@ -15,7 +15,7 @@ project(main CXX C)
 add_subdirectory(cpp)
 
 if(SKBUILD)
-    add_subdirectory(casa_arrow)
+    add_subdirectory(arcae)
 else()
     message(WARNING "scikit-build not available, Cython extensions not built")
 endif()
