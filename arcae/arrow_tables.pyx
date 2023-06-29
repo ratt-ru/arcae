@@ -28,16 +28,16 @@ from pyarrow.lib cimport (
 from pyarrow.lib import (tobytes, frombytes)
 
 from arcae.casa_tables cimport (CCasaTable,
-                                    CConfiguration,
-                                    CComplexType,
-                                    CComplexDoubleArray,
-                                    CComplexFloatArray,
-                                    CComplexDoubleType,
-                                    CComplexFloatType,
-                                    CServiceLocator,
-                                    complex64,
-                                    complex128,
-                                    UINT_MAX)
+                                CConfiguration,
+                                CComplexType,
+                                CComplexDoubleArray,
+                                CComplexFloatArray,
+                                CComplexDoubleType,
+                                CComplexFloatType,
+                                CServiceLocator,
+                                complex64,
+                                complex128,
+                                UINT_MAX)
 
 
 cdef class ComplexType(BaseExtensionType):
