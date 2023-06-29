@@ -217,9 +217,32 @@ def test_config():
     assert config.get("foo") is None
     assert config.get("foo", "bar") == "bar"
 
-    assert list(config.items()) == [("blah", "foo"), ("qux", "bar") ("validation-level", "full")]
+    assert list(config.items()) == [("blah", "foo"), ("qux", "bar"), ("validation-level", "full")]
 
     try:
         config["foo"] = 1
     except TypeError as e:
         assert "(expected str, got int)" in e.args[0]
+
+    del config["blah"]
+    del config["foo"]
+    del config["qux"]
+
+    assert len(config) == 1
+
+
+def test_config_context_mgr():
+    from arcae.arrow_tables import Configuration
+    from arcae import config
+    global_config = Configuration()
+    assert len(global_config) == 1 and list(config.items()) == [("validation-level", "full")]
+
+    with config.set(*{"foo": "bar", "qux-baz": "blah"}):
+        assert global_config["foo"] == "foo"
+        assert global_config["qux-baz"] == "blah"
+
+    with pytest.raises(KeyError):
+        assert global_config["foo"] == "foo"
+
+    with pytest.raises(KeyError):
+        assert global_config["qux-baz"] == "blah"
