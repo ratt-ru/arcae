@@ -197,9 +197,9 @@ def test_duckdb(partitioned_dataset):
 
 def test_config():
     from arcae.lib.arrow_tables import Configuration
-    global_config = global_configuration()
+    global_config = Configuration()
 
-    assert global_config["validate-level"] == "full"
+    assert global_config["validation-level"] == "full"
 
     global_config["blah"] = "foo"
     assert global_config["blah"] == "foo"
@@ -225,10 +225,9 @@ def test_config():
         assert "(expected str, got int)" in e.args[0]
 
     del global_config["blah"]
-    del global_config["foo"]
     del global_config["qux"]
 
-    assert len(global_config) == 1
+    assert list(global_config.items()) == [("validation-level", "full")]
 
 
 def test_config_context_mgr():
@@ -237,8 +236,8 @@ def test_config_context_mgr():
     global_config = Configuration()
     assert len(global_config) == 1 and list(global_config.items()) == [("validation-level", "full")]
 
-    with config.set(*{"foo": "bar", "qux-baz": "blah"}):
-        assert global_config["foo"] == "foo"
+    with config.set(**{"foo": "bar", "qux-baz": "blah"}):
+        assert global_config["foo"] == "bar"
         assert global_config["qux-baz"] == "blah"
 
     with pytest.raises(KeyError):
@@ -246,3 +245,16 @@ def test_config_context_mgr():
 
     with pytest.raises(KeyError):
         assert global_config["qux-baz"] == "blah"
+
+    with config.set(**{"foo": "bar"}):
+        assert global_config["foo"] == "bar"
+
+        with config.set(**{"qux": "baz"}):
+            assert global_config["foo"] == "bar"
+            assert global_config["qux"] == "baz"
+
+        with pytest.raises(KeyError):
+            global_config["qux"]
+
+    with pytest.raises(KeyError):
+        global_config["foo"]
