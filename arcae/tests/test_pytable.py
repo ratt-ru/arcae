@@ -8,7 +8,7 @@ import pyarrow.parquet as pq
 
 import pytest
 
-import arcae as ca
+import arcae
 
 @pytest.mark.parametrize("table_suffix, table_name", [
     ("", "MAIN"),
@@ -19,24 +19,24 @@ import arcae as ca
 ])
 def test_parquet_write(tmp_path, tau_ms, table_suffix, table_name):
     """ Test conversion of a representative MS and some of its subtables to parquet format """
-    T = ca.table(f"{tau_ms}{table_suffix}").to_arrow()
+    T = arcae.table(f"{tau_ms}{table_suffix}").to_arrow()
     pq.write_table(T, str(tmp_path / f"{table_name}.parquet"))
 
 
 def test_column_selection(column_case_table):
-    T = ca.table(column_case_table).to_arrow(0, 1)
+    T = arcae.table(column_case_table).to_arrow(0, 1)
     assert sorted(T.column_names) == ["FIXED", "FIXED_STRING", "SCALAR", "SCALAR_STRING", "VARIABLE", "VARIABLE_STRING"]
 
-    T = ca.table(column_case_table).to_arrow(0, 1, "VARIABLE")
+    T = arcae.table(column_case_table).to_arrow(0, 1, "VARIABLE")
     assert T.column_names == ["VARIABLE"]
 
-    T = ca.table(column_case_table).to_arrow(0, 1, ["VARIABLE", "FIXED"])
+    T = arcae.table(column_case_table).to_arrow(0, 1, ["VARIABLE", "FIXED"])
     assert sorted(T.column_names) == ["FIXED", "VARIABLE"]
 
 
 def test_column_cases(column_case_table, capfd):
     """ Test code paths """
-    T = ca.table(column_case_table).to_arrow()
+    T = arcae.table(column_case_table).to_arrow()
 
     assert T.column("VARIABLE").to_pylist() == [
         [[[0, 0]], [[0, 0]], [[0, 0]]],
@@ -72,7 +72,7 @@ def test_complex_cases(complex_case_table):
     from arcae.arrow_tables import ComplexDoubleType
     from arcae import config
 
-    table = ca.table(complex_case_table)
+    table = arcae.table(complex_case_table)
 
     with config.set(**{"casa.convert.strategy": "fixed complex"}):
         T = table.to_arrow()
@@ -92,7 +92,7 @@ def test_complex_cases(complex_case_table):
 
 def test_partial_read(sorting_table):
     """ Tests that partial reads work """
-    T = ca.table(sorting_table)
+    T = arcae.table(sorting_table)
     full = T.to_arrow()
     nrows = [1, 2, 3, 4]
     assert sum(nrows) == len(full) == 10
@@ -104,7 +104,7 @@ def test_partial_read(sorting_table):
         start += nrow
 
 def test_table_partitioning(sorting_table):
-    T = ca.table(sorting_table)
+    T = arcae.table(sorting_table)
 
     partitions = T.partition(["FIELD_ID", "DATA_DESC_ID"])
     assert len(partitions) == 3
@@ -126,7 +126,7 @@ def test_table_partitioning(sorting_table):
     ["TIME", "ANTENNA1", "ANTENNA2"]
 ])
 def test_table_partitioning_and_sorting(sorting_table, sort_keys):
-    partitions = ca.table(sorting_table).partition(["FIELD_ID", "DATA_DESC_ID"], sort_keys)
+    partitions = arcae.table(sorting_table).partition(["FIELD_ID", "DATA_DESC_ID"], sort_keys)
 
     if isinstance(sort_keys, str):
         sort_keys = [sort_keys]

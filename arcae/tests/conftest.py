@@ -66,13 +66,13 @@ def tau_ms(tau_ms_tar, tmp_path_factory):
 
 @pytest.fixture(scope="session")
 def partitioned_dataset(tau_ms, tmp_path_factory):
-    import arcae as ca
+    import arcae
     import pyarrow as pa
     import pyarrow.dataset as pad
 
     dsdir = tmp_path_factory.mktemp("partition-dataset")
 
-    AT = ca.table(tau_ms).to_arrow()
+    AT = arcae.table(tau_ms).to_arrow()
     partition_fields = [AT.schema.field(c) for c in ("FIELD_ID", "DATA_DESC_ID")]
     partition = pad.partitioning(pa.schema(partition_fields), flavor="hive")
     pad.write_dataset(AT, dsdir, partitioning=partition,
