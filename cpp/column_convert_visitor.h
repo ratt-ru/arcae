@@ -49,6 +49,9 @@ public:
 #undef VISIT
 
 private:
+
+    static Status ValidateArray(const std::shared_ptr<arrow::Array> & array);
+
     inline casacore::uInt local_row(casacore::uInt row)
         { return row - startrow; }
 
@@ -96,7 +99,7 @@ private:
             ARROW_ASSIGN_OR_RAISE(this->array, MakeArrowPrimitiveArray(buffer, nrow, arrow_dtype));
         }
 
-        return this->array->ValidateFull();
+        return ValidateArray(this->array);
     }
 
     template <typename T>
@@ -140,7 +143,7 @@ private:
             ARROW_ASSIGN_OR_RAISE(this->array, arrow::FixedSizeListArray::FromArrays(this->array, dim_size));
         }
 
-        return this->array->ValidateFull();
+        return ValidateArray(this->array);
     }
 
     template <typename T>
@@ -269,7 +272,7 @@ private:
             ARROW_ASSIGN_OR_RAISE(auto offsets, builder.Finish());
             ARROW_ASSIGN_OR_RAISE(this->array, arrow::ListArray::FromArrays(*offsets, *this->array));
             // NOTE(sjperkins): Perhaps remove this for performance
-            ARROW_RETURN_NOT_OK(this->array->ValidateFull());
+            ARROW_RETURN_NOT_OK(ValidateArray(this->array));
         }
 
         if(auto list_array = std::dynamic_pointer_cast<arrow::ListArray>(this->array)) {
@@ -283,7 +286,7 @@ private:
                 nulls,
                 null_counts));
 
-            return this->array->ValidateFull();
+            return ValidateArray(this->array);
         } else {
             return Status::Invalid("Unable to cast final array to arrow::ListArray");
         }
