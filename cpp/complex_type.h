@@ -1,13 +1,14 @@
-#ifndef CASA_ARROW_COMPLEX_TYPE_H
-#define CASA_ARROW_COMPLEX_TYPE_H
+#ifndef ARCAE_COMPLEX_TYPE_H
+#define ARCAE_COMPLEX_TYPE_H
 
 // Complex Number Extension Type
 
 #include <arrow/extension_type.h>
 
+namespace arcae {
+
 std::shared_ptr<arrow::DataType> complex64();
 std::shared_ptr<arrow::DataType> complex128();
-
 
 class ComplexFloatArray : public arrow::ExtensionArray {
  public:
@@ -89,5 +90,7 @@ class ComplexDoubleType : public ComplexType {
     return "";
   }
 };
+
+} // namespace arcae
 
 #endif

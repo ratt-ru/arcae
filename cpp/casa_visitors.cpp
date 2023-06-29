@@ -1,5 +1,7 @@
 #include "casa_visitors.h"
 
+namespace arcae {
+
 arrow::Status CasaTypeVisitor::Visit(const casacore::DataType & dtype) {
     switch(dtype) {
         case casacore::DataType::TpBool:
@@ -70,5 +72,6 @@ VISIT_CASA_TYPES(VISIT)
 // CASA_TYPE_VISITOR_DEFAULT(TpQuantity)
 // CASA_TYPE_VISITOR_DEFAULT(TpTable)
 
+} // namespace arcae
 
 #undef CASA_TYPE_VISITOR_DEFAULT

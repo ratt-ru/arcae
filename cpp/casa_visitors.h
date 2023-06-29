@@ -1,9 +1,11 @@
-#ifndef CASA_ARROW_CASA_VISITORS_H
-#define CASA_ARROW_CASA_VISITORS_H
+#ifndef ARCAE_CASA_VISITORS_H
+#define ARCAE_CASA_VISITORS_H
 
 #include <casacore/casa/Utilities/DataType.h>
 
 #include <arrow/api.h>
+
+namespace arcae {
 
 class CasaArrayVisitor {
  public:
@@ -49,5 +51,7 @@ class CasaTypeVisitor {
 
   #undef VISIT
 };
+
+} // namespace arcae
 
 #endif

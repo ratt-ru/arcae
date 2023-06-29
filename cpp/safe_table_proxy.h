@@ -1,5 +1,5 @@
-#ifndef CASA_ARROW_SAFE_TABLE_PROXY_H
-#define CASA_ARROW_SAFE_TABLE_PROXY_H
+#ifndef ARCAE_SAFE_TABLE_PROXY_H
+#define ARCAE_SAFE_TABLE_PROXY_H
 
 #include <climits>
 
@@ -10,14 +10,16 @@
 
 #include "column_convert_visitor.h"
 
-static constexpr char CASA_ARROW_METADATA[]  = "__arcae_metadata__";
-static constexpr char CASA_DESCRIPTOR[]  = "__casa_descriptor__";
-
 using ::casacore::TableProxy;
 using ::arrow::Future;
 using ::arrow::Status;
 using ::arrow::Result;
 using ::arrow::internal::ThreadPool;
+
+namespace arcae {
+
+static constexpr char ARCAE_METADATA[]  = "__arcae_metadata__";
+static constexpr char CASA_DESCRIPTOR[]  = "__casa_descriptor__";
 
 /// @class SafeTableProxy
 /// @brief Constrains Table access to an arrow::ThreadPool containing a single thread.
@@ -55,5 +57,7 @@ public:
 
     Result<bool> close();
 };
+
+} // namespace arcae
 
 #endif

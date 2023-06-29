@@ -15,6 +15,8 @@ using ::casacore::TableColumn;
 using ::casacore::TableIterProxy;
 using ::casacore::TableLock;
 
+namespace arcae {
+
 #define SAFE_TABLE_FUNCTOR(functor) \
     return arrow::DeferNotOk(this->io_pool->Submit((functor))).result()
 
@@ -112,7 +114,7 @@ SafeTableProxy::to_arrow(casacore::uInt startrow, casacore::uInt nrow, const std
             column_json.end();
 
             auto column_metadata = arrow::KeyValueMetadata::Make(
-                {CASA_ARROW_METADATA}, {json_oss.str()});
+                {ARCAE_METADATA}, {json_oss.str()});
             auto arrow_field = std::make_shared<arrow::Field>(
                 column_name, visitor.array->type(),
                 true, std::move(column_metadata));
@@ -128,7 +130,7 @@ SafeTableProxy::to_arrow(casacore::uInt startrow, casacore::uInt nrow, const std
         table_json.end();
 
         auto table_metadata = arrow::KeyValueMetadata::Make(
-            {CASA_ARROW_METADATA}, {json_oss.str()});
+            {ARCAE_METADATA}, {json_oss.str()});
 
         auto schema = arrow::schema(fields, std::move(table_metadata));
         auto table = arrow::Table::Make(std::move(schema), arrays, nrow_);
@@ -230,3 +232,5 @@ SafeTableProxy::close() {
         return false;
     }
 }
+
+} // namespace arcae
