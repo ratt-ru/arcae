@@ -18,7 +18,7 @@ DATA_CHUNK_SIZE = 2**20
 def fully_validate_arrays():
     from arcae import config
 
-    with config.set(**{"validate-level": "full"}):
+    with config.set(**{"validation-level": "full"}):
         yield
 
 def download_tau_ms(tau_ms_tar):
