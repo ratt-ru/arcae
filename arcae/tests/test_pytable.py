@@ -198,13 +198,16 @@ def test_duckdb(partitioned_dataset):
 def test_config():
     from arcae.arrow_tables import Configuration
     config = Configuration()
+
+    assert config["validate-level"] == "full"
+
     config["blah"] = "foo"
     assert config["blah"] == "foo"
-    assert len(config) == 1
+    assert len(config) == 2
 
     config["qux"] = "bar"
     assert config["qux"] == "bar"
-    assert len(config) == 2
+    assert len(config) == 3
 
     try:
         config["foo"] == "bar"
@@ -214,7 +217,7 @@ def test_config():
     assert config.get("foo") is None
     assert config.get("foo", "bar") == "bar"
 
-    assert list(config.items()) == [("blah", "foo"), ("qux", "bar")]
+    assert list(config.items()) == [("blah", "foo"), ("qux", "bar") ("validation-level", "full")]
 
     try:
         config["foo"] = 1
