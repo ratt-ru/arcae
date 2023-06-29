@@ -46,7 +46,7 @@ def download_tau_ms(tau_ms_tar):
 @pytest.fixture(scope="session")
 def tau_ms_tar():
     from appdirs import user_cache_dir
-    cache_dir = Path(user_cache_dir("casa-arrow")) / "test-data"
+    cache_dir = Path(user_cache_dir("arcae")) / "test-data"
     cache_dir.mkdir(parents=True, exist_ok=True)
     tau_ms_tar = cache_dir / TAU_MS_TAR
 
@@ -66,7 +66,7 @@ def tau_ms(tau_ms_tar, tmp_path_factory):
 
 @pytest.fixture(scope="session")
 def partitioned_dataset(tau_ms, tmp_path_factory):
-    import casa_arrow as ca
+    import arcae as ca
     import pyarrow as pa
     import pyarrow.dataset as pad
 

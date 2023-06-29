@@ -5,10 +5,10 @@ from typing import TYPE_CHECKING
 __version__ = "0.1.0"
 
 if TYPE_CHECKING:
-    from casa_arrow.lib.arrow_tables import Table
+    from arcae.lib.arrow_tables import Table
 
 def table(filename: str) -> "Table":
-    # Defer cython module import, to avoid conflicts between casa_arrow casacore libraries
+    # Defer cython module import, to avoid conflicts between arcae casacore libraries
     # and python-casacore casacore libraries
-    from casa_arrow.lib.arrow_tables import Table
+    from arcae.lib.arrow_tables import Table
     return Table(filename)

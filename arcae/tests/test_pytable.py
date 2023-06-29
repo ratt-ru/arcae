@@ -8,7 +8,7 @@ import pyarrow.parquet as pq
 
 import pytest
 
-import casa_arrow as ca
+import arcae as ca
 
 @pytest.mark.parametrize("table_suffix, table_name", [
     ("", "MAIN"),
@@ -69,8 +69,8 @@ def test_column_cases(column_case_table, capfd):
 
 
 def test_complex_cases(complex_case_table):
-    from casa_arrow.arrow_tables import ComplexDoubleType
-    from casa_arrow import config
+    from arcae.arrow_tables import ComplexDoubleType
+    from arcae import config
 
     table = ca.table(complex_case_table)
 
@@ -196,7 +196,7 @@ def test_duckdb(partitioned_dataset):
 
 
 def test_config():
-    from casa_arrow.arrow_tables import Configuration
+    from arcae.arrow_tables import Configuration
     config = Configuration()
     config["blah"] = "foo"
     assert config["blah"] == "foo"

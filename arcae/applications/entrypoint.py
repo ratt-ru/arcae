@@ -1,6 +1,6 @@
 import click
 
-from casa_arrow.applications.ms_export import MSExporter
+from arcae.applications.ms_export import MSExporter
 
 @click.group()
 @click.pass_context
