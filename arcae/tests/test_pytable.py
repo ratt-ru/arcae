@@ -234,7 +234,7 @@ def test_config_context_mgr():
     from arcae.lib.arrow_tables import Configuration
     from arcae import config
     global_config = Configuration()
-    assert len(global_config) == 1 and list(global_config.items()) == [("validation-level", "full")]
+    assert list(global_config.items()) == [("validation-level", "full")]
 
     with config.set(**{"foo": "bar", "qux-baz": "blah"}):
         assert global_config["foo"] == "bar"
@@ -258,3 +258,5 @@ def test_config_context_mgr():
 
     with pytest.raises(KeyError):
         global_config["foo"]
+
+    assert list(global_config.items()) == [("validation-level", "full")]
