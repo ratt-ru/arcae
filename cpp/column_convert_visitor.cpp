@@ -31,7 +31,7 @@ Status ColumnConvertVisitor::ValidateArray(const std::shared_ptr<arrow::Array> &
     } else if(validation_level == "none") {
         return Status::OK();
     } else {
-        ARROW_LOG(WARNING) << "Invalid validation-level " << validation_level
+        ARROW_LOG(WARNING) << "Invalid validation-level=" << validation_level
                             << ". No array construction validation will be performed";
         return Status::OK();
     }
