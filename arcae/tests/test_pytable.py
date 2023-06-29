@@ -196,7 +196,7 @@ def test_duckdb(partitioned_dataset):
 
 
 def test_config():
-    from arcae.arrow_tables import Configuration
+    from arcae.lib.arrow_tables import Configuration
     config = Configuration()
 
     assert config["validate-level"] == "full"
@@ -232,7 +232,7 @@ def test_config():
 
 
 def test_config_context_mgr():
-    from arcae.arrow_tables import Configuration
+    from arcae.lib.arrow_tables import Configuration
     from arcae import config
     global_config = Configuration()
     assert len(global_config) == 1 and list(config.items()) == [("validation-level", "full")]
