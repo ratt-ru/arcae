@@ -17,15 +17,30 @@ Rationale
 Build Wheel Locally
 -------------------
 
-In the user or, a virtual environment:
+In the user or, even better, a virtual environment:
 
 .. code-block:: python
 
   $ pip install -U pip cibuildwheel
-  $ bash scripts/run_cbuildwheel.sh 3.10
+  $ bash scripts/run_cbuildwheel.sh -p 3.8
 
 .. warning::
   Only linux wheels are currently supported.
+
+Local Development
+-----------------
+
+In the directory containing the source, setup your development environment as follows:
+
+.. code-block:: python
+
+  $ pip install -U pip virtualenv
+  $ virtualenv -p python3.8 /venv/arcaedev
+  $ . /venv/arcaedev/bin/activate
+  (arcaedev) export VCPKG_TARGET_TRIPLET=x64-linux-dynamic-cxx17-abi0-dbg  $ suffix to -rel for release
+  (arcaedev) pip install -e .[test]
+  (arcaedev) export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/vcpkg/installed/$VCPKG_TARGET_TRIPLET/lib
+  (arcaedev) py.test -s -vvv --pyargs arcae
 
 Usage
 -----
@@ -130,5 +145,17 @@ Some edge cases have not yet been implemented, but could be with some thought.
   This is `possible <daskms_ext_types_>`_ but requires some changes to how
   `C++ Extension Types are exposed in Python <arrow_python_expose_cpp_ext_types_>`_.
 
+
+
+Etymology
+---------
+
+Noun: **arca** f (genitive **arcae**); first declension
+A chest, box, coffer, safe (safe place for storing items, or anything of a similar shape)
+
+Pronounced: `ar-ki <arcae_pronounce_>`_.
+
+
 .. _daskms_ext_types: https://github.com/ratt-ru/dask-ms/blob/1ff73ce3a60ea6479e40fc8cf440fd8d077e3d26/daskms/experimental/arrow/extension_types.py#L120-L152
 .. _arrow_python_expose_cpp_ext_types: https://github.com/apache/arrow/issues/33997
+.. _arcae_pronounce: https://translate.google.com/?sl=la&tl=en&text=arcae%0A&op=translate
