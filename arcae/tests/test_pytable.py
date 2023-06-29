@@ -196,27 +196,65 @@ def test_duckdb(partitioned_dataset):
 
 
 def test_config():
-    from arcae.arrow_tables import Configuration
-    config = Configuration()
-    config["blah"] = "foo"
-    assert config["blah"] == "foo"
-    assert len(config) == 1
+    from arcae.lib.arrow_tables import Configuration
+    global_config = Configuration()
 
-    config["qux"] = "bar"
-    assert config["qux"] == "bar"
-    assert len(config) == 2
+    assert global_config["validation-level"] == "full"
+
+    global_config["blah"] = "foo"
+    assert global_config["blah"] == "foo"
+    assert len(global_config) == 2
+
+    global_config["qux"] = "bar"
+    assert global_config["qux"] == "bar"
+    assert len(global_config) == 3
 
     try:
-        config["foo"] == "bar"
+        global_config["foo"] == "bar"
     except KeyError as e:
         assert "foo" in e.args[0]
 
-    assert config.get("foo") is None
-    assert config.get("foo", "bar") == "bar"
+    assert global_config.get("foo") is None
+    assert global_config.get("foo", "bar") == "bar"
 
-    assert list(config.items()) == [("blah", "foo"), ("qux", "bar")]
+    assert list(global_config.items()) == [("blah", "foo"), ("qux", "bar"), ("validation-level", "full")]
 
     try:
-        config["foo"] = 1
+        global_config["foo"] = 1
     except TypeError as e:
         assert "(expected str, got int)" in e.args[0]
+
+    del global_config["blah"]
+    del global_config["qux"]
+
+    assert list(global_config.items()) == [("validation-level", "full")]
+
+
+def test_config_context_mgr():
+    from arcae.lib.arrow_tables import Configuration
+    from arcae import config
+    global_config = Configuration()
+    assert len(global_config) == 1 and list(global_config.items()) == [("validation-level", "full")]
+
+    with config.set(**{"foo": "bar", "qux-baz": "blah"}):
+        assert global_config["foo"] == "bar"
+        assert global_config["qux-baz"] == "blah"
+
+    with pytest.raises(KeyError):
+        assert global_config["foo"] == "foo"
+
+    with pytest.raises(KeyError):
+        assert global_config["qux-baz"] == "blah"
+
+    with config.set(**{"foo": "bar"}):
+        assert global_config["foo"] == "bar"
+
+        with config.set(**{"qux": "baz"}):
+            assert global_config["foo"] == "bar"
+            assert global_config["qux"] == "baz"
+
+        with pytest.raises(KeyError):
+            global_config["qux"]
+
+    with pytest.raises(KeyError):
+        global_config["foo"]

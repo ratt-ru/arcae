@@ -13,6 +13,14 @@ TAU_MS_TAR_HASH = "fc2ce9261817dfd88bbdd244c8e9e58ae0362173938df6ef2a587b1823147
 DATA_URL = f"https://ratt-public-data.s3.af-south-1.amazonaws.com/test-data/{TAU_MS_TAR}"
 DATA_CHUNK_SIZE = 2**20
 
+
+@pytest.fixture(scope="session", autouse=True)
+def fully_validate_arrays():
+    from arcae import config
+
+    with config.set(**{"validation-level": "full"}):
+        yield
+
 def download_tau_ms(tau_ms_tar):
     if tau_ms_tar.exists():
         with open(tau_ms_tar, "rb") as f:

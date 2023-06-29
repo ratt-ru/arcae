@@ -4,7 +4,7 @@ _DELETE_MARKER = object()
 
 @contextmanager
 def set(**kw):
-    from arcae.arrow_tables import Configuration
+    from arcae.lib.arrow_tables import Configuration
     config = Configuration()
     saved = {}
 
