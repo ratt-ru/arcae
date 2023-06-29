@@ -1,10 +1,12 @@
-#ifndef CASA_ARROW_SERVICE_LOCATOR_H
-#define CASA_ARROW_SERVICE_LOCATOR_H
+#ifndef ARCAE_SERVICE_LOCATOR_H
+#define ARCAE_SERVICE_LOCATOR_H
 
 #include <memory>
 #include <mutex>
 
 #include "configuration.h"
+
+namespace arcae {
 
 class ServiceLocator {
 private:
@@ -15,5 +17,7 @@ public:
   static void SetConfigurationService(std::unique_ptr<Configuration> service);
   static Configuration & configuration();
 };
+
+} // namespace arcae
 
 #endif

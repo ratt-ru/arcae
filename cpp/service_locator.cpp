@@ -1,5 +1,7 @@
 #include "service_locator.h"
 
+namespace arcae {
+
 std::mutex ServiceLocator::mutex_;
 std::unique_ptr<Configuration> ServiceLocator::configuration_service_;
 
@@ -17,3 +19,5 @@ Configuration & ServiceLocator::configuration() {
 
     return *configuration_service_;
 }
+
+} // namespace arcae

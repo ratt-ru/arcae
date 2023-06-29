@@ -5,6 +5,8 @@
 #include "column_convert_visitor.h"
 #include "complex_type.h"
 
+namespace arcae {
+
 ColumnConvertVisitor::ColumnConvertVisitor(
     const casacore::TableColumn & column,
     casacore::uInt startrow,
@@ -123,3 +125,5 @@ arrow::Status ColumnConvertVisitor::VisitTpRecord() {
 arrow::Status ColumnConvertVisitor::VisitTpTable() {
     return arrow::Status::NotImplemented("TpTable");
 }
+
+} // namespace arcae

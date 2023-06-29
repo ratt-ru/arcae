@@ -1,6 +1,8 @@
 #include "configuration.h"
 
 
+namespace arcae {
+
 arrow::Result<std::string> Configuration::Get(const std::string & key) const {
     auto it = kvmap_.find(key);
 
@@ -33,3 +35,5 @@ arrow::Result<bool> Configuration::Delete(const std::string & key) {
         return true;
     }
 }
+
+} // namespace arcae

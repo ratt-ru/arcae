@@ -13,13 +13,13 @@ cdef extern from "<climits>" nogil:
     cdef unsigned int UINT_MAX
 
 
-cdef extern from "../cpp/service_locator.h" nogil:
-    cdef cppclass CServiceLocator" ServiceLocator":
+cdef extern from "../cpp/service_locator.h" namespace "arcae" nogil:
+    cdef cppclass CServiceLocator" arcae::ServiceLocator":
         @staticmethod
         CConfiguration & configuration" ServiceLocator::configuration"()
 
-cdef extern from "../cpp/configuration.h" nogil:
-    cdef cppclass CConfiguration" Configuration":
+cdef extern from "../cpp/configuration.h" namespace "arcae" nogil:
+    cdef cppclass CConfiguration" arcae::Configuration":
         void Set" Configuration::Set"(const string & key, string value)
         CResult[string] Get" Configuration::Get"(const string & key)
         CResult[bool] Delete" Configuration::Delete"(const string & key)
@@ -27,8 +27,8 @@ cdef extern from "../cpp/configuration.h" nogil:
         size_t Size" Configuration::Size"()
 
 
-cdef extern from "../cpp/safe_table_proxy.h" nogil:
-    cdef cppclass CCasaTable" SafeTableProxy":
+cdef extern from "../cpp/safe_table_proxy.h" namespace "arcae" nogil:
+    cdef cppclass CCasaTable" arcae::SafeTableProxy":
         @staticmethod
         CResult[shared_ptr[CCasaTable]] Make" SafeTableProxy::Make"(const string & filename)
         CResult[bool] close" SafeTableProxy::close"()
@@ -39,21 +39,21 @@ cdef extern from "../cpp/safe_table_proxy.h" nogil:
         CResult[vector[string]] columns " SafeTableProxy::columns"()
         CResult[vector[shared_ptr[CCasaTable]]] partition " SafeTableProxy::partition"(const vector[string] & partition_columns, const vector[string] & sort_columns)
 
-cdef extern from "../cpp/complex_type.h" nogil:
-    cdef cppclass CComplexType" ComplexType"(CExtensionType):
+cdef extern from "../cpp/complex_type.h" namespace "arcae" nogil:
+    cdef cppclass CComplexType" arcae::ComplexType"(CExtensionType):
         shared_ptr[CDataType] value_type" ComplexType::value_type"()
         string extension_name()
 
-    cdef cppclass CComplexDoubleType" ComplexDoubleType"(CComplexType):
+    cdef cppclass CComplexDoubleType" arcae::ComplexDoubleType"(CComplexType):
         CComplexDoubleType" ComplexDoubleType"()
 
-    cdef cppclass CComplexFloatType" ComplexFloatType"(CComplexType):
+    cdef cppclass CComplexFloatType" arcae::ComplexFloatType"(CComplexType):
         CComplexFloatType" ComplexFloatType"()
 
-    cdef cppclass CComplexDoubleArray" ComplexDoubleArray":
+    cdef cppclass CComplexDoubleArray" arcae::ComplexDoubleArray":
         pass
 
-    cdef cppclass CComplexFloatArray" ComplexFloatArray":
+    cdef cppclass CComplexFloatArray" arcae::ComplexFloatArray":
         pass
 
     shared_ptr[CDataType] complex64()

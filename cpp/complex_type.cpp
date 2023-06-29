@@ -4,6 +4,8 @@
 
 #include "complex_type.h"
 
+namespace arcae {
+
 bool ComplexFloatType::ExtensionEquals(const ExtensionType& other) const {
   const auto& other_ext = static_cast<const ExtensionType&>(other);
   return other_ext.extension_name() == this->extension_name();
@@ -42,3 +44,5 @@ bool register_complex_types()
 }
 
 static auto complex_types_registered = register_complex_types();
+
+}

@@ -1,5 +1,5 @@
-#ifndef CASA_ARROW_COLUMN_CONVERT_VISITOR_H
-#define CASA_ARROW_COLUMN_CONVERT_VISITOR_H
+#ifndef ARCAE_COLUMN_CONVERT_VISITOR_H
+#define ARCAE_COLUMN_CONVERT_VISITOR_H
 
 #include <algorithm>
 
@@ -18,6 +18,8 @@ using ::arrow::Status;
 
 using ::casacore::IPosition;
 using ::casacore::Slice;
+
+namespace arcae {
 
 class ColumnConvertVisitor : public CasaTypeVisitor {
 public:
@@ -361,5 +363,7 @@ private:
         return ConvertVariableArrayColumn<T>(arrow_dtype, shapes, nulls, null_counts);
     }
 };
+
+} // namespace arcae
 
 #endif

@@ -1,11 +1,13 @@
-#ifndef CASA_ARROW_CONFIG_H
-#define CASA_ARROW_CONFIG_H
+#ifndef ARCAE_CONFIG_H
+#define ARCAE_CONFIG_H
 
 #include <map>
 #include <string>
 #include <vector>
 
 #include <arrow/result.h>
+
+namespace arcae {
 
 class Configuration {
 private:
@@ -28,5 +30,7 @@ public:
     std::string GetDefault(const std::string & key, std::string default_value) const;
     arrow::Result<bool> Delete(const std::string & key);
 };
+
+} // namespace arcae
 
 #endif

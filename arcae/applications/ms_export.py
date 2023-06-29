@@ -8,7 +8,7 @@ from rich.console import Group
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TimeElapsedColumn, TextColumn
 
-import arcae as ca
+import arcae
 import pyarrow.parquet as pq
 
 
@@ -34,7 +34,7 @@ class MSExporter:
         self.ui = MSExporter.UserInterface()
 
     def export(self):
-        table = ca.table(self.path)
+        table = arcae.table(self.path)
         fragment = table.to_arrow(0, 1)
         subtables = self.find_subtables(fragment.schema.metadata)
         shutil.rmtree(self.output, ignore_errors=True)
@@ -85,7 +85,7 @@ class MSExporter:
                 main_task,
                 description=f"Converted {subtable_name} ({s+1}/{len(subtables)}) subtables")
 
-            subtable = ca.table(f"{self.path}::{subtable_name}")
+            subtable = arcae.table(f"{self.path}::{subtable_name}")
             out_dir = os.path.join(self.output, subtable_name)
             os.makedirs(out_dir, exist_ok=True)
             sub_task = self.ui.subtable_sub_progress.add_task("", subtable.nrow())

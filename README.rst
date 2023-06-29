@@ -37,13 +37,13 @@ Example Usage:
     import json
     from pprint import pprint
 
-    import arcae as ca
+    import arcae
     import pandas as pd
     import pyarrow as pa
     import pyarrow.parquet as pq
 
     # Obtain (partial) Apache Arrow Table from a CASA Table
-    casa_table = ca.table("/path/to/measurementset.ms")
+    casa_table = arcae.table("/path/to/measurementset.ms")
     arrow_table = casa_table.to_arrow()        # read entire table
     arrow_table = casa_table.to_arrow(10, 20)  # startrow, nrow
     assert isinstance(arrow_table, pa.Table)
