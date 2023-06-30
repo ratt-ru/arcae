@@ -141,6 +141,7 @@ jobs:
 
   upload-to-pypi:
     name: Upload release to PyPI
+    if: github.ref == 'refs/heads/master'
     needs: [build-sdist, build-wheels]
     runs-on: ubuntu-latest
     environment:
