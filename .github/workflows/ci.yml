@@ -116,21 +116,48 @@ jobs:
           source $HOME/venv/bin/activate && pip install --find-links=${{ github.workspace }}/wheelhouse arcae[test]
           source $HOME/venv/bin/activate && py.test -s -vvv --pyargs arcae
 
-  upload-to-pypi:
-    name: Upload release to PyPI
+  upload-to-test-pypi:
+    name: Upload release to Test PyPI
     needs: [build-sdist, build-wheels]
     runs-on: ubuntu-latest
+    environment:
+      name: release-test
+    permissions:
+      id-token: write
     steps:
       - name: Download distribution artifacts
         uses: actions/download-artifact@v3
         with:
           name: ${{ env.ARTIFACT_NAME }}
-          path: ~/dist
+          path: dist
 
-      - name: List wheels
-        run: ls -lh ~/dist
+      - name: List artifacts
+        run: ls -lh dist
 
-    # TODO(sjperkins): Enable this
-    # - name: Publish package distributions to PyPI
-    #   if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags')
-    #   uses: pypa/gh-action-pypi-publish@release/v1
+      - name: Publish package distributions to Test PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+        continue-on-error: true
+
+  upload-to-pypi:
+    name: Upload release to PyPI
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags')
+    needs: [build-sdist, build-wheels]
+    runs-on: ubuntu-latest
+    environment:
+      name: release
+    permissions:
+      id-token: write
+    steps:
+      - name: Download distribution artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: dist
+
+      - name: List artifacts
+        run: ls -lh dist
+
+      - name: Publish package distributions to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
