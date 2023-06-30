@@ -154,7 +154,7 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           name: ${{ env.ARTIFACT_NAME }}
-          path: ~/dist
+          path: dist
 
       - name: List artifacts
         run: ls -lh dist
