@@ -138,6 +138,7 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
+        continue-on-error: true
 
   upload-to-pypi:
     name: Upload release to PyPI
