@@ -159,5 +159,5 @@ jobs:
       - name: List artifacts
         run: ls -lh dist
 
-      # - name: Publish package distributions to Test PyPI
-      #   uses: pypa/gh-action-pypi-publish@release/v1
+      - name: Publish package distributions to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
