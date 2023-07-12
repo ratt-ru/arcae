@@ -64,8 +64,8 @@ Example Usage:
     assert isinstance(arrow_table, pa.Table)
 
     # Print JSON-encoded Table and Column keywords
-    pprint(json.loads(AT.schema.metadata[b"__arcae_metadata__"]))
-    pprint(json.loads(AT.schema.field("DATA").metadata[b"__arcae_metadata__"]))
+    pprint(json.loads(arrow_table.schema.metadata[b"__arcae_metadata__"]))
+    pprint(json.loads(arrow_table.schema.field("DATA").metadata[b"__arcae_metadata__"]))
 
     # Extract Arrow Table columns into numpy arrays
     time = arrow_table.column("TIME").to_numpy()
