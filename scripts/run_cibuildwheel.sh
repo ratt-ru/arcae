@@ -52,7 +52,7 @@ VCPKG_INSTALLED_DIR=$VCPKG_INSTALLED_DIR \
 VCPKG_TARGET_TRIPLET=$VCPKG_TARGET_TRIPLET \
 LD_LIBRARY_PATH=$VCPKG_INSTALLED_DIR/$VCPKG_TARGET_TRIPLET/lib"
 export CIBW_REPAIR_WHEEL_COMMAND_LINUX="auditwheel repair -w {dest_dir} {wheel} --exclude libarrow_python.so --exclude libarrow.so.1200"
-export CIBW_TEST_SKIP: "*"
+export CIBW_TEST_SKIP="*"
 export CIBW_TEST_EXTRAS=
 export CIBW_TEST_COMMAND="python -c 'from arcae.lib.arrow_tables import Table'"
 export CIBW_VERBOSITY=3
