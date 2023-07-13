@@ -11,19 +11,11 @@
 #include "complex_type.h"
 #include "service_locator.h"
 
-using ::arrow::Buffer;
-using ::arrow::DataType;
-using ::arrow::Result;
-using ::arrow::Status;
-
-using ::casacore::IPosition;
-using ::casacore::Slice;
-
 namespace arcae {
 
 class ColumnConvertVisitor : public CasaTypeVisitor {
 public:
-    using ShapeVectorType = std::vector<IPosition>;
+    using ShapeVectorType = std::vector<casacore::IPosition>;
 
 public:
     const casacore::TableColumn & column;
@@ -43,30 +35,30 @@ public:
     virtual ~ColumnConvertVisitor() = default;
 
 #define VISIT(CASA_TYPE) \
-    virtual Status Visit##CASA_TYPE() override;
+    virtual arrow::Status Visit##CASA_TYPE() override;
 
     VISIT_CASA_TYPES(VISIT)
 #undef VISIT
 
 private:
 
-    static Status ValidateArray(const std::shared_ptr<arrow::Array> & array);
+    static arrow::Status ValidateArray(const std::shared_ptr<arrow::Array> & array);
 
     inline casacore::uInt local_row(casacore::uInt row)
         { return row - startrow; }
 
-    inline Status FailIfNotUTF8(const std::shared_ptr<DataType> & arrow_dtype) {
-        if(arrow_dtype == arrow::utf8()) { return Status::OK(); }
-        return Status::Invalid(arrow_dtype->ToString(), " incompatible with casacore::String");
+    inline arrow::Status FailIfNotUTF8(const std::shared_ptr<arrow::DataType> & arrow_dtype) {
+        if(arrow_dtype == arrow::utf8()) { return arrow::Status::OK(); }
+        return arrow::Status::Invalid(arrow_dtype->ToString(), " incompatible with casacore::String");
     }
 
-    Result<std::shared_ptr<arrow::Array>> MakeArrowPrimitiveArray(
-            const std::shared_ptr<Buffer> & buffer,
+    arrow::Result<std::shared_ptr<arrow::Array>> MakeArrowPrimitiveArray(
+            const std::shared_ptr<arrow::Buffer> & buffer,
             casacore::uInt nelements,
-            const std::shared_ptr<DataType> & arrow_dtype);
+            const std::shared_ptr<arrow::DataType> & arrow_dtype);
 
     template <typename T>
-    Status ConvertScalarColumn(const std::shared_ptr<DataType> & arrow_dtype) {
+    arrow::Status ConvertScalarColumn(const std::shared_ptr<arrow::DataType> & arrow_dtype) {
         auto column = casacore::ScalarColumn<T>(this->column);
 
         if constexpr(std::is_same<T, casacore::String>::value) {
@@ -75,25 +67,25 @@ private:
             arrow::StringBuilder builder;
 
             try {
-                auto strings = column.getColumnRange(Slice(startrow, nrow));
+                auto strings = column.getColumnRange(casacore::Slice(startrow, nrow));
                 for(auto & s: strings) { ARROW_RETURN_NOT_OK(builder.Append(s)); }
             } catch(std::exception & e) {
-                return Status::Invalid("ConvertScalarColumn ", column_desc.name(), " ", e.what());
+                return arrow::Status::Invalid("ConvertScalarColumn ", column_desc.name(), " ", e.what());
             }
 
             ARROW_ASSIGN_OR_RAISE(this->array, builder.Finish());
         } else {
             // Wrap Arrow Buffer in casacore Vector
             ARROW_ASSIGN_OR_RAISE(auto allocation, arrow::AllocateBuffer(nrow*sizeof(T), pool));
-            auto buffer = std::shared_ptr<Buffer>(std::move(allocation));
+            auto buffer = std::shared_ptr<arrow::Buffer>(std::move(allocation));
             auto * buf_ptr = reinterpret_cast<T *>(buffer->mutable_data());
-            auto casa_vector = casacore::Vector<T>(IPosition(1, nrow), buf_ptr, casacore::SHARE);
+            auto casa_vector = casacore::Vector<T>(casacore::IPosition(1, nrow), buf_ptr, casacore::SHARE);
 
             // Dump column data into Arrow Buffer
             try {
-                column.getColumnRange(Slice(startrow, nrow), casa_vector);
+                column.getColumnRange(casacore::Slice(startrow, nrow), casa_vector);
             } catch(std::exception & e) {
-                return Status::Invalid("ConvertScalarColumn ", column_desc.name(), " ", e.what());
+                return arrow::Status::Invalid("ConvertScalarColumn ", column_desc.name(), " ", e.what());
             }
 
             ARROW_ASSIGN_OR_RAISE(this->array, MakeArrowPrimitiveArray(buffer, nrow, arrow_dtype));
@@ -103,8 +95,8 @@ private:
     }
 
     template <typename T>
-    Status ConvertFixedArrayColumn(const std::shared_ptr<DataType> & arrow_dtype,
-                                   const IPosition & shape) {
+    arrow::Status ConvertFixedArrayColumn(const std::shared_ptr<arrow::DataType> & arrow_dtype,
+                                   const casacore::IPosition & shape) {
         auto column = casacore::ArrayColumn<T>(this->column);
 
         if constexpr(std::is_same<T, casacore::String>::value) {
@@ -121,18 +113,18 @@ private:
         } else {
             // Wrap Arrow Buffer in casacore Array
             auto array_shape = shape;
-            array_shape.append(IPosition(1, nrow));
+            array_shape.append(casacore::IPosition(1, nrow));
             auto nelements = array_shape.product();
             ARROW_ASSIGN_OR_RAISE(auto allocation, arrow::AllocateBuffer(nelements*sizeof(T), pool));
-            auto buffer = std::shared_ptr<Buffer>(std::move(allocation));
+            auto buffer = std::shared_ptr<arrow::Buffer>(std::move(allocation));
             auto * buf_ptr = reinterpret_cast<T *>(buffer->mutable_data());
             auto casa_array = casacore::Array<T>(array_shape, buf_ptr, casacore::SHARE);
 
             // Dump column data into Arrow Buffer
             try {
-                column.getColumnRange(Slice(startrow, nrow), casa_array);
+                column.getColumnRange(casacore::Slice(startrow, nrow), casa_array);
             } catch(std::exception & e) {
-                return Status::Invalid("MakeFixedArrayBuffer ", column_desc.name(), " ", e.what());
+                return arrow::Status::Invalid("MakeFixedArrayBuffer ", column_desc.name(), " ", e.what());
             }
 
             ARROW_ASSIGN_OR_RAISE(this->array, MakeArrowPrimitiveArray(buffer, nelements, arrow_dtype));
@@ -147,10 +139,10 @@ private:
     }
 
     template <typename T>
-    Status ConvertVariableArrayColumn(
-            const std::shared_ptr<DataType> & arrow_dtype,
-            const std::vector<IPosition> & shapes,
-            std::shared_ptr<Buffer> & nulls,
+    arrow::Status ConvertVariableArrayColumn(
+            const std::shared_ptr<arrow::DataType> & arrow_dtype,
+            const std::vector<casacore::IPosition> & shapes,
+            std::shared_ptr<arrow::Buffer> & nulls,
             int64_t null_counts) {
 
         auto column = casacore::ArrayColumn<T>(this->column);
@@ -172,7 +164,7 @@ private:
                     shapes.begin(), shapes.end(), casacore::uInt(0),
                     [](auto i, const auto & s) { return i + s.product(); });
             ARROW_ASSIGN_OR_RAISE(auto allocation, arrow::AllocateBuffer(nelements*sizeof(T), pool));
-            auto buffer = std::shared_ptr<Buffer>(std::move(allocation));
+            auto buffer = std::shared_ptr<arrow::Buffer>(std::move(allocation));
             auto * buf_ptr = reinterpret_cast<T *>(buffer->mutable_data());
             casacore::uInt offset = 0;
 
@@ -185,7 +177,7 @@ private:
                     try {
                         column.get(row, casa_array);
                     } catch(std::exception & e) {
-                        return Status::Invalid("ConvertVariableArrayColumn",
+                        return arrow::Status::Invalid("ConvertVariableArrayColumn",
                                                       column_desc.name(), " ", e.what());
                     }
 
@@ -194,7 +186,7 @@ private:
             }
 
             if(offset != nelements) {
-                return Status::Invalid("offsets != nelements "
+                return arrow::Status::Invalid("offsets != nelements "
                                        "during conversion of variably shaped column ",
                                        column_desc.name());
             }
@@ -234,7 +226,7 @@ private:
 
         // Compute the products
         auto ndim = column_desc.ndim();
-        auto products = std::vector<IPosition>(nrow, IPosition(ndim, 1));
+        auto products = std::vector<casacore::IPosition>(nrow, casacore::IPosition(ndim, 1));
 
         for(casacore::uInt row=startrow; row < endrow; ++row) {
             auto lrow = local_row(row);
@@ -288,40 +280,40 @@ private:
 
             return ValidateArray(this->array);
         } else {
-            return Status::Invalid("Unable to cast final array to arrow::ListArray");
+            return arrow::Status::Invalid("Unable to cast final array to arrow::ListArray");
         }
     }
 
     template <typename T>
-    Status CheckByteWidths(const std::shared_ptr<DataType> & arrow_dtype) {
+    arrow::Status CheckByteWidths(const std::shared_ptr<arrow::DataType> & arrow_dtype) {
         // Check that the arrow type byte widths match up with the casacore byte widths
         if(auto complex_dtype = std::dynamic_pointer_cast<ComplexType>(arrow_dtype)) {
             auto vdt = complex_dtype->value_type();
             if(vdt->byte_width() == -1 || 2*vdt->byte_width() != sizeof(T)) {
-                return Status::Invalid(
+                return arrow::Status::Invalid(
                     "2 x byte width of complex value type",
                     vdt->ToString(), " (",
                     2*vdt->byte_width(),
                     ") != sizeof(T) (", sizeof(T), ")");
             }
         } else if(arrow_dtype == arrow::utf8()) {
-            return Status::OK();
+            return arrow::Status::OK();
         } else if(arrow_dtype->byte_width() == -1 || arrow_dtype->byte_width() != sizeof(T)) {
-            return Status::Invalid(
+            return arrow::Status::Invalid(
                 arrow_dtype->ToString(), " byte width (",
                 arrow_dtype->byte_width(),
                 ") != sizeof(T) (", sizeof(T), ")");
         }
 
-        return Status::OK();
+        return arrow::Status::OK();
     }
 
     template <typename T>
-    Status ConvertColumn(const std::shared_ptr<DataType> & arrow_dtype) {
+    arrow::Status ConvertColumn(const std::shared_ptr<arrow::DataType> & arrow_dtype) {
         ARROW_RETURN_NOT_OK(CheckByteWidths<T>(arrow_dtype));
 
         if(column_desc.ndim() == -1) {
-            return Status::NotImplemented(
+            return arrow::Status::NotImplemented(
                 column_desc.name(), " has unconstrained dimensionality");
         }
 
@@ -340,7 +332,7 @@ private:
         }
 
         // Variably shaped, read in shapes and null values
-        auto shapes = std::vector<IPosition>(nrow, IPosition(column_desc.ndim(), 0));
+        auto shapes = std::vector<casacore::IPosition>(nrow, casacore::IPosition(column_desc.ndim(), 0));
         auto column = casacore::ArrayColumn<T>(this->column);
         bool shapes_equal = true;
         int64_t null_counts = 0;
