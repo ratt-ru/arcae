@@ -20,23 +20,32 @@ static constexpr char CASA_DESCRIPTOR[]  = "__casa_descriptor__";
 /// @brief Constrains Table access to an arrow::ThreadPool containing a single thread.
 class SafeTableProxy {
 private:
-    arrow::Future<std::shared_ptr<casacore::TableProxy>> table_future;
+    std::shared_ptr<casacore::TableProxy> table_proxy;
     std::shared_ptr<arrow::internal::ThreadPool> io_pool;
     bool is_closed;
 
 private:
-    inline arrow::Status FailIfClosed() const;
+    inline arrow::Status FailIfClosed() const {
+        return is_closed ? arrow::Status::Invalid("Table is closed")
+                         : arrow::Status::OK();
+    };
 
 protected:
-    SafeTableProxy() {};
+    SafeTableProxy() = default;
+    SafeTableProxy(const SafeTableProxy & rhs) = delete;
+    SafeTableProxy(SafeTableProxy && rhs) = delete;
+    SafeTableProxy& operator=(const SafeTableProxy & rhs) = delete;
+    SafeTableProxy& operator=(SafeTableProxy && rhs) = delete;
 
+    /// Run the given functor in the isolated Threadpool
     template <typename Fn>
-    std::invoke_result_t<Fn> SAFE_TABLE_FUNCTOR(Fn && functor) {
+    std::invoke_result_t<Fn> run_isolated(Fn && functor) {
         return arrow::DeferNotOk(this->io_pool->Submit(std::move(functor))).result();
     }
 
+    /// Run the given functor in the isolated Threadpool
     template <typename Fn>
-    std::invoke_result_t<Fn> SAFE_TABLE_FUNCTOR(Fn && functor) const {
+    std::invoke_result_t<Fn> run_isolated(Fn && functor) const {
         return arrow::DeferNotOk(this->io_pool->Submit(std::move(functor))).result();
     }
 
