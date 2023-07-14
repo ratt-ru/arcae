@@ -5,6 +5,11 @@
 #include "column_convert_visitor.h"
 #include "complex_type.h"
 
+using ::arrow::DataType;
+using ::arrow::Buffer;
+using ::arrow::Result;
+using ::arrow::Status;
+
 namespace arcae {
 
 ColumnConvertVisitor::ColumnConvertVisitor(

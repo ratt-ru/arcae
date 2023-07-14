@@ -10,11 +10,6 @@
 
 #include "column_convert_visitor.h"
 
-using ::casacore::TableProxy;
-using ::arrow::Future;
-using ::arrow::Status;
-using ::arrow::Result;
-using ::arrow::internal::ThreadPool;
 
 namespace arcae {
 
@@ -25,15 +20,25 @@ static constexpr char CASA_DESCRIPTOR[]  = "__casa_descriptor__";
 /// @brief Constrains Table access to an arrow::ThreadPool containing a single thread.
 class SafeTableProxy {
 private:
-    Future<std::shared_ptr<TableProxy>> table_future;
-    std::shared_ptr<ThreadPool> io_pool;
+    arrow::Future<std::shared_ptr<casacore::TableProxy>> table_future;
+    std::shared_ptr<arrow::internal::ThreadPool> io_pool;
     bool is_closed;
 
 private:
-    inline Status FailIfClosed() const;
+    inline arrow::Status FailIfClosed() const;
 
 protected:
     SafeTableProxy() {};
+
+    template <typename Fn>
+    std::invoke_result_t<Fn> SAFE_TABLE_FUNCTOR(Fn && functor) {
+        return arrow::DeferNotOk(this->io_pool->Submit(std::move(functor))).result();
+    }
+
+    template <typename Fn>
+    std::invoke_result_t<Fn> SAFE_TABLE_FUNCTOR(Fn && functor) const {
+        return arrow::DeferNotOk(this->io_pool->Submit(std::move(functor))).result();
+    }
 
 public:
     virtual ~SafeTableProxy() {
@@ -43,19 +48,19 @@ public:
         }
     };
 
-    static Result<std::shared_ptr<SafeTableProxy>> Make(const casacore::String & filename);
-    Result<std::shared_ptr<arrow::Table>> to_arrow(
+    static arrow::Result<std::shared_ptr<SafeTableProxy>> Make(const casacore::String & filename);
+    arrow::Result<std::shared_ptr<arrow::Table>> to_arrow(
         casacore::uInt startrow=0,
         casacore::uInt nrow=UINT_MAX,
         const std::vector<std::string> & columns = {}) const;
-    Result<std::vector<std::string>> columns() const;
-    Result<casacore::uInt> ncolumns() const;
-    Result<casacore::uInt> nrow() const;
-    Result<std::vector<std::shared_ptr<SafeTableProxy>>> partition(
+    arrow::Result<std::vector<std::string>> columns() const;
+    arrow::Result<casacore::uInt> ncolumns() const;
+    arrow::Result<casacore::uInt> nrow() const;
+    arrow::Result<std::vector<std::shared_ptr<SafeTableProxy>>> partition(
         const std::vector<std::string> & partition_columns={},
         const std::vector<std::string> & sort_columns={}) const;
 
-    Result<bool> close();
+    arrow::Result<bool> close();
 };
 
 } // namespace arcae

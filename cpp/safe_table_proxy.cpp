@@ -9,16 +9,20 @@
 #include "safe_table_proxy.h"
 
 
+using ::arrow::DataType;
+using ::arrow::Buffer;
+using ::arrow::Future;
+using ::arrow::Result;
+using ::arrow::Status;
+
 using ::casacore::Record;
 using ::casacore::Table;
 using ::casacore::TableColumn;
 using ::casacore::TableIterProxy;
 using ::casacore::TableLock;
+using ::casacore::TableProxy;
 
 namespace arcae {
-
-#define SAFE_TABLE_FUNCTOR(functor) \
-    return arrow::DeferNotOk(this->io_pool->Submit((functor))).result()
 
 Status SafeTableProxy::FailIfClosed() const {
     return is_closed ? Status::Invalid("Table is closed") : Status::OK();
@@ -27,12 +31,12 @@ Status SafeTableProxy::FailIfClosed() const {
 Result<std::shared_ptr<SafeTableProxy>>
 SafeTableProxy::Make(const casacore::String & filename) {
     auto proxy = std::shared_ptr<SafeTableProxy>(new SafeTableProxy());
-    ARROW_ASSIGN_OR_RAISE(proxy->io_pool, ThreadPool::Make(1));
+    ARROW_ASSIGN_OR_RAISE(proxy->io_pool, ::arrow::internal::ThreadPool::Make(1));
 
     // Mark as closed so that if construction fails, we don't try to close it
     proxy->is_closed = true;
 
-    auto future = arrow::DeferNotOk(proxy->io_pool->Submit([&]() -> Result<std::shared_ptr<TableProxy>> {
+    auto future = arrow::DeferNotOk(proxy->io_pool->Submit([&filename]() -> arrow::Result<std::shared_ptr<TableProxy>> {
         Record record;
         TableLock lock(TableLock::LockOption::AutoNoReadLocking);
 
@@ -55,11 +59,11 @@ SafeTableProxy::Make(const casacore::String & filename) {
     return proxy;
 }
 
-Result<std::shared_ptr<arrow::Table>>
+arrow::Result<std::shared_ptr<arrow::Table>>
 SafeTableProxy::to_arrow(casacore::uInt startrow, casacore::uInt nrow, const std::vector<std::string> & columns) const {
     ARROW_RETURN_NOT_OK(FailIfClosed());
 
-    SAFE_TABLE_FUNCTOR(([this, startrow, nrow, &columns]() -> Result<std::shared_ptr<arrow::Table>> {
+    return SAFE_TABLE_FUNCTOR([this, startrow, nrow, &columns]() -> arrow::Result<std::shared_ptr<arrow::Table>> {
         ARROW_ASSIGN_OR_RAISE(auto table_proxy, this->table_future.result());
         auto & casa_table = table_proxy->table();
         auto table_desc = casa_table.tableDesc();
@@ -141,7 +145,7 @@ SafeTableProxy::to_arrow(casacore::uInt startrow, casacore::uInt nrow, const std
         } else {
             return status;
         }
-    }));
+    });
 }
 
 
@@ -149,7 +153,7 @@ Result<std::vector<std::string>>
 SafeTableProxy::columns() const {
     ARROW_RETURN_NOT_OK(FailIfClosed());
 
-    SAFE_TABLE_FUNCTOR([this]() -> Result<std::vector<std::string>> {
+    return SAFE_TABLE_FUNCTOR([this]() -> Result<std::vector<std::string>> {
         ARROW_ASSIGN_OR_RAISE(auto table_proxy, this->table_future.result());
         auto column_names = table_proxy->table().tableDesc().columnNames();
         return std::vector<std::string>(column_names.begin(), column_names.end());
@@ -161,7 +165,7 @@ Result<casacore::uInt>
 SafeTableProxy::ncolumns() const {
     ARROW_RETURN_NOT_OK(FailIfClosed());
 
-    SAFE_TABLE_FUNCTOR([this]() -> Result<casacore::uInt> {
+    return SAFE_TABLE_FUNCTOR([this]() -> Result<casacore::uInt> {
         ARROW_ASSIGN_OR_RAISE(auto table_proxy, this->table_future.result());
         return table_proxy->table().tableDesc().ncolumn();
     });
@@ -171,7 +175,7 @@ Result<casacore::uInt>
 SafeTableProxy::nrow() const {
     ARROW_RETURN_NOT_OK(FailIfClosed());
 
-    SAFE_TABLE_FUNCTOR([this]() -> Result<casacore::uInt> {
+    return SAFE_TABLE_FUNCTOR([this]() -> Result<casacore::uInt> {
         ARROW_ASSIGN_OR_RAISE(auto table_proxy, this->table_future.result());
         return table_proxy->table().nrow();
     });
@@ -188,7 +192,7 @@ SafeTableProxy::partition(
 
     ARROW_RETURN_NOT_OK(FailIfClosed());
 
-    SAFE_TABLE_FUNCTOR(([this, &partition_columns, &sort_columns]() -> Result<std::vector<std::shared_ptr<SafeTableProxy>>> {
+    return SAFE_TABLE_FUNCTOR([this, &partition_columns, &sort_columns]() -> Result<std::vector<std::shared_ptr<SafeTableProxy>>> {
         ARROW_ASSIGN_OR_RAISE(auto table_proxy, this->table_future.result());
 
         casacore::Block<casacore::String> casa_sort_cols(sort_columns.size());
@@ -214,7 +218,7 @@ SafeTableProxy::partition(
         }
 
         return result;
-    }));
+    });
 }
 
 
@@ -223,7 +227,7 @@ SafeTableProxy::close() {
     if(!is_closed) {
         std::shared_ptr<void> defer_close(nullptr, [this](...){ this->is_closed = true; });
 
-        SAFE_TABLE_FUNCTOR([this]() -> Result<bool> {
+        return SAFE_TABLE_FUNCTOR([this]() -> Result<bool> {
             ARROW_ASSIGN_OR_RAISE(auto table_proxy, this->table_future.result());
             table_proxy->close();
             return true;
