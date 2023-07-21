@@ -260,3 +260,13 @@ def test_config_context_mgr():
         global_config["foo"]
 
     assert list(global_config.items()) == [("validation-level", "full")]
+
+
+
+def test_descriptor():
+    from arcae.lib.arrow_tables import required_ms_desc, complete_ms_desc
+
+    assert isinstance(complete_ms_desc("MAIN"), dict)
+    assert isinstance(complete_ms_desc("ANTENNA"), dict)
+    assert isinstance(complete_ms_desc("FEED"), dict)
+    assert isinstance(complete_ms_desc("SPECTRAL_WINDOW"), dict)

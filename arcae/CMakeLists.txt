@@ -25,5 +25,5 @@ endforeach()
 set_target_properties(arrow_tables PROPERTIES
     POSITION_INDEPENDENT_CODE 1)
 
-install(TARGETS arrow_tables LIBRARY DESTINATION ${CASAARROW_LIB_INSTALL_PATH})
+install(TARGETS arrow_tables LIBRARY DESTINATION ${ARCAE_LIB_INSTALL_PATH})
 

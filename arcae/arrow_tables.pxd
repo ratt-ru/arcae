@@ -26,6 +26,9 @@ cdef extern from "../cpp/configuration.h" namespace "arcae" nogil:
         vector[string] GetKeys" Configuration::GetKeys"()
         size_t Size" Configuration::Size"()
 
+cdef extern from "../cpp/descriptor.h" namespace "arcae" nogil:
+    cdef string CCompleteMSDesc" arcae::complete_ms_desc"(const string & table)
+    cdef string CRequiredMSDesc" arcae::required_ms_desc"(const string & table)
 
 cdef extern from "../cpp/safe_table_proxy.h" namespace "arcae" nogil:
     cdef cppclass CCasaTable" arcae::SafeTableProxy":
@@ -56,5 +59,5 @@ cdef extern from "../cpp/complex_type.h" namespace "arcae" nogil:
     cdef cppclass CComplexFloatArray" arcae::ComplexFloatArray":
         pass
 
-    shared_ptr[CDataType] complex64()
-    shared_ptr[CDataType] complex128()
+    cdef shared_ptr[CDataType] complex64()
+    cdef shared_ptr[CDataType] complex128()

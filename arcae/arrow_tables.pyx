@@ -4,6 +4,7 @@
 from collections.abc import Iterable, MutableMapping
 import cython
 from cython.operator cimport dereference as deref
+import json
 
 from libcpp cimport bool
 from libcpp.map cimport map
@@ -27,17 +28,25 @@ from pyarrow.lib cimport (
 
 from pyarrow.lib import (tobytes, frombytes)
 
-from arcae.casa_tables cimport (CCasaTable,
-                                CConfiguration,
-                                CComplexType,
-                                CComplexDoubleArray,
-                                CComplexFloatArray,
-                                CComplexDoubleType,
-                                CComplexFloatType,
-                                CServiceLocator,
-                                complex64,
-                                complex128,
-                                UINT_MAX)
+from arcae.arrow_tables cimport (CCasaTable,
+                                 CConfiguration,
+                                 CComplexType,
+                                 CCompleteMSDesc,
+                                 CRequiredMSDesc,
+                                 CComplexDoubleArray,
+                                 CComplexFloatArray,
+                                 CComplexDoubleType,
+                                 CComplexFloatType,
+                                 CServiceLocator,
+                                 complex64,
+                                 complex128,
+                                 UINT_MAX)
+
+def complete_ms_desc(table: str) -> dict:
+    return json.loads(frombytes(CCompleteMSDesc(tobytes(table))))
+
+def required_ms_desc(table: str) -> dict:
+    return json.loads(frombytes(CRequiredMSDesc(tobytes(table))))
 
 
 cdef class ComplexType(BaseExtensionType):
