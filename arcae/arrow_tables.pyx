@@ -38,6 +38,8 @@ from arcae.arrow_tables cimport (CCasaTable,
                                  CComplexFloatType,
                                  CServiceLocator,
                                  open_table,
+                                 default_ms,
+                                 default_ms_subtable,
                                  complex64,
                                  complex128,
                                  UINT_MAX)

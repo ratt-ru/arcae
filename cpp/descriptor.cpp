@@ -5,14 +5,20 @@
 
 #include "descriptor.h"
 
+#include <arrow/result.h>
+
 #include <casacore/casa/Json.h>
 #include <casacore/casa/Json/JsonKVMap.h>
 #include <casacore/casa/Containers/RecordInterface.h>
 #include <casacore/ms/MeasurementSets/MeasurementSet.h>
-#include <casacore/tables/Tables/SetupNewTab.h>
 #include <casacore/tables/Tables/TableError.h>
 #include <casacore/tables/Tables/TableRecord.h>
+#include <casacore/tables/Tables/TableDesc.h>
+#include <casacore/tables/Tables/TableProxy.h>
 #include <casacore/casa/Containers/ValueHolder.h>
+
+using ::arrow::Result;
+using ::arrow::Status;
 
 using ::casacore::JsonKVMap;
 using ::casacore::JsonParser;
@@ -93,8 +99,6 @@ std::string RecordToJson(const Record & record) {
 Record JsonToRecord(const std::string & json_record) {
     return JsonParser::parse(json_record).toRecord();
 }
-
-} // namespace
 
 TableDesc main_ms_desc(bool complete)
 {
@@ -196,19 +200,6 @@ TableDesc ms_table_desc(const String & table, bool complete)
     throw TableError("Unknown table type: " + table_);
 }
 
-
-// Get the table descriptions for the given table.
-// If "" or "MAIN", the table descriptions for a Measurement Set
-// will be supplied, otherwise table should be some valid
-// MeasurementSet subtable.
-// If complete is true, the full descriptor is returned, otherwise
-// only the required descriptor is returned
-std::string ms_descriptor(const std::string & table, bool complete)
-{
-    return RecordToJson(TableProxy::getTableDesc(ms_table_desc(table, complete), true));
-}
-
-
 // Merge required and user supplied Table Descriptions
 TableDesc merge_required_and_user_table_descs(const TableDesc & required_td,
                                               const TableDesc & user_td)
@@ -258,17 +249,38 @@ TableDesc merge_required_and_user_table_descs(const TableDesc & required_td,
     return result;
 }
 
-SetupNewTable default_ms_factory(const String & name,
-                                 const String & subtable,
-                                 const Record & table_desc,
-                                 const Record & dminfo)
+} // namespace
+
+
+// Get the table descriptions for the given table.
+// If "" or "MAIN", the table descriptions for a Measurement Set
+// will be supplied, otherwise table should be some valid
+// MeasurementSet subtable.
+// If complete is true, the full descriptor is returned, otherwise
+// only the required descriptor is returned
+std::string ms_descriptor(const std::string & table, bool complete)
 {
+    return RecordToJson(TableProxy::getTableDesc(ms_table_desc(table, complete), true));
+}
+
+
+
+Result<SetupNewTable> default_ms_factory(const std::string & name,
+                                         const std::string & subtable,
+                                         const std::string & json_table_desc,
+                                         const std::string & json_dminfo)
+{
+
+    auto table_desc = JsonParser::parse(json_table_desc).toRecord();
+    auto dminfo = JsonParser::parse(json_dminfo).toRecord();
+
+
     String msg;
     TableDesc user_td;
 
     // Create Table Description object from extra user table description
     if(!TableProxy::makeTableDesc(table_desc, user_td, msg)) {
-        throw TableError("Error Making Table Description " + msg);
+        return arrow::Status::Invalid("Failed to create Table Description", msg);
     }
 
     // Merge required and user table descriptions
@@ -283,84 +295,6 @@ SetupNewTable default_ms_factory(const String & name,
     setup.bindCreate(dminfo);
 
     return setup;
-}
-
-TableProxy default_ms_subtable(const std::string & subtable,
-                               std::string name,
-                               const std::string & json_table_desc,
-                               const std::string & json_dminfo)
-{
-    String table_ = subtable;
-    table_.upcase();
-
-    if(name.empty() || name == "MAIN") {
-        name = "MeasurementSet.ms";
-    }
-
-    auto table_desc = JsonParser::parse(json_table_desc).toRecord();
-    auto dminfo = JsonParser::parse(json_dminfo).toRecord();
-
-    SetupNewTable setup_new_table = default_ms_factory(name,
-        subtable, table_desc, dminfo);
-
-    if(table_.empty() || subtable == "MAIN") {
-        return TableProxy(MeasurementSet(setup_new_table));
-    } else if(table_ == "ANTENNA") {
-        return TableProxy(MSAntenna(setup_new_table));
-    } else if(table_ == "DATA_DESCRIPTION") {
-        return TableProxy(MSDataDescription(setup_new_table));
-    } else if(table_ == "DOPPLER") {
-        return TableProxy(MSDoppler(setup_new_table));
-    } else if(table_ == "FEED") {
-        return TableProxy(MSFeed(setup_new_table));
-    } else if(table_ == "FIELD") {
-        return TableProxy(MSField(setup_new_table));
-    } else if(table_ == "FLAG_CMD") {
-        return TableProxy(MSFlagCmd(setup_new_table));
-    } else if(table_ == "FREQ_OFFSET") {
-        return TableProxy(MSFreqOffset(setup_new_table));
-    } else if(table_ == "HISTORY") {
-        return TableProxy(MSHistory(setup_new_table));
-    } else if(table_ == "OBSERVATION") {
-        return TableProxy(MSObservation(setup_new_table));
-    } else if(table_ == "POINTING") {
-        return TableProxy(MSPointing(setup_new_table));
-    } else if(table_ == "POLARIZATION") {
-        return TableProxy(MSPolarization(setup_new_table));
-    } else if(table_ == "PROCESSOR") {
-        return TableProxy(MSProcessor(setup_new_table));
-    } else if(table_ == "SOURCE") {
-        return TableProxy(MSSource(setup_new_table));
-    } else if(table_ == "SPECTRAL_WINDOW") {
-        return TableProxy(MSSpectralWindow(setup_new_table));
-    } else if(table_ == "STATE") {
-        return TableProxy(MSState(setup_new_table));
-    } else if(table_ == "SYSCAL") {
-        return TableProxy(MSSysCal(setup_new_table));
-    } else if(table_ == "WEATHER") {
-        return TableProxy(MSWeather(setup_new_table));
-    }
-
-    throw TableError("Unknown table type: " + table_);
-}
-
-TableProxy default_ms(const std::string & name,
-                      const std::string & json_table_desc,
-                      const std::string & json_dminfo)
-{
-    auto table_desc = JsonParser::parse(json_table_desc).toRecord();
-    auto dminfo = JsonParser::parse(json_dminfo).toRecord();
-
-    // Create the main Measurement Set
-    SetupNewTable setup_new_table = default_ms_factory(name,
-        "MAIN", table_desc, dminfo);
-    MeasurementSet ms(setup_new_table);
-
-    // Create the MS default subtables
-    ms.createDefaultSubtables(Table::New);
-
-    // Create a table proxy
-    return TableProxy(ms);
 }
 
 } // namespace arcae

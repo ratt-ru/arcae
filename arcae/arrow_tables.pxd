@@ -42,6 +42,14 @@ cdef extern from "../cpp/safe_table_proxy.h" namespace "arcae" nogil:
 
 cdef extern from "../cpp/table_factory.h" namespace "arcae" nogil:
     cdef CResult[shared_ptr[CCasaTable]] open_table(const string & filename)
+    cdef CResult[shared_ptr[CCasaTable]] default_ms(const std::string & name,
+                                                    const std::string & json_table_desc="{}",
+                                                    const std::string & json_dminfo="{}")
+    cdef CResult[shared_ptr[CCasaTable]] default_ms_subtable(
+                                                    const std::string & subtable,
+                                                    std::string name,
+                                                    const std::string & json_table_desc="{}",
+                                                    const std::string & json_dminfo="{}")
 
 
 cdef extern from "../cpp/complex_type.h" namespace "arcae" nogil:
