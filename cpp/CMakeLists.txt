@@ -8,7 +8,8 @@ add_library(arcae SHARED
     configuration.cpp
     descriptor.cpp
     service_locator.cpp
-    safe_table_proxy.cpp)
+    safe_table_proxy.cpp
+    table_factory.cpp)
 
 target_link_directories(arcae PUBLIC ${PYARROW_LIBDIRS})
 target_link_libraries(arcae PkgConfig::casacore arrow)
