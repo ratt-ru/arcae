@@ -73,6 +73,12 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v3
 
+      - name: Get Github Action Cache Variables
+        uses: actions/github-script@v6
+        with:
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
 
       - name: Run cibuildwheel
         uses: pypa/cibuildwheel@v2.13.1
@@ -81,8 +87,8 @@ jobs:
           CIBW_BUILD_FRONTEND: build
           CIBW_BEFORE_ALL_LINUX: yum install -y zip flex bison gcc-gfortran
           CIBW_ENVIRONMENT_LINUX: >
-            ACTIONS_CACHE_URL=${{ env.ACTIONS_CACHE_URL }}
-            ACTIONS_RUNTIME_TOKEN=${{ env.ACTIONS_RUNTIME_TOKEN }}
+            ACTIONS_CACHE_URL=$ACTIONS_CACHE_URL
+            ACTIONS_RUNTIME_TOKEN=$ACTIONS_RUNTIME_TOKEN
             VCPKG_BINARY_SOURCES="clear;x-gha,readwrite"
             VCPKG_TARGET_TRIPLET=${{ matrix.platform[2] }}
             VCPKG_INSTALLED_DIR=${{ env.VCPKG_INSTALLED_DIR }}
