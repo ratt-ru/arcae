@@ -285,10 +285,10 @@ SetupNewTable default_ms_factory(const String & name,
     return setup;
 }
 
-TableProxy default_ms_subtable(const String & subtable,
-                               String name,
-                               const Record & table_desc,
-                               const Record & dminfo)
+TableProxy default_ms_subtable(const std::string & subtable,
+                               std::string name,
+                               const std::string & json_table_desc,
+                               const std::string & json_dminfo)
 {
     String table_ = subtable;
     table_.upcase();
@@ -296,6 +296,9 @@ TableProxy default_ms_subtable(const String & subtable,
     if(name.empty() || name == "MAIN") {
         name = "MeasurementSet.ms";
     }
+
+    auto table_desc = JsonParser::parse(json_table_desc).toRecord();
+    auto dminfo = JsonParser::parse(json_dminfo).toRecord();
 
     SetupNewTable setup_new_table = default_ms_factory(name,
         subtable, table_desc, dminfo);
@@ -341,10 +344,13 @@ TableProxy default_ms_subtable(const String & subtable,
     throw TableError("Unknown table type: " + table_);
 }
 
-TableProxy default_ms(const String & name,
-                      const Record & table_desc,
-                      const Record & dminfo)
+TableProxy default_ms(const std::string & name,
+                      const std::string & json_table_desc,
+                      const std::string & json_dminfo)
 {
+    auto table_desc = JsonParser::parse(json_table_desc).toRecord();
+    auto dminfo = JsonParser::parse(json_dminfo).toRecord();
+
     // Create the main Measurement Set
     SetupNewTable setup_new_table = default_ms_factory(name,
         "MAIN", table_desc, dminfo);
