@@ -2,6 +2,7 @@
 #define ARCAE_SAFE_TABLE_PROXY_H
 
 #include <climits>
+#include <functional>
 
 #include <casacore/tables/Tables.h>
 #include <casacore/tables/Tables/TableProxy.h>
@@ -57,7 +58,20 @@ public:
         }
     };
 
-    static arrow::Result<std::shared_ptr<SafeTableProxy>> Make(const casacore::String & filename);
+    template <typename Fn>
+    static arrow::Result<std::shared_ptr<SafeTableProxy>> Make(Fn && functor) {
+        struct enable_make_shared_stp : public SafeTableProxy {};
+        auto proxy = std::make_shared<enable_make_shared_stp>();
+        ARROW_ASSIGN_OR_RAISE(proxy->io_pool, ::arrow::internal::ThreadPool::Make(1));
+
+        // Mark as closed so that if construction fails, we don't try to close it
+        proxy->is_closed = true;
+        ARROW_ASSIGN_OR_RAISE(proxy->table_proxy, proxy->run_isolated(std::move(functor)));
+        proxy->is_closed = false;
+
+        return proxy;
+    }
+
     arrow::Result<std::shared_ptr<arrow::Table>> to_arrow(
         casacore::uInt startrow=0,
         casacore::uInt nrow=UINT_MAX,

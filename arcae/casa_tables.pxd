@@ -26,11 +26,9 @@ cdef extern from "../cpp/configuration.h" namespace "arcae" nogil:
         vector[string] GetKeys" Configuration::GetKeys"()
         size_t Size" Configuration::Size"()
 
-
 cdef extern from "../cpp/safe_table_proxy.h" namespace "arcae" nogil:
     cdef cppclass CCasaTable" arcae::SafeTableProxy":
         @staticmethod
-        CResult[shared_ptr[CCasaTable]] Make" SafeTableProxy::Make"(const string & filename)
         CResult[bool] close" SafeTableProxy::close"()
 
         CResult[shared_ptr[CTable]] to_arrow " SafeTableProxy::to_arrow"(unsigned int startrow, unsigned int nrow, const vector[string] & columns)
@@ -38,6 +36,10 @@ cdef extern from "../cpp/safe_table_proxy.h" namespace "arcae" nogil:
         CResult[unsigned int] ncolumns " SafeTableProxy::ncolumns"()
         CResult[vector[string]] columns " SafeTableProxy::columns"()
         CResult[vector[shared_ptr[CCasaTable]]] partition " SafeTableProxy::partition"(const vector[string] & partition_columns, const vector[string] & sort_columns)
+
+cdef extern from "../cpp/table_factory.h" namespace "arcae" nogil:
+    cdef CResult[shared_ptr[CCasaTable]] open_table(const string & filename)
+
 
 cdef extern from "../cpp/complex_type.h" namespace "arcae" nogil:
     cdef cppclass CComplexType" arcae::ComplexType"(CExtensionType):

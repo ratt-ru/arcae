@@ -35,6 +35,7 @@ from arcae.casa_tables cimport (CCasaTable,
                                 CComplexDoubleType,
                                 CComplexFloatType,
                                 CServiceLocator,
+                                open_table,
                                 complex64,
                                 complex128,
                                 UINT_MAX)
@@ -88,7 +89,7 @@ cdef class Table:
         cdef string cfilename = tobytes(filename)
 
         with nogil:
-            self.c_table = GetResultValue(CCasaTable.Make(cfilename))
+            self.c_table = GetResultValue(open_table(cfilename))
 
     def to_arrow(self, unsigned int startrow=0, unsigned int nrow=UINT_MAX, columns: list[str] | str = None):
         cdef:
