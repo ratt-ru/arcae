@@ -5,8 +5,7 @@
 
 namespace arcae {
 
-std::string complete_ms_desc(const std::string & table);
-std::string required_ms_desc(const std::string & table);
+std::string ms_descriptor(const std::string & table, bool complete=false);
 
 casacore::TableProxy default_ms(const casacore::String & name,
                                 const casacore::Record & table_desc={},

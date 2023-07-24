@@ -6,6 +6,7 @@
 #include "descriptor.h"
 
 #include <casacore/casa/Json.h>
+#include <casacore/casa/Json/JsonKVMap.h>
 #include <casacore/casa/Containers/RecordInterface.h>
 #include <casacore/ms/MeasurementSets/MeasurementSet.h>
 #include <casacore/tables/Tables/SetupNewTab.h>
@@ -13,6 +14,8 @@
 #include <casacore/tables/Tables/TableRecord.h>
 #include <casacore/casa/Containers/ValueHolder.h>
 
+using ::casacore::JsonKVMap;
+using ::casacore::JsonParser;
 using ::casacore::JsonOut;
 using ::casacore::String;
 using ::casacore::Vector;
@@ -74,9 +77,9 @@ TableDesc ms_subtable_desc(bool complete)
     return td;
 }
 
-std::string record_to_json(const Record & record) {
+std::string RecordToJson(const Record & record) {
     std::ostringstream json_oss;
-    JsonOut record_json(json_oss);
+    auto record_json = JsonOut(json_oss);
     record_json.start();
 
     for (casacore::uInt i=0; i < record.nfields(); ++i) {
@@ -85,6 +88,10 @@ std::string record_to_json(const Record & record) {
 
     record_json.end();
     return json_oss.str();
+}
+
+Record JsonToRecord(const std::string & json_record) {
+    return JsonParser::parse(json_record).toRecord();
 }
 
 } // namespace
@@ -190,22 +197,15 @@ TableDesc ms_table_desc(const String & table, bool complete)
 }
 
 
-// Get the required table descriptions for the given table.
+// Get the table descriptions for the given table.
 // If "" or "MAIN", the table descriptions for a Measurement Set
 // will be supplied, otherwise table should be some valid
-// MeasurementSet subtable
-std::string complete_ms_desc(const std::string & table)
+// MeasurementSet subtable.
+// If complete is true, the full descriptor is returned, otherwise
+// only the required descriptor is returned
+std::string ms_descriptor(const std::string & table, bool complete)
 {
-    return record_to_json(TableProxy::getTableDesc(ms_table_desc(table, true), true));
-}
-
-// Get the required table descriptions for the given table.
-// If "" or "MAIN", the table descriptions for a Measurement Set
-// will be supplied, otherwise table should be some valid
-// MeasurementSet subtable
-std::string required_ms_desc(const std::string & table)
-{
-    return record_to_json(TableProxy::getTableDesc(ms_table_desc(table, false), true));
+    return RecordToJson(TableProxy::getTableDesc(ms_table_desc(table, complete), true));
 }
 
 

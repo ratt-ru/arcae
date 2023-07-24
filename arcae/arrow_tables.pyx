@@ -31,8 +31,7 @@ from pyarrow.lib import (tobytes, frombytes)
 from arcae.arrow_tables cimport (CCasaTable,
                                  CConfiguration,
                                  CComplexType,
-                                 CCompleteMSDesc,
-                                 CRequiredMSDesc,
+                                 CMSDescriptor,
                                  CComplexDoubleArray,
                                  CComplexFloatArray,
                                  CComplexDoubleType,
@@ -42,11 +41,8 @@ from arcae.arrow_tables cimport (CCasaTable,
                                  complex128,
                                  UINT_MAX)
 
-def complete_ms_desc(table: str) -> dict:
-    return json.loads(frombytes(CCompleteMSDesc(tobytes(table))))
-
-def required_ms_desc(table: str) -> dict:
-    return json.loads(frombytes(CRequiredMSDesc(tobytes(table))))
+def ms_descriptor(table: str, complete: bool = False) -> dict:
+    return json.loads(frombytes(CMSDescriptor(tobytes(table), complete)))
 
 
 cdef class ComplexType(BaseExtensionType):

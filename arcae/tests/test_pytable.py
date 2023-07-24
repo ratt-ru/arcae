@@ -264,9 +264,9 @@ def test_config_context_mgr():
 
 
 def test_descriptor():
-    from arcae.lib.arrow_tables import required_ms_desc, complete_ms_desc
+    from arcae.lib.arrow_tables import ms_descriptor
 
-    assert isinstance(complete_ms_desc("MAIN"), dict)
-    assert isinstance(complete_ms_desc("ANTENNA"), dict)
-    assert isinstance(complete_ms_desc("FEED"), dict)
-    assert isinstance(complete_ms_desc("SPECTRAL_WINDOW"), dict)
+    assert isinstance(ms_descriptor("MAIN"), dict)
+    assert isinstance(ms_descriptor("ANTENNA"), dict)
+    assert isinstance(ms_descriptor("FEED"), dict)
+    assert isinstance(ms_descriptor("SPECTRAL_WINDOW"), dict)
