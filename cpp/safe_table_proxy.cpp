@@ -28,36 +28,6 @@ namespace {
 struct enable_make_shared_stp : public SafeTableProxy {};
 } // namespace
 
-Result<std::shared_ptr<SafeTableProxy>>
-SafeTableProxy::Make(const casacore::String & filename) {
-    auto proxy = std::make_shared<enable_make_shared_stp>();
-    ARROW_ASSIGN_OR_RAISE(proxy->io_pool, ::arrow::internal::ThreadPool::Make(1));
-
-
-    // Mark as closed so that if construction fails, we don't try to close it
-    proxy->is_closed = true;
-
-    auto future = arrow::DeferNotOk(proxy->io_pool->Submit([&filename]() -> arrow::Result<std::shared_ptr<TableProxy>> {
-        Record record;
-        TableLock lock(TableLock::LockOption::AutoNoReadLocking);
-
-        record.define("option", "usernoread");
-        record.define("internal", lock.interval());
-        record.define("maxwait", casacore::Int(lock.maxWait()));
-
-        try {
-            return std::make_shared<TableProxy>(
-                filename, record, Table::TableOption::Old);
-        } catch(std::exception & e) {
-            return Status::Invalid(e.what());
-        }
-    }));
-
-    ARROW_ASSIGN_OR_RAISE(proxy->table_proxy, future.MoveResult());
-    proxy->is_closed = false;
-
-    return proxy;
-}
 
 arrow::Result<std::shared_ptr<arrow::Table>>
 SafeTableProxy::to_arrow(casacore::uInt startrow, casacore::uInt nrow, const std::vector<std::string> & columns) const {
