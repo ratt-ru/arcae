@@ -83,7 +83,7 @@ jobs:
           CIBW_ENVIRONMENT_LINUX: >
             ACTIONS_CACHE_URL=${{ env.ACTIONS_CACHE_URL }}
             ACTIONS_RUNTIME_TOKEN=${{ env.ACTIONS_RUNTIME_TOKEN }}
-            VCPKG_BINARY_SOURCES="clear;x-gha;readwrite"
+            VCPKG_BINARY_SOURCES="clear;x-gha,readwrite"
             VCPKG_TARGET_TRIPLET=${{ matrix.platform[2] }}
             VCPKG_INSTALLED_DIR=${{ env.VCPKG_INSTALLED_DIR }}
             LD_LIBRARY_PATH=${{ env.VCPKG_INSTALLED_DIR }}/${{ matrix.platform[2] }}/lib
