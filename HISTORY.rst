@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Use ccache, if available (:pr:`50`)
 * Optimise storage and passing of TableProxy objects (:pr:`46`)
 * Convert SAFE_TABLE_FUNCTOR from macro to template function (:pr:`45`)
 * Fix `export CIBW_TEST_SKIP` (:pr:`42`)
