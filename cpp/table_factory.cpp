@@ -65,19 +65,18 @@ template <typename SubTable>
 
 Result<std::shared_ptr<SafeTableProxy>> default_ms_subtable(
                     const std::string & subtable,
-                    std::string name,
+                    const std::string & name,
                     const std::string & json_table_desc,
                     const std::string & json_dminfo)
 {
     String table_ = subtable;
     table_.upcase();
 
-    if(name.empty() || name == "MAIN") {
-        name = "MeasurementSet.ms";
-    }
+    std::string modname = name.empty() || name == "MAIN" ?
+                          "MeasurementSet.ms" : name;
 
     ARROW_ASSIGN_OR_RAISE(auto setup_new_table,
-                          default_ms_factory(name, subtable,
+                          default_ms_factory(modname, subtable,
                                             json_table_desc, json_dminfo));
 
     return SafeTableProxy::Make([&]() -> Result<std::shared_ptr<TableProxy>> {
