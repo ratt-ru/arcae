@@ -6,7 +6,8 @@
 
 namespace arcae {
 
-std::string ms_descriptor(const std::string & table, bool complete=false);
+arrow::Result<std::string> MSDescriptor(
+    const std::string & table, bool complete=false);
 
 arrow::Result<casacore::SetupNewTable> default_ms_factory(
     const std::string & name,

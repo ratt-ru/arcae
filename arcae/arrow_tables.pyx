@@ -45,7 +45,8 @@ from arcae.arrow_tables cimport (CCasaTable,
                                  UINT_MAX)
 
 def ms_descriptor(table: str, complete: bool = False) -> dict:
-    return json.loads(frombytes(CMSDescriptor(tobytes(table), complete)))
+    table_desc = GetResultValue(CMSDescriptor(tobytes(table), complete))
+    return json.loads(frombytes(table_desc))
 
 
 cdef class ComplexType(BaseExtensionType):

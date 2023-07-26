@@ -58,7 +58,7 @@ namespace arcae {
 namespace {
 
 template <typename SubTable>
-TableDesc ms_subtable_desc(bool complete)
+TableDesc MSSubtableDesc(bool complete)
 {
     if(!complete) {
         return SubTable::requiredTableDesc();
@@ -100,7 +100,7 @@ Record JsonToRecord(const std::string & json_record) {
     return JsonParser::parse(json_record).toRecord();
 }
 
-TableDesc main_ms_desc(bool complete)
+TableDesc MainMSDesc(bool complete)
 {
     // Get required descriptor
     TableDesc td = MeasurementSet::requiredTableDesc();
@@ -149,7 +149,7 @@ TableDesc main_ms_desc(bool complete)
 // If "" or "MAIN", the table descriptions for a Measurement Set
 // will be supplied, otherwise table should be some valid
 // MeasurementSet subtable
-TableDesc ms_table_desc(const String & table, bool complete)
+Result<TableDesc> MSTableDescriptor(const String & table, bool complete)
 {
     String table_ = table;
 
@@ -157,49 +157,49 @@ TableDesc ms_table_desc(const String & table, bool complete)
     table_.upcase();
 
     if(table.empty() || table_ == "MAIN") {
-        return main_ms_desc(complete);
+        return MainMSDesc(complete);
     } else if(table_ == "ANTENNA") {
-        return ms_subtable_desc<MSAntenna>(complete);
+        return MSSubtableDesc<MSAntenna>(complete);
     } else if(table_ == "DATA_DESCRIPTION") {
-        return ms_subtable_desc<MSDataDescription>(complete);
+        return MSSubtableDesc<MSDataDescription>(complete);
     } else if(table_ == "DOPPLER") {
-        return ms_subtable_desc<MSDoppler>(complete);
+        return MSSubtableDesc<MSDoppler>(complete);
     } else if(table_ == "FEED") {
-        return ms_subtable_desc<MSFeed>(complete);
+        return MSSubtableDesc<MSFeed>(complete);
     } else if(table_ == "FIELD") {
-        return ms_subtable_desc<MSField>(complete);
+        return MSSubtableDesc<MSField>(complete);
     } else if(table_ == "FLAG_CMD") {
-        return ms_subtable_desc<MSFlagCmd>(complete);
+        return MSSubtableDesc<MSFlagCmd>(complete);
     } else if(table_ == "FREQ_OFFSET") {
-        return ms_subtable_desc<MSFreqOffset>(complete);
+        return MSSubtableDesc<MSFreqOffset>(complete);
     } else if(table_ == "HISTORY") {
-        return ms_subtable_desc<MSHistory>(complete);
+        return MSSubtableDesc<MSHistory>(complete);
     } else if(table_ == "OBSERVATION") {
-        return ms_subtable_desc<MSObservation>(complete);
+        return MSSubtableDesc<MSObservation>(complete);
     } else if(table_ == "POINTING") {
-        return ms_subtable_desc<MSPointing>(complete);
+        return MSSubtableDesc<MSPointing>(complete);
     } else if(table_ == "POLARIZATION") {
-        return ms_subtable_desc<MSPolarization>(complete);
+        return MSSubtableDesc<MSPolarization>(complete);
     } else if(table_ == "PROCESSOR") {
-        return ms_subtable_desc<MSProcessor>(complete);
+        return MSSubtableDesc<MSProcessor>(complete);
     } else if(table_ == "SOURCE") {
-        return ms_subtable_desc<MSSource>(complete);
+        return MSSubtableDesc<MSSource>(complete);
     } else if(table_ == "SPECTRAL_WINDOW") {
-        return ms_subtable_desc<MSSpectralWindow>(complete);
+        return MSSubtableDesc<MSSpectralWindow>(complete);
     } else if(table_ == "STATE") {
-        return ms_subtable_desc<MSState>(complete);
+        return MSSubtableDesc<MSState>(complete);
     } else if(table_ == "SYSCAL") {
-        return ms_subtable_desc<MSSysCal>(complete);
+        return MSSubtableDesc<MSSysCal>(complete);
     } else if(table_ == "WEATHER") {
-        return ms_subtable_desc<MSWeather>(complete);
+        return MSSubtableDesc<MSWeather>(complete);
     }
 
-    throw TableError("Unknown table type: " + table_);
+    return arrow::Status::Invalid("Unknown table type ", table_);
 }
 
 // Merge required and user supplied Table Descriptions
-TableDesc merge_required_and_user_table_descs(const TableDesc & required_td,
-                                              const TableDesc & user_td)
+TableDesc MergeRequiredAndUserTableDescs(const TableDesc & required_td,
+                                         const TableDesc & user_td)
 {
     TableDesc result = required_td;
 
@@ -255,9 +255,10 @@ TableDesc merge_required_and_user_table_descs(const TableDesc & required_td,
 // MeasurementSet subtable.
 // If complete is true, the full descriptor is returned, otherwise
 // only the required descriptor is returned
-std::string ms_descriptor(const std::string & table, bool complete)
+Result<std::string> MSDescriptor(const std::string & table, bool complete)
 {
-    return RecordToJson(TableProxy::getTableDesc(ms_table_desc(table, complete), true));
+    ARROW_ASSIGN_OR_RAISE(auto table_desc, MSTableDescriptor(table, complete));
+    return RecordToJson(TableProxy::getTableDesc(table_desc, true));
 }
 
 
@@ -276,10 +277,11 @@ Result<SetupNewTable> default_ms_factory(const std::string & name,
         return arrow::Status::Invalid("Failed to create Table Description", msg);
     }
 
+    ARROW_ASSIGN_OR_RAISE(auto required_desc, MSTableDescriptor(subtable, false));
+
     // Merge required and user table descriptions
-    TableDesc final_desc = merge_required_and_user_table_descs(
-                                ms_table_desc(subtable, false),
-                                user_td);
+    TableDesc final_desc = MergeRequiredAndUserTableDescs(
+                                required_desc, user_td);
 
     // Return SetupNewTable object
     SetupNewTable setup = SetupNewTable(name, final_desc, Table::New);

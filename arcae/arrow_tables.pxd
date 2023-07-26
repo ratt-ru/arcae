@@ -27,7 +27,7 @@ cdef extern from "../cpp/configuration.h" namespace "arcae" nogil:
         size_t Size" Configuration::Size"()
 
 cdef extern from "../cpp/descriptor.h" namespace "arcae" nogil:
-    cdef string CMSDescriptor" arcae::ms_descriptor"(const string & table, bool complete)
+    cdef CResult[string] CMSDescriptor" arcae::MSDescriptor"(const string & table, bool complete)
 
 cdef extern from "../cpp/safe_table_proxy.h" namespace "arcae" nogil:
     cdef cppclass CCasaTable" arcae::SafeTableProxy":
