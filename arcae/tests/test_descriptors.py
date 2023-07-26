@@ -11,52 +11,48 @@ def test_descriptor_basic():
 
 def test_ms_and_weather_subtable(tmp_path_factory):
     ms = tmp_path_factory.mktemp("test") / "test.ms"
-    T = Table.ms_from_descriptor(str(ms))
-    assert (ms / "table.dat").exists()
-    assert not (ms / "WEATHER").exists()
-    T.close()
+    with Table.ms_from_descriptor(str(ms)) as T:
+        assert (ms / "table.dat").exists()
+        assert not (ms / "WEATHER").exists()
 
     # Basic descriptor
     table_desc = ms_descriptor("WEATHER", complete=False)
-    W = Table.ms_from_descriptor(str(ms), "WEATHER", table_desc)
-    assert (ms / "WEATHER").exists()
-    assert W.columns() == ["ANTENNA_ID", "INTERVAL", "TIME"]
-    W.close()
+    with Table.ms_from_descriptor(str(ms), "WEATHER", table_desc) as W:
+        assert (ms / "WEATHER").exists()
+        assert W.columns() == ["ANTENNA_ID", "INTERVAL", "TIME"]
 
     # Add a column to the basic descriptor
     table_desc = ms_descriptor("WEATHER", complete=False)
     table_desc["BLAH"] = table_desc["TIME"].copy()
-    W = Table.ms_from_descriptor(str(ms), "WEATHER", table_desc)
-    assert (ms / "WEATHER").exists()
-    assert W.columns() == ["ANTENNA_ID", "BLAH", "INTERVAL", "TIME"]
-    W.close()
+    with Table.ms_from_descriptor(str(ms), "WEATHER", table_desc) as W:
+        assert (ms / "WEATHER").exists()
+        assert W.columns() == ["ANTENNA_ID", "BLAH", "INTERVAL", "TIME"]
 
     # Complete descriptor
     table_desc = ms_descriptor("WEATHER", complete=True)
-    W = Table.ms_from_descriptor(str(ms), "WEATHER", table_desc)
-    assert (ms / "WEATHER").exists()
-    assert W.columns() == [
-        "ANTENNA_ID",
-        "DEW_POINT",
-        "DEW_POINT_FLAG",
-        "H2O",
-        "H2O_FLAG",
-        "INTERVAL",
-        "IONOS_ELECTRON",
-        "IONOS_ELECTRON_FLAG",
-        "PRESSURE",
-        "PRESSURE_FLAG",
-        "REL_HUMIDITY",
-        "REL_HUMIDITY_FLAG",
-        "TEMPERATURE",
-        "TEMPERATURE_FLAG",
-        "TIME",
-        "WIND_DIRECTION",
-        "WIND_DIRECTION_FLAG",
-        "WIND_SPEED",
-        "WIND_SPEED_FLAG",
-    ]
-    W.close()
+    with Table.ms_from_descriptor(str(ms), "WEATHER", table_desc) as W:
+        assert (ms / "WEATHER").exists()
+        assert W.columns() == [
+            "ANTENNA_ID",
+            "DEW_POINT",
+            "DEW_POINT_FLAG",
+            "H2O",
+            "H2O_FLAG",
+            "INTERVAL",
+            "IONOS_ELECTRON",
+            "IONOS_ELECTRON_FLAG",
+            "PRESSURE",
+            "PRESSURE_FLAG",
+            "REL_HUMIDITY",
+            "REL_HUMIDITY_FLAG",
+            "TEMPERATURE",
+            "TEMPERATURE_FLAG",
+            "TIME",
+            "WIND_DIRECTION",
+            "WIND_DIRECTION_FLAG",
+            "WIND_SPEED",
+            "WIND_SPEED_FLAG",
+        ]
 
 
 def test_weather_subtable_descriptor():
