@@ -5,6 +5,7 @@ from collections.abc import Iterable, MutableMapping
 import cython
 from cython.operator cimport dereference as deref
 import json
+from typing import Optional
 
 from libcpp cimport bool
 from libcpp.map cimport map
@@ -37,9 +38,8 @@ from arcae.arrow_tables cimport (CCasaTable,
                                  CComplexDoubleType,
                                  CComplexFloatType,
                                  CServiceLocator,
-                                 open_table,
-                                 default_ms,
-                                 default_ms_subtable,
+                                 copen_table,
+                                 cdefault_ms,
                                  complex64,
                                  complex128,
                                  UINT_MAX)
@@ -92,11 +92,36 @@ cdef class ComplexFloatArray(ExtensionArray):
 cdef class Table:
     cdef shared_ptr[CCasaTable] c_table
 
-    def __init__(self, filename):
-        cdef string cfilename = tobytes(filename)
+    def __init__(self):
+        raise TypeError("This class cannot be instantiated directly.")
 
-        with nogil:
-            self.c_table = GetResultValue(open_table(cfilename))
+    def __enter__(self):
+        return self
+
+    def __exit__(self, etype, evalue, etraceback):
+        self.close()
+
+    @staticmethod
+    def from_filename(filename: str) -> Table:
+        cdef Table table = Table.__new__(Table)
+        table.c_table = GetResultValue(copen_table(tobytes(filename)))
+        return table
+
+    @staticmethod
+    def ms_from_descriptor(
+        filename: str,
+        subtable: str = "MAIN",
+        table_desc: Optional[dict] = None,
+        dminfo: Optional[dict] = None
+    ) -> Table:
+        cdef Table table = Table.__new__(Table)
+        json_table_desc = json.dumps(table_desc) if table_desc else "{}"
+        json_dminfo = json.dumps(dminfo) if dminfo else "{}"
+        table.c_table = GetResultValue(cdefault_ms(tobytes(filename),
+                                                   tobytes(subtable),
+                                                   tobytes(json_table_desc),
+                                                   tobytes(json_dminfo)))
+        return table
 
     def to_arrow(self, unsigned int startrow=0, unsigned int nrow=UINT_MAX, columns: list[str] | str = None):
         cdef:

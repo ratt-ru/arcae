@@ -1,3 +1,4 @@
+import json
 import os
 
 import numpy as np
@@ -260,13 +261,3 @@ def test_config_context_mgr():
         global_config["foo"]
 
     assert list(global_config.items()) == [("validation-level", "full")]
-
-
-
-def test_descriptor():
-    from arcae.lib.arrow_tables import ms_descriptor
-
-    assert isinstance(ms_descriptor("MAIN"), dict)
-    assert isinstance(ms_descriptor("ANTENNA"), dict)
-    assert isinstance(ms_descriptor("FEED"), dict)
-    assert isinstance(ms_descriptor("SPECTRAL_WINDOW"), dict)

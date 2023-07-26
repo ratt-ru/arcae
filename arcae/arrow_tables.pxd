@@ -41,13 +41,11 @@ cdef extern from "../cpp/safe_table_proxy.h" namespace "arcae" nogil:
         CResult[vector[shared_ptr[CCasaTable]]] partition " SafeTableProxy::partition"(const vector[string] & partition_columns, const vector[string] & sort_columns)
 
 cdef extern from "../cpp/table_factory.h" namespace "arcae" nogil:
-    cdef CResult[shared_ptr[CCasaTable]] open_table(const string & filename)
-    cdef CResult[shared_ptr[CCasaTable]] default_ms(const string & name,
-                                                    const string & json_table_desc,
-                                                    const string & json_dminfo)
-    cdef CResult[shared_ptr[CCasaTable]] default_ms_subtable(
-                                                    const string & subtable,
+    cdef CResult[shared_ptr[CCasaTable]] copen_table" arcae::open_table"(
+                                                    const string & filename)
+    cdef CResult[shared_ptr[CCasaTable]] cdefault_ms" arcae::default_ms"(
                                                     const string & name,
+                                                    const string & subtable,
                                                     const string & json_table_desc,
                                                     const string & json_dminfo)
 

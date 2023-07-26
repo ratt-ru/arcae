@@ -145,9 +145,6 @@ TableDesc main_ms_desc(bool complete)
     return td;
 }
 
-
-
-
 // Get the required table descriptions for the given table.
 // If "" or "MAIN", the table descriptions for a Measurement Set
 // will be supplied, otherwise table should be some valid
@@ -270,13 +267,9 @@ Result<SetupNewTable> default_ms_factory(const std::string & name,
                                          const std::string & json_table_desc,
                                          const std::string & json_dminfo)
 {
-
-    auto table_desc = JsonParser::parse(json_table_desc).toRecord();
-    auto dminfo = JsonParser::parse(json_dminfo).toRecord();
-
-
     String msg;
     TableDesc user_td;
+    auto table_desc = JsonParser::parse(json_table_desc).toRecord();
 
     // Create Table Description object from extra user table description
     if(!TableProxy::makeTableDesc(table_desc, user_td, msg)) {
@@ -292,6 +285,7 @@ Result<SetupNewTable> default_ms_factory(const std::string & name,
     SetupNewTable setup = SetupNewTable(name, final_desc, Table::New);
 
     // Apply any data manager info
+    auto dminfo = JsonParser::parse(json_dminfo).toRecord();
     setup.bindCreate(dminfo);
 
     return setup;
