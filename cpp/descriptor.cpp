@@ -57,49 +57,6 @@ using ::casacore::MSWeather;
 namespace arcae {
 namespace {
 
-template <typename SubTable>
-TableDesc MSSubtableDesc(bool complete)
-{
-    if(!complete) {
-        return SubTable::requiredTableDesc();
-    }
-
-    using CEnum = typename SubTable::PredefinedColumns;
-
-    // Get required descriptor
-    TableDesc td = SubTable::requiredTableDesc();
-
-    // Add remaining columns
-    for(int i = CEnum::NUMBER_REQUIRED_COLUMNS + 1;
-        i <= CEnum::NUMBER_PREDEFINED_COLUMNS; ++i)
-    {
-        SubTable::addColumnToDesc(td, static_cast<CEnum>(i));
-    }
-
-    // NOTE(sjperkins)
-    // Inspection of the casacore code base seems to indicate
-    // that there are no optional MS subtable keywords.
-    // NUMBER_REQUIRED_KEYWORDS is only defined in the MS
-    return td;
-}
-
-std::string RecordToJson(const Record & record) {
-    std::ostringstream json_oss;
-    auto record_json = JsonOut(json_oss);
-    record_json.start();
-
-    for (casacore::uInt i=0; i < record.nfields(); ++i) {
-        record_json.write(record.name(i), record.asValueHolder(i));
-    }
-
-    record_json.end();
-    return json_oss.str();
-}
-
-Record JsonToRecord(const std::string & json_record) {
-    return JsonParser::parse(json_record).toRecord();
-}
-
 TableDesc MainMSDesc(bool complete)
 {
     // Get required descriptor
@@ -144,6 +101,50 @@ TableDesc MainMSDesc(bool complete)
 
     return td;
 }
+
+template <typename SubTable>
+TableDesc MSSubtableDesc(bool complete)
+{
+    if(!complete) {
+        return SubTable::requiredTableDesc();
+    }
+
+    using CEnum = typename SubTable::PredefinedColumns;
+
+    // Get required descriptor
+    TableDesc td = SubTable::requiredTableDesc();
+
+    // Add remaining columns
+    for(int i = CEnum::NUMBER_REQUIRED_COLUMNS + 1;
+        i <= CEnum::NUMBER_PREDEFINED_COLUMNS; ++i)
+    {
+        SubTable::addColumnToDesc(td, static_cast<CEnum>(i));
+    }
+
+    // NOTE(sjperkins)
+    // Inspection of the casacore code base seems to indicate
+    // that there are no optional MS subtable keywords.
+    // NUMBER_REQUIRED_KEYWORDS is only defined in the MS
+    return td;
+}
+
+std::string RecordToJson(const Record & record) {
+    std::ostringstream json_oss;
+    auto record_json = JsonOut(json_oss);
+    record_json.start();
+
+    for (casacore::uInt i=0; i < record.nfields(); ++i) {
+        record_json.write(record.name(i), record.asValueHolder(i));
+    }
+
+    record_json.end();
+    return json_oss.str();
+}
+
+Record JsonToRecord(const std::string & json_record) {
+    return JsonParser::parse(json_record).toRecord();
+}
+
 
 // Get the required table descriptions for the given table.
 // If "" or "MAIN", the table descriptions for a Measurement Set
