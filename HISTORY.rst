@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Create and use JSON Table Descriptors and Data Managers (:pr:`51`)
 * Use ccache, if available (:pr:`50`)
 * Use vcpkg's internal github actions binary caching (:pr:`49`)
 * Generalise the opening and creation of Tables (:pr:`48`)
