@@ -22,6 +22,8 @@
 #include <casacore/tables/Tables/TableLock.h>
 #include <casacore/ms/MeasurementSets/MeasurementSet.h>
 
+using namespace std::literals;
+
 using ::arrow::Result;
 using ::arrow::Status;
 
@@ -54,6 +56,29 @@ using ::casacore::MSWeather;
 
 
 namespace arcae {
+namespace {
+
+/// Table and subtable names
+static constexpr char kAntenna[] = "ANTENNA";
+static constexpr char kMain[] = "MAIN";
+static constexpr char kDataDescription[] = "DATA_DESCRIPTION";
+static constexpr char kDoppler[] = "DOPPLER";
+static constexpr char kFeed[] = "FEED";
+static constexpr char kField[] = "FIELD";
+static constexpr char kFlagCmd[] = "FLAG_CMD";
+static constexpr char kFreqOffset[] = "FREQ_OFFSET";
+static constexpr char kHistory[] = "HISTORY";
+static constexpr char kObservation[] = "OBSERVATION";
+static constexpr char kPointing[] = "POINTING";
+static constexpr char kPolarization[] = "POLARIZATION";
+static constexpr char kProcessor[] = "PROCESSOR";
+static constexpr char kSource[] = "SOURCE";
+static constexpr char kSpectralWindow[] = "SPECTRAL_WINDOW";
+static constexpr char kState[] = "STATE";
+static constexpr char kSyscal[] = "SYSCAL";
+static constexpr char kWeather[] = "WEATHER";
+
+} // namespace
 
 Result<std::shared_ptr<SafeTableProxy>> open_table(const std::string & filename) {
     return SafeTableProxy::Make([&filename]() -> Result<std::shared_ptr<TableProxy>> {
@@ -80,14 +105,14 @@ Result<std::shared_ptr<SafeTableProxy>> default_ms(
                     const std::string & json_dminfo)
 {
     // Upper case subtable name
-    std::string usubtable(subtable.size(), '0');
+    auto usubtable = std::string(subtable.size(), '0');
     std::transform(std::begin(subtable), std::end(subtable), std::begin(usubtable),
                    [](unsigned char c) { return std::toupper(c); });
 
-    std::string modname = name.empty() ? "measurementset.ms" : name;
+    auto modname = name.empty() ? "measurementset.ms"s : name;
 
     // Subtables are relative to the MS name
-    if(usubtable != "MAIN") {
+    if(usubtable != kMain) {
         modname.append(1, '/');
         modname.append(usubtable);
     }
@@ -97,45 +122,45 @@ Result<std::shared_ptr<SafeTableProxy>> default_ms(
                                              json_table_desc, json_dminfo));
 
     return SafeTableProxy::Make([&]() -> Result<std::shared_ptr<TableProxy>> {
-        if(usubtable.empty() || usubtable == "MAIN") {
+        if(usubtable.empty() || usubtable == kMain) {
             auto ms = MeasurementSet(setup_new_table);
             // Create the MS default subtables
             ms.createDefaultSubtables(Table::New);
             // Create a table proxy
             return std::make_shared<TableProxy>(ms);
-        } else if(usubtable == "ANTENNA") {
+        } else if(usubtable == kAntenna) {
             return std::make_shared<TableProxy>(MSAntenna(setup_new_table));
-        } else if(usubtable == "DATA_DESCRIPTION") {
+        } else if(usubtable == kDataDescription) {
             return std::make_shared<TableProxy>(MSDataDescription(setup_new_table));
-        } else if(usubtable == "DOPPLER") {
+        } else if(usubtable == kDoppler) {
             return std::make_shared<TableProxy>(MSDoppler(setup_new_table));
-        } else if(usubtable == "FEED") {
+        } else if(usubtable == kFeed) {
             return std::make_shared<TableProxy>(MSFeed(setup_new_table));
-        } else if(usubtable == "FIELD") {
+        } else if(usubtable == kField) {
             return std::make_shared<TableProxy>(MSField(setup_new_table));
-        } else if(usubtable == "FLAG_CMD") {
+        } else if(usubtable == kFlagCmd) {
             return std::make_shared<TableProxy>(MSFlagCmd(setup_new_table));
-        } else if(usubtable == "FREQ_OFFSET") {
+        } else if(usubtable == kFreqOffset) {
             return std::make_shared<TableProxy>(MSFreqOffset(setup_new_table));
-        } else if(usubtable == "HISTORY") {
+        } else if(usubtable == kHistory) {
             return std::make_shared<TableProxy>(MSHistory(setup_new_table));
-        } else if(usubtable == "OBSERVATION") {
+        } else if(usubtable == kObservation) {
             return std::make_shared<TableProxy>(MSObservation(setup_new_table));
-        } else if(usubtable == "POINTING") {
+        } else if(usubtable == kPointing) {
             return std::make_shared<TableProxy>(MSPointing(setup_new_table));
-        } else if(usubtable == "POLARIZATION") {
+        } else if(usubtable == kPolarization) {
             return std::make_shared<TableProxy>(MSPolarization(setup_new_table));
-        } else if(usubtable == "PROCESSOR") {
+        } else if(usubtable == kProcessor) {
             return std::make_shared<TableProxy>(MSProcessor(setup_new_table));
-        } else if(usubtable == "SOURCE") {
+        } else if(usubtable == kSource) {
             return std::make_shared<TableProxy>(MSSource(setup_new_table));
-        } else if(usubtable == "SPECTRAL_WINDOW") {
+        } else if(usubtable == kSpectralWindow) {
             return std::make_shared<TableProxy>(MSSpectralWindow(setup_new_table));
-        } else if(usubtable == "STATE") {
+        } else if(usubtable == kState) {
             return std::make_shared<TableProxy>(MSState(setup_new_table));
-        } else if(usubtable == "SYSCAL") {
+        } else if(usubtable == kSyscal) {
             return std::make_shared<TableProxy>(MSSysCal(setup_new_table));
-        } else if(usubtable == "WEATHER") {
+        } else if(usubtable == kWeather) {
             return std::make_shared<TableProxy>(MSWeather(setup_new_table));
         }
 

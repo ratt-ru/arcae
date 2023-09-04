@@ -67,6 +67,30 @@ using ::casacore::MSWeather;
 namespace arcae {
 namespace {
 
+// Table and subtable names
+static constexpr char kAntenna[] = "ANTENNA";
+static constexpr char kMain[] = "MAIN";
+static constexpr char kDataDescription[] = "DATA_DESCRIPTION";
+static constexpr char kDoppler[] = "DOPPLER";
+static constexpr char kFeed[] = "FEED";
+static constexpr char kField[] = "FIELD";
+static constexpr char kFlagCmd[] = "FLAG_CMD";
+static constexpr char kFreqOffset[] = "FREQ_OFFSET";
+static constexpr char kHistory[] = "HISTORY";
+static constexpr char kObservation[] = "OBSERVATION";
+static constexpr char kPointing[] = "POINTING";
+static constexpr char kPolarization[] = "POLARIZATION";
+static constexpr char kProcessor[] = "PROCESSOR";
+static constexpr char kSource[] = "SOURCE";
+static constexpr char kSpectralWindow[] = "SPECTRAL_WINDOW";
+static constexpr char kState[] = "STATE";
+static constexpr char kSyscal[] = "SYSCAL";
+static constexpr char kWeather[] = "WEATHER";
+
+// Category related columns
+static constexpr char kFlagCategory[]  = "FLAG_CATEGORY";
+static constexpr char kCategory[] = "CATEGORY";
+
 TableDesc MainMSDesc(bool complete)
 {
     // Get required descriptor
@@ -87,7 +111,7 @@ TableDesc MainMSDesc(bool complete)
         // This is an OK solution since the C++ layer always adds this keyword
         // if it is missing from the MS
         // (see addCat())
-        td.rwColumnDesc("FLAG_CATEGORY").rwKeywordSet().removeField("CATEGORY");
+        td.rwColumnDesc(kFlagCategory).rwKeywordSet().removeField(kCategory);
         return td;
     }
 
@@ -167,41 +191,41 @@ Result<TableDesc> MSTableDescriptor(const String & table, bool complete)
     // Upper case things to be sure
     table_.upcase();
 
-    if(table.empty() || table_ == "MAIN") {
+    if(table.empty() || table_ == kMain) {
         return MainMSDesc(complete);
-    } else if(table_ == "ANTENNA") {
+    } else if(table_ == kAntenna) {
         return MSSubtableDesc<MSAntenna>(complete);
-    } else if(table_ == "DATA_DESCRIPTION") {
+    } else if(table_ == kDataDescription) {
         return MSSubtableDesc<MSDataDescription>(complete);
-    } else if(table_ == "DOPPLER") {
+    } else if(table_ == kDoppler) {
         return MSSubtableDesc<MSDoppler>(complete);
-    } else if(table_ == "FEED") {
+    } else if(table_ == kFeed) {
         return MSSubtableDesc<MSFeed>(complete);
-    } else if(table_ == "FIELD") {
+    } else if(table_ == kField) {
         return MSSubtableDesc<MSField>(complete);
-    } else if(table_ == "FLAG_CMD") {
+    } else if(table_ == kFlagCmd) {
         return MSSubtableDesc<MSFlagCmd>(complete);
-    } else if(table_ == "FREQ_OFFSET") {
+    } else if(table_ == kFreqOffset) {
         return MSSubtableDesc<MSFreqOffset>(complete);
-    } else if(table_ == "HISTORY") {
+    } else if(table_ == kHistory) {
         return MSSubtableDesc<MSHistory>(complete);
-    } else if(table_ == "OBSERVATION") {
+    } else if(table_ == kObservation) {
         return MSSubtableDesc<MSObservation>(complete);
-    } else if(table_ == "POINTING") {
+    } else if(table_ == kPointing) {
         return MSSubtableDesc<MSPointing>(complete);
-    } else if(table_ == "POLARIZATION") {
+    } else if(table_ == kPolarization) {
         return MSSubtableDesc<MSPolarization>(complete);
-    } else if(table_ == "PROCESSOR") {
+    } else if(table_ == kProcessor) {
         return MSSubtableDesc<MSProcessor>(complete);
-    } else if(table_ == "SOURCE") {
+    } else if(table_ == kSource) {
         return MSSubtableDesc<MSSource>(complete);
-    } else if(table_ == "SPECTRAL_WINDOW") {
+    } else if(table_ == kSpectralWindow) {
         return MSSubtableDesc<MSSpectralWindow>(complete);
-    } else if(table_ == "STATE") {
+    } else if(table_ == kState) {
         return MSSubtableDesc<MSState>(complete);
-    } else if(table_ == "SYSCAL") {
+    } else if(table_ == kSyscal) {
         return MSSubtableDesc<MSSysCal>(complete);
-    } else if(table_ == "WEATHER") {
+    } else if(table_ == kWeather) {
         return MSSubtableDesc<MSWeather>(complete);
     }
 
