@@ -11,6 +11,12 @@
 namespace arcae {
 
 arrow::Result<std::shared_ptr<SafeTableProxy>> open_table(const std::string & filename);
+arrow::Result<std::shared_ptr<SafeTableProxy>> default_ms(
+                                const std::string & name,
+                                const std::string & subtable="MAIN",
+                                const std::string & json_table_desc="{}",
+                                const std::string & json_dminfo="{}");
+
 
 } // namespace arcae
 

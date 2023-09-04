@@ -11,4 +11,4 @@ def table(filename: str) -> "Table":
     # Defer cython module import, to avoid conflicts between arcae casacore libraries
     # and python-casacore casacore libraries
     from arcae.lib.arrow_tables import Table
-    return Table(filename)
+    return Table.from_filename(filename)
