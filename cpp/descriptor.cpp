@@ -1,3 +1,13 @@
+/// Parts of this file were originally contributed to https://github.com/casacore/python-casacore
+/// under a LGPLv3 license by https://github.com/sjperkins in the following PRs:
+/// - https://github.com/casacore/python-casacore/pull/72
+/// - https://github.com/casacore/python-casacore/pull/183
+/// More generally https://github.com/sjperkins made all contributions
+/// to pyms.cc up until python-casacore 3.5.2
+/// - https://github.com/casacore/python-casacore/commits/v3.5.2/src/pyms.cc
+/// Parts of this code are relicensed here under the BSD-3 license
+/// available at https://github.com/ratt-ru/arcae/blob/main/LICENSE
+
 #ifndef ARCAE_DESCRIPTOR_H
 #define ARCAE_DESCRIPTOR_H
 
