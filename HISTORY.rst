@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Add support for adding rows to a table (:pr:`53`)
 * Create and use JSON Table Descriptors and Data Managers (:pr:`51`)
 * Use ccache, if available (:pr:`50`)
 * Use vcpkg's internal github actions binary caching (:pr:`49`)

@@ -180,6 +180,8 @@ cdef class Table:
 
         return result
 
+    def addrows(self, nrows: int):
+        return  GetResultValue(self.c_table.get().addrows(nrows))
 
 class Configuration(MutableMapping):
     def __getitem__(self, key: str):
