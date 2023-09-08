@@ -73,6 +73,9 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v3
 
+      - name: List source directory
+        run: tree /home/runner/work/arcae
+
       - name: Get Github Action Cache Variables
         uses: actions/github-script@v6
         with:
