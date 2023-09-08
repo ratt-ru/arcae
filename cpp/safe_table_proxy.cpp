@@ -186,6 +186,17 @@ SafeTableProxy::partition(
 
 
 Result<bool>
+SafeTableProxy::addrows(casacore::uInt nrows) {
+    ARROW_RETURN_NOT_OK(FailIfClosed());
+
+    return run_isolated([this, nrows]() -> Result<bool> {
+        this->table_proxy->addRow(nrows);
+        return true;
+    });
+}
+
+
+Result<bool>
 SafeTableProxy::close() {
     if(!is_closed) {
         std::shared_ptr<void> defer_close(nullptr, [this](...){ this->is_closed = true; });

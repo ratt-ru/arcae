@@ -1,3 +1,5 @@
+from numpy.testing import assert_array_equal
+
 from arcae.lib.arrow_tables import Table
 from arcae.lib.arrow_tables import ms_descriptor
 
@@ -8,6 +10,17 @@ def test_descriptor_basic():
     assert isinstance(ms_descriptor("FEED"), dict)
     assert isinstance(ms_descriptor("SPECTRAL_WINDOW"), dict)
 
+
+def test_ms_addrows(tmp_path_factory):
+    ms = tmp_path_factory.mktemp("test") / "test.ms"
+    with Table.ms_from_descriptor(str(ms)) as T:
+        T.addrows(10)
+        assert T.nrow() == 10
+        AT = T.to_arrow()
+        assert len(AT) == 10
+        assert_array_equal(AT.column("TIME"), 0)
+        assert_array_equal(AT.column("ANTENNA1"), 0)
+        assert_array_equal(AT.column("ANTENNA2"), 0)
 
 def test_ms_and_weather_subtable(tmp_path_factory):
     ms = tmp_path_factory.mktemp("test") / "test.ms"

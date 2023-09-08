@@ -83,6 +83,8 @@ public:
         const std::vector<std::string> & partition_columns={},
         const std::vector<std::string> & sort_columns={}) const;
 
+    arrow::Result<bool> addrows(casacore::uInt nrows);
+
     arrow::Result<bool> close();
 };
 

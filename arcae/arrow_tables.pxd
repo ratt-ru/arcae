@@ -39,6 +39,8 @@ cdef extern from "../cpp/safe_table_proxy.h" namespace "arcae" nogil:
         CResult[unsigned int] ncolumns " SafeTableProxy::ncolumns"()
         CResult[vector[string]] columns " SafeTableProxy::columns"()
         CResult[vector[shared_ptr[CCasaTable]]] partition " SafeTableProxy::partition"(const vector[string] & partition_columns, const vector[string] & sort_columns)
+        CResult[bool] addrows " SafeTableProxy::addrows"(unsigned int nrows)
+
 
 cdef extern from "../cpp/table_factory.h" namespace "arcae" nogil:
     cdef CResult[shared_ptr[CCasaTable]] copen_table" arcae::open_table"(
