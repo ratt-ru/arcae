@@ -112,7 +112,7 @@ jobs:
         run: |
           cd $HOME
           virtualenv $HOME/venv
-          source $HOME/venv/bin/activate && pip install --find-links=${{ github.workspace }}/wheelhouse arcae[test]
+          source $HOME/venv/bin/activate && pip install -vvv --find-links=${{ github.workspace }}/wheelhouse arcae[test]
           source $HOME/venv/bin/activate && py.test -s -vvv --pyargs arcae
 
   upload-to-test-pypi:
