@@ -37,7 +37,8 @@ In the directory containing the source, setup your development environment as fo
   $ pip install -U pip virtualenv
   $ virtualenv -p python3.8 /venv/arcaedev
   $ . /venv/arcaedev/bin/activate
-  (arcaedev) export VCPKG_TARGET_TRIPLET=x64-linux-dynamic-cxx17-abi0-dbg  # suffix to -rel for release
+  # Edit pyproject.toml with instructions in https://github.com/ratt-ru/arcae/issues/52
+  (arcaedev) export VCPKG_TARGET_TRIPLET=x64-linux-dynamic-cxx17-abi0-dbg
   (arcaedev) pip install -e .[test]
   (arcaedev) export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/vcpkg/installed/$VCPKG_TARGET_TRIPLET/lib
   (arcaedev) py.test -s -vvv --pyargs arcae
