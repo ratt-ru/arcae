@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Enable initial OSX support in the build process (:pr:`54`)
 * Add support for adding rows to a table (:pr:`53`)
 * Create and use JSON Table Descriptors and Data Managers (:pr:`51`)
 * Use ccache, if available (:pr:`50`)
