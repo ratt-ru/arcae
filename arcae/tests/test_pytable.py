@@ -91,6 +91,33 @@ def test_complex_cases(complex_case_table):
         T = table.to_arrow()
         assert T.column("COMPLEX").type == pa.list_(pa.list_(pa.list_(pa.float64())))
 
+
+def test_getcol(getcol_table):
+    T = arcae.table(getcol_table)
+
+    assert_array_equal(T.getcol("TIME"), [0, 1, 2])
+
+    assert_array_equal(T.getcol("FLOAT_DATA"), [
+        [[0, 0, 0, 0], [0, 0, 0, 0]],
+        [[1, 1, 1, 1], [1, 1, 1, 1]],
+        [[2, 2, 2, 2], [2, 2, 2, 2]]])
+
+    assert_array_equal(T.getcol("COMPLEX_DATA"), [
+        [[0 + 0j, 0 + 0j, 0 + 0j, 0 + 0j], [0 + 0j, 0 + 0j, 0 + 0j, 0 + 0j]],
+        [[1 + 1j, 1 + 1j, 1 + 1j, 1 + 1j], [1 + 1j, 1 + 1j, 1 + 1j, 1 + 1j]],
+        [[2 + 2j, 2 + 2j, 2 + 2j, 2 + 2j], [2 + 2j, 2 + 2j, 2 + 2j, 2 + 2j]]])
+
+    for r in range(0, T.nrow(), 2):
+        assert_array_equal(
+            T.getcol("COMPLEX_DATA", startrow=r, nrow=1),
+            [[[r + r*1j]*4, [r + r*1j]*4]])
+
+    with pytest.raises(TypeError, match="variably shaped column VARDATA"):
+        T.getcol("VARDATA")
+
+    with pytest.raises(pa.lib.ArrowException, match="NONEXISTENT does not exist"):
+        T.getcol("NONEXISTENT")
+
 def test_partial_read(sorting_table):
     """ Tests that partial reads work """
     T = arcae.table(sorting_table)

@@ -314,3 +314,71 @@ def generate_complex_case_table(path):
 def complex_case_table(tmp_path_factory):
     return casa_table_at_path(generate_complex_case_table,
                               tmp_path_factory.mktemp("complex_cases"))
+
+
+def generate_getcol_table(path):
+    import numpy as np
+    import pyrap.tables as pt
+
+    table_desc = [
+        {
+            "desc": {
+                "_c_order": True,
+                "comment": "COMPLEX_DATA column",
+                "ndim": 2,
+                "shape": [2, 4],
+                "option": 0,
+                "valueType": "dcomplex",
+            },
+            "name": "COMPLEX_DATA",
+        },
+        {
+            "desc": {
+                "_c_order": True,
+                "comment": "FLOAT_DATA column",
+                "ndim": 2,
+                "shape": [2, 4],
+                "option": 0,
+                "valueType": "float",
+            },
+            "name": "FLOAT_DATA",
+        },
+        {
+            "desc": {
+                "_c_order": True,
+                "comment": "VARDATA column",
+                "ndim": 2,
+                "option": 0,
+                "valueType": "dcomplex",
+            },
+            "name": "VARDATA",
+        },
+        {
+            "desc": {
+                "_c_order": True,
+                "comment": "TIME column",
+                "option": 0,
+                "valueType": "double",
+            },
+            "name": "TIME",
+        }]
+
+    table_desc = pt.maketabdesc(table_desc)
+    table_name = os.path.join(path, "test.table")
+    nrow = 3
+
+    with pt.table(table_name, table_desc, nrow=nrow, ack=False) as T:
+        for i in range(nrow):
+            T.putcell("COMPLEX_DATA", i, np.full((2, 4), i + i*1j))
+            T.putcell("FLOAT_DATA", i, np.full((2, 4), i))
+            T.putcell("VARDATA", i, np.full((2, i + 1), i))
+            T.putcell("TIME", i, i)
+
+
+    return table_name
+
+
+@pytest.fixture
+def getcol_table(tmp_path_factory):
+    return casa_table_at_path(generate_getcol_table,
+                              tmp_path_factory.mktemp("getcol_cases"))

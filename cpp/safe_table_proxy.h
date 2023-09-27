@@ -72,10 +72,24 @@ public:
         return proxy;
     }
 
+    static std::tuple<casacore::uInt, casacore::uInt>
+    ClampRows(const casacore::Table & table,
+              casacore::uInt startrow,
+              casacore::uInt nrow);
+
     arrow::Result<std::shared_ptr<arrow::Table>> to_arrow(
         casacore::uInt startrow=0,
         casacore::uInt nrow=UINT_MAX,
         const std::vector<std::string> & columns = {}) const;
+
+    arrow::Result<std::shared_ptr<arrow::Array>> get_column(
+        const std::string & column,
+        casacore::uInt startrow,
+        casacore::uInt nrow) const;
+
+    arrow::Result<std::string> get_table_descriptor() const;
+    arrow::Result<std::string> get_column_descriptor(const std::string & column) const;
+
     arrow::Result<std::vector<std::string>> columns() const;
     arrow::Result<casacore::uInt> ncolumns() const;
     arrow::Result<casacore::uInt> nrow() const;

@@ -35,6 +35,9 @@ cdef extern from "../cpp/safe_table_proxy.h" namespace "arcae" nogil:
         CResult[bool] close" SafeTableProxy::close"()
 
         CResult[shared_ptr[CTable]] to_arrow " SafeTableProxy::to_arrow"(unsigned int startrow, unsigned int nrow, const vector[string] & columns)
+        CResult[shared_ptr[CArray]] get_column " SafeTableProxy::get_column"(const string & column, unsigned int startrow, unsigned int nrow)
+        CResult[string] get_table_descriptor " SafeTableProxy::get_table_descriptor"()
+        CResult[string] get_column_descriptor "SafeTableProxy::get_column_descriptor"(const string & column)
         CResult[unsigned int] nrow " SafeTableProxy::nrow"()
         CResult[unsigned int] ncolumns " SafeTableProxy::ncolumns"()
         CResult[vector[string]] columns " SafeTableProxy::columns"()
