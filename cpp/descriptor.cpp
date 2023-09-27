@@ -298,7 +298,7 @@ Result<std::string> MSDescriptor(const std::string & table, bool complete)
 
 
 
-Result<SetupNewTable> default_ms_factory(const std::string & name,
+Result<SetupNewTable> DefaultMSFactory(const std::string & name,
                                          const std::string & subtable,
                                          const std::string & json_table_desc,
                                          const std::string & json_dminfo)
