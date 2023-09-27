@@ -361,7 +361,28 @@ def generate_getcol_table(path):
                 "valueType": "double",
             },
             "name": "TIME",
-        }]
+        },
+        {
+            "desc": {
+                "_c_order": True,
+                "comment": "STRING column",
+                "option": 0,
+                "valueType": "string",
+            },
+            "name": "STRING",
+        },
+        {
+            "desc": {
+                "_c_order": True,
+                "comment": "NESTED_STRING column",
+                "option": 0,
+                "ndim": 2,
+                "shape": [2, 4],
+                "valueType": "string",
+            },
+            "name": "NESTED_STRING",
+        }
+        ]
 
     table_desc = pt.maketabdesc(table_desc)
     table_name = os.path.join(path, "test.table")
@@ -373,7 +394,11 @@ def generate_getcol_table(path):
             T.putcell("FLOAT_DATA", i, np.full((2, 4), i))
             T.putcell("VARDATA", i, np.full((2, i + 1), i))
             T.putcell("TIME", i, i)
+            T.putcell("STRING", i, str(i))
+            T.putcell("NESTED_STRING", i, {"shape": (2, 4), "array": [str(i)] * 2 * 4})
+            #T.putcell("NESTED_STRING", i, np.full((2, i + 1), str(i)))
 
+            #[str(i)] * 2 * (i+1)
 
     return table_name
 

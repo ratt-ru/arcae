@@ -158,12 +158,21 @@ cdef class Table:
         if isinstance(py_column, pa.NumericArray):
             return py_column.to_numpy(zero_copy_only=True)
 
+        if isinstance(py_column, pa.StringArray):
+            return py_column.to_numpy(zero_copy_only=False)
+
         if isinstance(py_column, pa.FixedSizeListArray):
             shape = [len(py_column)]
             nested_column = py_column
+            zero_copy_only = True
 
-            while not pa.types.is_primitive(nested_column.type):
-                if isinstance(nested_column, pa.FixedSizeListArray):
+            while True:
+                if pa.types.is_primitive(nested_column.type):
+                    break
+                elif isinstance(nested_column, pa.StringArray):
+                    zero_copy_only = False
+                    break
+                elif isinstance(nested_column, pa.FixedSizeListArray):
                     shape.append(nested_column.type.list_size)
                     nested_column = nested_column.flatten()
                 else:
@@ -173,7 +182,7 @@ cdef class Table:
                                     f"Only FixedSizeListArrays or PrimitiveArrays "
                                     f"are supported")
 
-            nested_column = nested_column.to_numpy(zero_copy_only=True)
+            nested_column = nested_column.to_numpy(zero_copy_only=zero_copy_only)
             array = nested_column.reshape(tuple(shape))
 
             # Convert to complex if necessary
