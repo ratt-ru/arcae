@@ -13,8 +13,6 @@
 
 #include <sstream>
 
-#include "descriptor.h"
-
 #include <arrow/result.h>
 
 #include <casacore/casa/Json.h>
@@ -26,6 +24,9 @@
 #include <casacore/tables/Tables/TableDesc.h>
 #include <casacore/tables/Tables/TableProxy.h>
 #include <casacore/casa/Containers/ValueHolder.h>
+
+#include "arcae/descriptor.h"
+
 
 using ::arrow::Result;
 using ::arrow::Status;

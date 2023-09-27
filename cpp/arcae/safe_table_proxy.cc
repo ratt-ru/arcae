@@ -6,7 +6,7 @@
 #include <casacore/casa/Json.h>
 #include <casacore/tables/Tables/TableIterProxy.h>
 
-#include "safe_table_proxy.h"
+#include "arcae/safe_table_proxy.h"
 
 
 using ::arrow::DataType;

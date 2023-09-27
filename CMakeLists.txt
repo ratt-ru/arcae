@@ -23,6 +23,8 @@ endif(CCACHE_FOUND)
 include(FindPyArrow)
 include(SetupVCPKG)
 project(main CXX C)
+
+include_directories(cpp)
 add_subdirectory(cpp)
 
 if(SKBUILD)

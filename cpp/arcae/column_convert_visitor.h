@@ -7,9 +7,9 @@
 
 #include <arrow/util/logging.h>  // IWYU pragma: keep
 
-#include "casa_visitors.h"
-#include "complex_type.h"
-#include "service_locator.h"
+#include "arcae/casa_visitors.h"
+#include "arcae/complex_type.h"
+#include "arcae/service_locator.h"
 
 namespace arcae {
 
