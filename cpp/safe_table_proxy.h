@@ -52,7 +52,7 @@ protected:
 
 public:
     virtual ~SafeTableProxy() {
-        auto result = close();
+        auto result = Close();
         if(!result.ok()) {
             ARROW_LOG(WARNING) << "Error closing file " << result.status();
         }
@@ -77,29 +77,29 @@ public:
               casacore::uInt startrow,
               casacore::uInt nrow);
 
-    arrow::Result<std::shared_ptr<arrow::Table>> to_arrow(
+    arrow::Result<std::shared_ptr<arrow::Table>> ToArrow(
         casacore::uInt startrow=0,
         casacore::uInt nrow=UINT_MAX,
         const std::vector<std::string> & columns = {}) const;
 
-    arrow::Result<std::shared_ptr<arrow::Array>> get_column(
+    arrow::Result<std::shared_ptr<arrow::Array>> GetColumn(
         const std::string & column,
         casacore::uInt startrow,
         casacore::uInt nrow) const;
 
-    arrow::Result<std::string> get_table_descriptor() const;
-    arrow::Result<std::string> get_column_descriptor(const std::string & column) const;
+    arrow::Result<std::string> GetTableDescriptor() const;
+    arrow::Result<std::string> GetColumnDescriptor(const std::string & column) const;
 
-    arrow::Result<std::vector<std::string>> columns() const;
-    arrow::Result<casacore::uInt> ncolumns() const;
-    arrow::Result<casacore::uInt> nrow() const;
-    arrow::Result<std::vector<std::shared_ptr<SafeTableProxy>>> partition(
+    arrow::Result<std::vector<std::string>> Columns() const;
+    arrow::Result<casacore::uInt> nColumns() const;
+    arrow::Result<casacore::uInt> nRow() const;
+    arrow::Result<std::vector<std::shared_ptr<SafeTableProxy>>> Partition(
         const std::vector<std::string> & partition_columns={},
         const std::vector<std::string> & sort_columns={}) const;
 
-    arrow::Result<bool> addrows(casacore::uInt nrows);
+    arrow::Result<bool> AddRows(casacore::uInt nrows);
 
-    arrow::Result<bool> close();
+    arrow::Result<bool> Close();
 };
 
 } // namespace arcae

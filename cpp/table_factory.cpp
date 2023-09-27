@@ -80,7 +80,7 @@ static constexpr char kWeather[] = "WEATHER";
 
 } // namespace
 
-Result<std::shared_ptr<SafeTableProxy>> open_table(const std::string & filename) {
+Result<std::shared_ptr<SafeTableProxy>> OpenTable(const std::string & filename) {
     return SafeTableProxy::Make([&filename]() -> Result<std::shared_ptr<TableProxy>> {
         Record record;
         TableLock lock(TableLock::LockOption::AutoNoReadLocking);
@@ -98,7 +98,7 @@ Result<std::shared_ptr<SafeTableProxy>> open_table(const std::string & filename)
     });
 }
 
-Result<std::shared_ptr<SafeTableProxy>> default_ms(
+Result<std::shared_ptr<SafeTableProxy>> DefaultMS(
                     const std::string & name,
                     const std::string & subtable,
                     const std::string & json_table_desc,
@@ -118,7 +118,7 @@ Result<std::shared_ptr<SafeTableProxy>> default_ms(
     }
 
     ARROW_ASSIGN_OR_RAISE(auto setup_new_table,
-                          default_ms_factory(modname, usubtable,
+                          DefaultMSFactory(modname, usubtable,
                                              json_table_desc, json_dminfo));
 
     return SafeTableProxy::Make([&]() -> Result<std::shared_ptr<TableProxy>> {

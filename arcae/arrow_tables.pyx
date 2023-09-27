@@ -40,8 +40,8 @@ from arcae.arrow_tables cimport (CCasaTable,
                                  CComplexDoubleType,
                                  CComplexFloatType,
                                  CServiceLocator,
-                                 copen_table,
-                                 cdefault_ms,
+                                 COpenTable,
+                                 CDefaultMS,
                                  complex64,
                                  complex128,
                                  UINT_MAX)
@@ -107,7 +107,7 @@ cdef class Table:
     @staticmethod
     def from_filename(filename: str) -> Table:
         cdef Table table = Table.__new__(Table)
-        table.c_table = GetResultValue(copen_table(tobytes(filename)))
+        table.c_table = GetResultValue(COpenTable(tobytes(filename)))
         return table
 
     @staticmethod
@@ -120,7 +120,7 @@ cdef class Table:
         cdef Table table = Table.__new__(Table)
         json_table_desc = json.dumps(table_desc) if table_desc else "{}"
         json_dminfo = json.dumps(dminfo) if dminfo else "{}"
-        table.c_table = GetResultValue(cdefault_ms(tobytes(filename),
+        table.c_table = GetResultValue(CDefaultMS(tobytes(filename),
                                                    tobytes(subtable),
                                                    tobytes(json_table_desc),
                                                    tobytes(json_dminfo)))
@@ -138,7 +138,7 @@ cdef class Table:
             cpp_columns = [tobytes(c) for c in columns]
 
         with nogil:
-            ctable = GetResultValue(deref(self.c_table).to_arrow(startrow, nrow, cpp_columns))
+            ctable = GetResultValue(deref(self.c_table).ToArrow(startrow, nrow, cpp_columns))
 
         return pyarrow_wrap_table(ctable)
 
@@ -148,7 +148,7 @@ cdef class Table:
             string cpp_column = tobytes(column)
 
         with nogil:
-            carray = GetResultValue(deref(self.c_table).get_column(cpp_column, startrow, nrow))
+            carray = GetResultValue(deref(self.c_table).GetColumn(cpp_column, startrow, nrow))
 
         py_column = pyarrow_wrap_array(carray)
 
@@ -187,23 +187,23 @@ cdef class Table:
 
 
     def nrow(self):
-        return GetResultValue(self.c_table.get().nrow())
+        return GetResultValue(self.c_table.get().nRow())
 
     def ncolumns(self):
-        return GetResultValue(self.c_table.get().ncolumns())
+        return GetResultValue(self.c_table.get().nColumns())
 
     def close(self):
-        return GetResultValue(self.c_table.get().close())
+        return GetResultValue(self.c_table.get().Close())
 
     def columns(self):
-        return [frombytes(s) for s in GetResultValue(self.c_table.get().columns())]
+        return [frombytes(s) for s in GetResultValue(self.c_table.get().Columns())]
 
     def getcoldesc(self, column: str):
-        col_desc = GetResultValue(self.c_table.get().get_column_descriptor(tobytes(column)))
+        col_desc = GetResultValue(self.c_table.get().GetColumnDescriptor(tobytes(column)))
         return json.loads(frombytes(col_desc)).popitem()[1]
 
     def tabledesc(self):
-        table_desc = GetResultValue(self.c_table.get().get_table_descriptor())
+        table_desc = GetResultValue(self.c_table.get().GetTableDescriptor())
         return json.loads(frombytes(table_desc)).popitem()[1]
 
     def partition(self, columns, sort_columns=None):
@@ -225,7 +225,7 @@ cdef class Table:
         result = []
 
         with nogil:
-            vector_result = GetResultValue(self.c_table.get().partition(cpp_columns, cpp_sort_columns))
+            vector_result = GetResultValue(self.c_table.get().Partition(cpp_columns, cpp_sort_columns))
 
         for v in vector_result:
             table: Table = Table.__new__(Table)
@@ -235,7 +235,7 @@ cdef class Table:
         return result
 
     def addrows(self, nrows: int):
-        return  GetResultValue(self.c_table.get().addrows(nrows))
+        return  GetResultValue(self.c_table.get().AddRows(nrows))
 
 class Configuration(MutableMapping):
     def __getitem__(self, key: str):

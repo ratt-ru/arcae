@@ -32,23 +32,23 @@ cdef extern from "../cpp/descriptor.h" namespace "arcae" nogil:
 cdef extern from "../cpp/safe_table_proxy.h" namespace "arcae" nogil:
     cdef cppclass CCasaTable" arcae::SafeTableProxy":
         @staticmethod
-        CResult[bool] close" SafeTableProxy::close"()
+        CResult[bool] Close" SafeTableProxy::Close"()
 
-        CResult[shared_ptr[CTable]] to_arrow " SafeTableProxy::to_arrow"(unsigned int startrow, unsigned int nrow, const vector[string] & columns)
-        CResult[shared_ptr[CArray]] get_column " SafeTableProxy::get_column"(const string & column, unsigned int startrow, unsigned int nrow)
-        CResult[string] get_table_descriptor " SafeTableProxy::get_table_descriptor"()
-        CResult[string] get_column_descriptor "SafeTableProxy::get_column_descriptor"(const string & column)
-        CResult[unsigned int] nrow " SafeTableProxy::nrow"()
-        CResult[unsigned int] ncolumns " SafeTableProxy::ncolumns"()
-        CResult[vector[string]] columns " SafeTableProxy::columns"()
-        CResult[vector[shared_ptr[CCasaTable]]] partition " SafeTableProxy::partition"(const vector[string] & partition_columns, const vector[string] & sort_columns)
-        CResult[bool] addrows " SafeTableProxy::addrows"(unsigned int nrows)
+        CResult[shared_ptr[CTable]] ToArrow " SafeTableProxy::ToArrow"(unsigned int startrow, unsigned int nrow, const vector[string] & columns)
+        CResult[shared_ptr[CArray]] GetColumn " SafeTableProxy::GetColumn"(const string & column, unsigned int startrow, unsigned int nrow)
+        CResult[string] GetTableDescriptor " SafeTableProxy::GetTableDescriptor"()
+        CResult[string] GetColumnDescriptor "SafeTableProxy::GetColumnDescriptor"(const string & column)
+        CResult[unsigned int] nRow " SafeTableProxy::nRow"()
+        CResult[unsigned int] nColumns " SafeTableProxy::nColumns"()
+        CResult[vector[string]] Columns " SafeTableProxy::Columns"()
+        CResult[vector[shared_ptr[CCasaTable]]] Partition " SafeTableProxy::Partition"(const vector[string] & partition_columns, const vector[string] & sort_columns)
+        CResult[bool] AddRows " SafeTableProxy::AddRows"(unsigned int nrows)
 
 
 cdef extern from "../cpp/table_factory.h" namespace "arcae" nogil:
-    cdef CResult[shared_ptr[CCasaTable]] copen_table" arcae::open_table"(
+    cdef CResult[shared_ptr[CCasaTable]] COpenTable" arcae::OpenTable"(
                                                     const string & filename)
-    cdef CResult[shared_ptr[CCasaTable]] cdefault_ms" arcae::default_ms"(
+    cdef CResult[shared_ptr[CCasaTable]] CDefaultMS" arcae::DefaultMS"(
                                                     const string & name,
                                                     const string & subtable,
                                                     const string & json_table_desc,

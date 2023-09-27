@@ -43,7 +43,7 @@ SafeTableProxy::ClampRows(const casacore::Table & table, casacore::uInt startrow
 }
 
 arrow::Result<std::string>
-SafeTableProxy::get_table_descriptor() const {
+SafeTableProxy::GetTableDescriptor() const {
     ARROW_RETURN_NOT_OK(FailIfClosed());
 
     return run_isolated([this]() -> arrow::Result<std::string> {
@@ -59,7 +59,7 @@ SafeTableProxy::get_table_descriptor() const {
 }
 
 arrow::Result<std::string>
-SafeTableProxy::get_column_descriptor(const std::string & column) const {
+SafeTableProxy::GetColumnDescriptor(const std::string & column) const {
     ARROW_RETURN_NOT_OK(FailIfClosed());
 
     return run_isolated([this, &column]() -> arrow::Result<std::string> {
@@ -82,7 +82,7 @@ SafeTableProxy::get_column_descriptor(const std::string & column) const {
 
 
 arrow::Result<std::shared_ptr<arrow::Array>>
-SafeTableProxy::get_column(const std::string & column, casacore::uInt startrow, casacore::uInt nrow) const {
+SafeTableProxy::GetColumn(const std::string & column, casacore::uInt startrow, casacore::uInt nrow) const {
     ARROW_RETURN_NOT_OK(FailIfClosed());
 
     return run_isolated([this, &column, startrow, nrow]() -> arrow::Result<std::shared_ptr<arrow::Array>> {
@@ -103,7 +103,7 @@ SafeTableProxy::get_column(const std::string & column, casacore::uInt startrow, 
 }
 
 arrow::Result<std::shared_ptr<arrow::Table>>
-SafeTableProxy::to_arrow(casacore::uInt startrow, casacore::uInt nrow, const std::vector<std::string> & columns) const {
+SafeTableProxy::ToArrow(casacore::uInt startrow, casacore::uInt nrow, const std::vector<std::string> & columns) const {
     ARROW_RETURN_NOT_OK(FailIfClosed());
 
     return run_isolated([this, startrow, nrow, &columns]() -> arrow::Result<std::shared_ptr<arrow::Table>> {
@@ -181,7 +181,7 @@ SafeTableProxy::to_arrow(casacore::uInt startrow, casacore::uInt nrow, const std
 
 
 Result<std::vector<std::string>>
-SafeTableProxy::columns() const {
+SafeTableProxy::Columns() const {
     ARROW_RETURN_NOT_OK(FailIfClosed());
 
     return run_isolated([this]() -> Result<std::vector<std::string>> {
@@ -192,7 +192,7 @@ SafeTableProxy::columns() const {
 
 
 Result<casacore::uInt>
-SafeTableProxy::ncolumns() const {
+SafeTableProxy::nColumns() const {
     ARROW_RETURN_NOT_OK(FailIfClosed());
 
     return run_isolated([this]() -> Result<casacore::uInt> {
@@ -201,7 +201,7 @@ SafeTableProxy::ncolumns() const {
 }
 
 Result<casacore::uInt>
-SafeTableProxy::nrow() const {
+SafeTableProxy::nRow() const {
     ARROW_RETURN_NOT_OK(FailIfClosed());
 
     return run_isolated([this]() -> Result<casacore::uInt> {
@@ -210,7 +210,7 @@ SafeTableProxy::nrow() const {
 }
 
 Result<std::vector<std::shared_ptr<SafeTableProxy>>>
-SafeTableProxy::partition(
+SafeTableProxy::Partition(
     const std::vector<std::string> & partition_columns,
     const std::vector<std::string> & sort_columns) const {
 
@@ -249,7 +249,7 @@ SafeTableProxy::partition(
 
 
 Result<bool>
-SafeTableProxy::addrows(casacore::uInt nrows) {
+SafeTableProxy::AddRows(casacore::uInt nrows) {
     ARROW_RETURN_NOT_OK(FailIfClosed());
 
     return run_isolated([this, nrows]() -> Result<bool> {
@@ -260,7 +260,7 @@ SafeTableProxy::addrows(casacore::uInt nrows) {
 
 
 Result<bool>
-SafeTableProxy::close() {
+SafeTableProxy::Close() {
     if(!is_closed) {
         std::shared_ptr<void> defer_close(nullptr, [this](...){ this->is_closed = true; });
 
