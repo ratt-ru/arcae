@@ -4,7 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
-* Support getcol (:pr:`55`)
+* Support getcol, tabledesc and getcoldesc (:pr:`55`)
 * Enable initial OSX support in the build process (:pr:`54`)
 * Add support for adding rows to a table (:pr:`53`)
 * Create and use JSON Table Descriptors and Data Managers (:pr:`51`)
