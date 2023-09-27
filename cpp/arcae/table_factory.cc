@@ -10,9 +10,9 @@
 
 #include <algorithm>
 
-#include "descriptor.h"
-#include "safe_table_proxy.h"
-#include "table_factory.h"
+#include "arcae/descriptor.h"
+#include "arcae/safe_table_proxy.h"
+#include "arcae/table_factory.h"
 
 #include <arrow/api.h>
 

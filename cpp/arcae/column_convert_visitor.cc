@@ -2,8 +2,8 @@
 
 #include <casacore/tables/Tables.h>
 
-#include "column_convert_visitor.h"
-#include "complex_type.h"
+#include "arcae/column_convert_visitor.h"
+#include "arcae/complex_type.h"
 
 using ::arrow::DataType;
 using ::arrow::Buffer;

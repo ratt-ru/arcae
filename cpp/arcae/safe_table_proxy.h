@@ -9,7 +9,7 @@
 
 #include <arrow/util/thread_pool.h>
 
-#include "column_convert_visitor.h"
+#include "arcae/column_convert_visitor.h"
 
 
 namespace arcae {

@@ -4,7 +4,7 @@
 #include <memory>
 #include <mutex>
 
-#include "configuration.h"
+#include "arcae/configuration.h"
 
 namespace arcae {
 

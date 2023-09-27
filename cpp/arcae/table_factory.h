@@ -6,7 +6,7 @@
 
 #include <arrow/result.h>
 
-#include "safe_table_proxy.h"
+#include "arcae/safe_table_proxy.h"
 
 namespace arcae {
 
