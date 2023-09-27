@@ -1,6 +1,6 @@
 [build-system]
 requires = [
-    "setuptools >= 45, < 64",
+    "setuptools",
     "cmake>=3.18",
     "cython>=0.29.33,<0.30.0",
     "ninja; platform_system!='Windows'",
