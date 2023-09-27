@@ -96,21 +96,28 @@ def test_getcol(getcol_table):
     T = arcae.table(getcol_table)
 
     assert_array_equal(T.getcol("TIME"), [0, 1, 2])
+    assert_array_equal(T.getcol("STRING"), ["0", "1", "2"])
 
     assert_array_equal(T.getcol("FLOAT_DATA"), [
         [[0, 0, 0, 0], [0, 0, 0, 0]],
         [[1, 1, 1, 1], [1, 1, 1, 1]],
         [[2, 2, 2, 2], [2, 2, 2, 2]]])
 
+    assert_array_equal(T.getcol("NESTED_STRING"), [
+        [["0", "0", "0", "0"], ["0", "0", "0", "0"]],
+        [["1", "1", "1", "1"], ["1", "1", "1", "1"]],
+        [["2", "2", "2", "2"], ["2", "2", "2", "2"]]])
+
     assert_array_equal(T.getcol("COMPLEX_DATA"), [
         [[0 + 0j, 0 + 0j, 0 + 0j, 0 + 0j], [0 + 0j, 0 + 0j, 0 + 0j, 0 + 0j]],
         [[1 + 1j, 1 + 1j, 1 + 1j, 1 + 1j], [1 + 1j, 1 + 1j, 1 + 1j, 1 + 1j]],
         [[2 + 2j, 2 + 2j, 2 + 2j, 2 + 2j], [2 + 2j, 2 + 2j, 2 + 2j, 2 + 2j]]])
 
+
     for r in range(0, T.nrow(), 2):
         assert_array_equal(
             T.getcol("COMPLEX_DATA", startrow=r, nrow=1),
-            [[[r + r*1j]*4, [r + r*1j]*4]])
+            [[[r + r*1j]*4]*2])
 
     with pytest.raises(TypeError, match="variably shaped column VARDATA"):
         T.getcol("VARDATA")
