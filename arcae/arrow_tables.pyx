@@ -13,12 +13,14 @@ from libcpp.memory cimport dynamic_pointer_cast, shared_ptr
 from libcpp.string cimport string
 from libcpp.vector cimport vector
 
+import numpy as np
 import pyarrow as pa
 from pyarrow.includes.common cimport *
 from pyarrow.includes.libarrow cimport *
 
 from pyarrow.lib cimport (
     pyarrow_wrap_table,
+    pyarrow_wrap_array,
     pyarrow_wrap_data_type,
     pyarrow_wrap_table,
     pyarrow_unwrap_data_type,
@@ -140,6 +142,50 @@ cdef class Table:
 
         return pyarrow_wrap_table(ctable)
 
+    def getcol(self, column: str, unsigned int startrow=0, unsigned int nrow=UINT_MAX):
+        cdef:
+            shared_ptr[CArray] carray
+            string cpp_column = tobytes(column)
+
+        with nogil:
+            carray = GetResultValue(deref(self.c_table).get_column(cpp_column, startrow, nrow))
+
+        py_column = pyarrow_wrap_array(carray)
+
+        if isinstance(py_column, (pa.ListArray, pa.LargeListArray)):
+            raise TypeError(f"Can't convert variably shaped column {column} to numpy array")
+
+        if isinstance(py_column, pa.NumericArray):
+            return py_column.to_numpy(zero_copy_only=True)
+
+        if isinstance(py_column, pa.FixedSizeListArray):
+            shape = [len(py_column)]
+            nested_column = py_column
+
+            while not pa.types.is_primitive(nested_column.type):
+                if isinstance(nested_column, pa.FixedSizeListArray):
+                    shape.append(nested_column.type.list_size)
+                    nested_column = nested_column.flatten()
+                else:
+                    raise TypeError(f"Encountered invalid type {nested_column.type} "
+                                    f"when converting column {column} from a "
+                                    f"nested FixedSizeListArray to a numpy array. "
+                                    f"Only FixedSizeListArrays or PrimitiveArrays "
+                                    f"are supported")
+
+            nested_column = nested_column.to_numpy(zero_copy_only=True)
+            array = nested_column.reshape(tuple(shape))
+
+            # Convert to complex if necessary
+            if "COMPLEX" in self.getcoldesc(column)["valueType"].upper():
+                complex_dtype = np.result_type(array.dtype, np.complex64)
+                array = array.view(complex_dtype)[..., 0]
+
+            return array
+
+        raise TypeError(f"Unhandled column type {py_column.type}")
+
+
     def nrow(self):
         return GetResultValue(self.c_table.get().nrow())
 
@@ -151,6 +197,14 @@ cdef class Table:
 
     def columns(self):
         return [frombytes(s) for s in GetResultValue(self.c_table.get().columns())]
+
+    def getcoldesc(self, column: str):
+        col_desc = GetResultValue(self.c_table.get().get_column_descriptor(tobytes(column)))
+        return json.loads(frombytes(col_desc)).popitem()[1]
+
+    def tabledesc(self):
+        table_desc = GetResultValue(self.c_table.get().get_table_descriptor())
+        return json.loads(frombytes(table_desc)).popitem()[1]
 
     def partition(self, columns, sort_columns=None):
         cdef vector[shared_ptr[CCasaTable]] vector_result

@@ -45,7 +45,7 @@ private:
     static arrow::Status ValidateArray(const std::shared_ptr<arrow::Array> & array);
 
     inline casacore::uInt local_row(casacore::uInt row)
-        { return row - startrow; }
+        { assert(row >= startrow); return row - startrow; }
 
     inline arrow::Status FailIfNotUTF8(const std::shared_ptr<arrow::DataType> & arrow_dtype) {
         if(arrow_dtype == arrow::utf8()) { return arrow::Status::OK(); }

@@ -29,26 +29,88 @@ struct enable_make_shared_stp : public SafeTableProxy {};
 } // namespace
 
 
+std::tuple<casacore::uInt, casacore::uInt>
+SafeTableProxy::ClampRows(const casacore::Table & table, casacore::uInt startrow, casacore::uInt nrow) {
+    if(startrow > table.nrow()) {
+        return {table.nrow(), 0};
+    }
+
+    if(startrow + nrow >= table.nrow()) {
+        nrow = std::min(table.nrow(), table.nrow() - startrow);
+    }
+
+    return {startrow, nrow};
+}
+
+arrow::Result<std::string>
+SafeTableProxy::get_table_descriptor() const {
+    ARROW_RETURN_NOT_OK(FailIfClosed());
+
+    return run_isolated([this]() -> arrow::Result<std::string> {
+        std::ostringstream json_oss;
+        casacore::JsonOut table_json(json_oss);
+
+        table_json.start();
+        table_json.write(CASA_DESCRIPTOR, table_proxy->getTableDescription(true, true));
+        table_json.end();
+
+        return json_oss.str();
+    });
+}
+
+arrow::Result<std::string>
+SafeTableProxy::get_column_descriptor(const std::string & column) const {
+    ARROW_RETURN_NOT_OK(FailIfClosed());
+
+    return run_isolated([this, &column]() -> arrow::Result<std::string> {
+        const auto & table_desc = this->table_proxy->table().tableDesc();
+
+        if(!table_desc.isColumn(column)) {
+            return arrow::Status::UnknownError(column, " does not exist");
+        }
+
+        std::ostringstream json_oss;
+        casacore::JsonOut column_json(json_oss);
+
+        column_json.start();
+        column_json.write(column, table_proxy->getColumnDescription(column, true, true));
+        column_json.end();
+
+        return json_oss.str();
+    });
+}
+
+
+arrow::Result<std::shared_ptr<arrow::Array>>
+SafeTableProxy::get_column(const std::string & column, casacore::uInt startrow, casacore::uInt nrow) const {
+    ARROW_RETURN_NOT_OK(FailIfClosed());
+
+    return run_isolated([this, &column, startrow, nrow]() -> arrow::Result<std::shared_ptr<arrow::Array>> {
+        auto & casa_table = this->table_proxy->table();
+
+        if(!casa_table.tableDesc().isColumn(column)) {
+            return arrow::Status::UnknownError(column, " does not exist");
+        }
+
+        auto table_column = TableColumn(casa_table, column);
+        const auto & column_desc = table_column.columnDesc();
+        auto [start_row, n_row] = ClampRows(casa_table, startrow, nrow);
+        auto visitor = ColumnConvertVisitor(table_column, start_row, n_row);
+        auto visit_status = visitor.Visit(column_desc.dataType());
+        ARROW_RETURN_NOT_OK(visit_status);
+        return std::move(visitor.array);
+    });
+}
+
 arrow::Result<std::shared_ptr<arrow::Table>>
 SafeTableProxy::to_arrow(casacore::uInt startrow, casacore::uInt nrow, const std::vector<std::string> & columns) const {
     ARROW_RETURN_NOT_OK(FailIfClosed());
 
     return run_isolated([this, startrow, nrow, &columns]() -> arrow::Result<std::shared_ptr<arrow::Table>> {
-        auto & casa_table = this->table_proxy->table();
-        auto table_desc = casa_table.tableDesc();
+        const auto & casa_table = this->table_proxy->table();
+        const auto & table_desc = casa_table.tableDesc();
         auto column_names = columns.size() == 0 ? table_desc.columnNames() : casacore::Vector<casacore::String>(columns);
-        auto startrow_ = startrow;
-        auto nrow_ = nrow;
-
-        if(startrow_ >= casa_table.nrow()) {
-            startrow_ = casa_table.nrow();
-            nrow_ = 0;
-        }
-
-        if(startrow_ + nrow_ >= casa_table.nrow()) {
-            nrow_ = std::min(casa_table.nrow(), casa_table.nrow() - startrow_);
-        }
-
+        auto [start_row, n_row] = ClampRows(casa_table, startrow, nrow);
         auto fields = arrow::FieldVector();
         auto arrays = arrow::ArrayVector();
 
@@ -62,7 +124,7 @@ SafeTableProxy::to_arrow(casacore::uInt startrow, casacore::uInt nrow, const std
 
             auto table_column = TableColumn(casa_table, column_name);
             auto column_desc = table_column.columnDesc();
-            auto visitor = ColumnConvertVisitor(table_column, startrow_, nrow_);
+            auto visitor = ColumnConvertVisitor(table_column, start_row, n_row);
             auto visit_status = visitor.Visit(column_desc.dataType());
 
             if(!visit_status.ok()) {
@@ -77,6 +139,7 @@ SafeTableProxy::to_arrow(casacore::uInt startrow, casacore::uInt nrow, const std
                     << ". Arrow array not created by Visitor";
                 continue;
             }
+
 
             std::ostringstream json_oss;
             casacore::JsonOut column_json(json_oss);
@@ -105,7 +168,7 @@ SafeTableProxy::to_arrow(casacore::uInt startrow, casacore::uInt nrow, const std
             {ARCAE_METADATA}, {json_oss.str()});
 
         auto schema = arrow::schema(fields, std::move(table_metadata));
-        auto table = arrow::Table::Make(std::move(schema), arrays, nrow_);
+        auto table = arrow::Table::Make(std::move(schema), arrays, n_row);
         auto status = table->Validate();
 
         if(!status.ok()) {

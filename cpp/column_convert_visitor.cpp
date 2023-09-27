@@ -82,8 +82,6 @@ ColumnConvertVisitor::MakeArrowPrimitiveArray(
     }
 }
 
-
-
 arrow::Status ColumnConvertVisitor::VisitTpBool() {
     // TODO(sjperkins)
     // Looks like casacore bool is actually a char, improve this
