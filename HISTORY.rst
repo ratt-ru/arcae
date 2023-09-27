@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Introduce a more canonical C++ project structure (:pr:`57`)
 * Consistently use CamelCase throughout the C++ layer (:pr:`56`)
 * Support getcol, tabledesc and getcoldesc (:pr:`55`)
 * Enable initial OSX support in the build process (:pr:`54`)
