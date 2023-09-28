@@ -2,7 +2,7 @@
 requires = [
     "setuptools",
     "cmake>=3.18",
-    "cython>=0.29.33,<0.30.0",
+    "cython>=3.0.2",
     "ninja; platform_system!='Windows'",
     "numpy>=1.24.1,<2.0.0",
     "requires",
