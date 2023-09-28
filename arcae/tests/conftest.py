@@ -396,9 +396,6 @@ def generate_getcol_table(path):
             T.putcell("TIME", i, i)
             T.putcell("STRING", i, str(i))
             T.putcell("NESTED_STRING", i, {"shape": (2, 4), "array": [str(i)] * 2 * 4})
-            #T.putcell("NESTED_STRING", i, np.full((2, i + 1), str(i)))
-
-            #[str(i)] * 2 * (i+1)
 
     return table_name
 

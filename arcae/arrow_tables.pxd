@@ -13,12 +13,12 @@ cdef extern from "<climits>" nogil:
     cdef unsigned int UINT_MAX
 
 
-cdef extern from "../cpp/arcae/service_locator.h" namespace "arcae" nogil:
+cdef extern from "arcae/service_locator.h" namespace "arcae" nogil:
     cdef cppclass CServiceLocator" arcae::ServiceLocator":
         @staticmethod
         CConfiguration & configuration" ServiceLocator::configuration"()
 
-cdef extern from "../cpp/arcae/configuration.h" namespace "arcae" nogil:
+cdef extern from "arcae/configuration.h" namespace "arcae" nogil:
     cdef cppclass CConfiguration" arcae::Configuration":
         void Set" Configuration::Set"(const string & key, string value)
         CResult[string] Get" Configuration::Get"(const string & key)
@@ -26,10 +26,10 @@ cdef extern from "../cpp/arcae/configuration.h" namespace "arcae" nogil:
         vector[string] GetKeys" Configuration::GetKeys"()
         size_t Size" Configuration::Size"()
 
-cdef extern from "../cpp/arcae/descriptor.h" namespace "arcae" nogil:
+cdef extern from "arcae/descriptor.h" namespace "arcae" nogil:
     cdef CResult[string] CMSDescriptor" arcae::MSDescriptor"(const string & table, bool complete)
 
-cdef extern from "../cpp/arcae/safe_table_proxy.h" namespace "arcae" nogil:
+cdef extern from "arcae/safe_table_proxy.h" namespace "arcae" nogil:
     cdef cppclass CCasaTable" arcae::SafeTableProxy":
         @staticmethod
         CResult[bool] Close" SafeTableProxy::Close"()
@@ -45,7 +45,7 @@ cdef extern from "../cpp/arcae/safe_table_proxy.h" namespace "arcae" nogil:
         CResult[bool] AddRows " SafeTableProxy::AddRows"(unsigned int nrows)
 
 
-cdef extern from "../cpp/arcae/table_factory.h" namespace "arcae" nogil:
+cdef extern from "arcae/table_factory.h" namespace "arcae" nogil:
     cdef CResult[shared_ptr[CCasaTable]] COpenTable" arcae::OpenTable"(
                                                     const string & filename)
     cdef CResult[shared_ptr[CCasaTable]] CDefaultMS" arcae::DefaultMS"(
@@ -55,7 +55,7 @@ cdef extern from "../cpp/arcae/table_factory.h" namespace "arcae" nogil:
                                                     const string & json_dminfo)
 
 
-cdef extern from "../cpp/arcae/complex_type.h" namespace "arcae" nogil:
+cdef extern from "arcae/complex_type.h" namespace "arcae" nogil:
     cdef cppclass CComplexType" arcae::ComplexType"(CExtensionType):
         shared_ptr[CDataType] value_type" ComplexType::value_type"()
         string extension_name()
