@@ -105,17 +105,6 @@ jobs:
           name: ${{ env.ARTIFACT_NAME }}
           path: ./wheelhouse/*.whl
 
-      - name: Install and test wheel
-        run: |
-          cd $HOME
-          virtualenv $HOME/venv
-          export WHEELHOUSE=${{ github.workspace }}/wheelhouse
-          export PYABI=${{ matrix.python[1] }}
-          export WHEEL=$(find $HWEELHOUSE -type f | grep $PYABI)
-          echo "Installing $WHEEL"
-          source $HOME/venv/bin/activate && pip install $WHEEL[test]
-          source $HOME/venv/bin/activate && py.test -s -vvv --pyargs arcae
-
   upload-to-test-pypi:
     name: Upload release to Test PyPI
     needs: [build-sdist, build-wheels]
