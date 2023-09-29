@@ -86,6 +86,7 @@ jobs:
           CIBW_BUILD: ${{ matrix.python[1] }}-${{ matrix.platform[0] }}
           CIBW_BUILD_FRONTEND: build
           CIBW_BEFORE_ALL_LINUX: yum install -y zip flex bison gcc-gfortran
+          CIBW_MANYLINUX_X86_64_IMAGE: quay.io/pypa/${{ matrix.platform[1] }}_x86_64
           CIBW_ENVIRONMENT_LINUX: >
             ACTIONS_CACHE_URL=${{ env.ACTIONS_CACHE_URL }}
             ACTIONS_RUNTIME_TOKEN=${{ env.ACTIONS_RUNTIME_TOKEN }}
