@@ -14,7 +14,7 @@ add_library(arcae SHARED
 target_link_directories(arcae PUBLIC ${PYARROW_LIBDIRS})
 target_link_libraries(arcae PkgConfig::casacore arrow)
 target_include_directories(arcae PUBLIC PkgConfig::casacore ${PYARROW_INCLUDE} ${CMAKE_INCLUDE_CURRENT_DIR})
-target_compile_options(arcae PUBLIC "-D_GLIBCXX_USE_CXX11_ABI=0")
+target_compile_options(arcae PUBLIC "-D_GLIBCXX_USE_CXX11_ABI=1")
 
 set_target_properties(arcae PROPERTIES
     POSITION_INDEPENDENT_CODE 1)
