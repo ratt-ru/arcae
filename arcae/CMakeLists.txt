@@ -12,7 +12,7 @@ target_link_directories(arrow_tables PUBLIC ${PYARROW_LIBDIRS})
 target_include_directories(arrow_tables PUBLIC
     PkgConfig::casacore ${PYARROW_INCLUDE} ${NUMPY_INCLUDE}
     ${CMAKE_SOURCE_DIR}/cpp)
-target_compile_options(arrow_tables PUBLIC "-D_GLIBCXX_USE_CXX11_ABI=0")
+target_compile_options(arrow_tables PUBLIC "-D_GLIBCXX_USE_CXX11_ABI=1")
 python_extension_module(arrow_tables)
 
 string(REPLACE " " ";" _PYARROW_LIBS ${PYARROW_LIBS})
