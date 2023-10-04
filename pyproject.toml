@@ -1,11 +1,49 @@
+[project]
+name = "arcae"
+version = "0.1.0"
+authors = [
+    {name = "Simon Perkins", email = "simon.perkins@gmail.com"}
+]
+description = "Arrow bindings for casacore"
+readme = {file = "README.rst", content-type = "test/rst"}
+requires_python = ">= 3.8"
+license = {file = "LICENSE"}
+classifiers = [
+    "License :: OSI Approved :: BSD License",
+    "Programming Language :: Python :: 3"
+]
+dependencies = [
+    "appdirs",
+    "click",
+    "rich",
+    "pyarrow == 13.0.0"
+]
+
+[project.optional-dependencies]
+dev = [
+    "black == 22.1.0",
+    "flake8 == 4.0.1",
+    "tbump"
+]
+test = [
+    "duckdb",
+    "pytest >= 7.0.0",
+    "python-casacore >= 3.5.0",
+    "requests"
+]
+
+[project.scripts]
+arcae = "arcae.applications.entrypoint:main"
+
+[project.urls]
+Repository = "https://github.com/ratt-ru/arcae"
+
 [build-system]
 requires = [
     "setuptools",
-    "cmake>=3.18",
     "cython>=3.0.2",
-    "ninja; platform_system!='Windows'",
     "numpy>=1.24.1,<2.0.0",
     "requires",
-    "scikit-build>=0.16.7",
+    "scikit-build-core",
     "pyarrow == 13.0.0"]
-build-backend = "setuptools.build_meta"
+build-backend = "scikit_build_core.build"
