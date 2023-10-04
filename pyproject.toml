@@ -40,10 +40,10 @@ Repository = "https://github.com/ratt-ru/arcae"
 
 [build-system]
 requires = [
-    "setuptools",
     "cython>=3.0.2",
-    "numpy>=1.24.1,<2.0.0",
-    "requires",
     "scikit-build-core",
     "pyarrow == 13.0.0"]
 build-backend = "scikit_build_core.build"
+
+[tools.setuptools.packages]
+find = {}
