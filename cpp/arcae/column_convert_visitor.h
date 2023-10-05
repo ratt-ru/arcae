@@ -18,13 +18,13 @@ public:
     using ShapeVectorType = std::vector<casacore::IPosition>;
 
 public:
-    const casacore::TableColumn & column;
-    casacore::uInt startrow;
-    casacore::uInt nrow;
-    casacore::uInt endrow;
-    const casacore::ColumnDesc & column_desc;
-    std::shared_ptr<arrow::Array> array;
-    arrow::MemoryPool * pool;
+    const casacore::TableColumn & column_;
+    const casacore::ColumnDesc & column_desc_;
+    casacore::uInt startrow_;
+    casacore::uInt endrow_;
+    casacore::uInt nrow_;
+    std::shared_ptr<arrow::Array> array_;
+    arrow::MemoryPool * pool_;
 
 public:
     explicit ColumnConvertVisitor(
@@ -45,7 +45,7 @@ private:
     static arrow::Status ValidateArray(const std::shared_ptr<arrow::Array> & array);
 
     inline casacore::uInt local_row(casacore::uInt row)
-        { assert(row >= startrow); return row - startrow; }
+        { assert(row >= startrow_); return row - startrow_; }
 
     inline arrow::Status FailIfNotUTF8(const std::shared_ptr<arrow::DataType> & arrow_dtype) {
         if(arrow_dtype == arrow::utf8()) { return arrow::Status::OK(); }
@@ -59,7 +59,7 @@ private:
 
     template <typename T>
     arrow::Status ConvertScalarColumn(const std::shared_ptr<arrow::DataType> & arrow_dtype) {
-        auto column = casacore::ScalarColumn<T>(this->column);
+        auto column = casacore::ScalarColumn<T>(column_);
 
         if constexpr(std::is_same<T, casacore::String>::value) {
             // Handle string cases with Arrow StringBuilders
@@ -67,75 +67,75 @@ private:
             arrow::StringBuilder builder;
 
             try {
-                auto strings = column.getColumnRange(casacore::Slice(startrow, nrow));
+                auto strings = column.getColumnRange(casacore::Slice(startrow_, nrow_));
                 for(auto & s: strings) { ARROW_RETURN_NOT_OK(builder.Append(s)); }
             } catch(std::exception & e) {
-                return arrow::Status::Invalid("ConvertScalarColumn ", column_desc.name(), " ", e.what());
+                return arrow::Status::Invalid("ConvertScalarColumn ", column_desc_.name(), " ", e.what());
             }
 
-            ARROW_ASSIGN_OR_RAISE(this->array, builder.Finish());
+            ARROW_ASSIGN_OR_RAISE(array_, builder.Finish());
         } else {
             // Wrap Arrow Buffer in casacore Vector
-            ARROW_ASSIGN_OR_RAISE(auto allocation, arrow::AllocateBuffer(nrow*sizeof(T), pool));
+            ARROW_ASSIGN_OR_RAISE(auto allocation, arrow::AllocateBuffer(nrow_*sizeof(T), pool_));
             auto buffer = std::shared_ptr<arrow::Buffer>(std::move(allocation));
             auto * buf_ptr = reinterpret_cast<T *>(buffer->mutable_data());
-            auto casa_vector = casacore::Vector<T>(casacore::IPosition(1, nrow), buf_ptr, casacore::SHARE);
+            auto casa_vector = casacore::Vector<T>(casacore::IPosition(1, nrow_), buf_ptr, casacore::SHARE);
 
             // Dump column data into Arrow Buffer
             try {
-                column.getColumnRange(casacore::Slice(startrow, nrow), casa_vector);
+                column.getColumnRange(casacore::Slice(startrow_, nrow_), casa_vector);
             } catch(std::exception & e) {
-                return arrow::Status::Invalid("ConvertScalarColumn ", column_desc.name(), " ", e.what());
+                return arrow::Status::Invalid("ConvertScalarColumn ", column_desc_.name(), " ", e.what());
             }
 
-            ARROW_ASSIGN_OR_RAISE(this->array, MakeArrowPrimitiveArray(buffer, nrow, arrow_dtype));
+            ARROW_ASSIGN_OR_RAISE(array_, MakeArrowPrimitiveArray(buffer, nrow_, arrow_dtype));
         }
 
-        return ValidateArray(this->array);
+        return ValidateArray(array_);
     }
 
     template <typename T>
     arrow::Status ConvertFixedArrayColumn(const std::shared_ptr<arrow::DataType> & arrow_dtype,
                                    const casacore::IPosition & shape) {
-        auto column = casacore::ArrayColumn<T>(this->column);
+        auto column = casacore::ArrayColumn<T>(column_);
 
         if constexpr(std::is_same<T, casacore::String>::value) {
             // Handle string cases with Arrow StringBuilders
            ARROW_RETURN_NOT_OK(FailIfNotUTF8(arrow_dtype));
            arrow::StringBuilder builder;
 
-            for(casacore::uInt row=startrow; row < endrow; ++row) {
+            for(casacore::uInt row=startrow_; row < endrow_; ++row) {
                 auto strings = column.get(row);
                 for(auto & string: strings)
                     { ARROW_RETURN_NOT_OK(builder.Append(string)); }
             }
-            ARROW_ASSIGN_OR_RAISE(this->array, builder.Finish());
+            ARROW_ASSIGN_OR_RAISE(array_, builder.Finish());
         } else {
             // Wrap Arrow Buffer in casacore Array
             auto array_shape = shape;
-            array_shape.append(casacore::IPosition(1, nrow));
+            array_shape.append(casacore::IPosition(1, nrow_));
             auto nelements = array_shape.product();
-            ARROW_ASSIGN_OR_RAISE(auto allocation, arrow::AllocateBuffer(nelements*sizeof(T), pool));
+            ARROW_ASSIGN_OR_RAISE(auto allocation, arrow::AllocateBuffer(nelements*sizeof(T), pool_));
             auto buffer = std::shared_ptr<arrow::Buffer>(std::move(allocation));
             auto * buf_ptr = reinterpret_cast<T *>(buffer->mutable_data());
             auto casa_array = casacore::Array<T>(array_shape, buf_ptr, casacore::SHARE);
 
             // Dump column data into Arrow Buffer
             try {
-                column.getColumnRange(casacore::Slice(startrow, nrow), casa_array);
+                column.getColumnRange(casacore::Slice(startrow_, nrow_), casa_array);
             } catch(std::exception & e) {
-                return arrow::Status::Invalid("MakeFixedArrayBuffer ", column_desc.name(), " ", e.what());
+                return arrow::Status::Invalid("MakeFixedArrayBuffer ", column_desc_.name(), " ", e.what());
             }
 
-            ARROW_ASSIGN_OR_RAISE(this->array, MakeArrowPrimitiveArray(buffer, nelements, arrow_dtype));
+            ARROW_ASSIGN_OR_RAISE(array_, MakeArrowPrimitiveArray(buffer, nelements, arrow_dtype));
         }
 
         // Fortran ordering
         for(auto dim_size: shape) {
-            ARROW_ASSIGN_OR_RAISE(this->array, arrow::FixedSizeListArray::FromArrays(this->array, dim_size));
+            ARROW_ASSIGN_OR_RAISE(array_, arrow::FixedSizeListArray::FromArrays(array_, dim_size));
         }
 
-        return ValidateArray(this->array);
+        return ValidateArray(array_);
     }
 
     template <typename T>
@@ -145,31 +145,31 @@ private:
             std::shared_ptr<arrow::Buffer> & nulls,
             int64_t null_counts) {
 
-        auto column = casacore::ArrayColumn<T>(this->column);
+        auto column = casacore::ArrayColumn<T>(column_);
 
         if constexpr(std::is_same<T, casacore::String>::value) {
             // Handle string cases with Arrow StringBuilders
             ARROW_RETURN_NOT_OK(FailIfNotUTF8(arrow_dtype));
             arrow::StringBuilder builder;
 
-            for(casacore::uInt row=startrow; row < endrow; ++row) {
+            for(casacore::uInt row=startrow_; row < endrow_; ++row) {
                 if(arrow::bit_util::GetBit(nulls->data(), local_row(row))) {
                     auto strings = column.get(row);
                     for(auto & string: strings) { ARROW_RETURN_NOT_OK(builder.Append(string)); }
                 }
             }
-            ARROW_ASSIGN_OR_RAISE(this->array, builder.Finish());
+            ARROW_ASSIGN_OR_RAISE(array_, builder.Finish());
         } else {
             auto nelements = std::accumulate(
                     shapes.begin(), shapes.end(), casacore::uInt(0),
                     [](auto i, const auto & s) { return i + s.product(); });
-            ARROW_ASSIGN_OR_RAISE(auto allocation, arrow::AllocateBuffer(nelements*sizeof(T), pool));
+            ARROW_ASSIGN_OR_RAISE(auto allocation, arrow::AllocateBuffer(nelements*sizeof(T), pool_));
             auto buffer = std::shared_ptr<arrow::Buffer>(std::move(allocation));
             auto * buf_ptr = reinterpret_cast<T *>(buffer->mutable_data());
             casacore::uInt offset = 0;
 
             // Dump column data into Arrow Buffer
-            for(casacore::uInt row=startrow; row < endrow; ++row) {
+            for(casacore::uInt row=startrow_; row < endrow_; ++row) {
                 auto lrow = local_row(row);
                 auto product = shapes[lrow].product();
                 if(arrow::bit_util::GetBit(nulls->data(), lrow) && product > 0) {
@@ -178,7 +178,7 @@ private:
                         column.get(row, casa_array);
                     } catch(std::exception & e) {
                         return arrow::Status::Invalid("ConvertVariableArrayColumn",
-                                                      column_desc.name(), " ", e.what());
+                                                      column_desc_.name(), " ", e.what());
                     }
 
                     offset += product;
@@ -188,10 +188,10 @@ private:
             if(offset != nelements) {
                 return arrow::Status::Invalid("offsets != nelements "
                                        "during conversion of variably shaped column ",
-                                       column_desc.name());
+                                       column_desc_.name());
             }
 
-            ARROW_ASSIGN_OR_RAISE(this->array, MakeArrowPrimitiveArray(buffer, nelements, arrow_dtype));
+            ARROW_ASSIGN_OR_RAISE(array_, MakeArrowPrimitiveArray(buffer, nelements, arrow_dtype));
         }
 
         // NOTE(sjperkins)
@@ -225,10 +225,10 @@ private:
 
 
         // Compute the products
-        auto ndim = column_desc.ndim();
-        auto products = std::vector<casacore::IPosition>(nrow, casacore::IPosition(ndim, 1));
+        auto ndim = column_desc_.ndim();
+        auto products = std::vector<casacore::IPosition>(nrow_, casacore::IPosition(ndim, 1));
 
-        for(casacore::uInt row=startrow; row < endrow; ++row) {
+        for(casacore::uInt row=startrow_; row < endrow_; ++row) {
             auto lrow = local_row(row);
             const auto & shape = shapes[lrow];
             auto & product = products[lrow];
@@ -243,13 +243,13 @@ private:
             unsigned int noffsets = std::accumulate(products.begin(), products.end(), 1,
                 [d](auto i, const auto & p) { return i + p[d]; });
 
-            arrow::Int32Builder builder(pool);
+            arrow::Int32Builder builder(pool_);
             unsigned int running_offset = 0;
             unsigned int o = 1;
             ARROW_RETURN_NOT_OK(builder.Reserve(noffsets));
             ARROW_RETURN_NOT_OK(builder.Append(running_offset));
 
-            for(casacore::uInt row=startrow; row < endrow; ++row) {
+            for(casacore::uInt row=startrow_; row < endrow_; ++row) {
                 auto repeats = products[local_row(row)][d];
                 auto dim_size = shapes[local_row(row)][d];
 
@@ -262,23 +262,23 @@ private:
             if(o != noffsets) { return arrow::Status::Invalid("o != noffsets"); }
 
             ARROW_ASSIGN_OR_RAISE(auto offsets, builder.Finish());
-            ARROW_ASSIGN_OR_RAISE(this->array, arrow::ListArray::FromArrays(*offsets, *this->array));
+            ARROW_ASSIGN_OR_RAISE(array_, arrow::ListArray::FromArrays(*offsets, *array_));
             // NOTE(sjperkins): Perhaps remove this for performance
-            ARROW_RETURN_NOT_OK(ValidateArray(this->array));
+            ARROW_RETURN_NOT_OK(ValidateArray(array_));
         }
 
-        if(auto list_array = std::dynamic_pointer_cast<arrow::ListArray>(this->array)) {
+        if(auto list_array = std::dynamic_pointer_cast<arrow::ListArray>(array_)) {
             // NOTE(sjperkins)
             // Directly adding nulls to the underlying list_array->data()
             // doesn't seem to work, recreate the array with nulls and null_count
-            ARROW_ASSIGN_OR_RAISE(this->array, arrow::ListArray::FromArrays(
+            ARROW_ASSIGN_OR_RAISE(array_, arrow::ListArray::FromArrays(
                 *list_array->offsets(),
                 *list_array->values(),
-                pool,
+                pool_,
                 nulls,
                 null_counts));
 
-            return ValidateArray(this->array);
+            return ValidateArray(array_);
         } else {
             return arrow::Status::Invalid("Unable to cast final array to arrow::ListArray");
         }
@@ -312,33 +312,34 @@ private:
     arrow::Status ConvertColumn(const std::shared_ptr<arrow::DataType> & arrow_dtype) {
         ARROW_RETURN_NOT_OK(CheckByteWidths<T>(arrow_dtype));
 
-        if(column_desc.ndim() == -1) {
+        if(column_desc_.ndim() == -1) {
             return arrow::Status::NotImplemented(
-                column_desc.name(), " has unconstrained dimensionality");
+                column_desc_.name(), " has unconstrained dimensionality");
         }
 
-        if(column_desc.isScalar()) {  // ndim == 0
+        if(column_desc_.isScalar()) {  // ndim == 0
             return ConvertScalarColumn<T>(arrow_dtype);
         }
 
-        assert(column_desc.ndim() >= 1);
+        assert(column_desc_.ndim() >= 1);
+
 
         auto & config = ServiceLocator::configuration();
         auto convert_method = config.GetDefault("casa.convert.strategy", "fixed");
         auto list_convert = convert_method.find("list") == 0;
 
-        if(!list_convert && column_desc.isFixedShape()) {
-            return ConvertFixedArrayColumn<T>(arrow_dtype, column_desc.shape());
+        if(!list_convert && column_desc_.isFixedShape()) {
+            return ConvertFixedArrayColumn<T>(arrow_dtype, column_desc_.shape());
         }
 
         // Variably shaped, read in shapes and null values
-        auto shapes = std::vector<casacore::IPosition>(nrow, casacore::IPosition(column_desc.ndim(), 0));
-        auto column = casacore::ArrayColumn<T>(this->column);
+        auto shapes = std::vector<casacore::IPosition>(nrow_, casacore::IPosition(column_desc_.ndim(), 0));
+        auto column = casacore::ArrayColumn<T>(column_);
         bool shapes_equal = true;
         int64_t null_counts = 0;
-        ARROW_ASSIGN_OR_RAISE(auto nulls, arrow::AllocateBitmap(nrow, pool));
+        ARROW_ASSIGN_OR_RAISE(auto nulls, arrow::AllocateBitmap(nrow_, pool_));
 
-        for(casacore::uInt row = startrow; row < endrow; ++row) {
+        for(casacore::uInt row = startrow_; row < endrow_; ++row) {
             auto lrow = local_row(row);
             auto is_defined = column.isDefined(row);
             arrow::bit_util::SetBitTo(nulls->mutable_data(), lrow, is_defined);
