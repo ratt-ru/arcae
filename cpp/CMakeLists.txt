@@ -19,4 +19,4 @@ target_compile_options(arcae PUBLIC "-D_GLIBCXX_USE_CXX11_ABI=1")
 set_target_properties(arcae PROPERTIES
     POSITION_INDEPENDENT_CODE 1)
 
-    install(TARGETS arcae LIBRARY DESTINATION ${ARCAE_LIB_INSTALL_PATH})
+install(TARGETS arcae LIBRARY DESTINATION arcae/lib)
