@@ -22,7 +22,7 @@ In the user or, even better, a virtual environment:
 .. code-block:: python
 
   $ pip install -U pip cibuildwheel
-  $ bash scripts/run_cbuildwheel.sh -p 3.8
+  $ bash scripts/run_cbuildwheel.sh -p 3.10
 
 .. warning::
   Only linux wheels are currently supported.
@@ -35,9 +35,8 @@ In the directory containing the source, setup your development environment as fo
 .. code-block:: python
 
   $ pip install -U pip virtualenv
-  $ virtualenv -p python3.8 /venv/arcaedev
+  $ virtualenv -p python3.10 /venv/arcaedev
   $ . /venv/arcaedev/bin/activate
-  # Edit pyproject.toml with instructions in https://github.com/ratt-ru/arcae/issues/52
   (arcaedev) export VCPKG_TARGET_TRIPLET=x64-linux-dynamic-cxx17-abi1-dbg
   (arcaedev) pip install -e .[test]
   (arcaedev) export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/vcpkg/installed/$VCPKG_TARGET_TRIPLET/lib

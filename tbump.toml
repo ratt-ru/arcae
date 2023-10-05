@@ -15,3 +15,7 @@ tag_template = "{new_version}"
 [[file]]
 src = "arcae/__init__.py"
 search = "__version__ = \"{current_version}\""
+
+[[file]]
+src = "pyproject.toml"
+search = "version = \"{current_version}\""

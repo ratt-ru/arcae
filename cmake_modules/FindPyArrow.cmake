@@ -17,9 +17,12 @@ if(NOT DEFINED NUMPY_INCLUDE)
     message(FATAL_ERROR "Unable to find numpy include directory. Set NUMPY_INCLUDE")
 endif()
 
+
 if(NOT DEFINED PYARROW_INCLUDE AND DEFINED ENV{PYARROW_INCLUDE})
     set(PYARROW_INCLUDE ENV{PYARROW_INCLUDE})
 endif()
+
+execute_process(COMMAND ${Python_EXECUTABLE} -c "import pyarrow; pyarrow.create_library_symlinks()")
 
 if(NOT DEFINED PYARROW_INCLUDE AND Python_Interpreter_FOUND)
     execute_process(COMMAND ${Python_EXECUTABLE} -c "import pyarrow; print(pyarrow.get_include())"

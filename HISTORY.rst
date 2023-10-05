@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Migrate build system to scikit-build-core (:pr:`61`)
 * Upgrade to Cython 3 and pyarrow 13.0.0 (:pr:`60`)
 * Introduce a more canonical C++ project structure (:pr:`57`. :pr:`59`)
 * Consistently use CamelCase throughout the C++ layer (:pr:`56`)

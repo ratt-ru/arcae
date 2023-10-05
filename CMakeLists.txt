@@ -12,7 +12,6 @@ set(CMAKE_JOB_POOL_COMPILE "compile")
 set(CMAKE_JOB_POOL_LINK "link")
 set(CMAKE_JOB_POOLS "compile=${ncores};link=2")
 
-set(ARCAE_LIB_INSTALL_PATH ${CMAKE_INSTALL_PREFIX}/arcae/lib)
 
 find_program(CCACHE_FOUND ccache)
 if(CCACHE_FOUND)
@@ -22,13 +21,13 @@ endif(CCACHE_FOUND)
 
 include(FindPyArrow)
 include(SetupVCPKG)
-project(main CXX C)
+project(arcae CXX)
 
 include_directories(cpp)
 add_subdirectory(cpp)
 
 if(SKBUILD)
-    add_subdirectory(arcae)
+    add_subdirectory(src/arcae)
 else()
     message(WARNING "scikit-build not available, Cython extensions not built")
 endif()
