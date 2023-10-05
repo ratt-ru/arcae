@@ -17,9 +17,12 @@ ColumnConvertVisitor::ColumnConvertVisitor(
     casacore::uInt startrow,
     casacore::uInt nrow,
     arrow::MemoryPool * pool)
-    : column(column), startrow(startrow), nrow(nrow),
-      endrow(startrow + nrow),
-      column_desc(column.columnDesc()), pool(pool) {
+    : column_(column),
+      startrow_(startrow),
+      nrow_(nrow),
+      endrow_(startrow + nrow),
+      column_desc_(column.columnDesc()),
+      pool_(pool) {
 
     assert(endrow <= column.nrow());
 }
@@ -68,7 +71,7 @@ ColumnConvertVisitor::MakeArrowPrimitiveArray(
         } else if(auto pos = convert_strategy.find("fixed"); pos == 0) {
             return arrow::FixedSizeListArray::FromArrays(child_array, 2);
         } else if(auto pos = convert_strategy.find("list"); pos == 0) {
-            arrow::Int32Builder builder(pool);
+            arrow::Int32Builder builder(pool_);
             ARROW_RETURN_NOT_OK(builder.Reserve(nelements + 1));
             for(decltype(nelements) i=0; i < nelements + 1; ++i)
                 { ARROW_RETURN_NOT_OK(builder.Append(2*i)); }

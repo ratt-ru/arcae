@@ -98,7 +98,7 @@ SafeTableProxy::GetColumn(const std::string & column, casacore::uInt startrow, c
         auto visitor = ColumnConvertVisitor(table_column, start_row, n_row);
         auto visit_status = visitor.Visit(column_desc.dataType());
         ARROW_RETURN_NOT_OK(visit_status);
-        return std::move(visitor.array);
+        return std::move(visitor.array_);
     });
 }
 
@@ -133,7 +133,7 @@ SafeTableProxy::ToArrow(casacore::uInt startrow, casacore::uInt nrow, const std:
                 continue;
             }
 
-            if(!visitor.array) {
+            if(!visitor.array_) {
                 ARROW_LOG(ERROR)
                     << "Ignoring " << column_name
                     << ". Arrow array not created by Visitor";
@@ -151,10 +151,10 @@ SafeTableProxy::ToArrow(casacore::uInt startrow, casacore::uInt nrow, const std:
             auto column_metadata = arrow::KeyValueMetadata::Make(
                 {ARCAE_METADATA}, {json_oss.str()});
             auto arrow_field = std::make_shared<arrow::Field>(
-                column_name, visitor.array->type(),
+                column_name, visitor.array_->type(),
                 true, std::move(column_metadata));
             fields.emplace_back(std::move(arrow_field));
-            arrays.emplace_back(std::move(visitor.array));
+            arrays.emplace_back(std::move(visitor.array_));
         }
 
         std::ostringstream json_oss;
