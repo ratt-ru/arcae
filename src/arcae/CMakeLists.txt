@@ -19,8 +19,9 @@ else()
     set(Python_SOABI_FIXED ${Python_SOABI})
 endif()
 
-python_add_library(arrow_tables MODULE WITH_SOABI arrow_tables.cc)
+message(STATUS "Python_SOABI_FIXED: ${Python_SOABI_FIXED}")
 
+python_add_library(arrow_tables MODULE arrow_tables.cc)
 set_target_properties(arrow_tables PROPERTIES OUTPUT_NAME "arrow_tables.${Python_SOABI_FIXED}")
 
 target_link_libraries(arrow_tables PUBLIC arcae PkgConfig::casacore)
