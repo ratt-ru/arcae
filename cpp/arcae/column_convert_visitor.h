@@ -19,6 +19,7 @@ public:
 
 public:
     const casacore::TableColumn & column_;
+    std::shared_ptr<arrow::Array> rowids_;
     const casacore::ColumnDesc & column_desc_;
     casacore::uInt startrow_;
     casacore::uInt endrow_;
@@ -41,6 +42,17 @@ public:
 #undef VISIT
 
 private:
+    static arrow::Result<std::shared_ptr<arrow::Array>>
+    GetRowIds(casacore::uInt startrow, casacore::uInt nrow, arrow::MemoryPool * pool) {
+        arrow::Int32Builder builder(pool);
+        ARROW_RETURN_NOT_OK(builder.Reserve(nrow));
+
+        for(auto [i, rowid] = std::tuple(startrow, int32_t(0)); i < nrow; ++i, ++rowid) {
+            ARROW_RETURN_NOT_OK(builder.Append(rowid));
+        }
+
+        return builder.Finish();
+    }
 
     static arrow::Status ValidateArray(const std::shared_ptr<arrow::Array> & array);
 
@@ -316,6 +328,8 @@ private:
             return arrow::Status::NotImplemented(
                 column_desc_.name(), " has unconstrained dimensionality");
         }
+
+        ARROW_ASSIGN_OR_RAISE(rowids_, GetRowIds(startrow_, nrow_, pool_));
 
         if(column_desc_.isScalar()) {  // ndim == 0
             return ConvertScalarColumn<T>(arrow_dtype);
