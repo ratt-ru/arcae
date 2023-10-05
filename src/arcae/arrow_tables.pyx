@@ -3,7 +3,6 @@
 
 from collections.abc import Iterable, MutableMapping
 import cython
-from cython.operator cimport dereference as deref
 import json
 from typing import Optional
 
@@ -66,7 +65,7 @@ cdef class ComplexType(BaseExtensionType):
             if not <bint>complex_type:
                 raise ValueError("Unable to downcast CDataType to CComplexType")
 
-            value_type = deref(complex_type).value_type()
+            value_type = complex_type.get().value_type()
 
         return pyarrow_wrap_data_type(value_type)
 
@@ -128,8 +127,8 @@ cdef class Table:
 
     def to_arrow(self, unsigned int startrow=0, unsigned int nrow=UINT_MAX, columns: list[str] | str = None):
         cdef:
-            shared_ptr[CTable] ctable
             vector[string] cpp_columns
+            shared_ptr[CArray] carray
 
         if isinstance(columns, str):
             columns = [columns]
@@ -137,8 +136,7 @@ cdef class Table:
         if columns:
             cpp_columns = [tobytes(c) for c in columns]
 
-        with nogil:
-            ctable = GetResultValue(deref(self.c_table).ToArrow(startrow, nrow, cpp_columns))
+        ctable = GetResultValue(self.c_table.get().ToArrow(startrow, nrow, cpp_columns))
 
         return pyarrow_wrap_table(ctable)
 
@@ -147,8 +145,7 @@ cdef class Table:
             shared_ptr[CArray] carray
             string cpp_column = tobytes(column)
 
-        with nogil:
-            carray = GetResultValue(deref(self.c_table).GetColumn(cpp_column, startrow, nrow))
+        carray = GetResultValue(self.c_table.get().GetColumn(cpp_column, startrow, nrow))
 
         py_column = pyarrow_wrap_array(carray)
 
@@ -233,8 +230,7 @@ cdef class Table:
         cpp_sort_columns: vector[string] = [] if sort_columns is None else [tobytes(c) for c in sort_columns]
         result = []
 
-        with nogil:
-            vector_result = GetResultValue(self.c_table.get().Partition(cpp_columns, cpp_sort_columns))
+        vector_result = GetResultValue(self.c_table.get().Partition(cpp_columns, cpp_sort_columns))
 
         for v in vector_result:
             table: Table = Table.__new__(Table)
