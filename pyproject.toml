@@ -47,3 +47,6 @@ build-backend = "scikit_build_core.build"
 
 [tools.setuptools.packages]
 find = {}
+
+[tool.scikit-build]
+# build-dir = "/tmp/arcae"

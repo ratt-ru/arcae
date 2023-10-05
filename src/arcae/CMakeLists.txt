@@ -11,7 +11,17 @@ add_custom_command(
             --output-file ${CMAKE_CURRENT_BINARY_DIR}/arrow_tables.cc
             --cplus -vvv)
 
+# Check and correct Python_SOABI if it has an .so suffix
+if(${Python_SOABI} MATCHES "\\.so$")
+    string(REGEX REPLACE "\\.so$" "" Python_SOABI_FIXED "${Python_SOABI}")
+    message(STATUS "Removing extra .so from ${Python_SOABI}")
+else()
+    set(Python_SOABI_FIXED ${Python_SOABI})
+endif()
+
 python_add_library(arrow_tables MODULE WITH_SOABI arrow_tables.cc)
+
+set_target_properties(arrow_tables PROPERTIES OUTPUT_NAME "arrow_tables.${Python_SOABI_FIXED}")
 
 target_link_libraries(arrow_tables PUBLIC arcae PkgConfig::casacore)
 target_link_directories(arrow_tables PUBLIC ${PYARROW_LIBDIRS})

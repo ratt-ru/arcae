@@ -45,6 +45,7 @@ export MANYLINUX_PLATFORM=manylinux_x86_64
 export CIBW_BUILD=$CPYTHON_VERSION-$MANYLINUX_PLATFORM
 export CIBW_BUILD_FRONTEND=build
 export CIBW_BEFORE_ALL_LINUX="yum install -y zip flex bison gcc-gfortran"
+export CIBW_MANYLINUX_X86_64_IMAGE="quay.io/pypa/manylinux_2_28_x86_64"
 export VCPKG_TARGET_TRIPLET=x64-linux-dynamic-cxx17-abi1-rel
 export CIBW_ENVIRONMENT_LINUX="\
 VCPKG_DEFAULT_BINARY_CACHE=/host$VCPKG_HOST_BINARY_CACHE \

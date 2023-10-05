@@ -21,13 +21,13 @@ endif(CCACHE_FOUND)
 
 include(FindPyArrow)
 include(SetupVCPKG)
-project(arcae CXX C)
+project(arcae CXX)
 
 include_directories(cpp)
 add_subdirectory(cpp)
 
 if(SKBUILD)
-    add_subdirectory(arcae)
+    add_subdirectory(src/arcae)
 else()
     message(WARNING "scikit-build not available, Cython extensions not built")
 endif()
