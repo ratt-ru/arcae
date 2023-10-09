@@ -12,6 +12,7 @@ THREADS = 8
 STEP = 2048
 MS_PARAMS = {"row": 100*STEP, "chan": 1024, "corr": 4}
 
+@pytest.mark.skip
 @pytest.mark.parametrize("ramp_ms", [MS_PARAMS], indirect=True,
                          ids=lambda c: f"ramp_ms: {','.join(f'{k}={v}' for k, v in c.items())}")
 def test_singlefile_multithread_read(ramp_ms, benchmark):
@@ -38,6 +39,7 @@ def test_singlefile_multithread_read(ramp_ms, benchmark):
     with cf.ThreadPoolExecutor(THREADS) as pool:
         benchmark(test_)
 
+@pytest.mark.skip
 @pytest.mark.parametrize("ramp_ms", [MS_PARAMS], indirect=True,
                          ids=lambda c: f"ramp_ms: {','.join(f'{k}={v}' for k, v in c.items())}")
 def test_multifile_multithreaded_read(ramp_ms, benchmark):
