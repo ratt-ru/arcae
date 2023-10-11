@@ -21,6 +21,13 @@ endif(CCACHE_FOUND)
 
 include(FindPyArrow)
 include(SetupVCPKG)
+
+if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
+    include(CTest)
+endif()
+
+enable_testing()
+
 project(arcae CXX)
 
 include_directories(cpp)
