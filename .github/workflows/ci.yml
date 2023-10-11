@@ -71,7 +71,7 @@ jobs:
 
       - name: Build and test shared library
         env:
-          VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+          VCPKG_BINARY_SOURCES: clear;x-gha,readwrite
           VCPKG_TARGET_TRIPLET: ${{ matrix.triplet }}
         run: |
           cmake -S . -B build
