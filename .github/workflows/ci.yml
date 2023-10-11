@@ -57,10 +57,17 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v3
 
+      - name: Set up Python ${{ matrix.python }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python }}
+
       - name: Install C++ Compiler and cmake
         run: |
           sudo apt update
           sudo apt install build-essential cmake
+          python -m pip install -U pip
+          python -m pip install pyarrow
 
       - name: Get Github Action Cache Variables
         uses: actions/github-script@v6
