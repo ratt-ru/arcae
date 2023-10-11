@@ -47,6 +47,12 @@ jobs:
     name: Execute C++ test cases
     runs-on: ubuntu-latest
     if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    strategy:
+      fail-fast: false
+      matrix:
+        triplet:
+          - x64-linux-dynamic-cxx17-abi1-rel
+
     steps:
       - name: Checkout source
         uses: actions/checkout@v3
@@ -63,13 +69,14 @@ jobs:
             core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
             core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
 
-      - name: Build shared library
+      - name: Build and test shared library
+        env:
+          VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+          VCPKG_TARGET_TRIPLET: ${{ matrix.triplet }}
         run: |
           cmake -S . -B build
           cmake --build build
-
-      - name: Run test cases
-        run: cd build && ctest
+          cd build && test
 
   build-wheels:
     name: Build and Test Binary Wheels
