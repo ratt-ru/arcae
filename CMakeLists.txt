@@ -14,6 +14,7 @@ set(CMAKE_JOB_POOL_COMPILE "compile")
 set(CMAKE_JOB_POOL_LINK "link")
 set(CMAKE_JOB_POOLS "compile=${ncores};link=2")
 
+project(arcae CXX)
 
 find_program(CCACHE_FOUND ccache)
 if(CCACHE_FOUND)
@@ -25,7 +26,6 @@ include(FindPyArrow)
 include(SetupVCPKG)
 include(CTest)
 
-project(arcae CXX)
 
 include_directories(cpp)
 add_subdirectory(cpp)
