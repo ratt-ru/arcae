@@ -90,7 +90,6 @@ jobs:
       - name: Execute C++ tests
         run: |
           cd build
-          tree
           ctest --verbose
 
       # - name: Debug with tmate on failure
