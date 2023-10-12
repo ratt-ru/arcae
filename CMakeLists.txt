@@ -23,6 +23,9 @@ include(FindPyArrow)
 include(SetupVCPKG)
 
 if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
+    message(STATUS "CMAKE_PROJECT_NAME=${CMAKE_PROJECT_NAME}")
+    message(STATUS "PROJECT_NAME=${PROJECT_NAME}")
+    message(STATUS "BUILD_TESTING=${BUILD_TESTING}")
     include(CTest)
 endif()
 
