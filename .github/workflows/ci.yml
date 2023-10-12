@@ -142,6 +142,7 @@ jobs:
           CIBW_BEFORE_ALL_LINUX: yum install -y zip flex bison gcc-gfortran
           CIBW_MANYLINUX_X86_64_IMAGE: quay.io/pypa/${{ matrix.platform[1] }}_x86_64
           CIBW_ENVIRONMENT_LINUX: >
+            CMAKE_ARGS=-DBUILD_TESTING=OFF
             ACTIONS_CACHE_URL=${{ env.ACTIONS_CACHE_URL }}
             ACTIONS_RUNTIME_TOKEN=${{ env.ACTIONS_RUNTIME_TOKEN }}
             VCPKG_BINARY_SOURCES="clear;x-gha,readwrite"
