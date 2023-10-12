@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.26)
 cmake_host_system_information(RESULT ncores QUERY NUMBER_OF_PHYSICAL_CORES)
+enable_testing()
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED On)
 set(CMAKE_CXX_EXTENSIONS Off)
@@ -22,14 +24,13 @@ endif(CCACHE_FOUND)
 include(FindPyArrow)
 include(SetupVCPKG)
 
+message(STATUS "CMAKE_PROJECT_NAME=${CMAKE_PROJECT_NAME}")
+message(STATUS "PROJECT_NAME=${PROJECT_NAME}")
+message(STATUS "BUILD_TESTING=${BUILD_TESTING}")
+
 if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
-    message(STATUS "CMAKE_PROJECT_NAME=${CMAKE_PROJECT_NAME}")
-    message(STATUS "PROJECT_NAME=${PROJECT_NAME}")
-    message(STATUS "BUILD_TESTING=${BUILD_TESTING}")
     include(CTest)
 endif()
-
-enable_testing()
 
 project(arcae CXX)
 
