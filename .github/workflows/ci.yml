@@ -76,13 +76,19 @@ jobs:
             core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
             core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
 
-      - name: Build and test shared library
+      - name: Build C++ libraries and tests
         env:
           VCPKG_BINARY_SOURCES: clear;x-gha,readwrite
           VCPKG_TARGET_TRIPLET: ${{ matrix.triplet }}
         run: |
           cmake -S . -B build
           cmake --build build
+
+      - name: Execute C++ tests
+        run: |
+          cd build
+          tree
+          ctest
 
   build-wheels:
     name: Build and Test Binary Wheels
