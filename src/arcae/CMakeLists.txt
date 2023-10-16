@@ -31,7 +31,6 @@ target_include_directories(arrow_tables PUBLIC
                             ${PYARROW_INCLUDE}
                             ${NUMPY_INCLUDE}
                             ${CMAKE_SOURCE_DIR}/cpp)
-target_compile_options(arrow_tables PUBLIC "-D_GLIBCXX_USE_CXX11_ABI=1")
 
 string(REPLACE " " ";" _PYARROW_LIBS ${PYARROW_LIBS})
 
