@@ -1,9 +1,15 @@
 #ifndef ARCAE_COLUMN_MAPPER_H
 #define ARCAE_COLUMN_MAPPER_H
 
+#include <iostream> //remove
+
 #include <algorithm>
+#include <cassert>
 #include <cstdint>
+#include <numeric>
 #include <vector>
+
+#include <casacore/casa/Arrays/Slicer.h>
 
 /// Utility class for mapping between in-disk and
 /// in-memory indices
@@ -29,44 +35,60 @@ public:
   };
 
   struct Range {
-    IdMap start;
-    IdMap end;
+    T start;
+    T end;
 
     constexpr inline bool operator==(const Range & lhs) const
         { return start == lhs.start && end == lhs.end; }
-    constexpr inline bool IsValid() { return start.from >= 0 && start.to >= 0; }
-    constexpr inline bool IsSingleton() { return IsValid() && end.IsEmpty(); }
-    static constexpr inline Range Empty() { return {IdMap::Empty(), IdMap::Empty()}; }
   };
 
   using ValueType = T;
   using ColumnIds = std::vector<T>;
   using ColumnSelection = std::vector<ColumnIds>;
   using ColumnMap = std::vector<IdMap>;
+  using ColumnMaps = std::vector<ColumnMap>;
   using ColumnRange = std::vector<Range>;
   using ColumnRanges = std::vector<ColumnRange>;
 
   ColumnMapping() = delete;
-  ColumnMapping(const ColumnSelection & column_selection={}, Direction direction=FORWARD)
-    : ranges_(DecomposeIntoRanges(column_selection, direction)) {}
+  ColumnMapping(const ColumnSelection & column_selection={},
+                Direction direction=FORWARD)
+    : maps_(MakeMaps(column_selection, direction)),
+      ranges_(MakeRanges(maps_, direction)),
+      direction_(direction) {}
 
-  static ColumnRanges DecomposeIntoRanges(const ColumnSelection & column_selection,
-                                          Direction direction);
+  static ColumnMaps MakeMaps(const ColumnSelection & column_selection,
+                             Direction direction=FORWARD);
+  static ColumnRanges MakeRanges(const ColumnMaps & maps,
+                                 Direction direction=FORWARD);
 
+  std::size_t NrOfElements() const {
+    return std::accumulate(std::begin(maps_), std::end(maps_), std::size_t(1),
+                           [](const auto & init, const auto & map)
+                                { return init * map.size(); });
+  }
+
+  bool IsSimple() const;
+  const ColumnMaps & GetMaps() const { return maps_; }
+  const ColumnRanges & GetRanges() const { return ranges_; }
+
+  Direction direction_;
+  ColumnMaps maps_;
   ColumnRanges ranges_;
 };
 
-template <typename T> typename ColumnMapping<T>::ColumnRanges
-ColumnMapping<T>::DecomposeIntoRanges(const ColumnSelection & column_selection, Direction direction)
+template <typename T> typename ColumnMapping<T>::ColumnMaps
+ColumnMapping<T>::MakeMaps(const ColumnSelection & column_selection, Direction direction)
 {
-    ColumnRanges ranges;
-    ranges.reserve(column_selection.size());
+    assert(column_selection.size() > 0);
+    for(const auto & c: column_selection) assert(c.size() > 0);
+
+    ColumnMaps column_maps;
+    column_maps.reserve(column_selection.size());
 
     for(std::size_t dim=0; dim < column_selection.size(); ++dim) {
         const auto & column_ids = column_selection[dim];
-        ColumnRange column_range;
-
-        ColumnMap column_map;
+        auto column_map = ColumnMap{};
         column_map.reserve(column_ids.size());
 
         for(auto [from_it, to] = std::tuple{std::begin(column_ids), ValueType(0)};
@@ -74,12 +96,7 @@ ColumnMapping<T>::DecomposeIntoRanges(const ColumnSelection & column_selection, 
             column_map.push_back({*from_it, to});
         }
 
-        if(column_map.size() == 0) {
-            column_range.push_back(Range::Empty());
-            continue;
-        }
-
-        if(direction == Direction::FORWARD) {
+        if(direction == FORWARD) {
             std::sort(std::begin(column_map), std::end(column_map),
                     [](const auto & lhs, const auto & rhs) {
                         return lhs.from < rhs.from; });
@@ -89,34 +106,77 @@ ColumnMapping<T>::DecomposeIntoRanges(const ColumnSelection & column_selection, 
                         return lhs.to < rhs.to; });
         }
 
-        auto current = Range{*std::begin(column_map), IdMap::Empty()};
-
-        for(auto [prev, next] = std::tuple{
-                    std::begin(column_map),
-                    std::next(std::begin(column_map))};
-            next != std::end(column_map); ++prev, ++next) {
-
-            if(next->from - prev->from == 1) {
-                current.end = *next;
-            } else {
-                column_range.push_back(current);
-                current = Range{*next, IdMap::Empty()};
-            }
-        }
-
-        column_range.push_back(current);
-
-        // for(auto & range: column_range) {
-        //     std::cout << '[' << range.start.from << ", " << range.start.to
-        //               << "] -> [" << range.end.from << ", " << range.end.to << "]" << std::endl;
-        // }
-
-        // std::cout << std::endl;
-
-        ranges.emplace_back(std::move(column_range));
+        column_maps.emplace_back(std::move(column_map));
     }
 
-    return ranges;
+    return column_maps;
+}
+
+template <typename T> typename ColumnMapping<T>::ColumnRanges
+ColumnMapping<T>::MakeRanges(const ColumnMaps & maps, Direction direction) {
+  ColumnRanges column_ranges;
+  column_ranges.reserve(maps.size());
+
+  for(std::size_t dim=0; dim < maps.size(); ++dim) {
+      const auto & column_map = maps[dim];
+      auto column_range = ColumnRange{};
+      assert(column_map.size() > 0);
+      auto begin_it = std::begin(column_map);
+      auto current = Range{0, 1};
+
+      for(auto [i, prev, next] = std::tuple{
+              ValueType(1),
+              std::begin(column_map),
+              std::next(std::begin(column_map))};
+          next != std::end(column_map); ++i, ++prev, ++next) {
+
+          if(direction == FORWARD && next->from - prev->from == 1) {
+              current.end += 1;
+          } else if(direction == BACKWARD && next->to - prev->to == 1) {
+              current.end += 1;
+          } else {
+              column_range.push_back(current);
+              current = Range{i, i + 1};
+          }
+      }
+
+      column_range.push_back(current);
+      column_ranges.emplace_back(std::move(column_range));
+  }
+
+  return column_ranges;
+}
+
+template <typename T>
+bool ColumnMapping<T>::IsSimple() const {
+  for(std::size_t dim=0; dim < maps_.size(); ++dim) {
+    const auto & column_map = maps_[dim];
+    const auto & column_range = ranges_[dim];
+
+    // More than one range of row ids in a dimension
+    if(column_range.size() > 1) return false;
+
+    if(direction_ == FORWARD) {
+      for(auto &[start, end]: column_range) {
+        for(std::size_t i = start + 1; i < end; ++i) {
+          if(column_map[i].from - column_map[i-1].from != 1) {
+            return false;
+          }
+        }
+      }
+    } else {
+      for(auto &[start, end]: column_range) {
+        for(std::size_t i = start + 1; i < end; ++i) {
+          if(column_map[i].to - column_map[i-1].to != 1) {
+            return false;
+          }
+        }
+      }
+    }
+
+  }
+
+  return true;
 }
 
 
