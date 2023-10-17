@@ -4,7 +4,6 @@ pkg_check_modules(casacore REQUIRED IMPORTED_TARGET casacore)
 add_library(arcae SHARED
     arcae/casa_visitors.cc
     arcae/column_convert_visitor.cc
-    arcae/fancy_convert_visitor.cc
     arcae/complex_type.cc
     arcae/configuration.cc
     arcae/descriptor.cc
