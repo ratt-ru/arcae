@@ -3,6 +3,7 @@
 
 #include <climits>
 #include <functional>
+#include <type_traits>
 
 #include <casacore/tables/Tables.h>
 #include <casacore/tables/Tables/TableProxy.h>
@@ -16,6 +17,16 @@ namespace arcae {
 
 static constexpr char ARCAE_METADATA[]  = "__arcae_metadata__";
 static constexpr char CASA_DESCRIPTOR[]  = "__casa_descriptor__";
+
+
+template <typename Fn, typename ...Args>
+using FunctorReturnType = decltype(std::invoke(std::declval<Fn>(), std::declval<Args>()...));
+
+template <typename T>
+struct is_arrow_result : std::false_type {};
+
+template <typename R>
+struct is_arrow_result<arrow::Result<R>> : std::true_type {};
 
 /// @class SafeTableProxy
 /// @brief Constrains Table access to an arrow::ThreadPool containing a single thread.
@@ -41,13 +52,13 @@ protected:
     /// Run the given functor in the isolated Threadpool
     template <typename Fn>
     std::invoke_result_t<Fn> run_isolated(Fn && functor) {
-        return arrow::DeferNotOk(this->io_pool->Submit(std::move(functor))).result();
+        return arrow::DeferNotOk(this->io_pool->Submit(std::forward<Fn>(functor))).result();
     }
 
     /// Run the given functor in the isolated Threadpool
     template <typename Fn>
     std::invoke_result_t<Fn> run_isolated(Fn && functor) const {
-        return arrow::DeferNotOk(this->io_pool->Submit(std::move(functor))).result();
+        return arrow::DeferNotOk(this->io_pool->Submit(std::forward<Fn>(functor))).result();
     }
 
 public:
@@ -57,6 +68,27 @@ public:
             ARROW_LOG(WARNING) << "Error closing file " << result.status();
         }
     };
+
+    template <typename Fn,
+              typename = std::enable_if_t<
+                std::is_invocable_v<Fn, const casacore::TableProxy &>>>
+    std::invoke_result_t<Fn, const casacore::TableProxy &> run(Fn && functor) const {
+        return run_isolated([this, functor = std::move(functor)]() mutable {
+            return std::invoke(std::forward<Fn>(functor),
+                               static_cast<const casacore::TableProxy &>(*this->table_proxy));
+        });
+    }
+
+    template <typename Fn,
+              typename = std::enable_if_t<
+                std::is_invocable_v<Fn, casacore::TableProxy &>>>
+    std::invoke_result_t<Fn, casacore::TableProxy &> run(Fn && functor) {
+        return run_isolated([this, functor = std::move(functor)]() mutable {
+            return std::invoke(std::forward<Fn>(functor),
+                               static_cast<casacore::TableProxy &>(*this->table_proxy));
+        });
+    }
+
 
     template <typename Fn>
     static arrow::Result<std::shared_ptr<SafeTableProxy>> Make(Fn && functor) {

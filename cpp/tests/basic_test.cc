@@ -32,3 +32,12 @@ TEST_F(BasicTableTests, CasaTable) {
   ASSERT_TRUE(table_proxy_);
   ASSERT_EQ(table_proxy_->nRow(), 100);
 }
+
+
+TEST_F(BasicTableTests, RunFunctor) {
+  auto nrows = table_proxy_->run([](casacore::TableProxy & proxy) {
+    return arrow::Result(proxy.table().nrow());
+  });
+
+  EXPECT_EQ(nrows, 100);
+}

@@ -65,24 +65,19 @@ TEST(RangeTest, CheckMapsAndRangesMultiple) {
     EXPECT_THAT(ranges[2], ::testing::ElementsAre(
         C::Range{0, 3},
         C::Range{3, 5}));
+
+    ASSERT_FALSE(map.IsSimple());
 }
 
 TEST(RangeTest, TestSimplicity) {
-    {
-        auto map = C({{4, 3, 2, 1}}, C::FORWARD);
-        EXPECT_TRUE(map.IsSimple());
-    }
-    {
-        // Discontinuous range in first dimension
-        auto map = C({{4, 3, 2, 0}}, C::FORWARD);
-        EXPECT_FALSE(map.IsSimple());
-    }
-    {
-        auto map = C({{4, 3, 2, 1}, {6, 7}, {9, 8}}, C::FORWARD);
-        EXPECT_TRUE(map.IsSimple());
-    }
-    {
-        auto map = C({{4, 3, 2, 1}, {6, 7}, {9, 8}}, C::BACKWARD);
-        EXPECT_TRUE(map.IsSimple());
-    }
+    EXPECT_TRUE(C({{1, 2, 3, 4}}, C::FORWARD).IsSimple());
+    EXPECT_TRUE(C({{1, 2, 3, 4}}, C::BACKWARD).IsSimple());
+    EXPECT_TRUE(C({{1, 2, 3, 4}, {5, 6}, {6, 7}}, C::FORWARD).IsSimple());
+    EXPECT_TRUE(C({{1, 2, 3, 4}, {5, 6}, {6, 7}}, C::BACKWARD).IsSimple());
+
+    // Multiple mapping ranges (discontiguous)
+    EXPECT_FALSE(C({{1, 2, 4, 5}}).IsSimple());
+
+    // Not monotically increasing
+    EXPECT_FALSE(C({{4, 3, 2, 1}}).IsSimple());
 }

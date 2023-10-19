@@ -19,6 +19,7 @@ class ColumnMapping {
   static_assert(std::is_signed_v<T>, "T is not signed");
 
 public:
+  // Direction of the map
   enum Direction {
     FORWARD=0,
     BACKWARD
@@ -50,7 +51,6 @@ public:
   using ColumnRange = std::vector<Range>;
   using ColumnRanges = std::vector<ColumnRange>;
 
-  ColumnMapping() = delete;
   ColumnMapping(const ColumnSelection & column_selection={},
                 Direction direction=FORWARD)
     : maps_(MakeMaps(column_selection, direction)),
@@ -147,6 +147,11 @@ ColumnMapping<T>::MakeRanges(const ColumnMaps & maps, Direction direction) {
   return column_ranges;
 }
 
+/// Returns true if this is a simple mapping. A mapping is simple
+/// if the following holds:
+/// 1. There is a single mapping range in each dimension
+/// 2. Each IdMap in the mapping range is monotically increasing
+///    in both the from and to field
 template <typename T>
 bool ColumnMapping<T>::IsSimple() const {
   for(std::size_t dim=0; dim < maps_.size(); ++dim) {
@@ -156,24 +161,16 @@ bool ColumnMapping<T>::IsSimple() const {
     // More than one range of row ids in a dimension
     if(column_range.size() > 1) return false;
 
-    if(direction_ == FORWARD) {
-      for(auto &[start, end]: column_range) {
-        for(std::size_t i = start + 1; i < end; ++i) {
-          if(column_map[i].from - column_map[i-1].from != 1) {
-            return false;
-          }
+    for(auto &[start, end]: column_range) {
+      for(std::size_t i = start + 1; i < end; ++i) {
+        if(column_map[i].from - column_map[i-1].from != 1) {
+          return false;
         }
-      }
-    } else {
-      for(auto &[start, end]: column_range) {
-        for(std::size_t i = start + 1; i < end; ++i) {
-          if(column_map[i].to - column_map[i-1].to != 1) {
-            return false;
-          }
+        if(column_map[i].to - column_map[i-1].to != 1) {
+          return false;
         }
       }
     }
-
   }
 
   return true;
