@@ -4,6 +4,8 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Don't hold the GIL when calling GetResultValue (:pr:`66`)
+* Add support for a C++ test suite (:pr:`64`)
 * Use underscore for ColumnConvertVisitor member names (:pr:`62`)
 * Migrate build system to scikit-build-core (:pr:`61`)
 * Upgrade to Cython 3 and pyarrow 13.0.0 (:pr:`60`)
