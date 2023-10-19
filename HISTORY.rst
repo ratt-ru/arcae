@@ -4,6 +4,8 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Support multiple table objects reading from the same underlying table in multiple threads (:pr:`67`)
+* Don't hold the GIL when calling GetResultValue (:pr:`66`)
 * Add support for a C++ test suite (:pr:`64`)
 * Use underscore for ColumnConvertVisitor member names (:pr:`62`)
 * Migrate build system to scikit-build-core (:pr:`61`)
