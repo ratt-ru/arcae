@@ -2,6 +2,10 @@
 History
 =======
 
+X.Y.Z (YYYY-MM-DD)
+------------------
+* Set skip-existing=true when uploading distributables to TestPyPI (:pr:`68`)
+
 0.2.0 (2023-10-19)
 ------------------
 * Support multiple table objects reading from the same underlying table in multiple threads (:pr:`67`)
