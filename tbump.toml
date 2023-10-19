@@ -13,7 +13,7 @@ message_template = "Bump to {new_version}"
 tag_template = "{new_version}"
 
 [[file]]
-src = "arcae/__init__.py"
+src = "src/arcae/__init__.py"
 search = "__version__ = \"{current_version}\""
 
 [[file]]
