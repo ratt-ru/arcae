@@ -2,7 +2,7 @@
 History
 =======
 
-X.Y.Z (YYYY-MM-DD)
+0.2.0 (2023-10-19)
 ------------------
 * Support multiple table objects reading from the same underlying table in multiple threads (:pr:`67`)
 * Don't hold the GIL when calling GetResultValue (:pr:`66`)
