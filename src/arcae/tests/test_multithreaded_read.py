@@ -1,5 +1,4 @@
 import concurrent.futures as cf
-import gc
 import numpy as np
 from numpy.testing import assert_array_equal
 import threading
@@ -7,12 +6,28 @@ import threading
 import arcae
 import pytest
 
+try:
+    import pytest_benchmark
+except ImportError:
+    pytest_benchmark = None
+
+# This test suite benchmarks reads in two cases:
+#
+# 1. Multiple read requests issued from multiple threads through a single table object
+# 2. Multiple read requests issued from multiple threads through multiple table objects
+#    that have all opened the same file
+#
+# Notes:
+# * COMPARE should be set to False when testing pure I/O, but is useful for
+#   ensuring that no data corruption occurs.
+# * Larger dimension sizes are more representative of real world scenarios
+# * Remember to drop caches between tests
 COMPARE = False
 THREADS = 8
-STEP = 2048
+STEP = 10
 MS_PARAMS = {"row": 100*STEP, "chan": 1024, "corr": 4}
 
-@pytest.mark.skip
+@pytest.mark.skipif(not pytest_benchmark, reason="pytest-benchmark not installed")
 @pytest.mark.parametrize("ramp_ms", [MS_PARAMS], indirect=True,
                          ids=lambda c: f"ramp_ms: {','.join(f'{k}={v}' for k, v in c.items())}")
 def test_singlefile_multithread_read(ramp_ms, benchmark):
@@ -39,7 +54,8 @@ def test_singlefile_multithread_read(ramp_ms, benchmark):
     with cf.ThreadPoolExecutor(THREADS) as pool:
         benchmark(test_)
 
-@pytest.mark.skip
+
+@pytest.mark.skipif(not pytest_benchmark, reason="pytest-benchmark not installed")
 @pytest.mark.parametrize("ramp_ms", [MS_PARAMS], indirect=True,
                          ids=lambda c: f"ramp_ms: {','.join(f'{k}={v}' for k, v in c.items())}")
 def test_multifile_multithreaded_read(ramp_ms, benchmark):
@@ -55,7 +71,7 @@ def test_multifile_multithreaded_read(ramp_ms, benchmark):
         try:
             T = table_cache[ms]
         except KeyError:
-            print(f"Creating {ms} in thread {threading.get_ident()}")
+            print(f"Opening {ms} in thread {threading.get_ident()}")
             T = table_cache[ms] = arcae.table(ms)
 
         # with arcae.table(ms) as T:
