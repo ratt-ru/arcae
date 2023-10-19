@@ -269,9 +269,9 @@ def generate_column_cases_table(path):
     return table_name
 
 
-def casa_table_at_path(factory, path):
+def casa_table_at_path(factory, *args):
     with mp.get_context("spawn").Pool(1) as pool:
-        return pool.apply(factory, (str(path),))
+        return pool.apply(factory, args)
 
 
 @pytest.fixture
@@ -404,3 +404,69 @@ def generate_getcol_table(path):
 def getcol_table(tmp_path_factory):
     return casa_table_at_path(generate_getcol_table,
                               tmp_path_factory.mktemp("getcol_cases"))
+
+
+STEP = 1024
+NROW = 100*STEP
+NCHAN = 1024
+NCORR = 4
+
+def generate_ramp_ms(path, dims):
+    import numpy as np
+    import pyrap.tables as pt
+
+    nrow = dims.get("row", NROW)
+    nchan = dims.get("chan", NCHAN)
+    ncorr = dims.get("corr", NCORR)
+
+    data_shape = (nchan, ncorr)
+
+    table_desc = [
+        {
+            "desc": {
+                "_c_order": True,
+                "comment": "COMPLEX_DATA column",
+                "ndim": 2,
+                "shape": list(data_shape),
+                "option": 0,
+                "valueType": "dcomplex",
+            },
+            "name": "COMPLEX_DATA",
+        },
+        {
+            "desc": {
+                "_c_order": True,
+                "comment": "TIME column",
+                "option": 0,
+                "valueType": "double",
+            },
+            "name": "TIME",
+        }
+    ]
+
+    table_desc = pt.maketabdesc(table_desc)
+    table_name = os.path.join(path, "test.table")
+
+    with pt.table(table_name, table_desc, nrow=nrow, ack=False) as T:
+        for startrow in range(0, nrow, STEP):
+            local_nrow = min(STEP, nrow - startrow)
+
+            row_data = np.arange(startrow, startrow + local_nrow)
+            data = np.broadcast_to(row_data[:, None, None], row_data.shape + data_shape)
+
+            assert data.shape[0] == local_nrow
+
+            T.putcol("COMPLEX_DATA", data, startrow=startrow, nrow=local_nrow)
+            T.putcol("TIME", row_data, startrow=startrow, nrow=local_nrow)
+
+    return table_name
+
+@pytest.fixture(
+        scope="session",
+        params=[
+            {"row": NROW, "chan": NCHAN, "corr": NCORR}
+        ])
+def ramp_ms(request, tmp_path_factory):
+    return casa_table_at_path(generate_ramp_ms,
+                              tmp_path_factory.mktemp("generate_ramp_ms"),
+                              request.param)

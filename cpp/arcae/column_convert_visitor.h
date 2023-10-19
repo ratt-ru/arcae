@@ -60,6 +60,7 @@ private:
     template <typename T>
     arrow::Status ConvertScalarColumn(const std::shared_ptr<arrow::DataType> & arrow_dtype) {
         auto column = casacore::ScalarColumn<T>(column_);
+        column.setMaximumCacheSize(1);
 
         if constexpr(std::is_same<T, casacore::String>::value) {
             // Handle string cases with Arrow StringBuilders
@@ -98,6 +99,7 @@ private:
     arrow::Status ConvertFixedArrayColumn(const std::shared_ptr<arrow::DataType> & arrow_dtype,
                                    const casacore::IPosition & shape) {
         auto column = casacore::ArrayColumn<T>(column_);
+        column.setMaximumCacheSize(1);
 
         if constexpr(std::is_same<T, casacore::String>::value) {
             // Handle string cases with Arrow StringBuilders
@@ -146,6 +148,7 @@ private:
             int64_t null_counts) {
 
         auto column = casacore::ArrayColumn<T>(column_);
+        column.setMaximumCacheSize(1);
 
         if constexpr(std::is_same<T, casacore::String>::value) {
             // Handle string cases with Arrow StringBuilders

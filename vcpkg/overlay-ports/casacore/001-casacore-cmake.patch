@@ -537,3 +537,29 @@ index 139bd035e..9828461b8 100644
  #else
  	typedef std::false_type allocator_is_always_equal;
  #endif
+diff --git a/tables/Tables/PlainTable.cc b/tables/Tables/PlainTable.cc
+index 6214242b4..3c2c0dcb8 100644
+--- a/tables/Tables/PlainTable.cc
++++ b/tables/Tables/PlainTable.cc
+@@ -47,7 +47,7 @@
+ namespace casacore { //# NAMESPACE CASACORE - BEGIN
+ 
+ //# Initialize the static TableCache object.
+-TableCache PlainTable::theirTableCache;
++thread_local TableCache PlainTable::theirTableCache;
+ 
+ PlainTable::PlainTable (SetupNewTable& newtab, rownr_t nrrow, Bool initialize,
+                         const TableLock& lockOptions, int endianFormat,
+diff --git a/tables/Tables/PlainTable.h b/tables/Tables/PlainTable.h
+index 452e33cd3..bb46a0dba 100644
+--- a/tables/Tables/PlainTable.h
++++ b/tables/Tables/PlainTable.h
+@@ -316,7 +316,7 @@ private:
+                                        //# False = little endian canonical
+     TSMOption      tsmOption_p;
+     //# cache of open (plain) tables
+-    static TableCache theirTableCache;
++    static thread_local TableCache theirTableCache;
+ };
+ 
+ 

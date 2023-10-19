@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.26)
+cmake_minimum_required(VERSION 3.25)
 cmake_host_system_information(RESULT ncores QUERY NUMBER_OF_PHYSICAL_CORES)
 enable_testing()
 
