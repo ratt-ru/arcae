@@ -2,7 +2,7 @@
 import pyarrow as pa  # noqa
 from typing import TYPE_CHECKING
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 if TYPE_CHECKING:
     from arcae.lib.arrow_tables import Table
