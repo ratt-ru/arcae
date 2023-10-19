@@ -24,7 +24,7 @@ ColumnConvertVisitor::ColumnConvertVisitor(
       column_desc_(column.columnDesc()),
       pool_(pool) {
 
-    assert(endrow <= column.nrow());
+    assert(endrow_ <= column.nrow());
 }
 
 

@@ -20,3 +20,7 @@ set_target_properties(arcae PROPERTIES
     POSITION_INDEPENDENT_CODE 1)
 
 install(TARGETS arcae LIBRARY DESTINATION arcae/lib)
+
+if(BUILD_TESTING)
+    add_subdirectory(tests)
+endif()
