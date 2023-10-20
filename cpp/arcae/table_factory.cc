@@ -80,21 +80,31 @@ static constexpr char kWeather[] = "WEATHER";
 
 } // namespace
 
-Result<std::shared_ptr<SafeTableProxy>> OpenTable(const std::string & filename) {
-    return SafeTableProxy::Make([&filename]() -> Result<std::shared_ptr<TableProxy>> {
+Result<std::shared_ptr<SafeTableProxy>> OpenTable(
+        const std::string & filename,
+        bool readonly) {
+    return SafeTableProxy::Make([&filename, &readonly]() -> Result<std::shared_ptr<TableProxy>> {
         Record record;
         TableLock lock(TableLock::LockOption::AutoNoReadLocking);
 
-        record.define("option", "usernoread");
+        record.define("option", "auto");
         record.define("internal", lock.interval());
         record.define("maxwait", casacore::Int(lock.maxWait()));
 
+        std::shared_ptr<TableProxy> proxy;
+
         try {
-            return std::make_shared<TableProxy>(
+            proxy = std::make_shared<TableProxy>(
                 filename, record, Table::TableOption::Old);
+
+            if(!readonly) {
+                proxy->reopenRW();
+            }
         } catch(std::exception & e) {
             return Status::Invalid(e.what());
         }
+
+        return proxy;
     });
 }
 
