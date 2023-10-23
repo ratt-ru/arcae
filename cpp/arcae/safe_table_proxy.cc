@@ -277,6 +277,7 @@ SafeTableProxy::Close() {
         return run_isolated([this]() -> Result<bool> {
             this->table_->flush();
             this->table_->unlock();
+            this->table_.reset();
             return true;
         });
     }
