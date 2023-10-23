@@ -168,4 +168,11 @@ Result<std::shared_ptr<SafeTableProxy>> DefaultMS(
     });
 }
 
+arrow::Result<std::shared_ptr<SafeTableProxy>> Taql(const std::string & taql) {
+    return SafeTableProxy::Make([&]() -> arrow::Result<std::shared_ptr<TableProxy>> {
+        return std::make_shared<TableProxy>(taql, std::vector<TableProxy>{});
+    });
+}
+
+
 } // namespace arcae

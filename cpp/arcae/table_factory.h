@@ -16,6 +16,8 @@ arrow::Result<std::shared_ptr<SafeTableProxy>> DefaultMS(
                                 const std::string & subtable="MAIN",
                                 const std::string & json_table_desc="{}",
                                 const std::string & json_dminfo="{}");
+arrow::Result<std::shared_ptr<SafeTableProxy>> Taql(
+                                const std::string & taql);
 
 
 } // namespace arcae

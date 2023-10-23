@@ -1,6 +1,7 @@
 import json
 import os
 
+
 import numpy as np
 from numpy.testing import assert_array_equal
 import pyarrow as pa
@@ -10,6 +11,7 @@ import pyarrow.parquet as pq
 import pytest
 
 import arcae
+from arcae.lib.arrow_tables import Table
 
 @pytest.mark.parametrize("table_suffix, table_name", [
     ("", "MAIN"),
@@ -137,6 +139,50 @@ def test_partial_read(sorting_table):
     for nrow in nrows:
         assert full.take(list(range(start, start + nrow))) == T.to_arrow(start, nrow)
         start += nrow
+
+def test_table_taql(sorting_table):
+    """ Tests that basic taql queries work """
+    with Table.from_taql(f"SELECT * FROM {sorting_table} ORDER BY TIME, ANTENNA1, ANTENNA2") as T:
+        assert pa.Table.from_pydict({
+            "FIELD_ID": pa.array([2, 2, 2, 1, 1, 1, 1, 0, 0, 0], pa.int32()),
+            "ANTENNA1": pa.array([1, 0, 0, 1, 2, 1, 1, 1, 0, 0], pa.int32()),
+            "ANTENNA2": pa.array([2, 1, 1, 0, 1, 2, 3, 2, 2, 1], pa.int32()),
+            "DATA_DESC_ID": pa.array([1, 1, 1, 0, 0, 0, 0, 0, 0, 0], pa.int32()),
+            "SCAN_NUMBER": pa.array([1, 0, 1, 0, 1, 0, 1, 0, 1, 0], pa.int32()),
+            "STATE_ID": pa.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0], pa.int32()),
+            "TIME": pa.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0], pa.float64()),
+        }) == T.to_arrow()
+
+    with Table.from_taql(f"SELECT * FROM {sorting_table} ORDER BY ANTENNA1, ANTENNA2, TIME") as T:
+        assert pa.Table.from_pydict({
+            "FIELD_ID": pa.array([2, 2, 0, 0, 1, 2, 1, 0, 1, 1], pa.int32()),
+            "ANTENNA1": pa.array([0, 0, 0, 0, 1, 1, 1, 1, 1, 2], pa.int32()),
+            "ANTENNA2": pa.array([1, 1, 1, 2, 0, 2, 2, 2, 3, 1], pa.int32()),
+            "DATA_DESC_ID": pa.array([1, 1, 0, 0, 0, 1, 0, 0, 0, 0], pa.int32()),
+            "SCAN_NUMBER": pa.array([0, 1, 0, 1, 0, 1, 0, 0, 1, 1], pa.int32()),
+            "STATE_ID": pa.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0], pa.int32()),
+            "TIME": pa.array([0.2, 0.3, 1, 0.9, 0.4, 0.1, 0.6, 0.8, 0.7, 0.5], pa.float64()),
+        }) == T.to_arrow()
+
+
+def test_complex_taql(sorting_table):
+    query = f"""
+    SELECT
+        ANTENNA1,
+        ANTENNA2,
+        GROWID() as ROW,
+        GAGGR(TIME) as TIME,
+        GAGGR(FIELD_ID) as FIELD_ID,
+        GAGGR(SCAN_NUMBER) as SCAN_NUMBER
+    FROM
+        {sorting_table}
+    GROUPBY
+        ANTENNA1,
+        ANTENNA2
+    """
+
+    with Table.from_taql(query) as T:
+        print(T.to_arrow())
 
 def test_table_partitioning(sorting_table):
     T = arcae.table(sorting_table)
