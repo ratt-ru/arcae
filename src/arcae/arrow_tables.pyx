@@ -41,6 +41,7 @@ from arcae.arrow_tables cimport (CCasaTable,
                                  CServiceLocator,
                                  COpenTable,
                                  CDefaultMS,
+                                 CTaql,
                                  complex64,
                                  complex128,
                                  UINT_MAX)
@@ -102,6 +103,12 @@ cdef class Table:
 
     def __exit__(self, etype, evalue, etraceback):
         self.close()
+
+    @staticmethod
+    def from_taql(taql: str) -> Table:
+      cdef Table table = Table.__new__(Table)
+      table.c_table = GetResultValue(CTaql(tobytes(taql)))
+      return table
 
     @staticmethod
     def from_filename(filename: str) -> Table:
