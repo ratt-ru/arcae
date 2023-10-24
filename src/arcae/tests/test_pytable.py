@@ -33,6 +33,8 @@ def test_column_selection(column_case_table):
             "FIXED_STRING",
             "SCALAR",
             "SCALAR_STRING",
+            # Even though the column is unconstrained, ndim is the same
+            "UNCONSTRAINED_SAME_NDIM",
             "VARIABLE",
             "VARIABLE_STRING"
         ]
@@ -43,7 +45,9 @@ def test_column_selection(column_case_table):
             "FIXED_STRING",
             "SCALAR",
             "SCALAR_STRING",
-            "UNCONSTRAINED",   # We can
+            # When retrieving a single row, we can get values from an unconstrained column
+            "UNCONSTRAINED",
+            "UNCONSTRAINED_SAME_NDIM",
             "VARIABLE",
             "VARIABLE_STRING"
         ]
