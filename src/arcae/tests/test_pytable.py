@@ -27,14 +27,32 @@ def test_parquet_write(tmp_path, tau_ms, table_suffix, table_name):
 
 
 def test_column_selection(column_case_table):
-    T = arcae.table(column_case_table).to_arrow(0, 1)
-    assert sorted(T.column_names) == ["FIXED", "FIXED_STRING", "SCALAR", "SCALAR_STRING", "VARIABLE", "VARIABLE_STRING"]
+    with arcae.table(column_case_table) as T:
+        assert sorted(T.to_arrow().column_names) == [
+            "FIXED",
+            "FIXED_STRING",
+            "SCALAR",
+            "SCALAR_STRING",
+            "VARIABLE",
+            "VARIABLE_STRING"
+        ]
 
-    T = arcae.table(column_case_table).to_arrow(0, 1, "VARIABLE")
-    assert T.column_names == ["VARIABLE"]
+    with arcae.table(column_case_table) as T:
+        assert sorted(T.to_arrow(0, 1).column_names) == [
+            "FIXED",
+            "FIXED_STRING",
+            "SCALAR",
+            "SCALAR_STRING",
+            "UNCONSTRAINED",   # We can
+            "VARIABLE",
+            "VARIABLE_STRING"
+        ]
 
-    T = arcae.table(column_case_table).to_arrow(0, 1, ["VARIABLE", "FIXED"])
-    assert sorted(T.column_names) == ["FIXED", "VARIABLE"]
+    with arcae.table(column_case_table) as T:
+        assert sorted(T.to_arrow(0, 1, "VARIABLE").column_names) == ["VARIABLE"]
+
+    with arcae.table(column_case_table) as T:
+        assert sorted(T.to_arrow(0, 1, ["VARIABLE", "FIXED"]).column_names) == ["FIXED", "VARIABLE"]
 
 
 def test_column_cases(column_case_table, capfd):
@@ -186,7 +204,8 @@ def test_complex_taql(sorting_table):
         ]
         AT = AT.append_column("ROW", pa.array(np.arange(len(AT))))
         AT = AT.group_by(group_cols).aggregate(agg_cols)
-        new_names = [c.removesuffix("_list") if c.endswith("_list") else c for c in AT.column_names]
+        new_names = [c.removesuffix("_list") if c.endswith("_list")
+                     else c for c in AT.column_names]
         AT = AT.rename_columns(new_names)
 
     with Table.from_taql(query) as T:

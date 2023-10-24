@@ -2,7 +2,7 @@
 #define ARCAE_COLUMN_CONVERT_VISITOR_H
 
 #include <algorithm>
-#include <set>
+#include <unordered_set>
 
 #include <casacore/tables/Tables.h>
 
@@ -11,6 +11,7 @@
 #include "arcae/casa_visitors.h"
 #include "arcae/complex_type.h"
 #include "arcae/service_locator.h"
+#include "arcae/utility.h"
 
 namespace arcae {
 
@@ -316,6 +317,10 @@ private:
     arrow::Status ConvertColumn(const std::shared_ptr<arrow::DataType> & arrow_dtype) {
         ARROW_RETURN_NOT_OK(CheckByteWidths<T>(arrow_dtype));
 
+        if(nrow_ == 0) {
+            return arrow::Status::Invalid("Zero-length row request");
+        }
+
         if(column_desc_.isScalar()) {  // ndim == 0
             return ConvertScalarColumn<T>(arrow_dtype);
         }
@@ -330,7 +335,7 @@ private:
 
         // Variably shaped, read in shapes and null values
         auto shapes = std::vector<casacore::IPosition>(nrow_, casacore::IPosition());
-        auto shapes_set = std::set<casacore::IPosition>();
+        auto shapes_set = std::unordered_set<casacore::IPosition>{};
         auto column = casacore::ArrayColumn<T>(column_);
         int64_t null_counts = 0;
         ARROW_ASSIGN_OR_RAISE(auto nulls, arrow::AllocateBitmap(nrow_, pool_));
