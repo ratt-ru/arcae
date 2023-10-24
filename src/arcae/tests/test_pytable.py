@@ -142,28 +142,20 @@ def test_partial_read(sorting_table):
 
 def test_table_taql(sorting_table):
     """ Tests that basic taql queries work """
-    with Table.from_taql(f"SELECT * FROM {sorting_table} ORDER BY TIME, ANTENNA1, ANTENNA2") as T:
-        assert pa.Table.from_pydict({
-            "FIELD_ID": pa.array([2, 2, 2, 1, 1, 1, 1, 0, 0, 0], pa.int32()),
-            "ANTENNA1": pa.array([1, 0, 0, 1, 2, 1, 1, 1, 0, 0], pa.int32()),
-            "ANTENNA2": pa.array([2, 1, 1, 0, 1, 2, 3, 2, 2, 1], pa.int32()),
-            "DATA_DESC_ID": pa.array([1, 1, 1, 0, 0, 0, 0, 0, 0, 0], pa.int32()),
-            "SCAN_NUMBER": pa.array([1, 0, 1, 0, 1, 0, 1, 0, 1, 0], pa.int32()),
-            "STATE_ID": pa.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0], pa.int32()),
-            "TIME": pa.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0], pa.float64()),
-        }) == T.to_arrow()
+    with arcae.table(sorting_table) as T:
+        AT = T.to_arrow()
 
-    with Table.from_taql(f"SELECT * FROM {sorting_table} ORDER BY ANTENNA1, ANTENNA2, TIME") as T:
-        assert pa.Table.from_pydict({
-            "FIELD_ID": pa.array([2, 2, 0, 0, 1, 2, 1, 0, 1, 1], pa.int32()),
-            "ANTENNA1": pa.array([0, 0, 0, 0, 1, 1, 1, 1, 1, 2], pa.int32()),
-            "ANTENNA2": pa.array([1, 1, 1, 2, 0, 2, 2, 2, 3, 1], pa.int32()),
-            "DATA_DESC_ID": pa.array([1, 1, 0, 0, 0, 1, 0, 0, 0, 0], pa.int32()),
-            "SCAN_NUMBER": pa.array([0, 1, 0, 1, 0, 1, 0, 0, 1, 1], pa.int32()),
-            "STATE_ID": pa.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0], pa.int32()),
-            "TIME": pa.array([0.2, 0.3, 1, 0.9, 0.4, 0.1, 0.6, 0.8, 0.7, 0.5], pa.float64()),
-        }) == T.to_arrow()
+    with Table.from_taql(f"SELECT * FROM {sorting_table} ORDER BY TIME, ANTENNA1, ANTENNA2") as Q:
+        assert AT.sort_by([
+            ("TIME", "ascending"),
+            ("ANTENNA1", "ascending"),
+            ("ANTENNA2", "ascending")]) == Q.to_arrow()
 
+    with Table.from_taql(f"SELECT * FROM {sorting_table} ORDER BY ANTENNA1, ANTENNA2, TIME") as Q:
+        assert AT.sort_by([
+            ("ANTENNA1", "ascending"),
+            ("ANTENNA2", "ascending"),
+            ("TIME", "ascending")]) == Q.to_arrow()
 
 def test_complex_taql(sorting_table):
     query = f"""
