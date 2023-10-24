@@ -207,7 +207,7 @@ def test_complex_taql(sorting_table):
         ]
         AT = AT.append_column("ROW", pa.array(np.arange(len(AT))))
         AT = AT.group_by(group_cols).aggregate(agg_cols)
-        new_names = [c.removesuffix("_list") if c.endswith("_list")
+        new_names = [c[:-len("_list")] if c.endswith("_list")
                      else c for c in AT.column_names]
         AT = AT.rename_columns(new_names)
 
