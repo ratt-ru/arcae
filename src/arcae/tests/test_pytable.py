@@ -158,6 +158,8 @@ def test_table_taql(sorting_table):
             ("TIME", "ascending")]) == Q.to_arrow()
 
 def test_complex_taql(sorting_table):
+    """ Test a relatively complex taql query """
+
     query = f"""
     SELECT
         ANTENNA1,
@@ -173,8 +175,26 @@ def test_complex_taql(sorting_table):
         ANTENNA2
     """
 
+    with arcae.table(sorting_table) as T:
+        AT = T.to_arrow()
+        group_cols = ["ANTENNA1", "ANTENNA2"]
+        agg_cols = [
+            ("TIME", "list"),
+            ("FIELD_ID", "list"),
+            ("ROW", "list"),
+            ("SCAN_NUMBER", "list")
+        ]
+        AT = AT.append_column("ROW", pa.array(np.arange(len(AT))))
+        AT = AT.group_by(group_cols).aggregate(agg_cols)
+        new_names = [c.removesuffix("_list") if c.endswith("_list") else c for c in AT.column_names]
+        AT = AT.rename_columns(new_names)
+
     with Table.from_taql(query) as T:
-        print(T.to_arrow())
+        QT = T.to_arrow()
+        # Ensure fields are ordered the same and have same types
+        # TAQL returns indexing columns as int64 instead of original int32
+        assert AT.select(QT.column_names).cast(QT.schema).equals(QT)
+
 
 def test_table_partitioning(sorting_table):
     T = arcae.table(sorting_table)

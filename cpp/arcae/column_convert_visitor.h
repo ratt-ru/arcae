@@ -2,6 +2,7 @@
 #define ARCAE_COLUMN_CONVERT_VISITOR_H
 
 #include <algorithm>
+#include <set>
 
 #include <casacore/tables/Tables.h>
 
@@ -145,7 +146,8 @@ private:
             const std::shared_ptr<arrow::DataType> & arrow_dtype,
             const std::vector<casacore::IPosition> & shapes,
             std::shared_ptr<arrow::Buffer> & nulls,
-            int64_t null_counts) {
+            int64_t null_counts,
+            casacore::uInt ndim) {
 
         auto column = casacore::ArrayColumn<T>(column_);
         column.setMaximumCacheSize(1);
@@ -228,7 +230,6 @@ private:
 
 
         // Compute the products
-        auto ndim = column_desc_.ndim();
         auto products = std::vector<casacore::IPosition>(nrow_, casacore::IPosition(ndim, 1));
 
         for(casacore::uInt row=startrow_; row < endrow_; ++row) {
@@ -315,17 +316,9 @@ private:
     arrow::Status ConvertColumn(const std::shared_ptr<arrow::DataType> & arrow_dtype) {
         ARROW_RETURN_NOT_OK(CheckByteWidths<T>(arrow_dtype));
 
-        if(column_desc_.ndim() == -1) {
-            return arrow::Status::NotImplemented(
-                column_desc_.name(), " has unconstrained dimensionality");
-        }
-
         if(column_desc_.isScalar()) {  // ndim == 0
             return ConvertScalarColumn<T>(arrow_dtype);
         }
-
-        assert(column_desc_.ndim() >= 1);
-
 
         auto & config = ServiceLocator::configuration();
         auto convert_method = config.GetDefault("casa.convert.strategy", "fixed");
@@ -336,9 +329,9 @@ private:
         }
 
         // Variably shaped, read in shapes and null values
-        auto shapes = std::vector<casacore::IPosition>(nrow_, casacore::IPosition(column_desc_.ndim(), 0));
+        auto shapes = std::vector<casacore::IPosition>(nrow_, casacore::IPosition());
+        auto shapes_set = std::set<casacore::IPosition>();
         auto column = casacore::ArrayColumn<T>(column_);
-        bool shapes_equal = true;
         int64_t null_counts = 0;
         ARROW_ASSIGN_OR_RAISE(auto nulls, arrow::AllocateBitmap(nrow_, pool_));
 
@@ -347,10 +340,39 @@ private:
             auto is_defined = column.isDefined(row);
             arrow::bit_util::SetBitTo(nulls->mutable_data(), lrow, is_defined);
             null_counts += is_defined ? 0 : 1;
-            if(is_defined)
-                { shapes[lrow] = column.shape(row); }
-            if(shapes_equal)
-                { shapes_equal = (shapes[lrow] == shapes[0]); }
+
+            if(is_defined) {
+                shapes[lrow] = column.shape(row);
+                shapes_set.insert(shapes[lrow]);
+            }
+        }
+
+        auto [shapes_equal, ndim_equal] = [&]() -> std::tuple<bool, bool> {
+            bool ndim_equal = true;
+            bool shapes_equal = true;
+
+            if(shapes_set.size() <= 1) {
+                return {shapes_equal, ndim_equal};
+            }
+
+            for(auto it = std::begin(shapes_set); it != std::end(shapes_set); ++it) {
+                if(it->size() != std::begin(shapes_set)->size()) {
+                    ndim_equal = ndim_equal && false;
+                    shapes_equal = shapes_equal && false;
+                    continue;
+                }
+
+                if(*it != *std::begin(shapes_set)) {
+                    shapes_equal = shapes_equal && false;
+                }
+            }
+
+            return {shapes_equal, ndim_equal};
+        }();
+
+        if(!ndim_equal) {
+            return arrow::Status::NotImplemented(
+                column_desc_.name(), " has unconstrained dimensionality");
         }
 
         // No nulls and all shapes are equal, we can represent this with a
@@ -359,7 +381,12 @@ private:
             return ConvertFixedArrayColumn<T>(arrow_dtype, shapes[0]);
         }
 
-        return ConvertVariableArrayColumn<T>(arrow_dtype, shapes, nulls, null_counts);
+        return ConvertVariableArrayColumn<T>(
+                arrow_dtype,
+                shapes,
+                nulls,
+                null_counts,
+                shapes[0].size());
     }
 };
 
