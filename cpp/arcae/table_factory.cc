@@ -18,7 +18,7 @@
 
 #include <casacore/tables/Tables/SetupNewTab.h>
 #include <casacore/tables/Tables.h>
-#include <casacore/tables/Tables/TableProxy.h>
+#include <casacore/tables/Tables/Table.h>
 #include <casacore/tables/Tables/TableLock.h>
 #include <casacore/ms/MeasurementSets/MeasurementSet.h>
 
@@ -30,7 +30,7 @@ using ::arrow::Status;
 using ::casacore::String;
 
 using ::casacore::SetupNewTable;
-using ::casacore::TableProxy;
+using ::casacore::Table;
 using ::casacore::TableLock;
 using ::casacore::Table;
 using ::casacore::Record;
@@ -81,17 +81,13 @@ static constexpr char kWeather[] = "WEATHER";
 } // namespace
 
 Result<std::shared_ptr<SafeTableProxy>> OpenTable(const std::string & filename) {
-    return SafeTableProxy::Make([&filename]() -> Result<std::shared_ptr<TableProxy>> {
-        Record record;
-        TableLock lock(TableLock::LockOption::AutoNoReadLocking);
+    return SafeTableProxy::Make([&filename]() -> Result<std::shared_ptr<Table>> {
+        auto table_lock = TableLock(TableLock::LockOption::NoLocking);
 
-        record.define("option", "usernoread");
-        record.define("internal", lock.interval());
-        record.define("maxwait", casacore::Int(lock.maxWait()));
 
         try {
-            return std::make_shared<TableProxy>(
-                filename, record, Table::TableOption::Old);
+            return std::make_shared<Table>(
+                filename, table_lock, Table::TableOption::Old);
         } catch(std::exception & e) {
             return Status::Invalid(e.what());
         }
@@ -121,47 +117,47 @@ Result<std::shared_ptr<SafeTableProxy>> DefaultMS(
                           DefaultMSFactory(modname, usubtable,
                                              json_table_desc, json_dminfo));
 
-    return SafeTableProxy::Make([&]() -> Result<std::shared_ptr<TableProxy>> {
+    return SafeTableProxy::Make([&]() -> Result<std::shared_ptr<Table>> {
         if(usubtable.empty() || usubtable == kMain) {
             auto ms = MeasurementSet(setup_new_table);
             // Create the MS default subtables
             ms.createDefaultSubtables(Table::New);
             // Create a table proxy
-            return std::make_shared<TableProxy>(ms);
+            return std::make_shared<Table>(ms);
         } else if(usubtable == kAntenna) {
-            return std::make_shared<TableProxy>(MSAntenna(setup_new_table));
+            return std::make_shared<Table>(MSAntenna(setup_new_table));
         } else if(usubtable == kDataDescription) {
-            return std::make_shared<TableProxy>(MSDataDescription(setup_new_table));
+            return std::make_shared<Table>(MSDataDescription(setup_new_table));
         } else if(usubtable == kDoppler) {
-            return std::make_shared<TableProxy>(MSDoppler(setup_new_table));
+            return std::make_shared<Table>(MSDoppler(setup_new_table));
         } else if(usubtable == kFeed) {
-            return std::make_shared<TableProxy>(MSFeed(setup_new_table));
+            return std::make_shared<Table>(MSFeed(setup_new_table));
         } else if(usubtable == kField) {
-            return std::make_shared<TableProxy>(MSField(setup_new_table));
+            return std::make_shared<Table>(MSField(setup_new_table));
         } else if(usubtable == kFlagCmd) {
-            return std::make_shared<TableProxy>(MSFlagCmd(setup_new_table));
+            return std::make_shared<Table>(MSFlagCmd(setup_new_table));
         } else if(usubtable == kFreqOffset) {
-            return std::make_shared<TableProxy>(MSFreqOffset(setup_new_table));
+            return std::make_shared<Table>(MSFreqOffset(setup_new_table));
         } else if(usubtable == kHistory) {
-            return std::make_shared<TableProxy>(MSHistory(setup_new_table));
+            return std::make_shared<Table>(MSHistory(setup_new_table));
         } else if(usubtable == kObservation) {
-            return std::make_shared<TableProxy>(MSObservation(setup_new_table));
+            return std::make_shared<Table>(MSObservation(setup_new_table));
         } else if(usubtable == kPointing) {
-            return std::make_shared<TableProxy>(MSPointing(setup_new_table));
+            return std::make_shared<Table>(MSPointing(setup_new_table));
         } else if(usubtable == kPolarization) {
-            return std::make_shared<TableProxy>(MSPolarization(setup_new_table));
+            return std::make_shared<Table>(MSPolarization(setup_new_table));
         } else if(usubtable == kProcessor) {
-            return std::make_shared<TableProxy>(MSProcessor(setup_new_table));
+            return std::make_shared<Table>(MSProcessor(setup_new_table));
         } else if(usubtable == kSource) {
-            return std::make_shared<TableProxy>(MSSource(setup_new_table));
+            return std::make_shared<Table>(MSSource(setup_new_table));
         } else if(usubtable == kSpectralWindow) {
-            return std::make_shared<TableProxy>(MSSpectralWindow(setup_new_table));
+            return std::make_shared<Table>(MSSpectralWindow(setup_new_table));
         } else if(usubtable == kState) {
-            return std::make_shared<TableProxy>(MSState(setup_new_table));
+            return std::make_shared<Table>(MSState(setup_new_table));
         } else if(usubtable == kSyscal) {
-            return std::make_shared<TableProxy>(MSSysCal(setup_new_table));
+            return std::make_shared<Table>(MSSysCal(setup_new_table));
         } else if(usubtable == kWeather) {
-            return std::make_shared<TableProxy>(MSWeather(setup_new_table));
+            return std::make_shared<Table>(MSWeather(setup_new_table));
         }
 
         return arrow::Status::Invalid("Uknown table type: ", usubtable);

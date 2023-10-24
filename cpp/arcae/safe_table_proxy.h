@@ -1,11 +1,10 @@
-#ifndef ARCAE_SAFE_TABLE_PROXY_H
-#define ARCAE_SAFE_TABLE_PROXY_H
+#ifndef ARCAE_SAFE_table_H
+#define ARCAE_SAFE_table_H
 
 #include <climits>
 #include <functional>
 
 #include <casacore/tables/Tables.h>
-#include <casacore/tables/Tables/TableProxy.h>
 
 #include <arrow/util/thread_pool.h>
 
@@ -21,13 +20,13 @@ static constexpr char CASA_DESCRIPTOR[]  = "__casa_descriptor__";
 /// @brief Constrains Table access to an arrow::ThreadPool containing a single thread.
 class SafeTableProxy {
 private:
-    std::shared_ptr<casacore::TableProxy> table_proxy;
-    std::shared_ptr<arrow::internal::ThreadPool> io_pool;
-    bool is_closed;
+    std::shared_ptr<casacore::Table> table_;
+    std::shared_ptr<arrow::internal::ThreadPool> io_pool_;
+    bool is_closed_;
 
 private:
     inline arrow::Status FailIfClosed() const {
-        return is_closed ? arrow::Status::Invalid("Table is closed")
+        return is_closed_ ? arrow::Status::Invalid("Table is closed")
                          : arrow::Status::OK();
     };
 
@@ -41,13 +40,13 @@ protected:
     /// Run the given functor in the isolated Threadpool
     template <typename Fn>
     std::invoke_result_t<Fn> run_isolated(Fn && functor) {
-        return arrow::DeferNotOk(this->io_pool->Submit(std::move(functor))).result();
+        return arrow::DeferNotOk(this->io_pool_->Submit(std::move(functor))).result();
     }
 
     /// Run the given functor in the isolated Threadpool
     template <typename Fn>
     std::invoke_result_t<Fn> run_isolated(Fn && functor) const {
-        return arrow::DeferNotOk(this->io_pool->Submit(std::move(functor))).result();
+        return arrow::DeferNotOk(this->io_pool_->Submit(std::move(functor))).result();
     }
 
 public:
@@ -62,12 +61,12 @@ public:
     static arrow::Result<std::shared_ptr<SafeTableProxy>> Make(Fn && functor) {
         struct enable_make_shared_stp : public SafeTableProxy {};
         auto proxy = std::make_shared<enable_make_shared_stp>();
-        ARROW_ASSIGN_OR_RAISE(proxy->io_pool, ::arrow::internal::ThreadPool::Make(1));
+        ARROW_ASSIGN_OR_RAISE(proxy->io_pool_, ::arrow::internal::ThreadPool::Make(1));
 
         // Mark as closed so that if construction fails, we don't try to close it
-        proxy->is_closed = true;
-        ARROW_ASSIGN_OR_RAISE(proxy->table_proxy, proxy->run_isolated(std::move(functor)));
-        proxy->is_closed = false;
+        proxy->is_closed_ = true;
+        ARROW_ASSIGN_OR_RAISE(proxy->table_, proxy->run_isolated(std::move(functor)));
+        proxy->is_closed_ = false;
 
         return proxy;
     }

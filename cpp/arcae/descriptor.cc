@@ -20,9 +20,10 @@
 #include <casacore/casa/Containers/RecordInterface.h>
 #include <casacore/ms/MeasurementSets/MeasurementSet.h>
 #include <casacore/tables/Tables/TableError.h>
+#include <casacore/tables/Tables/TableProxy.h>
 #include <casacore/tables/Tables/TableRecord.h>
 #include <casacore/tables/Tables/TableDesc.h>
-#include <casacore/tables/Tables/TableProxy.h>
+#include <casacore/tables/Tables/Table.h>
 #include <casacore/casa/Containers/ValueHolder.h>
 
 #include "arcae/descriptor.h"
@@ -41,9 +42,10 @@ using ::casacore::TableDesc;
 using ::casacore::SetupNewTable;
 using ::casacore::Record;
 using ::casacore::RecordInterface;
-using ::casacore::TableProxy;
+using ::casacore::Table;
 using ::casacore::TableError;
 using ::casacore::Table;
+using ::casacore::TableProxy;
 
 using ::casacore::MeasurementSet;
 using ::casacore::MSAntenna;
