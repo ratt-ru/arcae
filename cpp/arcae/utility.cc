@@ -19,4 +19,12 @@ size_t hash<casacore::IPosition>::operator()(const casacore::IPosition& p) const
     return result;
 }
 
+bool equal_to<casacore::IPosition>::operator()(
+    const casacore::IPosition & lhs,
+    const casacore::IPosition & rhs) const {
+
+    return lhs.size() == rhs.size() && lhs == rhs;
+}
+
+
 }  // namespace std

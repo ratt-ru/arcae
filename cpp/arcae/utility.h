@@ -11,6 +11,12 @@ struct hash<casacore::IPosition> {
     std::size_t operator()(const casacore::IPosition & p) const noexcept;
 };
 
+// IPosition operator== throws Conformance error if lhs.size() != rhs.size()
+template <>
+struct equal_to<casacore::IPosition> {
+    bool operator()(const casacore::IPosition & lhs, const casacore::IPosition & rhs) const;
+};
+
 }  // namespace std
 
 #endif //  ARCAE_UTILITY_H
