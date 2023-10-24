@@ -1,11 +1,11 @@
 [project]
 name = "arcae"
-version = "0.1.0"
+version = "0.2.0"
 authors = [
     {name = "Simon Perkins", email = "simon.perkins@gmail.com"}
 ]
 description = "Arrow bindings for casacore"
-readme = {file = "README.rst", content-type = "test/rst"}
+readme = {file = "README.rst", content-type = "text/x-rst"}
 requires_python = ">= 3.8"
 license = {file = "LICENSE"}
 classifiers = [

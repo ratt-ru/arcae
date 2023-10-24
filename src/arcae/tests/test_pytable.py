@@ -1,5 +1,5 @@
-import json
 import os
+
 
 import numpy as np
 from numpy.testing import assert_array_equal
@@ -10,6 +10,7 @@ import pyarrow.parquet as pq
 import pytest
 
 import arcae
+from arcae.lib.arrow_tables import Table
 
 @pytest.mark.parametrize("table_suffix, table_name", [
     ("", "MAIN"),
@@ -25,14 +26,36 @@ def test_parquet_write(tmp_path, tau_ms, table_suffix, table_name):
 
 
 def test_column_selection(column_case_table):
-    T = arcae.table(column_case_table).to_arrow(0, 1)
-    assert sorted(T.column_names) == ["FIXED", "FIXED_STRING", "SCALAR", "SCALAR_STRING", "VARIABLE", "VARIABLE_STRING"]
+    with arcae.table(column_case_table) as T:
+        assert sorted(T.to_arrow().column_names) == [
+            "FIXED",
+            "FIXED_STRING",
+            "SCALAR",
+            "SCALAR_STRING",
+            # Even though the column is unconstrained, ndim is the same
+            "UNCONSTRAINED_SAME_NDIM",
+            "VARIABLE",
+            "VARIABLE_STRING"
+        ]
 
-    T = arcae.table(column_case_table).to_arrow(0, 1, "VARIABLE")
-    assert T.column_names == ["VARIABLE"]
+    with arcae.table(column_case_table) as T:
+        assert sorted(T.to_arrow(0, 1).column_names) == [
+            "FIXED",
+            "FIXED_STRING",
+            "SCALAR",
+            "SCALAR_STRING",
+            # When retrieving a single row, we can get values from an unconstrained column
+            "UNCONSTRAINED",
+            "UNCONSTRAINED_SAME_NDIM",
+            "VARIABLE",
+            "VARIABLE_STRING"
+        ]
 
-    T = arcae.table(column_case_table).to_arrow(0, 1, ["VARIABLE", "FIXED"])
-    assert sorted(T.column_names) == ["FIXED", "VARIABLE"]
+    with arcae.table(column_case_table) as T:
+        assert sorted(T.to_arrow(0, 1, "VARIABLE").column_names) == ["VARIABLE"]
+
+    with arcae.table(column_case_table) as T:
+        assert sorted(T.to_arrow(0, 1, ["VARIABLE", "FIXED"]).column_names) == ["FIXED", "VARIABLE"]
 
 
 def test_column_cases(column_case_table, capfd):
@@ -137,6 +160,63 @@ def test_partial_read(sorting_table):
     for nrow in nrows:
         assert full.take(list(range(start, start + nrow))) == T.to_arrow(start, nrow)
         start += nrow
+
+def test_table_taql(sorting_table):
+    """ Tests that basic taql queries work """
+    with arcae.table(sorting_table) as T:
+        AT = T.to_arrow()
+
+    with Table.from_taql(f"SELECT * FROM {sorting_table} ORDER BY TIME, ANTENNA1, ANTENNA2") as Q:
+        assert AT.sort_by([
+            ("TIME", "ascending"),
+            ("ANTENNA1", "ascending"),
+            ("ANTENNA2", "ascending")]) == Q.to_arrow()
+
+    with Table.from_taql(f"SELECT * FROM {sorting_table} ORDER BY ANTENNA1, ANTENNA2, TIME") as Q:
+        assert AT.sort_by([
+            ("ANTENNA1", "ascending"),
+            ("ANTENNA2", "ascending"),
+            ("TIME", "ascending")]) == Q.to_arrow()
+
+def test_complex_taql(sorting_table):
+    """ Test a relatively complex taql query """
+
+    query = f"""
+    SELECT
+        ANTENNA1,
+        ANTENNA2,
+        GROWID() as ROW,
+        GAGGR(TIME) as TIME,
+        GAGGR(FIELD_ID) as FIELD_ID,
+        GAGGR(SCAN_NUMBER) as SCAN_NUMBER
+    FROM
+        {sorting_table}
+    GROUPBY
+        ANTENNA1,
+        ANTENNA2
+    """
+
+    with arcae.table(sorting_table) as T:
+        AT = T.to_arrow()
+        group_cols = ["ANTENNA1", "ANTENNA2"]
+        agg_cols = [
+            ("TIME", "list"),
+            ("FIELD_ID", "list"),
+            ("ROW", "list"),
+            ("SCAN_NUMBER", "list")
+        ]
+        AT = AT.append_column("ROW", pa.array(np.arange(len(AT))))
+        AT = AT.group_by(group_cols).aggregate(agg_cols)
+        new_names = [c[:-len("_list")] if c.endswith("_list")
+                     else c for c in AT.column_names]
+        AT = AT.rename_columns(new_names)
+
+    with Table.from_taql(query) as T:
+        QT = T.to_arrow()
+        # Ensure fields are ordered the same and have same types
+        # TAQL returns indexing columns as int64 instead of original int32
+        assert AT.select(QT.column_names).cast(QT.schema).equals(QT)
+
 
 def test_table_partitioning(sorting_table):
     T = arcae.table(sorting_table)

@@ -241,8 +241,21 @@ def generate_column_cases_table(path):
                 "valueType": "int",
             },
             "name": "UNCONSTRAINED",
+        },
+        {
+            "desc": {
+                "_c_order": True,
+                "comment": "UNCONSTRAINED_SAME_NDIM column",
+                "dataManagerGroup": "",
+                "dataManagerType": "",
+                "keywords": {},
+                "maxlen": 0,
+                "ndim": -1,
+                "option": 0,
+                "valueType": "int",
+            },
+            "name": "UNCONSTRAINED_SAME_NDIM",
         }
-
     ]
 
     table_desc = pt.maketabdesc(table_desc)
@@ -253,6 +266,7 @@ def generate_column_cases_table(path):
         for i in range(nrow):
             T.putcell("VARIABLE", i, np.full((3, 1 + i, 2), i))
             T.putcell("FIXED", i, np.full((2, 4), i))
+            T.putcell("UNCONSTRAINED_SAME_NDIM", i, np.full((3, 1 + i, 2), i))
             T.putcell("SCALAR", i, i)
 
             T.putcell("VARIABLE_STRING", i, np.full((3, 1 + i, 2), str(i)))

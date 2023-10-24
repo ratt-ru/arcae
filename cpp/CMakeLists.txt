@@ -9,7 +9,8 @@ add_library(arcae SHARED
     arcae/descriptor.cc
     arcae/service_locator.cc
     arcae/safe_table_proxy.cc
-    arcae/table_factory.cc)
+    arcae/table_factory.cc
+    arcae/utility.cc)
 
 target_link_directories(arcae PUBLIC ${PYARROW_LIBDIRS})
 target_link_libraries(arcae PkgConfig::casacore arrow)

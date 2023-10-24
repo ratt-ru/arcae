@@ -1,5 +1,5 @@
 [version]
-current = "0.1.0"
+current = "0.2.0"
 regex = '''
   (?P<major>\d+)
   \.
@@ -13,7 +13,7 @@ message_template = "Bump to {new_version}"
 tag_template = "{new_version}"
 
 [[file]]
-src = "arcae/__init__.py"
+src = "src/arcae/__init__.py"
 search = "__version__ = \"{current_version}\""
 
 [[file]]
