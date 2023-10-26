@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Update README.rst to reflect new possibilities for unconstrained columns (ndim==-1) (:pr:`74`)
 * Guard against python-casacore imports (:pr:`73`)
 
 0.2.1 (2023-10-24)
