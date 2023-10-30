@@ -18,6 +18,7 @@ class ColumnMapping {
   static_assert(std::is_integral_v<T>, "T is not integral");
   static_assert(std::is_signed_v<T>, "T is not signed");
 
+
 public:
   // Direction of the map
   enum Direction {
@@ -51,6 +52,65 @@ public:
   using ColumnRange = std::vector<Range>;
   using ColumnRanges = std::vector<ColumnRange>;
 
+  class RangeIterator {
+    private:
+      ColumnMapping & map_;
+      std::size_t pos_;
+      std::vector<std::size_t> index_;
+      bool done_;
+    public:
+      RangeIterator(ColumnMapping & column_map, bool done=false) :
+        map_(column_map),
+        done_(done),
+        index_(column_map.nDim(), 0) {}
+
+      std::vector<std::size_t> operator*() {
+        return index_;
+      }
+
+      RangeIterator & operator++() {
+        std::size_t dim = index_.size() - 1;
+
+        while(dim >= 0) {
+          index_[dim]++;
+          if(index_[dim] < map_.ranges_[dim].size()) {
+            break;
+          } else if(dim > 0) {
+            index_[dim] = 0;
+            --dim;
+          } else {
+            done_ = true;
+            break;
+          }
+        }
+
+        return *this;
+      }
+
+      RangeIterator & operator++(int) {
+        auto temp = RangeIterator(*this);
+        ++(*this);
+        return temp;
+      }
+
+      bool operator==(const RangeIterator & other) const {
+        if(&map_ != &other.map_) {
+          return false;
+        }
+
+        if(done_ && other.done_) {
+          return true;
+        }
+
+        return done_ == other.done_ && index_ == other.index_;
+      }
+
+      bool operator!=(const RangeIterator & other) const {
+        return !(*this == other);
+      }
+  };
+
+
   ColumnMapping(const ColumnSelection & column_selection={},
                 Direction direction=FORWARD)
     : maps_(MakeMaps(column_selection, direction)),
@@ -68,9 +128,24 @@ public:
                                 { return init * map.size(); });
   }
 
+  std::size_t NrOfRanges() const {
+    return std::accumulate(std::begin(ranges_), std::end(ranges_), std::size_t(1),
+                           [](const auto & init, const auto & range)
+                                { return init * range.size(); });
+  }
+
+  RangeIterator RangeBegin() {
+    return RangeIterator{*this, false};
+  }
+
+  RangeIterator RangeEnd() {
+    return RangeIterator{*this, true};
+  }
+
   bool IsSimple() const;
-  const ColumnMaps & GetMaps() const { return maps_; }
+  const ColumnMaps & GetMaps() const { return maps_;  }
   const ColumnRanges & GetRanges() const { return ranges_; }
+  const std::size_t nDim() const { return ranges_.size(); }
 
   Direction direction_;
   ColumnMaps maps_;
