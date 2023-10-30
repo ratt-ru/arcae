@@ -81,3 +81,30 @@ TEST(RangeTest, TestSimplicity) {
     // Not monotically increasing
     EXPECT_FALSE(C({{4, 3, 2, 1}}).IsSimple());
 }
+
+
+TEST(RangeTest, IteratorTest) {
+    auto map = C({
+        {4, 3, 2, 1, 8, 7, 20},    // Three disjoint ranges
+        {5, 6, 8, 9},              // Two disjoin range
+        {7, 9, 8, 12, 11}});       // Two disjoint ranges
+
+    auto it = map.RangeBegin();
+
+    EXPECT_THAT(*it, ::testing::ElementsAre(0, 0, 0)); ++it;
+    EXPECT_THAT(*it, ::testing::ElementsAre(0, 0, 1)); ++it;
+    EXPECT_THAT(*it, ::testing::ElementsAre(0, 1, 0)); ++it;
+    EXPECT_THAT(*it, ::testing::ElementsAre(0, 1, 1)); ++it;
+
+    EXPECT_THAT(*it, ::testing::ElementsAre(1, 0, 0)); ++it;
+    EXPECT_THAT(*it, ::testing::ElementsAre(1, 0, 1)); ++it;
+    EXPECT_THAT(*it, ::testing::ElementsAre(1, 1, 0)); ++it;
+    EXPECT_THAT(*it, ::testing::ElementsAre(1, 1, 1)); ++it;
+
+    EXPECT_THAT(*it, ::testing::ElementsAre(2, 0, 0)); ++it;
+    EXPECT_THAT(*it, ::testing::ElementsAre(2, 0, 1)); ++it;
+    EXPECT_THAT(*it, ::testing::ElementsAre(2, 1, 0)); ++it;
+    EXPECT_THAT(*it, ::testing::ElementsAre(2, 1, 1)); ++it;
+
+    EXPECT_EQ(it, map.RangeEnd());
+}

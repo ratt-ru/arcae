@@ -55,7 +55,6 @@ public:
   class RangeIterator {
     private:
       ColumnMapping & map_;
-      std::size_t pos_;
       std::vector<std::size_t> index_;
       bool done_;
     public:
@@ -69,15 +68,21 @@ public:
       }
 
       RangeIterator & operator++() {
+        // Iterate from fastest to slowest changing dimension
         std::size_t dim = index_.size() - 1;
 
         while(dim >= 0) {
           index_[dim]++;
+          // We've achieved a succesful iteration in this dimension
           if(index_[dim] < map_.ranges_[dim].size()) {
             break;
+          // We've exceeded the size of the current dimension
+          // reset to zero and increment in a slower changing dimension
           } else if(dim > 0) {
             index_[dim] = 0;
             --dim;
+            // This was the slowest changing dimension
+            // so we're done
           } else {
             done_ = true;
             break;
