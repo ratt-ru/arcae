@@ -18,7 +18,6 @@ class ColumnMapping {
   static_assert(std::is_integral_v<T>, "T is not integral");
   static_assert(std::is_signed_v<T>, "T is not signed");
 
-
 public:
   // Direction of the map
   enum Direction {
@@ -63,8 +62,25 @@ public:
         done_(done),
         index_(column_map.nDim(), 0) {}
 
-      std::vector<std::size_t> operator*() {
-        return index_;
+      casacore::Slicer operator*() {
+        auto start = casacore::IPosition(index_.size());
+        auto end = casacore::IPosition(index_.size());
+
+        for(std::size_t dim=0; dim < index_.size(); ++dim) {
+          const auto & dim_ranges = map_.ranges_[dim];
+          const auto & dim_maps = map_.maps_[dim];
+          const auto & range = dim_ranges[index_[dim]];
+
+          if(map_.direction_ == FORWARD) {
+            start[dim] = dim_maps[range.start].from;
+            end[dim] = dim_maps[range.end - 1].from;
+          } else {
+            start[dim] = dim_maps[range.start].to;
+            end[dim] = dim_maps[range.end - 1].to;
+          }
+        }
+
+        return casacore::Slicer(std::move(start), std::move(end), casacore::Slicer::endIsLast);
       }
 
       RangeIterator & operator++() {
@@ -77,12 +93,12 @@ public:
           if(index_[dim] < map_.ranges_[dim].size()) {
             break;
           // We've exceeded the size of the current dimension
-          // reset to zero and increment in a slower changing dimension
+          // reset to zero and retry the while loop
+          // in a slower changing dimension
           } else if(dim > 0) {
             index_[dim] = 0;
             --dim;
-            // This was the slowest changing dimension
-            // so we're done
+            // This was the slowest changing dimension so we're done
           } else {
             done_ = true;
             break;
@@ -127,13 +143,13 @@ public:
   static ColumnRanges MakeRanges(const ColumnMaps & maps,
                                  Direction direction=FORWARD);
 
-  std::size_t NrOfElements() const {
+  std::size_t nElements() const {
     return std::accumulate(std::begin(maps_), std::end(maps_), std::size_t(1),
                            [](const auto & init, const auto & map)
                                 { return init * map.size(); });
   }
 
-  std::size_t NrOfRanges() const {
+  std::size_t nRanges() const {
     return std::accumulate(std::begin(ranges_), std::end(ranges_), std::size_t(1),
                            [](const auto & init, const auto & range)
                                 { return init * range.size(); });

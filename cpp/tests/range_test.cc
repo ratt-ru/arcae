@@ -82,8 +82,24 @@ TEST(RangeTest, TestSimplicity) {
     EXPECT_FALSE(C({{4, 3, 2, 1}}).IsSimple());
 }
 
+TEST(RangeTest, IteratorSingletonTest) {
+    using casacore::Slicer;
+    using I = casacore::IPosition;
+
+    auto last = casacore::Slicer::endIsLast;
+    auto map = C({C::ColumnIds{1}});
+    auto it = map.RangeBegin();
+    EXPECT_EQ(*it, Slicer(I({1}), I({1}), last)); ++it;
+    EXPECT_EQ(it, map.RangeEnd());
+}
+
 
 TEST(RangeTest, IteratorTest) {
+    using casacore::Slicer;
+    using I = casacore::IPosition;
+
+    auto last = casacore::Slicer::endIsLast;
+
     auto map = C({
         {4, 3, 2, 1, 8, 7, 20},    // Three disjoint ranges
         {5, 6, 8, 9},              // Two disjoin range
@@ -91,20 +107,20 @@ TEST(RangeTest, IteratorTest) {
 
     auto it = map.RangeBegin();
 
-    EXPECT_THAT(*it, ::testing::ElementsAre(0, 0, 0)); ++it;
-    EXPECT_THAT(*it, ::testing::ElementsAre(0, 0, 1)); ++it;
-    EXPECT_THAT(*it, ::testing::ElementsAre(0, 1, 0)); ++it;
-    EXPECT_THAT(*it, ::testing::ElementsAre(0, 1, 1)); ++it;
+    EXPECT_EQ(*it, Slicer(I({1, 5, 7}), I({4, 6, 9}), last)); ++it;
+    EXPECT_EQ(*it, Slicer(I({1, 5, 11}), I({4, 6, 12}), last)); ++it;
+    EXPECT_EQ(*it, Slicer(I({1, 8, 7}), I({4, 9, 9}), last)); ++it;
+    EXPECT_EQ(*it, Slicer(I({1, 8, 11}), I({4, 9, 12}), last)); ++it;
 
-    EXPECT_THAT(*it, ::testing::ElementsAre(1, 0, 0)); ++it;
-    EXPECT_THAT(*it, ::testing::ElementsAre(1, 0, 1)); ++it;
-    EXPECT_THAT(*it, ::testing::ElementsAre(1, 1, 0)); ++it;
-    EXPECT_THAT(*it, ::testing::ElementsAre(1, 1, 1)); ++it;
+    EXPECT_EQ(*it, Slicer(I({7, 5, 7}), I({8, 6, 9}), last)); ++it;
+    EXPECT_EQ(*it, Slicer(I({7, 5, 11}), I({8, 6, 12}), last)); ++it;
+    EXPECT_EQ(*it, Slicer(I({7, 8, 7}), I({8, 9, 9}), last)); ++it;
+    EXPECT_EQ(*it, Slicer(I({7, 8, 11}), I({8, 9, 12}), last)); ++it;
 
-    EXPECT_THAT(*it, ::testing::ElementsAre(2, 0, 0)); ++it;
-    EXPECT_THAT(*it, ::testing::ElementsAre(2, 0, 1)); ++it;
-    EXPECT_THAT(*it, ::testing::ElementsAre(2, 1, 0)); ++it;
-    EXPECT_THAT(*it, ::testing::ElementsAre(2, 1, 1)); ++it;
+    EXPECT_EQ(*it, Slicer(I({20, 5, 7}), I({20, 6, 9}), last)); ++it;
+    EXPECT_EQ(*it, Slicer(I({20, 5, 11}), I({20, 6, 12}), last)); ++it;
+    EXPECT_EQ(*it, Slicer(I({20, 8, 7}), I({20, 9, 9}), last)); ++it;
+    EXPECT_EQ(*it, Slicer(I({20, 8, 11}), I({20, 9, 12}), last)); ++it;
 
     EXPECT_EQ(it, map.RangeEnd());
 }
