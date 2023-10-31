@@ -13,6 +13,7 @@ using casacore::Array;
 using casacore::ArrayColumn;
 using casacore::ArrayColumnDesc;
 using casacore::ColumnDesc;
+using CasaComplex = casacore::Complex;
 using MS = casacore::MeasurementSet;
 using MSColumns = casacore::MSMainEnums::PredefinedColumns;
 using casacore::SetupNewTable;
@@ -49,12 +50,12 @@ class RangeTableTests : public ::testing::Test {
     void SetUp() override {
       auto factory = [this]() -> arrow::Result<std::shared_ptr<TableProxy>> {
         auto * test_info = ::testing::UnitTest::GetInstance()->current_test_info();
-        auto table_desc = TableDesc(MS::requiredTableDesc());
         table_name_ = std::string(test_info->name() + "-"s + arcae::hexuuid(4) + ".table"s);
 
+        auto table_desc = TableDesc(MS::requiredTableDesc());
         auto data_shape = IPos({kncorr, knchan});
         auto tile_shape = IPos({kncorr, knchan, 1});
-        auto data_column_desc = ArrayColumnDesc<casacore::Complex>(
+        auto data_column_desc = ArrayColumnDesc<CasaComplex>(
             "MODEL_DATA", data_shape, ColumnDesc::FixedShape);
         table_desc.addColumn(data_column_desc);
         auto storage_manager = TiledColumnStMan("TiledModelData", tile_shape);
@@ -68,14 +69,14 @@ class RangeTableTests : public ::testing::Test {
         auto time = GetScalarColumn<double>(ms, MS::TIME);
         auto ant1 = GetScalarColumn<int>(ms, MS::ANTENNA1);
         auto ant2 = GetScalarColumn<int>(ms, MS::ANTENNA2);
-        auto data = GetArrayColumn<casacore::Complex>(ms, MS::MODEL_DATA);
+        auto data = GetArrayColumn<CasaComplex>(ms, MS::MODEL_DATA);
 
         time.putColumn({0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0});
         field.putColumn({0, 0, 0, 0, 0, 0, 0, 0, 0, 0});
         ddid.putColumn({0, 0, 0, 0, 0, 0, 0, 0, 0, 0});
         ant1.putColumn({0, 0, 0, 0, 0, 0, 0, 0, 0, 0});
         ant2.putColumn({1, 1, 1, 1, 1, 1, 1, 1, 1, 1});
-        data.putColumn(Array<casacore::Complex>(IPos({kncorr, knchan, knrow}), {1, 2}));
+        data.putColumn(Array<CasaComplex>(IPos({kncorr, knchan, knrow}), {1, 2}));
 
         return std::make_shared<TableProxy>(ms);
       };
