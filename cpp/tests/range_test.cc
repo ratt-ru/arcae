@@ -1,9 +1,16 @@
 
 #include <arcae/column_mapper.h>
+#include <arcae/safe_table_proxy.h>
+#include <arcae/table_factory.h>
+#include <tests/test_utils.h>
 
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 #include <arrow/testing/gtest_util.h>
+
+using casacore::Slicer;
+using IPos = casacore::IPosition;
+
 
 using C = ColumnMapping<std::int32_t>;
 
@@ -83,21 +90,15 @@ TEST(RangeTest, TestSimplicity) {
 }
 
 TEST(RangeTest, IteratorSingletonTest) {
-    using casacore::Slicer;
-    using I = casacore::IPosition;
-
     auto last = casacore::Slicer::endIsLast;
     auto map = C({C::ColumnIds{1}});
     auto it = map.RangeBegin();
-    EXPECT_EQ(*it, Slicer(I({1}), I({1}), last)); ++it;
+    EXPECT_EQ(*it, Slicer(IPos({1}), IPos({1}), last)); ++it;
     EXPECT_EQ(it, map.RangeEnd());
 }
 
 
 TEST(RangeTest, IteratorTest) {
-    using casacore::Slicer;
-    using I = casacore::IPosition;
-
     auto last = casacore::Slicer::endIsLast;
 
     auto map = C({
@@ -107,20 +108,20 @@ TEST(RangeTest, IteratorTest) {
 
     auto it = map.RangeBegin();
 
-    EXPECT_EQ(*it, Slicer(I({1, 5, 7}), I({4, 6, 9}), last)); ++it;
-    EXPECT_EQ(*it, Slicer(I({1, 5, 11}), I({4, 6, 12}), last)); ++it;
-    EXPECT_EQ(*it, Slicer(I({1, 8, 7}), I({4, 9, 9}), last)); ++it;
-    EXPECT_EQ(*it, Slicer(I({1, 8, 11}), I({4, 9, 12}), last)); ++it;
+    EXPECT_EQ(*it, Slicer(IPos({1, 5, 7}), IPos({4, 6, 9}), last)); ++it;
+    EXPECT_EQ(*it, Slicer(IPos({1, 5, 11}), IPos({4, 6, 12}), last)); ++it;
+    EXPECT_EQ(*it, Slicer(IPos({1, 8, 7}), IPos({4, 9, 9}), last)); ++it;
+    EXPECT_EQ(*it, Slicer(IPos({1, 8, 11}), IPos({4, 9, 12}), last)); ++it;
 
-    EXPECT_EQ(*it, Slicer(I({7, 5, 7}), I({8, 6, 9}), last)); ++it;
-    EXPECT_EQ(*it, Slicer(I({7, 5, 11}), I({8, 6, 12}), last)); ++it;
-    EXPECT_EQ(*it, Slicer(I({7, 8, 7}), I({8, 9, 9}), last)); ++it;
-    EXPECT_EQ(*it, Slicer(I({7, 8, 11}), I({8, 9, 12}), last)); ++it;
+    EXPECT_EQ(*it, Slicer(IPos({7, 5, 7}), IPos({8, 6, 9}), last)); ++it;
+    EXPECT_EQ(*it, Slicer(IPos({7, 5, 11}), IPos({8, 6, 12}), last)); ++it;
+    EXPECT_EQ(*it, Slicer(IPos({7, 8, 7}), IPos({8, 9, 9}), last)); ++it;
+    EXPECT_EQ(*it, Slicer(IPos({7, 8, 11}), IPos({8, 9, 12}), last)); ++it;
 
-    EXPECT_EQ(*it, Slicer(I({20, 5, 7}), I({20, 6, 9}), last)); ++it;
-    EXPECT_EQ(*it, Slicer(I({20, 5, 11}), I({20, 6, 12}), last)); ++it;
-    EXPECT_EQ(*it, Slicer(I({20, 8, 7}), I({20, 9, 9}), last)); ++it;
-    EXPECT_EQ(*it, Slicer(I({20, 8, 11}), I({20, 9, 12}), last)); ++it;
+    EXPECT_EQ(*it, Slicer(IPos({20, 5, 7}), IPos({20, 6, 9}), last)); ++it;
+    EXPECT_EQ(*it, Slicer(IPos({20, 5, 11}), IPos({20, 6, 12}), last)); ++it;
+    EXPECT_EQ(*it, Slicer(IPos({20, 8, 7}), IPos({20, 9, 9}), last)); ++it;
+    EXPECT_EQ(*it, Slicer(IPos({20, 8, 11}), IPos({20, 9, 12}), last)); ++it;
 
     EXPECT_EQ(it, map.RangeEnd());
 }

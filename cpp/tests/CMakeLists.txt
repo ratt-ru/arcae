@@ -12,3 +12,7 @@ add_test(basic_test basic_test)
 add_executable(range_test range_test.cc)
 target_link_libraries(range_test PRIVATE GTest::gtest_main arcae test_utils)
 add_test(range_test range_test)
+
+add_executable(range_table_test range_table_test.cc)
+target_link_libraries(range_table_test PRIVATE GTest::gtest_main arcae test_utils)
+add_test(range_table_test range_table_test)
