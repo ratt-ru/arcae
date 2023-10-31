@@ -138,7 +138,8 @@ Limitations
 
 Some edge cases have not yet been implemented, but could be with some thought.
 
-* Not yet able to handle columns with unconstrained rank (ndim == -1). Probably simplest to convert these rows to json and store as a string.
+* Columns with unconstrained rank (ndim == -1) whose rows, in practice, have differing dimensions.
+  Unconstrained rank columns whose rows actually have the same rank are catered for.
 * Not yet able to handle TpRecord columns. Probably simplest to convert these rows to json and store as a string.
 * Not yet able to handle TpQuantity columns. Possible to represent as a run-time parametric Arrow DataType.
 * `to_numpy()` conversion of nested lists produces nested numpy arrays, instead of tensors.
