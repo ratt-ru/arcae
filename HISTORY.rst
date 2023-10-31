@@ -4,6 +4,13 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Update README.rst to show that it is possible to convert
+  unconstrained columns (ndim==-1) whose rows have the same rank (:pr:`74`)
+* Guard against python-casacore imports (:pr:`73`)
+
+0.2.1 (2023-10-24)
+------------------
+* Table Query Language Support (:pr:`71`)
 * Set skip-existing=true when uploading distributables to TestPyPI (:pr:`68`)
 
 0.2.0 (2023-10-19)
