@@ -73,7 +73,7 @@ public:
               typename = std::enable_if_t<
                 std::is_invocable_v<Fn, const casacore::TableProxy &>>>
     std::invoke_result_t<Fn, const casacore::TableProxy &> run(Fn && functor) const {
-        return run_isolated([this, functor = std::move(functor)]() mutable {
+        return run_isolated([this, functor = std::forward<Fn>(functor)]() mutable {
             return std::invoke(std::forward<Fn>(functor),
                                static_cast<const casacore::TableProxy &>(*this->table_proxy));
         });
@@ -83,7 +83,7 @@ public:
               typename = std::enable_if_t<
                 std::is_invocable_v<Fn, casacore::TableProxy &>>>
     std::invoke_result_t<Fn, casacore::TableProxy &> run(Fn && functor) {
-        return run_isolated([this, functor = std::move(functor)]() mutable {
+        return run_isolated([this, functor = std::forward<Fn>(functor)]() mutable {
             return std::invoke(std::forward<Fn>(functor),
                                static_cast<casacore::TableProxy &>(*this->table_proxy));
         });

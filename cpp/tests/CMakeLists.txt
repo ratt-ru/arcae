@@ -1,7 +1,6 @@
 find_package(GTest CONFIG REQUIRED)
 
 add_library(test_utils test_utils.cc)
-
 add_compile_options("-fsanitize=address")
 add_link_options("-fsanitize=address")
 
@@ -16,3 +15,7 @@ add_test(range_test range_test)
 add_executable(range_table_test range_table_test.cc)
 target_link_libraries(range_table_test PRIVATE GTest::gtest_main arcae test_utils)
 add_test(range_table_test range_table_test)
+
+add_executable(parallel_write_test parallel_write_test.cc)
+target_link_libraries(parallel_write_test PRIVATE GTest::gtest_main arcae test_utils)
+add_test(parallel_write_test parallel_write_test)

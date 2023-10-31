@@ -10,7 +10,9 @@
 
 namespace arcae {
 
-arrow::Result<std::shared_ptr<SafeTableProxy>> OpenTable(const std::string & filename);
+arrow::Result<std::shared_ptr<SafeTableProxy>> OpenTable(
+                                const std::string & filename,
+                                bool readonly=true);
 arrow::Result<std::shared_ptr<SafeTableProxy>> DefaultMS(
                                 const std::string & name,
                                 const std::string & subtable="MAIN",
