@@ -9,6 +9,24 @@
 #include <casacore/ms/MeasurementSets/MeasurementSet.h>
 #include <gtest/gtest.h>
 
+using casacore::Array;
+using casacore::ArrayColumn;
+using casacore::ArrayColumnDesc;
+using casacore::ColumnDesc;
+using CasaComplex = casacore::Complex;
+using MS = casacore::MeasurementSet;
+using MSColumns = casacore::MSMainEnums::PredefinedColumns;
+using casacore::SetupNewTable;
+using casacore::ScalarColumn;
+using casacore::Slice;
+using casacore::Slicer;
+using casacore::Table;
+using casacore::TableDesc;
+using casacore::TableColumn;
+using casacore::TableProxy;
+using casacore::TiledColumnStMan;
+using IPos = casacore::IPosition;
+
 using namespace std::string_literals;
 
 static constexpr std::size_t knrow = 20;
@@ -16,30 +34,29 @@ static constexpr std::size_t knchan = 4;
 static constexpr std::size_t kncorr = 1;
 static constexpr std::size_t knthreads = 16;
 
+static constexpr std::size_t kinc = 2;
+
 class WriteTests : public ::testing::Test {
   protected:
     std::shared_ptr<arcae::SafeTableProxy> table_proxy_;
+    std::string table_name_;
 
     void SetUp() override {
-      auto factory = []() -> arrow::Result<std::shared_ptr<casacore::TableProxy>> {
+      auto factory = [this]() -> arrow::Result<std::shared_ptr<TableProxy>> {
         auto * test_info = ::testing::UnitTest::GetInstance()->current_test_info();
-        auto table_desc = casacore::TableDesc(casacore::MeasurementSet::requiredTableDesc());
-        auto tablename = std::string(test_info->name() + "-"s + arcae::hexuuid(4) + ".table"s);
-        auto setup_new_table = casacore::SetupNewTable(tablename, table_desc, casacore::Table::New);
-        auto ms = casacore::MeasurementSet(setup_new_table, knrow);
+        auto table_desc = TableDesc(MS::requiredTableDesc());
+        table_name_ = std::string(test_info->name() + "-"s + arcae::hexuuid(4) + ".table"s);
 
-        {
-            auto data_shape = casacore::IPosition({kncorr, knchan});
-            auto tile_shape = casacore::IPosition({1, kncorr, knchan});
-            auto table_desc = casacore::TableDesc();
-            auto column_desc = casacore::ArrayColumnDesc<casacore::Complex>(
-                "MODEL_DATA", data_shape, casacore::ColumnDesc::FixedShape);
-            table_desc.addColumn(column_desc);
-            auto storage_manager = casacore::TiledColumnStMan("TiledModelData", tile_shape);
-            ms.addColumn(table_desc, storage_manager);
-        }
-
-        return std::make_shared<casacore::TableProxy>(ms);
+        auto data_shape = IPos({kncorr, knchan});
+        auto tile_shape = IPos({kncorr, knchan, 1});
+        auto data_column_desc = ArrayColumnDesc<CasaComplex>(
+            "MODEL_DATA", data_shape, ColumnDesc::FixedShape);
+        table_desc.addColumn(data_column_desc);
+        auto storage_manager = TiledColumnStMan("TiledModelData", tile_shape);
+        auto setup_new_table = SetupNewTable(table_name_, table_desc, Table::New);
+        setup_new_table.bindColumn("MODEL_DATA", storage_manager);
+        auto ms = MS(setup_new_table, knrow);
+        return std::make_shared<TableProxy>(ms);
       };
 
       ASSERT_OK_AND_ASSIGN(table_proxy_, arcae::SafeTableProxy::Make(factory));
@@ -52,10 +69,10 @@ TEST_F(WriteTests, Parallel) {
   ASSERT_EQ(table_proxy_->nRow(), knrow);
 
   auto data_result = table_proxy_->run(
-    [](const casacore::TableProxy & proxy) -> arrow::Result<casacore::Array<casacore::Complex>> {
+    [](const TableProxy & proxy) -> arrow::Result<Array<CasaComplex>> {
         auto table = proxy.table();
-        auto table_column = casacore::TableColumn(table, "MODEL_DATA");
-        auto column = casacore::ArrayColumn<casacore::Complex>(table_column);
+        auto table_column = TableColumn(table, "MODEL_DATA");
+        auto column = ArrayColumn<CasaComplex>(table_column);
         return column.getColumn();
     });
 
@@ -66,10 +83,10 @@ TEST_F(WriteTests, Parallel) {
   }
 
   auto name_result = table_proxy_->run(
-    [data = std::move(data)](const casacore::TableProxy & proxy) -> arrow::Result<std::string> {
+    [data = std::move(data)](const TableProxy & proxy) -> arrow::Result<std::string> {
         auto table = proxy.table();
-        auto table_column = casacore::TableColumn(table, "MODEL_DATA");
-        auto column = casacore::ArrayColumn<casacore::Complex>(table_column);
+        auto table_column = TableColumn(table, "MODEL_DATA");
+        auto column = ArrayColumn<CasaComplex>(table_column);
         column.putColumn(data);
         return table.tableName();
     });
@@ -86,37 +103,68 @@ TEST_F(WriteTests, Parallel) {
 
   ASSERT_OK_AND_ASSIGN(auto pool, arrow::internal::ThreadPool::Make(knthreads));
 
-  static constexpr std::size_t inc = 2;
+  {
+    std::vector<arrow::Future<bool>> futures;
 
-  std::vector<arrow::Future<bool>> futures;
+    for(auto [r, c] = std::tuple{std::size_t{0}, std::size_t{0}}; r < knrow; r += kinc, ++c) {
+      std::size_t end = std::min(r + kinc, knrow);
+      auto result = arrow::DeferNotOk(pool->Submit(
+          [start=r, nrow=end-r, writer=writers[c % knthreads]]() mutable {
+              return writer->run([start=start, nrow=nrow](TableProxy & proxy) mutable -> arrow::Result<bool> {
+                  auto table = proxy.table();
+                  auto table_column = TableColumn(table, "MODEL_DATA");
+                  auto & column_desc = table_column.columnDesc();
+                  auto column = ArrayColumn<CasaComplex>(table_column);
+                  column.setMaximumCacheSize(1);
+                  auto data = Array<CasaComplex>(IPos({kncorr, knchan, int(nrow)}));
+                  data.set(start);
 
-  for(auto [r, c] = std::tuple{std::size_t{0}, std::size_t{0}}; r < knrow; r += inc, ++c) {
-    std::size_t end = std::min(r + inc, knrow);
-    auto result = arrow::DeferNotOk(pool->Submit(
-        [start=r, nrow=end-r, writer=writers[c % knthreads]]() mutable {
-            return writer->run([start=start, nrow=nrow](casacore::TableProxy & proxy) mutable -> arrow::Result<bool> {
-                auto table = proxy.table();
-                auto table_column = casacore::TableColumn(table, "MODEL_DATA");
-                auto & column_desc = table_column.columnDesc();
-                auto column = casacore::ArrayColumn<casacore::Complex>(table_column);
-                column.setMaximumCacheSize(1);
-                auto data = casacore::Array<casacore::Complex>(casacore::IPosition({kncorr, knchan, int(nrow)}));
-                data.set(start);
+                  try {
+                      column.putColumnRange(Slice(start, nrow), data);
+                      table.flush();
+                  } catch(std::exception & e) {
+                      return arrow::Status::Invalid("Write failed ", e.what());
+                  }
 
-                try {
-                    column.putColumnRange(casacore::Slice(start, nrow), data);
-                    table.flush();
-                } catch(std::exception & e) {
-                    return arrow::Status::Invalid("Write failed ", e.what());
-                }
+                  return arrow::Result{true};
+              });
+          }));
 
-                return arrow::Result{true};
-            });
-        }));
+      futures.push_back(result);
+    }
 
-    futures.push_back(result);
+    auto all = arrow::All(futures).result().ValueOrDie();
+    for(auto res: all) res.ValueOrDie();
+    all.clear();
+    futures.clear();
   }
 
-  auto all = arrow::All(futures).result().ValueOrDie();
-  for(auto res: all) res.ValueOrDie();
+  {
+    for(auto [r, c] = std::tuple{std::size_t{0}, std::size_t{0}}; r < knrow; r += kinc, ++c) {
+      std::size_t end = std::min(r + kinc, knrow);
+      auto future = arrow::DeferNotOk(pool->Submit(
+          [start=r, nrow=end-r, writer=writers[c % knthreads]]() mutable {
+              return writer->run([start=start, nrow=nrow](TableProxy & proxy) mutable -> arrow::Result<Array<CasaComplex>> {
+                  auto table = proxy.table();
+                  auto table_column = TableColumn(table, "MODEL_DATA");
+                  auto & column_desc = table_column.columnDesc();
+                  auto column = ArrayColumn<CasaComplex>(table_column);
+                  column.setMaximumCacheSize(1);
+
+                  try {
+                      return column.getColumnRange(Slice(start, nrow));
+                  } catch(std::exception & e) {
+                      return arrow::Status::Invalid("Write failed ", e.what());
+                  }
+
+              });
+          }));
+
+      auto data = future.result().ValueOrDie();
+
+      for(auto it = data.begin(); it != data.end(); ++it) {
+        EXPECT_EQ(*it, CasaComplex(r, 0));
+      }
+    }
+  }
 }
