@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Remove WITH_SOABI workaround (:pr:`75`)
 * Add test case demonstrating the feasibility of parallel writes to
   Tiled Storage Manager Columns (:pr:`69`)
 * Update README.rst to show that it is possible to convert
