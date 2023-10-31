@@ -56,6 +56,17 @@ class WriteTests : public ::testing::Test {
         auto setup_new_table = SetupNewTable(table_name_, table_desc, Table::New);
         setup_new_table.bindColumn("MODEL_DATA", storage_manager);
         auto ms = MS(setup_new_table, knrow);
+
+        // Create a ramp of data values and insert it into the data column
+        auto data = Array<CasaComplex>(IPos{kncorr, knchan, knrow});
+
+        for(auto [i, it] = std::tuple{0, data.begin()}; it != data.end(); ++it, ++i) {
+          *it = i;
+        }
+
+        auto data_column = ArrayColumn<CasaComplex>(TableColumn(ms, "MODEL_DATA"));
+        data_column.putColumn(data);
+
         return std::make_shared<TableProxy>(ms);
       };
 
@@ -67,45 +78,22 @@ class WriteTests : public ::testing::Test {
 TEST_F(WriteTests, Parallel) {
   ASSERT_TRUE(table_proxy_);
   ASSERT_EQ(table_proxy_->nRow(), knrow);
-
-  auto data_result = table_proxy_->run(
-    [](const TableProxy & proxy) -> arrow::Result<Array<CasaComplex>> {
-        auto table = proxy.table();
-        auto table_column = TableColumn(table, "MODEL_DATA");
-        auto column = ArrayColumn<CasaComplex>(table_column);
-        return column.getColumn();
-    });
-
-  ASSERT_OK_AND_ASSIGN(auto data, data_result);
-
-  for(auto [i, it] = std::tuple{0, data.begin()}; it != data.end(); ++it, ++i) {
-    *it = i;
-  }
-
-  auto name_result = table_proxy_->run(
-    [data = std::move(data)](const TableProxy & proxy) -> arrow::Result<std::string> {
-        auto table = proxy.table();
-        auto table_column = TableColumn(table, "MODEL_DATA");
-        auto column = ArrayColumn<CasaComplex>(table_column);
-        column.putColumn(data);
-        return table.tableName();
-    });
-
-  ASSERT_OK_AND_ASSIGN(auto name, name_result);
-  table_proxy_.reset();
-
-  std::vector<std::shared_ptr<arcae::SafeTableProxy>> writers;
-
-  for(std::size_t i=0; i < knthreads; ++i) {
-    ASSERT_OK_AND_ASSIGN(auto writer, arcae::OpenTable(name, false));
-    writers.emplace_back(std::move(writer));
-  }
-
-  ASSERT_OK_AND_ASSIGN(auto pool, arrow::internal::ThreadPool::Make(knthreads));
+  table_proxy_.reset(); // close
 
   {
+    // Write some data in parallel;
+    std::vector<std::shared_ptr<arcae::SafeTableProxy>> writers;
     std::vector<arrow::Future<bool>> futures;
+    ASSERT_OK_AND_ASSIGN(auto pool, arrow::internal::ThreadPool::Make(knthreads));
 
+    // Create knthreads worth of SafeTableProxies
+    for(std::size_t i=0; i < knthreads; ++i) {
+      ASSERT_OK_AND_ASSIGN(auto writer, arcae::OpenTable(table_name_, false));
+      writers.emplace_back(std::move(writer));
+    }
+
+    // Iterate over the space of knrows in increments of kinc
+    // Each iteration will independently write it's part of the column
     for(auto [r, c] = std::tuple{std::size_t{0}, std::size_t{0}}; r < knrow; r += kinc, ++c) {
       std::size_t end = std::min(r + kinc, knrow);
       auto result = arrow::DeferNotOk(pool->Submit(
@@ -113,7 +101,7 @@ TEST_F(WriteTests, Parallel) {
               return writer->run([start=start, nrow=nrow](TableProxy & proxy) mutable -> arrow::Result<bool> {
                   auto table = proxy.table();
                   auto table_column = TableColumn(table, "MODEL_DATA");
-                  auto & column_desc = table_column.columnDesc();
+                  const auto & column_desc = table_column.columnDesc();
                   auto column = ArrayColumn<CasaComplex>(table_column);
                   column.setMaximumCacheSize(1);
                   auto data = Array<CasaComplex>(IPos({kncorr, knchan, int(nrow)}));
@@ -133,38 +121,39 @@ TEST_F(WriteTests, Parallel) {
       futures.push_back(result);
     }
 
+    // Wait for all futures to complete
     auto all = arrow::All(futures).result().ValueOrDie();
     for(auto res: all) res.ValueOrDie();
     all.clear();
     futures.clear();
   }
 
-  {
-    for(auto [r, c] = std::tuple{std::size_t{0}, std::size_t{0}}; r < knrow; r += kinc, ++c) {
-      std::size_t end = std::min(r + kinc, knrow);
-      auto future = arrow::DeferNotOk(pool->Submit(
-          [start=r, nrow=end-r, writer=writers[c % knthreads]]() mutable {
-              return writer->run([start=start, nrow=nrow](TableProxy & proxy) mutable -> arrow::Result<Array<CasaComplex>> {
-                  auto table = proxy.table();
-                  auto table_column = TableColumn(table, "MODEL_DATA");
-                  auto & column_desc = table_column.columnDesc();
-                  auto column = ArrayColumn<CasaComplex>(table_column);
-                  column.setMaximumCacheSize(1);
+  // Reopen the table
+  ASSERT_OK_AND_ASSIGN(table_proxy_, arcae::OpenTable(table_name_, true));
 
-                  try {
-                      return column.getColumnRange(Slice(start, nrow));
-                  } catch(std::exception & e) {
-                      return arrow::Status::Invalid("Write failed ", e.what());
-                  }
+  // Using the same iteration pattern for writes, read sections of the table
+  // and compare them for the expected result
+  for(auto [r, c] = std::tuple{std::size_t{0}, std::size_t{0}}; r < knrow; r += kinc, ++c) {
+    std::size_t end = std::min(r + kinc, knrow);
 
-              });
-          }));
+    auto future = table_proxy_->run([start=r, nrow=end - r](TableProxy & proxy) mutable -> arrow::Result<Array<CasaComplex>> {
+      auto table = proxy.table();
+      auto table_column = TableColumn(table, "MODEL_DATA");
+      const auto & column_desc = table_column.columnDesc();
+      auto column = ArrayColumn<CasaComplex>(table_column);
+      column.setMaximumCacheSize(1);
 
-      auto data = future.result().ValueOrDie();
-
-      for(auto it = data.begin(); it != data.end(); ++it) {
-        EXPECT_EQ(*it, CasaComplex(r, 0));
+      try {
+          return column.getColumnRange(Slice(start, nrow));
+      } catch(std::exception & e) {
+          return arrow::Status::Invalid("Write failed ", e.what());
       }
+    });
+
+    ASSERT_OK_AND_ASSIGN(auto data, future);
+
+    for(auto it = data.begin(); it != data.end(); ++it) {
+      EXPECT_EQ(*it, CasaComplex(r, 0));
     }
   }
 }
