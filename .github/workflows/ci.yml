@@ -114,7 +114,6 @@ jobs:
         platform:
           # platform tag, manylinux tag, vcpkg triplet
           - [manylinux_x86_64, manylinux_2_28, x64-linux-dynamic-cxx17-abi1-rel]
-          - [manylinux_aarch64, manylinux_2_28, arm64-linux-dynamic-cxx17-abi1-rel]
 
     steps:
       - name: Set up Python ${{ matrix.python[0] }}
@@ -142,7 +141,6 @@ jobs:
           CIBW_BUILD_FRONTEND: build
           CIBW_BEFORE_ALL_LINUX: yum install -y zip flex bison gcc-gfortran
           CIBW_MANYLINUX_X86_64_IMAGE: quay.io/pypa/${{ matrix.platform[1] }}_x86_64
-          CIBW_MANYLINUX_AARCH64_IMAGE: quay.io/pypa/${{ matrix.platform[1] }}_aarch64
           CIBW_ENVIRONMENT_LINUX: >
             CMAKE_ARGS=-DBUILD_TESTING=OFF
             ACTIONS_CACHE_URL=${{ env.ACTIONS_CACHE_URL }}
