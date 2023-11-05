@@ -132,7 +132,7 @@ jobs:
       - name: Run cibuildwheel
         uses: pypa/cibuildwheel@v2.13.1
         env:
-          CIBW_BUILD: cp${{ matrix.python[1] }}-manylinux_x86_64
+          CIBW_BUILD: ${{ matrix.python[1] }}-manylinux_x86_64
           CIBW_BUILD_FRONTEND: build
           CIBW_BEFORE_ALL_LINUX: yum install -y zip flex bison gcc-gfortran
           CIBW_MANYLINUX_X86_64_IMAGE: quay.io/pypa/manylinux_2_28_x86_64
