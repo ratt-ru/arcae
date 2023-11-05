@@ -1,6 +1,6 @@
 load("cirrus", "env", "fs", "http")
 
-def main(ctx)
+def main(ctx):
     if env.get("CIRRUS_REPO_FULL_NAME") != "ratt-ru/arcae":
         return []
     
