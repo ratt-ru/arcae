@@ -30,7 +30,7 @@ build_and_store_wheels: &BUILD_AND_STORE_WHEELS
       VCPKG_TARGET_TRIPLET: x64-linux-dynamic-cxx17-abi1-rel
       CIBW_ENVIRONMENT_LINUX:
         CMAKE_ARGS=-DBUILD_TESTING=OFF
-        VCPKG_BINARY_SOURCES="clear;http,$CIRRUS_HTTP_CACHE_HOST/{name}/{triplet}/{version}/{sha},readwrite"
+        #VCPKG_BINARY_SOURCES="clear;http,$CIRRUS_HTTP_CACHE_HOST/{name}/{triplet}/{version}/{sha},readwrite"
         VCPKG_TARGET_TRIPLET=$VCPKG_TARGET_TRIPLET
         VCPKG_INSTALLED_DIR=$VCPKG_INSTALLED_DIR
         LD_LIBRARY_PATH=$VCPKG_INSTALLED_DIR/$VCPKG_TARGET_TRIPLET/lib
