@@ -42,4 +42,3 @@ build_and_store_wheels: &BUILD_AND_STORE_WHEELS
       apt install -y python-is-python3 python3-venv
       which python
       echo $CIRRUS_CHANGE_MESSAGE
-    <<: *BUILD_AND_STORE_WHEELS
