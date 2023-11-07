@@ -12,7 +12,7 @@ using casacore::Slicer;
 using IPos = casacore::IPosition;
 
 
-using C = ColumnMapping<std::int32_t>;
+using C = arcae::ColumnMapping<std::int32_t>;
 
 TEST(RangeDeathTest, CheckMapsAndRangeNull) {
     GTEST_FLAG_SET(death_test_style, "threadsafe");
@@ -103,7 +103,7 @@ TEST(RangeTest, IteratorTest) {
 
     auto map = C({
         {4, 3, 2, 1, 8, 7, 20},    // Three disjoint ranges
-        {5, 6, 8, 9},              // Two disjoin range
+        {5, 6, 8, 9},              // Two disjoint ranges
         {7, 9, 8, 12, 11}});       // Two disjoint ranges
 
     auto it = map.RangeBegin();

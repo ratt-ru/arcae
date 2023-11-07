@@ -11,12 +11,14 @@
 
 #include <casacore/casa/Arrays/Slicer.h>
 
+namespace arcae {
+
 /// Utility class for mapping between in-disk and
 /// in-memory indices
 template <typename T=std::int32_t>
 class ColumnMapping {
   static_assert(std::is_integral_v<T>, "T is not integral");
-  static_assert(std::is_signed_v<T>, "T is not signed");
+  //static_assert(std::is_signed_v<T>, "T is not signed");
 
 public:
   // Direction of the map
@@ -53,7 +55,7 @@ public:
 
   class RangeIterator {
     private:
-      ColumnMapping & map_;
+      const ColumnMapping & map_;
       std::vector<std::size_t> index_;
       bool done_;
     public:
@@ -89,7 +91,7 @@ public:
 
         while(dim >= 0) {
           index_[dim]++;
-          // We've achieved a succesful iteration in this dimension
+          // We've achieved a successful iteration in this dimension
           if(index_[dim] < map_.ranges_[dim].size()) {
             break;
           // We've exceeded the size of the current dimension
@@ -106,12 +108,6 @@ public:
         }
 
         return *this;
-      }
-
-      RangeIterator & operator++(int) {
-        auto temp = RangeIterator(*this);
-        ++(*this);
-        return temp;
       }
 
       bool operator==(const RangeIterator & other) const {
@@ -155,12 +151,12 @@ public:
                                 { return init * range.size(); });
   }
 
-  RangeIterator RangeBegin() {
-    return RangeIterator{*this, false};
+  RangeIterator RangeBegin() const {
+    return RangeIterator{const_cast<ColumnMapping<T> &>(*this), false};
   }
 
-  RangeIterator RangeEnd() {
-    return RangeIterator{*this, true};
+  RangeIterator RangeEnd() const {
+    return RangeIterator{const_cast<ColumnMapping<T> &>(*this), true};
   }
 
   bool IsSimple() const;
@@ -272,6 +268,6 @@ bool ColumnMapping<T>::IsSimple() const {
   return true;
 }
 
-
+} // namespace arcae
 
 #endif // ARCAE_COLUMN_MAPPER_H
