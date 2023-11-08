@@ -79,15 +79,20 @@ public:
             auto * buf_ptr = reinterpret_cast<T *>(buffer->mutable_data());
             auto casa_vector = casacore::Vector<T>(casacore::IPosition(1, nelements), buf_ptr, casacore::SHARE);
 
-            assert(column_map_.IsSimple());
-
-            for(auto it = column_map_.RangeBegin(); it != column_map_.RangeEnd(); ++it) {
-                // Dump column data into Arrow Buffer
+            if(column_map_.IsSimple()) {
                 try {
-                    std::cout << "Getting " << *it << std::endl;
-                    column.getColumnRange(*it, casa_vector);
+                    column.getColumnRange(*column_map_.RangeBegin(), casa_vector);
                 } catch(std::exception & e) {
                     return arrow::Status::Invalid("ConvertScalarColumn ", column_desc_.name(), " ", e.what());
+                }
+            } else {
+                for(auto it = column_map_.RangeBegin(); it != column_map_.RangeEnd(); ++it) {
+                    // Dump column data into Arrow Buffer
+                    try {
+                        auto chunk = column.getColumnRange(*it);
+                    } catch(std::exception & e) {
+                        return arrow::Status::Invalid("ConvertScalarColumn ", column_desc_.name(), " ", e.what());
+                    }
                 }
             }
 

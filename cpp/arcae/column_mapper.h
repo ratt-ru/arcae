@@ -53,6 +53,54 @@ public:
   using ColumnRange = std::vector<Range>;
   using ColumnRanges = std::vector<ColumnRange>;
 
+  class ChunkIterator {
+    private:
+      const ColumnMapping & map_;
+      casacore::IPosition current_;
+      casacore::IPosition end_;
+      bool done_;
+
+    public:
+      ChunkIterator(const ColumnMapping & map,
+                    const casacore::IPosition & start,
+                    const casacore::IPosition & end)
+        : map_(map), current_(start), end_(end), done_(false) {}
+
+      ChunkIterator(const ColumnMapping & map, bool done)
+        : map_(map), current_(), end_(), done_(done) {}
+
+      ChunkIterator & operator++() {
+        // Iterate from fastest to slowest changing dimension
+        std::size_t dim = current_.size() - 1;
+
+        while(!done_ && dim >= 0) {
+          current_[dim]++;
+          // We've achieved a successful iteration in this dimension
+          if(current_[dim] < end_[dim]) { break; }
+          // Reset to zero and retry in the next dimension
+          else if(dim > 0) { current_[dim] = 0; --dim; }
+          // This was the slowest changing dimension so we're done
+          else { done_ = true; }
+        }
+
+        return *this;
+      }        
+
+      casacore::IPosition operator*() const {
+        return current_;
+      }
+
+      bool operator==(const ChunkIterator & other) const {
+        if(&map_ != &other.map_) return false;
+        if(done_ && other.done_) return true;
+        return done_ == other.done_ && current_ == other.current_ && end_ == other.end_;
+      }
+
+      bool operator!=(const ChunkIterator & other) const {
+        return !(*this == other);
+      }
+  };
+
   class RangeIterator {
     private:
       const ColumnMapping & map_;
@@ -64,7 +112,7 @@ public:
         done_(done),
         index_(column_map.nDim(), 0) {}
 
-      casacore::Slicer operator*() {
+      casacore::Slicer GetSlicer() {
         auto start = casacore::IPosition(index_.size());
         auto end = casacore::IPosition(index_.size());
 
@@ -85,40 +133,41 @@ public:
         return casacore::Slicer(std::move(start), std::move(end), casacore::Slicer::endIsLast);
       }
 
+      ChunkIterator ChunkBegin() {
+        auto slicer = GetSlicer();
+        return ChunkIterator(map_, slicer.start(), slicer.end());
+      }
+
+      inline ChunkIterator ChunkEnd() {
+        return ChunkIterator(map_, true);
+      }
+
+
+      inline casacore::Slicer operator*() {
+        return GetSlicer();
+      }
+
       RangeIterator & operator++() {
         // Iterate from fastest to slowest changing dimension
         std::size_t dim = index_.size() - 1;
 
-        while(dim >= 0) {
+        while(!done_ && dim >= 0) {
           index_[dim]++;
           // We've achieved a successful iteration in this dimension
-          if(index_[dim] < map_.ranges_[dim].size()) {
-            break;
+          if(index_[dim] < map_.ranges_[dim].size()) { break; }
           // We've exceeded the size of the current dimension
           // reset to zero and retry the while loop
-          // in a slower changing dimension
-          } else if(dim > 0) {
-            index_[dim] = 0;
-            --dim;
-            // This was the slowest changing dimension so we're done
-          } else {
-            done_ = true;
-            break;
-          }
+          else if(dim > 0) { index_[dim] = 0; --dim; }
+          // This was the slowest changing dimension so we're done
+          else { done_ = true; }
         }
 
         return *this;
       }
 
       bool operator==(const RangeIterator & other) const {
-        if(&map_ != &other.map_) {
-          return false;
-        }
-
-        if(done_ && other.done_) {
-          return true;
-        }
-
+        if(&map_ != &other.map_) return false;
+        if(done_ && other.done_) return true;
         return done_ == other.done_ && index_ == other.index_;
       }
 

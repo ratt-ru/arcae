@@ -98,7 +98,7 @@ TEST(RangeTest, IteratorSingletonTest) {
 }
 
 
-TEST(RangeTest, IteratorTest) {
+TEST(RangeTest, RangeIteratorTest) {
     auto last = casacore::Slicer::endIsLast;
 
     auto map = C({
@@ -124,4 +124,47 @@ TEST(RangeTest, IteratorTest) {
     EXPECT_EQ(*it, Slicer(IPos({20, 8, 11}), IPos({20, 9, 12}), last)); ++it;
 
     EXPECT_EQ(it, map.RangeEnd());
+}
+
+
+TEST(RangeTest, ChunkIteratorTest) {
+    auto last = casacore::Slicer::endIsLast;
+
+    auto map = C({
+        {0, 1, 3},
+        {0, 1},
+        {0, 1, 3}
+    });
+
+    auto rit = map.RangeBegin();
+
+    {    
+        EXPECT_EQ(*rit, Slicer(IPos({0, 0, 0}), IPos({1, 1, 1}), last));
+        auto cit = rit.ChunkBegin();
+        EXPECT_EQ(*cit, IPos({0, 0, 0})); ++cit;
+        EXPECT_EQ(cit, rit.ChunkEnd()); ++rit;
+    }
+
+    {
+        EXPECT_EQ(*rit, Slicer(IPos({0, 0, 3}), IPos({1, 1, 3}), last));
+        auto cit = rit.ChunkBegin();
+        EXPECT_EQ(*cit, IPos({0, 0, 3})); ++cit;
+        EXPECT_EQ(cit, rit.ChunkEnd()); ++rit;
+    }
+
+    {
+        EXPECT_EQ(*rit, Slicer(IPos({3, 0, 0}), IPos({3, 1, 1}), last));
+        auto cit = rit.ChunkBegin();
+        EXPECT_EQ(*cit, IPos({3, 0, 0})); ++cit;
+        EXPECT_EQ(cit, rit.ChunkEnd()); ++rit;
+    }
+
+    {
+        EXPECT_EQ(*rit, Slicer(IPos({3, 0, 3}), IPos({3, 1, 3}), last));
+        auto cit = rit.ChunkBegin();
+        EXPECT_EQ(*cit, IPos({3, 0, 3})); ++cit;
+        EXPECT_EQ(cit, rit.ChunkEnd()); ++rit;
+    }
+
+    EXPECT_EQ(rit, map.RangeEnd());
 }

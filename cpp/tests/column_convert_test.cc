@@ -80,12 +80,12 @@ class ColumnConvertTest : public ::testing::Test {
         setup_new_table.bindColumn("MODEL_DATA", storage_manager);
         auto ms = MS(setup_new_table, knrow);
 
-        auto field = GetScalarColumn<int>(ms, MS::FIELD_ID);
-        auto ddid = GetScalarColumn<int>(ms, MS::DATA_DESC_ID);
-        auto scan = GetScalarColumn<int>(ms, MS::SCAN_NUMBER);
-        auto time = GetScalarColumn<double>(ms, MS::TIME);
-        auto ant1 = GetScalarColumn<int>(ms, MS::ANTENNA1);
-        auto ant2 = GetScalarColumn<int>(ms, MS::ANTENNA2);
+        auto field = GetScalarColumn<casacore::Int>(ms, MS::FIELD_ID);
+        auto ddid = GetScalarColumn<casacore::Int>(ms, MS::DATA_DESC_ID);
+        auto scan = GetScalarColumn<casacore::Int>(ms, MS::SCAN_NUMBER);
+        auto time = GetScalarColumn<casacore::Double>(ms, MS::TIME);
+        auto ant1 = GetScalarColumn<casacore::Int>(ms, MS::ANTENNA1);
+        auto ant2 = GetScalarColumn<casacore::Int>(ms, MS::ANTENNA2);
         auto data = GetArrayColumn<CasaComplex>(ms, MS::MODEL_DATA);
         auto corrected_data = GetArrayColumn<CasaComplex>(ms, "VAR_DATA");
 
@@ -96,8 +96,7 @@ class ColumnConvertTest : public ::testing::Test {
         ant2.putColumn({1, 1, 1, 1, 1, 1, 1, 1, 1, 1});
         data.putColumn(Array<CasaComplex>(IPos({kncorr, knchan, knrow}), {1, 2}));
 
-        auto rd = std::random_device{};
-        auto gen = std::mt19937{rd()};
+        auto gen = std::mt19937{std::random_device{}()};
         auto chan_dist = std::uniform_int_distribution<>(knchan, knchan + 2);
         auto corr_dist = std::uniform_int_distribution<>(kncorr, kncorr + 1);
 
@@ -117,27 +116,29 @@ class ColumnConvertTest : public ::testing::Test {
 };
 
 TEST_F(ColumnConvertTest, SelectFromRange) {
-  auto result = table_proxy_->run([](const TableProxy & proxy) -> arrow::Result<std::shared_ptr<arrow::Array>> {
-    auto table = proxy.table();
-    // auto data_column = GetArrayColumn<CasaComplex>(table, "VAR_DATA");
-    // auto row_range = Slicer(IPos({0}), IPos({5}), Slicer::endIsLast);
-    // auto section = Slicer(IPos({0, 0}), IPos({0, 2}), Slicer::endIsLast);
-    // auto data = data_column.getColumnRange(row_range, section);
+  ASSERT_OK_AND_ASSIGN(auto result,
+      (table_proxy_->run([](const TableProxy & proxy) -> arrow::Result<std::shared_ptr<arrow::Array>> { 
+          auto table = proxy.table();
+          // auto data_column = GetArrayColumn<CasaComplex>(table, "VAR_DATA");
+          // auto row_range = Slicer(IPos({0}), IPos({5}), Slicer::endIsLast);
+          // auto section = Slicer(IPos({0, 0}), IPos({0, 2}), Slicer::endIsLast);
+          // auto data = data_column.getColumnRange(row_range, section);
 
-    auto data_column = GetScalarColumn<casacore::Int>(table, "ANTENNA1");
+          auto data_column = GetScalarColumn<casacore::Double>(table, "TIME");
 
-    using CM = arcae::ColumnMapping<casacore::rownr_t>;
-    auto row_ids = CM::ColumnIds(data_column.nrow(), 0);
+          using CM = arcae::ColumnMapping<casacore::rownr_t>;
+          // auto row_ids = CM::ColumnIds(data_column.nrow(), 0);
 
-    for(std::size_t i=0; i < row_ids.size(); ++i) {
-      row_ids[i] = i;
-    }
+          // for(std::size_t i=0; i < row_ids.size(); ++i) {
+          //   row_ids[i] = i;
+          // }
 
-    auto column_map = CM{CM::ColumnSelection{std::move(row_ids)}};
-    auto visitor = arcae::NewConvertVisitor(data_column, column_map);
-    ARROW_RETURN_NOT_OK(visitor.Visit(data_column.columnDesc().dataType()));
-    return visitor.array_;
-  });
+          auto row_ids = CM::ColumnIds{0, 1, 2, 3, 6, 7, 8, 9};
+          auto column_map = CM{CM::ColumnSelection{std::move(row_ids)}};
+          auto visitor = arcae::NewConvertVisitor(data_column, column_map);
+          ARROW_RETURN_NOT_OK(visitor.Visit(data_column.columnDesc().dataType()));
+          return visitor.array_;
+        })));
 
-  ASSERT_OK_AND_ASSIGN(auto blah, result);
+  std::cout << result->ToString() << std::endl;
 }
