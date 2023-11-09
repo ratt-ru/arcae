@@ -23,6 +23,7 @@ public:
   // Direction of the map
   enum Direction { FORWARD=0, BACKWARD };
 
+  // Describes a mapping between two dimension id's
   struct IdMap {
     T from;
     T to;
@@ -31,6 +32,7 @@ public:
         { return from == lhs.from && to == lhs.to; }
   };
 
+  // Describes a range along a dimension (end is exclusive)
   struct Range {
     T start;
     T end;
@@ -97,12 +99,12 @@ public:
 
       // Return the Ranges for the given dimension
       inline const ColumnRange & DimRanges(std::size_t dim) const {
-        return map_.ranges_[dim];
+        return map_.DimRanges(dim);
       }
 
       // Return the Maps for the given dimension
       inline const ColumnMap & DimMaps(std::size_t dim) const {
-        return map_.maps_[dim];
+        return map_.DimMaps(dim);
       }
 
       // Return the currently selected Range of the given dimension
@@ -162,6 +164,16 @@ public:
   inline RangeIterator RangeEnd() const {
     return RangeIterator{const_cast<ColumnMapping<T> &>(*this), true};
   }
+
+    // Return the Ranges for the given dimension
+    inline const ColumnRange & DimRanges(std::size_t dim) const {
+      return ranges_[dim];
+    }
+
+    // Return the Maps for the given dimension
+    inline const ColumnMap & DimMaps(std::size_t dim) const {
+      return maps_[dim];
+    }
 
   /// Returns true if this is a simple mapping. A mapping is simple
   /// if the following holds:
@@ -344,8 +356,8 @@ ColumnMapping<T>::MakeRanges(const ColumnMaps & maps, Direction direction) {
 template <typename T>
 bool ColumnMapping<T>::IsSimple() const {
   for(std::size_t dim=0; dim < maps_.size(); ++dim) {
-    const auto & column_map = maps_[dim];
-    const auto & column_range = ranges_[dim];
+    const auto & column_map = DimMaps(dim);
+    const auto & column_range = DimRanges(dim);
 
     // More than one range of row ids in a dimension
     if(column_range.size() > 1) return false;
