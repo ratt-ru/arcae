@@ -54,10 +54,11 @@ public:
 
   // Iterates over the current mapping in the RangeIterator
   class ChunkIterator {
-    public:
+    private:
       const RangeIterator & rit_;
       std::vector<T> current_;
       bool done_;
+    public:
 
       // Initialise the current map from the range starts
       // of the encapsulated RangeIterator
@@ -114,11 +115,12 @@ public:
 
   // Iterates over the Disjoint Ranges defined by a ColumnMapping
   class RangeIterator {
-    public:
+    private:
       const ColumnMapping & map_;
       std::vector<std::size_t> index_;
       bool done_;
 
+    public:
       RangeIterator(ColumnMapping & column_map, bool done=false) :
         map_(column_map), done_(done), index_(column_map.nDim(), 0) {}
 
@@ -150,7 +152,7 @@ public:
         return ChunkIterator(*this, true);
       }
 
-      casacore::Slicer operator*() {
+      casacore::Slicer operator*() const {
         assert(!done_);
         auto start = casacore::IPosition(index_.size());
         auto end = casacore::IPosition(index_.size());
