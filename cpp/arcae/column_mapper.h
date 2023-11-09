@@ -205,10 +205,9 @@ ColumnMapping<T>::MapIterator::operator++() {
 
 template <typename T>
 bool ColumnMapping<T>::MapIterator::operator==(const MapIterator & other) const {
-  if(&rit_ != &other.rit_) return false;
-    // Don't bother comparing indices if we're done
-  if(done_ && other.done_) return true;
-  return done_ == other.done_ && current_ == other.current_;
+  return &rit_ == &other.rit_ && done_ == other.done_ &&
+         // If we're done, unnecessary to compare current_
+         done_ == true ? true : current_ == other.current_;
 }
 
 template <typename T>
@@ -257,10 +256,9 @@ ColumnMapping<T>::RangeIterator::operator++() {
 
 template <typename T>
 bool ColumnMapping<T>::RangeIterator::operator==(const RangeIterator & other) const {
-  if(&map_ != &other.map_) return false;
-  // Don't bother comparing indices if we're done
-  if(done_ && other.done_) return true;
-  return done_ == other.done_ && index_ == other.index_;
+  return &map_ == &other.map_ && done_ == other.done_ &&
+         // If we're done unnecessary to compare index_
+         done_ == true ? true : index_ == other.index_;
 }
 
 
