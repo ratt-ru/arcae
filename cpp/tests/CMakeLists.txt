@@ -19,3 +19,6 @@ add_test(column_convert_test column_convert_test)
 add_executable(parallel_write_test parallel_write_test.cc)
 target_link_libraries(parallel_write_test PRIVATE GTest::gtest_main arcae test_utils)
 add_test(parallel_write_test parallel_write_test)
+
+set_tests_properties(basic_test range_test column_convert_test range_test parallel_write_test
+                     PROPERTIES ENVIRONMENT "LD_LIBRARY_PATH=${VCPKG_LIBDIRS}")
