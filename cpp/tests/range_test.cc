@@ -76,7 +76,7 @@ TEST(RangeTest, CheckMapsAndRangesMultiple) {
     ASSERT_FALSE(map.IsSimple());
 }
 
-TEST(RangeTest, TestSimplicity) {
+TEST(RangeTest, TestSimplimity) {
     EXPECT_TRUE(C({{1, 2, 3, 4}}, C::FORWARD).IsSimple());
     EXPECT_TRUE(C({{1, 2, 3, 4}}, C::BACKWARD).IsSimple());
     EXPECT_TRUE(C({{1, 2, 3, 4}, {5, 6}, {6, 7}}, C::FORWARD).IsSimple());
@@ -149,44 +149,44 @@ TEST(RangeTest, ChunkIteratorTest) {
 
     {
         EXPECT_EQ(*rit, Slicer(IPos({0, 0, 0}), IPos({1, 1, 1}), last));
-        auto cit = rit.ChunkBegin();
-        EXPECT_EQ(*cit, (std::vector<IdMap>{{0, 0}, {0, 0}, {0, 0}})); ++cit; ++n;
-        EXPECT_EQ(*cit, (std::vector<IdMap>{{0, 0}, {0, 0}, {1, 1}})); ++cit; ++n;
-        EXPECT_EQ(*cit, (std::vector<IdMap>{{0, 0}, {1, 1}, {0, 0}})); ++cit; ++n;
-        EXPECT_EQ(*cit, (std::vector<IdMap>{{0, 0}, {1, 1}, {1, 1}})); ++cit; ++n;
-        EXPECT_EQ(*cit, (std::vector<IdMap>{{1, 1}, {0, 0}, {0, 0}})); ++cit; ++n;
-        EXPECT_EQ(*cit, (std::vector<IdMap>{{1, 1}, {0, 0}, {1, 1}})); ++cit; ++n;
-        EXPECT_EQ(*cit, (std::vector<IdMap>{{1, 1}, {1, 1}, {0, 0}})); ++cit; ++n;
-        EXPECT_EQ(*cit, (std::vector<IdMap>{{1, 1}, {1, 1}, {1, 1}})); ++cit; ++n;
-        EXPECT_EQ(cit, rit.ChunkEnd()); ++rit;
+        auto mit = rit.MapBegin();
+        EXPECT_EQ(*mit, (std::vector<IdMap>{{0, 0}, {0, 0}, {0, 0}})); ++mit; ++n;
+        EXPECT_EQ(*mit, (std::vector<IdMap>{{0, 0}, {0, 0}, {1, 1}})); ++mit; ++n;
+        EXPECT_EQ(*mit, (std::vector<IdMap>{{0, 0}, {1, 1}, {0, 0}})); ++mit; ++n;
+        EXPECT_EQ(*mit, (std::vector<IdMap>{{0, 0}, {1, 1}, {1, 1}})); ++mit; ++n;
+        EXPECT_EQ(*mit, (std::vector<IdMap>{{1, 1}, {0, 0}, {0, 0}})); ++mit; ++n;
+        EXPECT_EQ(*mit, (std::vector<IdMap>{{1, 1}, {0, 0}, {1, 1}})); ++mit; ++n;
+        EXPECT_EQ(*mit, (std::vector<IdMap>{{1, 1}, {1, 1}, {0, 0}})); ++mit; ++n;
+        EXPECT_EQ(*mit, (std::vector<IdMap>{{1, 1}, {1, 1}, {1, 1}})); ++mit; ++n;
+        EXPECT_EQ(mit, rit.MapEnd()); ++rit;
     }
 
     {
         EXPECT_EQ(*rit, Slicer(IPos({0, 0, 3}), IPos({1, 1, 3}), last));
-        auto cit = rit.ChunkBegin();
-        EXPECT_EQ(*cit, (std::vector<IdMap>{{0, 0}, {0, 0}, {3, 2}})); ++cit; ++n;
-        EXPECT_EQ(*cit, (std::vector<IdMap>{{0, 0}, {1, 1}, {3, 2}})); ++cit; ++n;
-        EXPECT_EQ(*cit, (std::vector<IdMap>{{1, 1}, {0, 0}, {3, 2}})); ++cit; ++n;
-        EXPECT_EQ(*cit, (std::vector<IdMap>{{1, 1}, {1, 1}, {3, 2}})); ++cit; ++n;
-        EXPECT_EQ(cit, rit.ChunkEnd()); ++rit;
+        auto mit = rit.MapBegin();
+        EXPECT_EQ(*mit, (std::vector<IdMap>{{0, 0}, {0, 0}, {3, 2}})); ++mit; ++n;
+        EXPECT_EQ(*mit, (std::vector<IdMap>{{0, 0}, {1, 1}, {3, 2}})); ++mit; ++n;
+        EXPECT_EQ(*mit, (std::vector<IdMap>{{1, 1}, {0, 0}, {3, 2}})); ++mit; ++n;
+        EXPECT_EQ(*mit, (std::vector<IdMap>{{1, 1}, {1, 1}, {3, 2}})); ++mit; ++n;
+        EXPECT_EQ(mit, rit.MapEnd()); ++rit;
     }
 
     {
         EXPECT_EQ(*rit, Slicer(IPos({3, 0, 0}), IPos({3, 1, 1}), last));
-        auto cit = rit.ChunkBegin();
-        EXPECT_EQ(*cit, (std::vector<IdMap>{{3, 2}, {0, 0}, {0, 0}})); ++cit; ++n;
-        EXPECT_EQ(*cit, (std::vector<IdMap>{{3, 2}, {0, 0}, {1, 1}})); ++cit; ++n;
-        EXPECT_EQ(*cit, (std::vector<IdMap>{{3, 2}, {1, 1}, {0, 0}})); ++cit; ++n;
-        EXPECT_EQ(*cit, (std::vector<IdMap>{{3, 2}, {1, 1}, {1, 1}})); ++cit; ++n;
-        EXPECT_EQ(cit, rit.ChunkEnd()); ++rit;
+        auto mit = rit.MapBegin();
+        EXPECT_EQ(*mit, (std::vector<IdMap>{{3, 2}, {0, 0}, {0, 0}})); ++mit; ++n;
+        EXPECT_EQ(*mit, (std::vector<IdMap>{{3, 2}, {0, 0}, {1, 1}})); ++mit; ++n;
+        EXPECT_EQ(*mit, (std::vector<IdMap>{{3, 2}, {1, 1}, {0, 0}})); ++mit; ++n;
+        EXPECT_EQ(*mit, (std::vector<IdMap>{{3, 2}, {1, 1}, {1, 1}})); ++mit; ++n;
+        EXPECT_EQ(mit, rit.MapEnd()); ++rit;
     }
 
     {
         EXPECT_EQ(*rit, Slicer(IPos({3, 0, 3}), IPos({3, 1, 3}), last));
-        auto cit = rit.ChunkBegin();
-        EXPECT_EQ(*cit, (std::vector<IdMap>{{3, 2}, {0, 0}, {3, 2}})); ++cit; ++n;
-        EXPECT_EQ(*cit, (std::vector<IdMap>{{3, 2}, {1, 1}, {3, 2}})); ++cit; ++n;
-        EXPECT_EQ(cit, rit.ChunkEnd()); ++rit;
+        auto mit = rit.MapBegin();
+        EXPECT_EQ(*mit, (std::vector<IdMap>{{3, 2}, {0, 0}, {3, 2}})); ++mit; ++n;
+        EXPECT_EQ(*mit, (std::vector<IdMap>{{3, 2}, {1, 1}, {3, 2}})); ++mit; ++n;
+        EXPECT_EQ(mit, rit.MapEnd()); ++rit;
     }
 
     EXPECT_EQ(rit, map.RangeEnd());

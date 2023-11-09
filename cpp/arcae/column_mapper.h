@@ -50,7 +50,7 @@ public:
   class RangeIterator;
 
   // Iterates over the current mapping in the RangeIterator
-  class ChunkIterator {
+  class MapIterator {
     private:
       const RangeIterator & rit_;
       std::vector<T> current_;
@@ -67,10 +67,10 @@ public:
         return result;
       }
 
-      ChunkIterator(const RangeIterator & rit, bool done)
+      MapIterator(const RangeIterator & rit, bool done)
         : rit_(rit), current_(CurrentFromRangeIterator(rit)), done_(done) {}
 
-      ChunkIterator & operator++() {
+      MapIterator & operator++() {
         assert(!done_);
         // Iterate from fastest to slowest changing dimension
         std::size_t dim = current_.size() - 1;
@@ -99,13 +99,13 @@ public:
         return result;
       }
 
-      bool operator==(const ChunkIterator & other) const {
+      bool operator==(const MapIterator & other) const {
         if(&rit_ != &other.rit_) return false;
         if(done_ && other.done_) return true;
         return done_ == other.done_ && current_ == other.current_;
       }
 
-      bool operator!=(const ChunkIterator & other) const {
+      bool operator!=(const MapIterator & other) const {
         return !(*this == other);
       }
   };
@@ -141,12 +141,12 @@ public:
         return DimRanges(dim)[index_[dim]];
       }
 
-      inline ChunkIterator ChunkBegin() const {
-        return ChunkIterator(*this, false);
+      inline MapIterator MapBegin() const {
+        return MapIterator(*this, false);
       }
 
-      inline ChunkIterator ChunkEnd() const {
-        return ChunkIterator(*this, true);
+      inline MapIterator MapEnd() const {
+        return MapIterator(*this, true);
       }
 
       casacore::Slicer operator*() const {
