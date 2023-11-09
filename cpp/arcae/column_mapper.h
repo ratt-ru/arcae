@@ -22,10 +22,7 @@ class ColumnMapping {
 
 public:
   // Direction of the map
-  enum Direction {
-    FORWARD=0,
-    BACKWARD
-  };
+  enum Direction { FORWARD=0, BACKWARD };
 
   struct IdMap {
     T from;
@@ -62,11 +59,13 @@ public:
       std::vector<T> current_;
       bool done_;
 
-      // Initialise the current position from the range starts
+      // Initialise the current map from the range starts
       // of the encapsulated RangeIterator
       static std::vector<T> CurrentFromRangeIterator(const RangeIterator & rit) {
-        auto result = std::vector<T>(rit.nDim(), 0);
-        for(auto dim=0; dim < rit.nDim(); ++dim) result[dim] = rit.DimRange(dim).start;
+        auto result = std::vector<T>(rit.nDim(), T{0});
+        for(auto dim=0; dim < rit.nDim(); ++dim) {
+          result[dim] = rit.DimRange(dim).start;
+        }
         return result;
       }
 
