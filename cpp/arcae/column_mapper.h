@@ -70,42 +70,11 @@ public:
       MapIterator(const RangeIterator & rit, bool done)
         : rit_(rit), current_(CurrentFromRangeIterator(rit)), done_(done) {}
 
-      MapIterator & operator++() {
-        assert(!done_);
-        // Iterate from fastest to slowest changing dimension
-        std::size_t dim = current_.size() - 1;
+      MapIterator & operator++();
+      std::vector<IdMap> operator*() const;
+      bool operator==(const MapIterator & other) const;
 
-        while(dim >= 0) {
-          current_[dim]++;
-          // We've achieved a successful iteration in this dimension
-          if(current_[dim] < rit_.DimRange(dim).end) { break; }
-          // Reset to zero and retry in the next dimension
-          else if(dim > 0) { current_[dim] = rit_.DimRange(dim).start; --dim; }
-          // This was the slowest changing dimension so we're done
-          else { done_ = true; break; }
-        }
-
-        return *this;
-      }
-
-      std::vector<IdMap> operator*() const {
-        assert(!done_);
-        auto result = std::vector<IdMap>(current_.size(), {0, 0});
-
-        for(auto dim=0; dim < current_.size(); ++dim) {
-          result[dim] = rit_.DimMaps(dim)[current_[dim]];
-        }
-
-        return result;
-      }
-
-      bool operator==(const MapIterator & other) const {
-        if(&rit_ != &other.rit_) return false;
-        if(done_ && other.done_) return true;
-        return done_ == other.done_ && current_ == other.current_;
-      }
-
-      bool operator!=(const MapIterator & other) const {
+      inline bool operator!=(const MapIterator & other) const {
         return !(*this == other);
       }
   };
@@ -149,53 +118,11 @@ public:
         return MapIterator(*this, true);
       }
 
-      casacore::Slicer operator*() const {
-        assert(!done_);
-        auto start = casacore::IPosition(index_.size());
-        auto end = casacore::IPosition(index_.size());
+      casacore::Slicer operator*() const;
+      RangeIterator & operator++();
+      bool operator==(const RangeIterator & other) const;
 
-        for(std::size_t dim=0; dim < index_.size(); ++dim) {
-          const auto & dim_maps = DimMaps(dim);
-          const auto & range = DimRange(dim);
-
-          if(map_.direction_ == FORWARD) {
-            start[dim] = dim_maps[range.start].from;
-            end[dim] = dim_maps[range.end - 1].from;
-          } else {
-            start[dim] = dim_maps[range.start].to;
-            end[dim] = dim_maps[range.end - 1].to;
-          }
-        }
-
-        return casacore::Slicer(start, end, casacore::Slicer::endIsLast);
-      }
-
-      RangeIterator & operator++() {
-        assert(!done_);
-        // Iterate from fastest to slowest changing dimension
-        std::size_t dim = index_.size() - 1;
-
-        while(dim >= 0) {
-          index_[dim]++;
-          // We've achieved a successful iteration in this dimension
-          if(index_[dim] < map_.ranges_[dim].size()) { break; }
-          // We've exceeded the size of the current dimension
-          // reset to zero and retry the while loop
-          else if(dim > 0) { index_[dim] = 0; --dim; }
-          // This was the slowest changing dimension so we're done
-          else { done_ = true; break; }
-        }
-
-        return *this;
-      }
-
-      bool operator==(const RangeIterator & other) const {
-        if(&map_ != &other.map_) return false;
-        if(done_ && other.done_) return true;
-        return done_ == other.done_ && index_ == other.index_;
-      }
-
-      bool operator!=(const RangeIterator & other) const {
+      inline bool operator!=(const RangeIterator & other) const {
         return !(*this == other);
       }
   };
@@ -212,23 +139,23 @@ public:
   static ColumnRanges MakeRanges(const ColumnMaps & maps,
                                  Direction direction=FORWARD);
 
-  std::size_t nElements() const {
+  inline std::size_t nElements() const {
     return std::accumulate(std::begin(maps_), std::end(maps_), std::size_t(1),
                            [](const auto & init, const auto & map)
                                 { return init * map.size(); });
   }
 
-  std::size_t nRanges() const {
+  inline std::size_t nRanges() const {
     return std::accumulate(std::begin(ranges_), std::end(ranges_), std::size_t(1),
                            [](const auto & init, const auto & range)
                                 { return init * range.size(); });
   }
 
-  RangeIterator RangeBegin() const {
+  inline RangeIterator RangeBegin() const {
     return RangeIterator{const_cast<ColumnMapping<T> &>(*this), false};
   }
 
-  RangeIterator RangeEnd() const {
+  inline RangeIterator RangeEnd() const {
     return RangeIterator{const_cast<ColumnMapping<T> &>(*this), true};
   }
 
@@ -242,39 +169,134 @@ public:
   ColumnRanges ranges_;
 };
 
+template <typename T>
+std::vector<typename ColumnMapping<T>::IdMap>
+ColumnMapping<T>::MapIterator::operator*() const {
+  assert(!done_);
+  auto result = std::vector<IdMap>(current_.size(), {0, 0});
+
+  for(auto dim=0; dim < current_.size(); ++dim) {
+    result[dim] = rit_.DimMaps(dim)[current_[dim]];
+  }
+
+  return result;
+}
+
+
+template <typename T>
+typename ColumnMapping<T>::MapIterator &
+ColumnMapping<T>::MapIterator::operator++() {
+  assert(!done_);
+  // Iterate from fastest to slowest changing dimension
+  std::size_t dim = current_.size() - 1;
+
+  while(dim >= 0) {
+    current_[dim]++;
+    // We've achieved a successful iteration in this dimension
+    if(current_[dim] < rit_.DimRange(dim).end) { break; }
+    // Reset to zero and retry in the next dimension
+    else if(dim > 0) { current_[dim] = rit_.DimRange(dim).start; --dim; }
+    // This was the slowest changing dimension so we're done
+    else { done_ = true; break; }
+  }
+
+  return *this;
+}
+
+template <typename T>
+bool ColumnMapping<T>::MapIterator::operator==(const MapIterator & other) const {
+  if(&rit_ != &other.rit_) return false;
+    // Don't bother comparing indices if we're done
+  if(done_ && other.done_) return true;
+  return done_ == other.done_ && current_ == other.current_;
+}
+
+template <typename T>
+casacore::Slicer
+ColumnMapping<T>::RangeIterator::operator*() const {
+  assert(!done_);
+  auto start = casacore::IPosition(index_.size());
+  auto end = casacore::IPosition(index_.size());
+
+  for(std::size_t dim=0; dim < index_.size(); ++dim) {
+    const auto & dim_maps = DimMaps(dim);
+    const auto & range = DimRange(dim);
+
+    if(map_.direction_ == FORWARD) {
+      start[dim] = dim_maps[range.start].from;
+      end[dim] = dim_maps[range.end - 1].from;
+    } else {
+      start[dim] = dim_maps[range.start].to;
+      end[dim] = dim_maps[range.end - 1].to;
+    }
+  }
+
+  return casacore::Slicer(start, end, casacore::Slicer::endIsLast);
+}
+
+template <typename T>
+typename ColumnMapping<T>::RangeIterator &
+ColumnMapping<T>::RangeIterator::operator++() {
+  assert(!done_);
+  // Iterate from fastest to slowest changing dimension
+  std::size_t dim = index_.size() - 1;
+
+  while(dim >= 0) {
+    index_[dim]++;
+    // We've achieved a successful iteration in this dimension
+    if(index_[dim] < map_.ranges_[dim].size()) { break; }
+    // We've exceeded the size of the current dimension
+    // reset to zero and retry the while loop
+    else if(dim > 0) { index_[dim] = 0; --dim; }
+    // This was the slowest changing dimension so we're done
+    else { done_ = true; break; }
+  }
+
+  return *this;
+}
+
+template <typename T>
+bool ColumnMapping<T>::RangeIterator::operator==(const RangeIterator & other) const {
+  if(&map_ != &other.map_) return false;
+  // Don't bother comparing indices if we're done
+  if(done_ && other.done_) return true;
+  return done_ == other.done_ && index_ == other.index_;
+}
+
+
 template <typename T> typename ColumnMapping<T>::ColumnMaps
 ColumnMapping<T>::MakeMaps(const ColumnSelection & column_selection, Direction direction)
 {
-    assert(column_selection.size() > 0);
-    for(const auto & c: column_selection) assert(c.size() > 0);
+  assert(column_selection.size() > 0);
+  for(const auto & c: column_selection) assert(c.size() > 0);
 
-    ColumnMaps column_maps;
-    column_maps.reserve(column_selection.size());
+  ColumnMaps column_maps;
+  column_maps.reserve(column_selection.size());
 
-    for(std::size_t dim=0; dim < column_selection.size(); ++dim) {
-        const auto & column_ids = column_selection[dim];
-        auto column_map = ColumnMap{};
-        column_map.reserve(column_ids.size());
+  for(std::size_t dim=0; dim < column_selection.size(); ++dim) {
+      const auto & column_ids = column_selection[dim];
+      auto column_map = ColumnMap{};
+      column_map.reserve(column_ids.size());
 
-        for(auto [it, to] = std::tuple{std::begin(column_ids), T{0}};
-            it != std::end(column_ids); ++to, ++it) {
-              column_map.push_back({*it, to});
-        }
+      for(auto [it, to] = std::tuple{std::begin(column_ids), T{0}};
+          it != std::end(column_ids); ++to, ++it) {
+            column_map.push_back({*it, to});
+      }
 
-        if(direction == FORWARD) {
-            std::sort(std::begin(column_map), std::end(column_map),
-                    [](const auto & lhs, const auto & rhs) {
-                        return lhs.from < rhs.from; });
-        } else {
-            std::sort(std::begin(column_map), std::end(column_map),
-                    [](const auto & lhs, const auto & rhs) {
-                        return lhs.to < rhs.to; });
-        }
+      if(direction == FORWARD) {
+          std::sort(std::begin(column_map), std::end(column_map),
+                  [](const auto & lhs, const auto & rhs) {
+                      return lhs.from < rhs.from; });
+      } else {
+          std::sort(std::begin(column_map), std::end(column_map),
+                  [](const auto & lhs, const auto & rhs) {
+                      return lhs.to < rhs.to; });
+      }
 
-        column_maps.emplace_back(std::move(column_map));
-    }
+      column_maps.emplace_back(std::move(column_map));
+  }
 
-    return column_maps;
+  return column_maps;
 }
 
 template <typename T> typename ColumnMapping<T>::ColumnRanges
