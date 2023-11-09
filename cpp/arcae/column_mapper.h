@@ -18,7 +18,6 @@ namespace arcae {
 template <typename T=std::int32_t>
 class ColumnMapping {
   static_assert(std::is_integral_v<T>, "T is not integral");
-  //static_assert(std::is_signed_v<T>, "T is not signed");
 
 public:
   // Direction of the map
@@ -30,8 +29,6 @@ public:
 
     constexpr inline bool operator==(const IdMap & lhs) const
         { return from == lhs.from && to == lhs.to; }
-    static constexpr inline IdMap Empty() { return IdMap{-1, -1}; };
-    constexpr inline bool IsEmpty() const { return *this == Empty(); }
   };
 
   struct Range {
@@ -93,7 +90,7 @@ public:
 
       std::vector<IdMap> operator*() const {
         assert(!done_);
-        auto result = std::vector<IdMap>(current_.size(), IdMap::Empty());
+        auto result = std::vector<IdMap>(current_.size(), {0, 0});
 
         for(auto dim=0; dim < current_.size(); ++dim) {
           result[dim] = rit_.DimMaps(dim)[current_[dim]];
