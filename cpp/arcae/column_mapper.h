@@ -113,7 +113,7 @@ public:
       }
   };
 
-  // Iterates over the Disjoint Ranges defined by the ColumnMapping
+  // Iterates over the Disjoint Ranges defined by a ColumnMapping
   class RangeIterator {
     public:
       const ColumnMapping & map_;
