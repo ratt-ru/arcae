@@ -130,41 +130,65 @@ TEST(RangeTest, RangeIteratorTest) {
 TEST(RangeTest, ChunkIteratorTest) {
     auto last = casacore::Slicer::endIsLast;
 
+    // Worked example testing iteration over 4 ranges
+    // and the chunks within these ranges:
+    //
+    // 1. 2 x 2 x 2 elements
+    // 2. 2 x 2 x 1 elements
+    // 3. 1 x 2 x 2 elements
+    // 4. 1 x 2 x 1 elements
     auto map = C({
-        {0, 1, 3},
-        {0, 1},
-        {0, 1, 3}
+        {0, 1, 3},    // Two disjoint ranges
+        {0, 1},       // One range
+        {0, 1, 3}     // Two disjoint ranges
     });
 
+    using IdMap = C::IdMap;
+    auto n = std::size_t{0};
     auto rit = map.RangeBegin();
 
-    {    
+    {
         EXPECT_EQ(*rit, Slicer(IPos({0, 0, 0}), IPos({1, 1, 1}), last));
         auto cit = rit.ChunkBegin();
-        EXPECT_EQ(*cit, IPos({0, 0, 0})); ++cit;
+        EXPECT_EQ(*cit, (std::vector<IdMap>{{0, 0}, {0, 0}, {0, 0}})); ++cit; ++n;
+        EXPECT_EQ(*cit, (std::vector<IdMap>{{0, 0}, {0, 0}, {1, 1}})); ++cit; ++n;
+        EXPECT_EQ(*cit, (std::vector<IdMap>{{0, 0}, {1, 1}, {0, 0}})); ++cit; ++n;
+        EXPECT_EQ(*cit, (std::vector<IdMap>{{0, 0}, {1, 1}, {1, 1}})); ++cit; ++n;
+        EXPECT_EQ(*cit, (std::vector<IdMap>{{1, 1}, {0, 0}, {0, 0}})); ++cit; ++n;
+        EXPECT_EQ(*cit, (std::vector<IdMap>{{1, 1}, {0, 0}, {1, 1}})); ++cit; ++n;
+        EXPECT_EQ(*cit, (std::vector<IdMap>{{1, 1}, {1, 1}, {0, 0}})); ++cit; ++n;
+        EXPECT_EQ(*cit, (std::vector<IdMap>{{1, 1}, {1, 1}, {1, 1}})); ++cit; ++n;
         EXPECT_EQ(cit, rit.ChunkEnd()); ++rit;
     }
 
     {
         EXPECT_EQ(*rit, Slicer(IPos({0, 0, 3}), IPos({1, 1, 3}), last));
         auto cit = rit.ChunkBegin();
-        EXPECT_EQ(*cit, IPos({0, 0, 3})); ++cit;
+        EXPECT_EQ(*cit, (std::vector<IdMap>{{0, 0}, {0, 0}, {3, 2}})); ++cit; ++n;
+        EXPECT_EQ(*cit, (std::vector<IdMap>{{0, 0}, {1, 1}, {3, 2}})); ++cit; ++n;
+        EXPECT_EQ(*cit, (std::vector<IdMap>{{1, 1}, {0, 0}, {3, 2}})); ++cit; ++n;
+        EXPECT_EQ(*cit, (std::vector<IdMap>{{1, 1}, {1, 1}, {3, 2}})); ++cit; ++n;
         EXPECT_EQ(cit, rit.ChunkEnd()); ++rit;
     }
 
     {
         EXPECT_EQ(*rit, Slicer(IPos({3, 0, 0}), IPos({3, 1, 1}), last));
         auto cit = rit.ChunkBegin();
-        EXPECT_EQ(*cit, IPos({3, 0, 0})); ++cit;
+        EXPECT_EQ(*cit, (std::vector<IdMap>{{3, 2}, {0, 0}, {0, 0}})); ++cit; ++n;
+        EXPECT_EQ(*cit, (std::vector<IdMap>{{3, 2}, {0, 0}, {1, 1}})); ++cit; ++n;
+        EXPECT_EQ(*cit, (std::vector<IdMap>{{3, 2}, {1, 1}, {0, 0}})); ++cit; ++n;
+        EXPECT_EQ(*cit, (std::vector<IdMap>{{3, 2}, {1, 1}, {1, 1}})); ++cit; ++n;
         EXPECT_EQ(cit, rit.ChunkEnd()); ++rit;
     }
 
     {
         EXPECT_EQ(*rit, Slicer(IPos({3, 0, 3}), IPos({3, 1, 3}), last));
         auto cit = rit.ChunkBegin();
-        EXPECT_EQ(*cit, IPos({3, 0, 3})); ++cit;
+        EXPECT_EQ(*cit, (std::vector<IdMap>{{3, 2}, {0, 0}, {3, 2}})); ++cit; ++n;
+        EXPECT_EQ(*cit, (std::vector<IdMap>{{3, 2}, {1, 1}, {3, 2}})); ++cit; ++n;
         EXPECT_EQ(cit, rit.ChunkEnd()); ++rit;
     }
 
     EXPECT_EQ(rit, map.RangeEnd());
+    EXPECT_EQ(n, map.nElements());
 }

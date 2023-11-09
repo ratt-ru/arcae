@@ -45,7 +45,6 @@ public:
         { return start == lhs.start && end == lhs.end; }
   };
 
-  using ValueType = T;
   using ColumnIds = std::vector<T>;
   using ColumnSelection = std::vector<ColumnIds>;
   using ColumnMap = std::vector<IdMap>;
@@ -53,47 +52,60 @@ public:
   using ColumnRange = std::vector<Range>;
   using ColumnRanges = std::vector<ColumnRange>;
 
+  // Forward declaration
+  class RangeIterator;
+
+  // Iterates over the current mapping in the RangeIterator
   class ChunkIterator {
-    private:
-      const ColumnMapping & map_;
-      casacore::IPosition current_;
-      casacore::IPosition end_;
+    public:
+      const RangeIterator & rit_;
+      std::vector<T> current_;
       bool done_;
 
-    public:
-      ChunkIterator(const ColumnMapping & map,
-                    const casacore::IPosition & start,
-                    const casacore::IPosition & end)
-        : map_(map), current_(start), end_(end), done_(false) {}
+      // Initialise the current position from the range starts
+      // of the encapsulated RangeIterator
+      static std::vector<T> CurrentFromRangeIterator(const RangeIterator & rit) {
+        auto result = std::vector<T>(rit.nDim(), 0);
+        for(auto dim=0; dim < rit.nDim(); ++dim) result[dim] = rit.DimRange(dim).start;
+        return result;
+      }
 
-      ChunkIterator(const ColumnMapping & map, bool done)
-        : map_(map), current_(), end_(), done_(done) {}
+      ChunkIterator(const RangeIterator & rit, bool done)
+        : rit_(rit), current_(CurrentFromRangeIterator(rit)), done_(done) {}
 
       ChunkIterator & operator++() {
+        assert(!done_);
         // Iterate from fastest to slowest changing dimension
         std::size_t dim = current_.size() - 1;
 
-        while(!done_ && dim >= 0) {
+        while(dim >= 0) {
           current_[dim]++;
           // We've achieved a successful iteration in this dimension
-          if(current_[dim] < end_[dim]) { break; }
+          if(current_[dim] < rit_.DimRange(dim).end) { break; }
           // Reset to zero and retry in the next dimension
-          else if(dim > 0) { current_[dim] = 0; --dim; }
+          else if(dim > 0) { current_[dim] = rit_.DimRange(dim).start; --dim; }
           // This was the slowest changing dimension so we're done
-          else { done_ = true; }
+          else { done_ = true; break; }
         }
 
         return *this;
-      }        
+      }
 
-      casacore::IPosition operator*() const {
-        return current_;
+      std::vector<IdMap> operator*() const {
+        assert(!done_);
+        auto result = std::vector<IdMap>(current_.size(), IdMap::Empty());
+
+        for(auto dim=0; dim < current_.size(); ++dim) {
+          result[dim] = rit_.DimMap(dim)[current_[dim]];
+        }
+
+        return result;
       }
 
       bool operator==(const ChunkIterator & other) const {
-        if(&map_ != &other.map_) return false;
+        if(&rit_ != &other.rit_) return false;
         if(done_ && other.done_) return true;
-        return done_ == other.done_ && current_ == other.current_ && end_ == other.end_;
+        return done_ == other.done_ && current_ == other.current_;
       }
 
       bool operator!=(const ChunkIterator & other) const {
@@ -101,25 +113,52 @@ public:
       }
   };
 
+  // Iterates over the Disjoint Ranges defined by the ColumnMapping
   class RangeIterator {
-    private:
+    public:
       const ColumnMapping & map_;
       std::vector<std::size_t> index_;
       bool done_;
-    public:
-      RangeIterator(ColumnMapping & column_map, bool done=false) :
-        map_(column_map),
-        done_(done),
-        index_(column_map.nDim(), 0) {}
 
-      casacore::Slicer GetSlicer() {
+      RangeIterator(ColumnMapping & column_map, bool done=false) :
+        map_(column_map), done_(done), index_(column_map.nDim(), 0) {}
+
+      // Return the number of dimensions in the index
+      inline const std::size_t nDim() const {
+        return index_.size();
+      }
+
+      // Return the Ranges for the given dimension
+      inline const ColumnRange & DimRanges(std::size_t dim) const {
+        return map_.ranges_[dim];
+      }
+
+      // Return the Maps for the given dimension
+      inline const ColumnMap & DimMap(std::size_t dim) const {
+        return map_.maps_[dim];
+      }
+
+      // Return the currently selected Range of the given dimension
+      inline const Range & DimRange(std::size_t dim) const {
+        return DimRanges(dim)[index_[dim]];
+      }
+
+      inline ChunkIterator ChunkBegin() const {
+        return ChunkIterator(*this, false);
+      }
+
+      inline ChunkIterator ChunkEnd() const {
+        return ChunkIterator(*this, true);
+      }
+
+      casacore::Slicer operator*() {
+        assert(!done_);
         auto start = casacore::IPosition(index_.size());
         auto end = casacore::IPosition(index_.size());
 
         for(std::size_t dim=0; dim < index_.size(); ++dim) {
-          const auto & dim_ranges = map_.ranges_[dim];
-          const auto & dim_maps = map_.maps_[dim];
-          const auto & range = dim_ranges[index_[dim]];
+          const auto & dim_maps = DimMap(dim);
+          const auto & range = DimRange(dim);
 
           if(map_.direction_ == FORWARD) {
             start[dim] = dim_maps[range.start].from;
@@ -130,28 +169,15 @@ public:
           }
         }
 
-        return casacore::Slicer(std::move(start), std::move(end), casacore::Slicer::endIsLast);
-      }
-
-      ChunkIterator ChunkBegin() {
-        auto slicer = GetSlicer();
-        return ChunkIterator(map_, slicer.start(), slicer.end());
-      }
-
-      inline ChunkIterator ChunkEnd() {
-        return ChunkIterator(map_, true);
-      }
-
-
-      inline casacore::Slicer operator*() {
-        return GetSlicer();
+        return casacore::Slicer(start, end, casacore::Slicer::endIsLast);
       }
 
       RangeIterator & operator++() {
+        assert(!done_);
         // Iterate from fastest to slowest changing dimension
         std::size_t dim = index_.size() - 1;
 
-        while(!done_ && dim >= 0) {
+        while(dim >= 0) {
           index_[dim]++;
           // We've achieved a successful iteration in this dimension
           if(index_[dim] < map_.ranges_[dim].size()) { break; }
@@ -159,7 +185,7 @@ public:
           // reset to zero and retry the while loop
           else if(dim > 0) { index_[dim] = 0; --dim; }
           // This was the slowest changing dimension so we're done
-          else { done_ = true; }
+          else { done_ = true; break; }
         }
 
         return *this;
@@ -232,7 +258,7 @@ ColumnMapping<T>::MakeMaps(const ColumnSelection & column_selection, Direction d
         auto column_map = ColumnMap{};
         column_map.reserve(column_ids.size());
 
-        for(auto [from_it, to] = std::tuple{std::begin(column_ids), ValueType(0)};
+        for(auto [from_it, to] = std::tuple{std::begin(column_ids), T{0}};
                 from_it != std::end(column_ids); ++to, ++from_it) {
             column_map.push_back({*from_it, to});
         }
@@ -266,7 +292,7 @@ ColumnMapping<T>::MakeRanges(const ColumnMaps & maps, Direction direction) {
       auto current = Range{0, 1};
 
       for(auto [i, prev, next] = std::tuple{
-              ValueType(1),
+              T{1},
               std::begin(column_map),
               std::next(std::begin(column_map))};
           next != std::end(column_map); ++i, ++prev, ++next) {
