@@ -96,7 +96,7 @@ public:
         auto result = std::vector<IdMap>(current_.size(), IdMap::Empty());
 
         for(auto dim=0; dim < current_.size(); ++dim) {
-          result[dim] = rit_.DimMap(dim)[current_[dim]];
+          result[dim] = rit_.DimMaps(dim)[current_[dim]];
         }
 
         return result;
@@ -135,7 +135,7 @@ public:
       }
 
       // Return the Maps for the given dimension
-      inline const ColumnMap & DimMap(std::size_t dim) const {
+      inline const ColumnMap & DimMaps(std::size_t dim) const {
         return map_.maps_[dim];
       }
 
@@ -158,7 +158,7 @@ public:
         auto end = casacore::IPosition(index_.size());
 
         for(std::size_t dim=0; dim < index_.size(); ++dim) {
-          const auto & dim_maps = DimMap(dim);
+          const auto & dim_maps = DimMaps(dim);
           const auto & range = DimRange(dim);
 
           if(map_.direction_ == FORWARD) {
