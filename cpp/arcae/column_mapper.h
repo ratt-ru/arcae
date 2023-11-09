@@ -13,8 +13,8 @@
 
 namespace arcae {
 
-/// Utility class for mapping between in-disk and
-/// in-memory indices
+/// Utility class for mapping between on-disk
+/// and in-memory indices
 template <typename T=std::int32_t>
 class ColumnMapping {
   static_assert(std::is_integral_v<T>, "T is not integral");
