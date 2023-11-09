@@ -256,9 +256,9 @@ ColumnMapping<T>::MakeMaps(const ColumnSelection & column_selection, Direction d
         auto column_map = ColumnMap{};
         column_map.reserve(column_ids.size());
 
-        for(auto [from_it, to] = std::tuple{std::begin(column_ids), T{0}};
-                from_it != std::end(column_ids); ++to, ++from_it) {
-            column_map.push_back({*from_it, to});
+        for(auto [it, to] = std::tuple{std::begin(column_ids), T{0}};
+            it != std::end(column_ids); ++to, ++it) {
+              column_map.push_back({*it, to});
         }
 
         if(direction == FORWARD) {
