@@ -134,17 +134,21 @@ public:
       ranges_(MakeRanges(maps_, direction)),
       direction_(direction) {}
 
+  /// Construct ColumnMaps from the provided Column Selection
   static ColumnMaps MakeMaps(const ColumnSelection & column_selection,
                              Direction direction=FORWARD);
+  /// Construct ColumnRanges from the provided maps (derived from MakeMaps)
   static ColumnRanges MakeRanges(const ColumnMaps & maps,
                                  Direction direction=FORWARD);
 
+  /// Number of elements in this mapping
   inline std::size_t nElements() const {
     return std::accumulate(std::begin(maps_), std::end(maps_), std::size_t(1),
                            [](const auto & init, const auto & map)
                                 { return init * map.size(); });
   }
 
+  /// Number of disjoint ranges in this mapping
   inline std::size_t nRanges() const {
     return std::accumulate(std::begin(ranges_), std::end(ranges_), std::size_t(1),
                            [](const auto & init, const auto & range)
@@ -159,6 +163,11 @@ public:
     return RangeIterator{const_cast<ColumnMapping<T> &>(*this), true};
   }
 
+  /// Returns true if this is a simple mapping. A mapping is simple
+  /// if the following holds:
+  /// 1. There is a single mapping range in each dimension
+  /// 2. Each IdMap in the mapping range is monotically increasing
+  ///    in both the from and to field
   bool IsSimple() const;
   const ColumnMaps & GetMaps() const { return maps_;  }
   const ColumnRanges & GetRanges() const { return ranges_; }
@@ -206,7 +215,7 @@ ColumnMapping<T>::MapIterator::operator++() {
 template <typename T>
 bool ColumnMapping<T>::MapIterator::operator==(const MapIterator & other) const {
   return &rit_ == &other.rit_ && done_ == other.done_ &&
-         // If we're done, unnecessary to compare current_
+         // Don't compare current_ if we're done
          done_ == true ? true : current_ == other.current_;
 }
 
@@ -257,7 +266,7 @@ ColumnMapping<T>::RangeIterator::operator++() {
 template <typename T>
 bool ColumnMapping<T>::RangeIterator::operator==(const RangeIterator & other) const {
   return &map_ == &other.map_ && done_ == other.done_ &&
-         // If we're done unnecessary to compare index_
+         // Don't compare index_ if we're done
          done_ == true ? true : index_ == other.index_;
 }
 
@@ -332,11 +341,6 @@ ColumnMapping<T>::MakeRanges(const ColumnMaps & maps, Direction direction) {
   return column_ranges;
 }
 
-/// Returns true if this is a simple mapping. A mapping is simple
-/// if the following holds:
-/// 1. There is a single mapping range in each dimension
-/// 2. Each IdMap in the mapping range is monotically increasing
-///    in both the from and to field
 template <typename T>
 bool ColumnMapping<T>::IsSimple() const {
   for(std::size_t dim=0; dim < maps_.size(); ++dim) {
