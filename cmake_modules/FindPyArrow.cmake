@@ -1,7 +1,8 @@
 include(FindPython3)
 
 find_package(Python COMPONENTS Interpreter)
-message("Python ${Python_EXECUTABLE}")
+message("Python_EXECUABLE=${Python_EXECUTABLE}")
+message("Python_ROOT_DIR=${Python_ROOT_DIR}")
 
 if(NOT DEFINED NUMPY_INCLUDE AND DEFINED ENV{NUMPY_INCLUDE})
     set(NUMPY_INCLUDE ENV{NUMPY_INCLUDE})
