@@ -9,13 +9,14 @@
 #include <numeric>
 #include <vector>
 
+#include <casacore/casa/aipsxtype.h>
 #include <casacore/casa/Arrays/Slicer.h>
 
 namespace arcae {
 
 /// Utility class for mapping between on-disk
 /// and in-memory indices
-template <typename T=std::int32_t>
+template <typename T=casacore::rownr_t>
 class ColumnMapping {
   static_assert(std::is_integral_v<T>, "T is not integral");
 

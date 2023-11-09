@@ -12,7 +12,7 @@ using casacore::Slicer;
 using IPos = casacore::IPosition;
 
 
-using C = arcae::ColumnMapping<std::int32_t>;
+using C = arcae::ColumnMapping<casacore::rownr_t>;
 
 TEST(RangeDeathTest, CheckMapsAndRangeNull) {
     GTEST_FLAG_SET(death_test_style, "threadsafe");
