@@ -2,7 +2,7 @@
 History
 =======
 
-X.Y.Z (YYYY-MM-DD)
+0.2.2 (2023-11-10)
 ------------------
 * Remove WITH_SOABI workaround (:pr:`75`)
 * Add test case demonstrating the feasibility of parallel writes to
