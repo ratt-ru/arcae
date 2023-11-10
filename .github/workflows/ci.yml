@@ -150,7 +150,7 @@ jobs:
             VCPKG_INSTALLED_DIR=${{ env.VCPKG_INSTALLED_DIR }}
             LD_LIBRARY_PATH=${{ env.VCPKG_INSTALLED_DIR }}/${{ matrix.platform[2] }}/lib
           CIBW_REPAIR_WHEEL_COMMAND_LINUX: >
-            auditwheel repair -w {dest_dir} {wheel} --exclude libarrow_python.so --exclude libarrow.so.1300
+            auditwheel repair -w {dest_dir} {wheel} --exclude libarrow_python.so --exclude libarrow.so.1400
           CIBW_TEST_EXTRAS: test
           CIBW_TEST_COMMAND: py.test -s -vvv --pyargs arcae
 
