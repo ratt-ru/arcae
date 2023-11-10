@@ -1,6 +1,6 @@
 [project]
 name = "arcae"
-version = "0.2.1"
+version = "0.2.2"
 authors = [
     {name = "Simon Perkins", email = "simon.perkins@gmail.com"}
 ]
@@ -16,7 +16,7 @@ dependencies = [
     "appdirs",
     "click",
     "rich",
-    "pyarrow == 13.0.0"
+    "pyarrow == 14.0.1"
 ]
 
 [project.optional-dependencies]
@@ -42,7 +42,7 @@ Repository = "https://github.com/ratt-ru/arcae"
 requires = [
     "cython>=3.0.2",
     "scikit-build-core",
-    "pyarrow == 13.0.0"]
+    "pyarrow == 14.0.1"]
 build-backend = "scikit_build_core.build"
 
 [tools.setuptools.packages]
