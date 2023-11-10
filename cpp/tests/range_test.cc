@@ -127,11 +127,11 @@ TEST(RangeTest, RangeIteratorTest) {
 }
 
 
-TEST(RangeTest, ChunkIteratorTest) {
+TEST(RangeTest, MapIteratorTest) {
     auto last = casacore::Slicer::endIsLast;
 
     // Worked example testing iteration over 4 ranges
-    // and the chunks within these ranges:
+    // and the maps within these ranges:
     //
     // 1. 2 x 2 x 2 elements
     // 2. 2 x 2 x 1 elements

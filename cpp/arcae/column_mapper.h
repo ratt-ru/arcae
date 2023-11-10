@@ -166,15 +166,15 @@ public:
     return RangeIterator{const_cast<ColumnMapping<T> &>(*this), true};
   }
 
-    // Return the Ranges for the given dimension
-    inline const ColumnRange & DimRanges(std::size_t dim) const {
-      return ranges_[dim];
-    }
+  // Return the Ranges for the given dimension
+  inline const ColumnRange & DimRanges(std::size_t dim) const {
+    return ranges_[dim];
+  }
 
-    // Return the Maps for the given dimension
-    inline const ColumnMap & DimMaps(std::size_t dim) const {
-      return maps_[dim];
-    }
+  // Return the Maps for the given dimension
+  inline const ColumnMap & DimMaps(std::size_t dim) const {
+    return maps_[dim];
+  }
 
   /// Returns true if this is a simple mapping. A mapping is simple
   /// if the following holds:
