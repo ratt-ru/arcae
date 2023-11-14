@@ -2,6 +2,10 @@
 History
 =======
 
+X.Y.Z (YYYY-MM-DD)
+------------------
+* Fix ENV access within cmake files (:pr:`79`)
+
 0.2.2 (2023-11-10)
 ------------------
 * Upgrade to pyarrow 14.0.1 (:pr:`77`)
