@@ -23,9 +23,9 @@ set(VCPKG_HASH ${CMAKE_MATCH_1})
 
 # Discover or infer the source directory where vcpkg will be decompressed
 if(DEFINED ENV{VCPKG_SOURCE_DIR})
-    set(VCPKG_SOURCE_DIR "$ENV{VCPKG_SOURCE_DIR}")
+    set(VCPKG_SOURCE_DIR $ENV{VCPKG_SOURCE_DIR})
 else()
-    set(VCPKG_SOURCE_DIR "${CMAKE_SOURCE_DIR}/vcpkg/source")
+    set(VCPKG_SOURCE_DIR ${CMAKE_SOURCE_DIR}/vcpkg/source)
 endif()
 
 # Download and decompress vcpkg
@@ -36,15 +36,15 @@ FetchContent_MakeAvailable(vcpkg)
 if(DEFINED ENV{VCPKG_INSTALLED_DIR})
     set(VCPKG_INSTALLED_DIR $ENV{VCPKG_INSTALLED_DIR})
 else()
-    set(VCPKG_INSTALLED_DIR "${CMAKE_SOURCE_DIR}/vcpkg/installed")
+    set(VCPKG_INSTALLED_DIR ${CMAKE_SOURCE_DIR}/vcpkg/installed)
 endif()
 
 # Set the vcpkg manifest directory and toolchain
-set(VCPKG_MANIFEST_DIR "${CMAKE_SOURCE_DIR}/vcpkg/manifest")
-set(CMAKE_TOOLCHAIN_FILE "${vcpkg_SOURCE_DIR}/scripts/buildsystems/vcpkg.cmake" CACHE FILEPATH "")
+set(VCPKG_MANIFEST_DIR ${CMAKE_SOURCE_DIR}/vcpkg/manifest)
+set(CMAKE_TOOLCHAIN_FILE ${vcpkg_SOURCE_DIR}/scripts/buildsystems/vcpkg.cmake CACHE FILEPATH "")
 
-set(VCPKG_OVERLAY_TRIPLETS "${CMAKE_SOURCE_DIR}/vcpkg/overlay-triplets")
-set(VCPKG_OVERLAY_PORTS "${CMAKE_SOURCE_DIR}/vcpkg/overlay-ports/casacore")
+set(VCPKG_OVERLAY_TRIPLETS ${CMAKE_SOURCE_DIR}/vcpkg/overlay-triplets)
+set(VCPKG_OVERLAY_PORTS ${CMAKE_SOURCE_DIR}/vcpkg/overlay-ports/casacore)
 
 # Discover or infer the vcpkg target triplet
 if(DEFINED ENV{VCPKG_TARGET_TRIPLET})
