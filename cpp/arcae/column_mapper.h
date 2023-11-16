@@ -1,11 +1,8 @@
 #ifndef ARCAE_COLUMN_MAPPER_H
 #define ARCAE_COLUMN_MAPPER_H
 
-#include <iostream> //remove
-
 #include <algorithm>
 #include <cassert>
-#include <cstdint>
 #include <numeric>
 #include <vector>
 
