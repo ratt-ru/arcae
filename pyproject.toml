@@ -14,12 +14,14 @@ classifiers = [
 ]
 dependencies = [
     "appdirs",
-    "click",
-    "rich",
     "pyarrow == 14.0.1"
 ]
 
 [project.optional-dependencies]
+applications = [
+    "click",
+    "rich",
+]
 dev = [
     "black == 22.1.0",
     "flake8 == 4.0.1",
