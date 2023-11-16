@@ -222,9 +222,8 @@ ColumnMapping<T>::MapIterator::operator++() {
 
 template <typename T>
 bool ColumnMapping<T>::MapIterator::operator==(const MapIterator & other) const {
-  return &rit_ == &other.rit_ && done_ == other.done_ &&
-         // Don't compare current_ if we're done
-         done_ == true ? true : current_ == other.current_;
+  if(&rit_ != &other.rit_ || done_ != other.done_) return false;
+  return done_ ? true : current_ == other.current_;
 }
 
 template <typename T>
@@ -271,9 +270,8 @@ ColumnMapping<T>::RangeIterator::operator++() {
 
 template <typename T>
 bool ColumnMapping<T>::RangeIterator::operator==(const RangeIterator & other) const {
-  return &map_ == &other.map_ && done_ == other.done_ &&
-         // Don't compare index_ if we're done
-         done_ == true ? true : index_ == other.index_;
+  if(&map_ != &other.map_ || done_ != other.done_) return false;
+  return done_ ? true : index_ == other.index_;
 }
 
 

@@ -143,12 +143,15 @@ TEST(RangeTest, MapIteratorTest) {
         {0, 1, 3}     // Two disjoint ranges
     });
 
+    EXPECT_NE(map.RangeBegin(), map.RangeEnd());
+
     using IdMap = C::IdMap;
     auto n = std::size_t{0};
     auto rit = map.RangeBegin();
 
     {
         EXPECT_EQ(*rit, Slicer(IPos({0, 0, 0}), IPos({1, 1, 1}), last));
+        EXPECT_NE(rit.MapBegin(), rit.MapEnd());
         auto mit = rit.MapBegin();
         EXPECT_EQ(*mit, (std::vector<IdMap>{{0, 0}, {0, 0}, {0, 0}})); ++mit; ++n;
         EXPECT_EQ(*mit, (std::vector<IdMap>{{0, 0}, {0, 0}, {1, 1}})); ++mit; ++n;
@@ -163,6 +166,7 @@ TEST(RangeTest, MapIteratorTest) {
 
     {
         EXPECT_EQ(*rit, Slicer(IPos({0, 0, 3}), IPos({1, 1, 3}), last));
+        EXPECT_NE(rit.MapBegin(), rit.MapEnd());
         auto mit = rit.MapBegin();
         EXPECT_EQ(*mit, (std::vector<IdMap>{{0, 0}, {0, 0}, {3, 2}})); ++mit; ++n;
         EXPECT_EQ(*mit, (std::vector<IdMap>{{0, 0}, {1, 1}, {3, 2}})); ++mit; ++n;
@@ -173,6 +177,7 @@ TEST(RangeTest, MapIteratorTest) {
 
     {
         EXPECT_EQ(*rit, Slicer(IPos({3, 0, 0}), IPos({3, 1, 1}), last));
+        EXPECT_NE(rit.MapBegin(), rit.MapEnd());
         auto mit = rit.MapBegin();
         EXPECT_EQ(*mit, (std::vector<IdMap>{{3, 2}, {0, 0}, {0, 0}})); ++mit; ++n;
         EXPECT_EQ(*mit, (std::vector<IdMap>{{3, 2}, {0, 0}, {1, 1}})); ++mit; ++n;
@@ -183,6 +188,7 @@ TEST(RangeTest, MapIteratorTest) {
 
     {
         EXPECT_EQ(*rit, Slicer(IPos({3, 0, 3}), IPos({3, 1, 3}), last));
+        EXPECT_NE(rit.MapBegin(), rit.MapEnd());
         auto mit = rit.MapBegin();
         EXPECT_EQ(*mit, (std::vector<IdMap>{{3, 2}, {0, 0}, {3, 2}})); ++mit; ++n;
         EXPECT_EQ(*mit, (std::vector<IdMap>{{3, 2}, {1, 1}, {3, 2}})); ++mit; ++n;
