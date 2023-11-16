@@ -1,4 +1,8 @@
-import click
+try:
+    import click
+except ImportError as e:
+    raise ImportError("click is not installed.\n"
+                      "pip install arcae[applications]") from e
 
 from arcae.applications.ms_export import MSExporter
 
