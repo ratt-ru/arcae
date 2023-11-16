@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Make export application dependencies optional (:pr:`80`)
 * Fix ENV access within cmake files (:pr:`79`)
 
 0.2.2 (2023-11-10)

@@ -3,10 +3,14 @@ import os
 import os.path
 import shutil
 
-from rich.live import Live
-from rich.console import Group
-from rich.panel import Panel
-from rich.progress import Progress, SpinnerColumn, TimeElapsedColumn, TextColumn
+try:
+    from rich.live import Live
+    from rich.console import Group
+    from rich.panel import Panel
+    from rich.progress import Progress, SpinnerColumn, TimeElapsedColumn, TextColumn
+except ImportError as e:
+    raise ImportError("rich is not installed.\n"
+                      "pip install arcae[applications]")
 
 import arcae
 import pyarrow.parquet as pq
