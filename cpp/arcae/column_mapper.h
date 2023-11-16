@@ -210,9 +210,7 @@ typename ColumnMapping<T>::MapIterator &
 ColumnMapping<T>::MapIterator::operator++() {
   assert(!done_);
   // Iterate from fastest to slowest changing dimension
-  std::size_t dim = current_.size() - 1;
-
-  while(dim >= 0) {
+  for(std::size_t dim = current_.size() - 1; dim >= 0;) {
     current_[dim]++;
     // We've achieved a successful iteration in this dimension
     if(current_[dim] < rit_.DimRange(dim).end) { break; }
@@ -260,9 +258,7 @@ typename ColumnMapping<T>::RangeIterator &
 ColumnMapping<T>::RangeIterator::operator++() {
   assert(!done_);
   // Iterate from fastest to slowest changing dimension
-  std::size_t dim = index_.size() - 1;
-
-  while(dim >= 0) {
+  for(std::size_t dim = index_.size() - 1; dim >= 0;) {
     index_[dim]++;
     // We've achieved a successful iteration in this dimension
     if(index_[dim] < map_.ranges_[dim].size()) { break; }
