@@ -2,6 +2,7 @@
 #define ARCAE_NEW_CONVERT_VISITOR_H
 
 #include <algorithm>
+#include <cstddef>
 #include <unordered_set>
 
 #include <casacore/tables/Tables.h>
@@ -50,20 +51,15 @@ public:
         auto column = casacore::ScalarColumn<T>(column_);
         column.setMaximumCacheSize(1);
 
-        if(column_map_.nDim() != 1) {
-            return arrow::Status::Invalid(
-                "Number of dimensions in Column Map does not match "
-                "that of column ", column_desc_.name());
-        }
-
-        if constexpr(std::is_same<T, casacore::String>::value) {
+        if constexpr(std::is_same_v<T, casacore::String>) {
             // Handle string cases with Arrow StringBuilders
             ARROW_RETURN_NOT_OK(FailIfNotUTF8(arrow_dtype));
+            return arrow::Status::NotImplemented("ConvertScalarColumn<casacore::String>");
             arrow::StringBuilder builder;
 
             for(auto it = column_map_.RangeBegin(); it != column_map_.RangeEnd(); ++it) {
                 try {
-                    auto strings = column.getColumnRange(*it);
+                    auto strings = column.getColumnRange(it.GetRowSlicer());
                     for(auto & s: strings) { ARROW_RETURN_NOT_OK(builder.Append(s)); }
                 } catch(std::exception & e) {
                     return arrow::Status::Invalid("ConvertScalarColumn ", column_desc_.name(), " ", e.what());
@@ -78,18 +74,27 @@ public:
             auto buffer = std::shared_ptr<arrow::Buffer>(std::move(allocation));
             auto * buf_ptr = reinterpret_cast<T *>(buffer->mutable_data());
             auto casa_vector = casacore::Vector<T>(casacore::IPosition(1, nelements), buf_ptr, casacore::SHARE);
+            auto casa_ptr = casa_vector.data();
 
             if(column_map_.IsSimple()) {
                 try {
+                    // Dump column data straight into the Arrow Buffer
                     column.getColumnRange(*column_map_.RangeBegin(), casa_vector);
                 } catch(std::exception & e) {
                     return arrow::Status::Invalid("ConvertScalarColumn ", column_desc_.name(), " ", e.what());
                 }
             } else {
                 for(auto it = column_map_.RangeBegin(); it != column_map_.RangeEnd(); ++it) {
-                    // Dump column data into Arrow Buffer
+
+                    // Copy sections of data into the Arrow Buffer
                     try {
-                        auto chunk = column.getColumnRange(*it);
+                        auto chunk = column.getColumnRange(it.GetRowSlicer());
+                        auto chunk_ptr = chunk.data();
+
+                        for(auto [i, mit] = std::tuple{int{0}, it.MapBegin()}; mit != it.MapEnd(); ++mit, ++i) {
+                            auto out = mit.FlatDestination(casa_vector.shape());
+                            casa_ptr[out] = chunk_ptr[i];
+                        }
                     } catch(std::exception & e) {
                         return arrow::Status::Invalid("ConvertScalarColumn ", column_desc_.name(), " ", e.what());
                     }
@@ -101,6 +106,70 @@ public:
 
         return ValidateArray(array_);
     }
+
+    template <typename T>
+    arrow::Status ConvertFixedColumn(const std::shared_ptr<arrow::DataType> & arrow_dtype) {
+        auto column = casacore::ArrayColumn<T>(column_);
+        column.setMaximumCacheSize(1);
+
+        if constexpr(std::is_same_v<T, casacore::String>) {
+            // Handle string cases with Arrow StringBuilders
+            ARROW_RETURN_NOT_OK(FailIfNotUTF8(arrow_dtype));
+            return arrow::Status::Invalid("ConvertedFixedColumn<casacore::String>");
+            arrow::StringBuilder builder;
+
+            for(auto it = column_map_.RangeBegin(); it != column_map_.RangeEnd(); ++it) {
+                try {
+                    auto strings = column.getColumnRange(*it);
+                    for(auto & s: strings) { ARROW_RETURN_NOT_OK(builder.Append(s)); }
+                } catch(std::exception & e) {
+                    return arrow::Status::Invalid("ConvertFixedColumn ", column_desc_.name(), " ", e.what());
+                }
+            }
+
+            ARROW_ASSIGN_OR_RAISE(array_, builder.Finish());
+        } else {
+            // Wrap Arrow Buffer in casacore Vector
+            auto shape = column_map_.GetShape();
+            auto nelements = shape.product();
+            ARROW_ASSIGN_OR_RAISE(auto allocation, arrow::AllocateBuffer(nelements*sizeof(T), pool_));
+            auto buffer = std::shared_ptr<arrow::Buffer>(std::move(allocation));
+            auto * buf_ptr = reinterpret_cast<T *>(buffer->mutable_data());
+            auto casa_vector = casacore::Array<T>(shape, buf_ptr, casacore::SHARE);
+            auto casa_ptr = casa_vector.data();
+
+            if(column_map_.IsSimple()) {
+                try {
+                    // Dump column data straight into the Arrow Buffer
+                    column.getColumnRange(column_map_.RangeBegin().GetRowSlicer(),
+                                          column_map_.RangeBegin().GetSectionSlicer(),
+                                          casa_vector);
+                } catch(std::exception & e) {
+                    return arrow::Status::Invalid("ConvertFixedColumn ", column_desc_.name(), " ", e.what());
+                }
+            } else {
+                for(auto it = column_map_.RangeBegin(); it != column_map_.RangeEnd(); ++it) {
+                    // Copy sections of data into the Arrow Buffer
+                    try {
+                        auto chunk = column.getColumnRange(it.GetRowSlicer(), it.GetSectionSlicer());
+                        auto chunk_ptr = chunk.data();
+
+                        for(auto [i, mit] = std::tuple{int{0}, it.MapBegin()}; mit != it.MapEnd(); ++mit, ++i) {
+                            auto out = mit.FlatDestination(casa_vector.shape());
+                            casa_ptr[out] = chunk_ptr[i];
+                        }
+                    } catch(std::exception & e) {
+                        return arrow::Status::Invalid("ConvertFixedColumn ", column_desc_.name(), " ", e.what());
+                    }
+                }
+            }
+
+            ARROW_ASSIGN_OR_RAISE(array_, MakeArrowPrimitiveArray(buffer, nelements, arrow_dtype));
+        }
+
+        return ValidateArray(array_);
+    }
+
 
 
 private:
@@ -149,8 +218,12 @@ private:
             return ConvertScalarColumn<T>(arrow_dtype);
         }
 
+        if(column_desc_.isFixedShape()) {
+            return ConvertFixedColumn<T>(arrow_dtype);
+        }
+
         return arrow::Status::Invalid("Unable to convert column ", column_desc_.name());
-        
+
     };
 };
 

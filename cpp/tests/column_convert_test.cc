@@ -1,3 +1,5 @@
+#include <casacore/casa/BasicSL/Complexfwd.h>
+#include <casacore/tables/Tables/RefRows.h>
 #include <memory>
 #include <random>
 
@@ -14,6 +16,7 @@
 #include <arrow/testing/gtest_util.h>
 
 #include "arrow/result.h"
+#include "arrow/status.h"
 
 using casacore::Array;
 using casacore::ArrayColumn;
@@ -104,11 +107,11 @@ class ColumnConvertTest : public ::testing::Test {
         auto corr_dist = std::uniform_int_distribution<>(kncorr, kncorr + 1);
 
         for(std::size_t i=0; i < knrow; ++i) {
-          auto array = Array<CasaComplex>(
+          auto corrected_array = Array<CasaComplex>(
                   IPos({corr_dist(gen), chan_dist(gen), 1}),
                   {static_cast<float>(i), static_cast<float>(i)});
 
-          corrected_data.putColumnCells(casacore::RefRows(i, i), array);
+          corrected_data.putColumnCells(casacore::RefRows(i, i), corrected_array);
         }
 
         return std::make_shared<TableProxy>(ms);
@@ -127,20 +130,28 @@ TEST_F(ColumnConvertTest, SelectFromRange) {
     // auto section = Slicer(IPos({0, 0}), IPos({0, 2}), Slicer::endIsLast);
     // auto data = data_column.getColumnRange(row_range, section);
 
-    auto data_column = GetScalarColumn<casacore::Double>(table, "TIME");
+    auto time_column = GetScalarColumn<casacore::Double>(table, "TIME");
+    auto data_column = GetArrayColumn<CasaComplex>(table, MS::MODEL_DATA);
 
     using CM = arcae::ColumnMapping<casacore::rownr_t>;
-    // auto row_ids = CM::ColumnIds(data_column.nrow(), 0);
+    // auto row_ids = CM::ColumnIds(time_column.nrow(), 0);
 
     // for(std::size_t i=0; i < row_ids.size(); ++i) {
     //   row_ids[i] = i;
     // }
 
     auto row_ids = CM::ColumnIds{0, 1, 2, 3, 6, 7, 8, 9};
-    auto column_map = CM{CM::ColumnSelection{std::move(row_ids)}};
-    auto visitor = arcae::NewConvertVisitor(data_column, column_map);
-    ARROW_RETURN_NOT_OK(visitor.Visit(data_column.columnDesc().dataType()));
-    return visitor.array_;
+    {
+      auto column_map = CM{CM::ColumnSelection{{row_ids}}};
+      auto visitor = arcae::NewConvertVisitor(time_column, column_map);
+      ARROW_RETURN_NOT_OK(visitor.Visit(time_column.columnDesc().dataType()));
+    }
+    {
+      auto column_map = CM{CM::ColumnSelection{{0}, {0, 1, 3}, {0}}};
+      auto visitor = arcae::NewConvertVisitor(data_column, column_map);
+      ARROW_RETURN_NOT_OK(visitor.Visit(data_column.columnDesc().dataType()));
+      return visitor.array_;
+    }
 })));
 
   std::cout << result->ToString() << std::endl;

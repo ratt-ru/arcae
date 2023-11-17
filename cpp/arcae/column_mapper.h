@@ -161,7 +161,10 @@ public:
         return MapIterator(*this, true);
       }
 
+      // Returns a slicer for the row dimension
       casacore::Slicer GetRowSlicer() const;
+      // Returns a slicer for secondary dimensions
+      casacore::Slicer GetSectionSlicer() const;
       casacore::Slicer operator*() const;
       RangeIterator & operator++();
       bool operator==(const RangeIterator & other) const;
@@ -219,9 +222,19 @@ public:
   /// 2. Each IdMap in the mapping range is monotically increasing
   ///    in both the from and to field
   bool IsSimple() const;
-  const ColumnMaps & GetMaps() const { return maps_;  }
-  const ColumnRanges & GetRanges() const { return ranges_; }
-  const std::size_t nDim() const { return ranges_.size(); }
+  const casacore::IPosition GetShape() const {
+    casacore::IPosition shape(nDim(), 0);
+
+    for(auto dim = std::size_t{0}; dim < nDim(); ++dim) {
+      shape[dim] = DimMaps(dim).size();
+    }
+
+    return shape;
+  }
+
+  inline const ColumnMaps & GetMaps() const { return maps_;  }
+  inline const ColumnRanges & GetRanges() const { return ranges_; }
+  inline const std::size_t nDim() const { return ranges_.size(); }
 
   ColumnMaps maps_;
   ColumnRanges ranges_;
@@ -282,6 +295,27 @@ ColumnMapping<T>::RangeIterator::GetRowSlicer() const {
     casacore::IPosition({static_cast<ssize_t>(start)}),
     casacore::IPosition({static_cast<ssize_t>(end)}),
     casacore::Slicer::endIsLast);
+}
+
+template <typename T>
+casacore::Slicer
+ColumnMapping<T>::RangeIterator::GetSectionSlicer() const {
+  assert(!done_);
+  assert(nDim() > 1);
+  casacore::IPosition start(nDim() - 1, 0);
+  casacore::IPosition end(nDim() - 1, 0);
+
+  for(std::ptrdiff_t dim = 1; dim < nDim(); ++dim) {
+    const auto & dim_maps = DimMaps(dim);
+    const auto & range = DimRange(dim);
+    // TODO: casacore rownr_t is unsigned but ssize_t is signed
+    // Find a proper solution to the narrowing conversion and
+    // possible resulting issues
+    start[nDim() - 1 - dim] = static_cast<ssize_t>(dim_maps[range.start].from);
+    end[nDim() - 1 - dim] = static_cast<ssize_t>(dim_maps[range.end - 1].from);
+  }
+
+  return casacore::Slicer(start, end, casacore::Slicer::endIsLast);
 }
 
 template <typename T>
