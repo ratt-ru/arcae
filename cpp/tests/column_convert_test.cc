@@ -1,15 +1,19 @@
+#include <memory>
 #include <random>
 
 #include <arcae/new_convert_visitor.h>
 #include <arcae/safe_table_proxy.h>
 #include <arcae/table_factory.h>
 #include <casacore/tables/Tables.h>
+#include <casacore/tables/Tables/TableColumn.h>
 #include <casacore/ms/MeasurementSets/MeasurementSet.h>
 #include <tests/test_utils.h>
 
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 #include <arrow/testing/gtest_util.h>
+
+#include "arrow/result.h"
 
 using casacore::Array;
 using casacore::ArrayColumn;
@@ -20,7 +24,6 @@ using MS = casacore::MeasurementSet;
 using MSColumns = casacore::MSMainEnums::PredefinedColumns;
 using casacore::SetupNewTable;
 using casacore::ScalarColumn;
-using casacore::Slicer;
 using casacore::Table;
 using casacore::TableDesc;
 using casacore::TableColumn;
@@ -117,28 +120,28 @@ class ColumnConvertTest : public ::testing::Test {
 
 TEST_F(ColumnConvertTest, SelectFromRange) {
   ASSERT_OK_AND_ASSIGN(auto result,
-      (table_proxy_->run([](const TableProxy & proxy) -> arrow::Result<std::shared_ptr<arrow::Array>> { 
-          auto table = proxy.table();
-          // auto data_column = GetArrayColumn<CasaComplex>(table, "VAR_DATA");
-          // auto row_range = Slicer(IPos({0}), IPos({5}), Slicer::endIsLast);
-          // auto section = Slicer(IPos({0, 0}), IPos({0, 2}), Slicer::endIsLast);
-          // auto data = data_column.getColumnRange(row_range, section);
+      (table_proxy_->run([](const TableProxy & proxy) -> arrow::Result<std::shared_ptr<arrow::Array>> {
+    auto table = proxy.table();
+    // auto data_column = GetArrayColumn<CasaComplex>(table, "VAR_DATA");
+    // auto row_range = Slicer(IPos({0}), IPos({5}), Slicer::endIsLast);
+    // auto section = Slicer(IPos({0, 0}), IPos({0, 2}), Slicer::endIsLast);
+    // auto data = data_column.getColumnRange(row_range, section);
 
-          auto data_column = GetScalarColumn<casacore::Double>(table, "TIME");
+    auto data_column = GetScalarColumn<casacore::Double>(table, "TIME");
 
-          using CM = arcae::ColumnMapping<casacore::rownr_t>;
-          // auto row_ids = CM::ColumnIds(data_column.nrow(), 0);
+    using CM = arcae::ColumnMapping<casacore::rownr_t>;
+    // auto row_ids = CM::ColumnIds(data_column.nrow(), 0);
 
-          // for(std::size_t i=0; i < row_ids.size(); ++i) {
-          //   row_ids[i] = i;
-          // }
+    // for(std::size_t i=0; i < row_ids.size(); ++i) {
+    //   row_ids[i] = i;
+    // }
 
-          auto row_ids = CM::ColumnIds{0, 1, 2, 3, 6, 7, 8, 9};
-          auto column_map = CM{CM::ColumnSelection{std::move(row_ids)}};
-          auto visitor = arcae::NewConvertVisitor(data_column, column_map);
-          ARROW_RETURN_NOT_OK(visitor.Visit(data_column.columnDesc().dataType()));
-          return visitor.array_;
-        })));
+    auto row_ids = CM::ColumnIds{0, 1, 2, 3, 6, 7, 8, 9};
+    auto column_map = CM{CM::ColumnSelection{std::move(row_ids)}};
+    auto visitor = arcae::NewConvertVisitor(data_column, column_map);
+    ARROW_RETURN_NOT_OK(visitor.Visit(data_column.columnDesc().dataType()));
+    return visitor.array_;
+})));
 
   std::cout << result->ToString() << std::endl;
 }

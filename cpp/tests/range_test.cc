@@ -76,11 +76,9 @@ TEST(RangeTest, CheckMapsAndRangesMultiple) {
     ASSERT_FALSE(map.IsSimple());
 }
 
-TEST(RangeTest, TestSimplimity) {
-    EXPECT_TRUE(C({{1, 2, 3, 4}}, C::FORWARD).IsSimple());
-    EXPECT_TRUE(C({{1, 2, 3, 4}}, C::BACKWARD).IsSimple());
-    EXPECT_TRUE(C({{1, 2, 3, 4}, {5, 6}, {6, 7}}, C::FORWARD).IsSimple());
-    EXPECT_TRUE(C({{1, 2, 3, 4}, {5, 6}, {6, 7}}, C::BACKWARD).IsSimple());
+TEST(RangeTest, TestSimplicity) {
+    EXPECT_TRUE(C({{1, 2, 3, 4}}).IsSimple());
+    EXPECT_TRUE(C({{1, 2, 3, 4}, {5, 6}, {6, 7}}).IsSimple());
 
     // Multiple mapping ranges (discontiguous)
     EXPECT_FALSE(C({{1, 2, 4, 5}}).IsSimple());
@@ -125,6 +123,38 @@ TEST(RangeTest, RangeIteratorTest) {
 
     EXPECT_EQ(it, map.RangeEnd());
 }
+
+
+TEST(RangeTest, RowSlicerTest) {
+    auto last = casacore::Slicer::endIsLast;
+
+    auto map = C({
+        {4, 3, 2, 1, 8, 7, 20},    // Three disjoint ranges
+        {5, 6, 8, 9},              // Two disjoint ranges
+        {7, 9, 8, 12, 11}});       // Two disjoint ranges
+
+    EXPECT_NE(map.RangeBegin(), map.RangeEnd());
+
+    auto it = map.RangeBegin();
+
+    EXPECT_EQ(it.GetRowSlicer(), Slicer(IPos({1}), IPos({4}), last)); ++it;
+    EXPECT_EQ(it.GetRowSlicer(), Slicer(IPos({1}), IPos({4}), last)); ++it;
+    EXPECT_EQ(it.GetRowSlicer(), Slicer(IPos({1}), IPos({4}), last)); ++it;
+    EXPECT_EQ(it.GetRowSlicer(), Slicer(IPos({1}), IPos({4}), last)); ++it;
+
+    EXPECT_EQ(it.GetRowSlicer(), Slicer(IPos({7}), IPos({8}), last)); ++it;
+    EXPECT_EQ(it.GetRowSlicer(), Slicer(IPos({7}), IPos({8}), last)); ++it;
+    EXPECT_EQ(it.GetRowSlicer(), Slicer(IPos({7}), IPos({8}), last)); ++it;
+    EXPECT_EQ(it.GetRowSlicer(), Slicer(IPos({7}), IPos({8}), last)); ++it;
+
+    EXPECT_EQ(it.GetRowSlicer(), Slicer(IPos({20}), IPos({20}), last)); ++it;
+    EXPECT_EQ(it.GetRowSlicer(), Slicer(IPos({20}), IPos({20}), last)); ++it;
+    EXPECT_EQ(it.GetRowSlicer(), Slicer(IPos({20}), IPos({20}), last)); ++it;
+    EXPECT_EQ(it.GetRowSlicer(), Slicer(IPos({20}), IPos({20}), last)); ++it;
+
+    EXPECT_EQ(it, map.RangeEnd());
+}
+
 
 
 TEST(RangeTest, MapIteratorTest) {

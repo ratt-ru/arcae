@@ -3,14 +3,15 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cstddef>
 #include <numeric>
 #include <vector>
 
 #include <casacore/casa/aipsxtype.h>
+#include <casacore/casa/Arrays/IPosition.h>
 #include <casacore/casa/Arrays/Slicer.h>
 
 namespace arcae {
-
 /// Utility class for mapping between on-disk
 /// and in-memory indices
 template <typename T=casacore::rownr_t>
@@ -18,8 +19,6 @@ class ColumnMapping {
   static_assert(std::is_integral_v<T>, "T is not integral");
 
 public:
-  // Direction of the map
-  enum Direction { FORWARD=0, BACKWARD };
 
   // Describes a mapping between two dimension id's
   struct IdMap {
@@ -61,9 +60,53 @@ public:
       // of the encapsulated RangeIterator
       static std::vector<T> CurrentFromRangeIterator(const RangeIterator & rit) {
         auto result = std::vector<T>(rit.nDim(), T{0});
-        for(auto dim=0; dim < rit.nDim(); ++dim) {
+        for(auto dim=std::ptrdiff_t{0}; dim < rit.nDim(); ++dim) {
           result[dim] = rit.DimRange(dim).start;
         }
+        return result;
+      }
+
+      std::size_t FlatDestination(const casacore::IPosition & shape) {
+        assert(rit_.nDim() > 0);
+        auto product = std::size_t{1};
+        auto result = std::size_t{0};
+
+        for(auto dim = rit_.nDim() - 1; dim >= 0; --dim) {
+          result += product * rit_.DimMaps(dim)[current_[dim]].to;
+          product *= shape[dim];
+        }
+
+        return result;
+      }
+
+      std::size_t FlatSource(const casacore::IPosition & shape) {
+        assert(rit_.nDim() > 0);
+        auto product = std::size_t{1};
+        auto result = std::size_t{0};
+
+        for(auto dim = rit_.nDim() - 1; dim >= 0; --dim) {
+          result += product * rit_.DimMaps(dim)[current_[dim]].from;
+          product *= shape[dim];
+        }
+
+        return result;
+      }
+
+      std::pair<T, T> FlatMap(const casacore::IPosition & source, const casacore::IPosition & dest) {
+        assert(rit_.nDim() > 0);
+        assert(source.size() == dest.size());
+        assert(source.size() == rit_.nDim());
+        auto product = std::pair<T, T>{1, 1};
+        auto result = std::pair<T, T>{0, 0};
+
+        for(auto dim = rit_.nDim() - 1; dim >= 0; --dim) {
+          const auto & id_map = rit_.DimMaps(dim)[current_[dim]];
+          result.first += product.first * id_map.from;
+          result.second += product.second * id_map.to;
+          product.first *= source[dim];
+          product.second *= dest[dim];
+        }
+
         return result;
       }
 
@@ -91,7 +134,7 @@ public:
         map_(column_map), done_(done), index_(column_map.nDim(), 0) {}
 
       // Return the number of dimensions in the index
-      inline const std::size_t nDim() const {
+      inline const std::ptrdiff_t nDim() const {
         return index_.size();
       }
 
@@ -118,6 +161,7 @@ public:
         return MapIterator(*this, true);
       }
 
+      casacore::Slicer GetRowSlicer() const;
       casacore::Slicer operator*() const;
       RangeIterator & operator++();
       bool operator==(const RangeIterator & other) const;
@@ -128,29 +172,25 @@ public:
   };
 
 
-  ColumnMapping(const ColumnSelection & column_selection={},
-                Direction direction=FORWARD)
-    : maps_(MakeMaps(column_selection, direction)),
-      ranges_(MakeRanges(maps_, direction)),
-      direction_(direction) {}
+  ColumnMapping(const ColumnSelection & column_selection={})
+    : maps_(MakeMaps(column_selection)),
+      ranges_(MakeRanges(maps_)) {}
 
   /// Construct ColumnMaps from the provided Column Selection
-  static ColumnMaps MakeMaps(const ColumnSelection & column_selection,
-                             Direction direction=FORWARD);
+  static ColumnMaps MakeMaps(const ColumnSelection & column_selection);
   /// Construct ColumnRanges from the provided maps (derived from MakeMaps)
-  static ColumnRanges MakeRanges(const ColumnMaps & maps,
-                                 Direction direction=FORWARD);
+  static ColumnRanges MakeRanges(const ColumnMaps & maps);
 
   /// Number of elements in this mapping
-  inline std::size_t nElements() const {
-    return std::accumulate(std::begin(maps_), std::end(maps_), std::size_t(1),
+  inline std::ptrdiff_t nElements() const {
+    return std::accumulate(std::begin(maps_), std::end(maps_), std::ptrdiff_t(1),
                            [](const auto & init, const auto & map)
                                 { return init * map.size(); });
   }
 
   /// Number of disjoint ranges in this mapping
-  inline std::size_t nRanges() const {
-    return std::accumulate(std::begin(ranges_), std::end(ranges_), std::size_t(1),
+  inline std::ptrdiff_t nRanges() const {
+    return std::accumulate(std::begin(ranges_), std::end(ranges_), std::ptrdiff_t(1),
                            [](const auto & init, const auto & range)
                                 { return init * range.size(); });
   }
@@ -183,10 +223,10 @@ public:
   const ColumnRanges & GetRanges() const { return ranges_; }
   const std::size_t nDim() const { return ranges_.size(); }
 
-  Direction direction_;
   ColumnMaps maps_;
   ColumnRanges ranges_;
 };
+
 
 template <typename T>
 std::vector<typename ColumnMapping<T>::IdMap>
@@ -228,6 +268,24 @@ bool ColumnMapping<T>::MapIterator::operator==(const MapIterator & other) const 
 
 template <typename T>
 casacore::Slicer
+ColumnMapping<T>::RangeIterator::GetRowSlicer() const {
+  assert(!done_);
+  assert(index_.size() > 0);
+  const auto & dim_maps = DimMaps(0);
+  const auto & range = DimRange(0);
+  auto start = dim_maps[range.start].from;
+  auto end = dim_maps[range.end - 1].from;
+  // TODO: casacore rownr_t is unsigned but ssize_t is signed
+  // Find a proper solution to the narrowing conversion and
+  // possible resulting issues
+  return casacore::Slicer(
+    casacore::IPosition({static_cast<ssize_t>(start)}),
+    casacore::IPosition({static_cast<ssize_t>(end)}),
+    casacore::Slicer::endIsLast);
+}
+
+template <typename T>
+casacore::Slicer
 ColumnMapping<T>::RangeIterator::operator*() const {
   assert(!done_);
   auto start = casacore::IPosition(index_.size());
@@ -236,14 +294,11 @@ ColumnMapping<T>::RangeIterator::operator*() const {
   for(std::size_t dim=0; dim < index_.size(); ++dim) {
     const auto & dim_maps = DimMaps(dim);
     const auto & range = DimRange(dim);
-
-    if(map_.direction_ == FORWARD) {
-      start[dim] = dim_maps[range.start].from;
-      end[dim] = dim_maps[range.end - 1].from;
-    } else {
-      start[dim] = dim_maps[range.start].to;
-      end[dim] = dim_maps[range.end - 1].to;
-    }
+    // TODO: casacore rownr_t is unsigned but ssize_t is signed
+    // Find a proper solution to the narrowing conversion and
+    // possible resulting issues
+    start[dim] = static_cast<ssize_t>(dim_maps[range.start].from);
+    end[dim] = static_cast<ssize_t>(dim_maps[range.end - 1].from);
   }
 
   return casacore::Slicer(start, end, casacore::Slicer::endIsLast);
@@ -276,7 +331,7 @@ bool ColumnMapping<T>::RangeIterator::operator==(const RangeIterator & other) co
 
 
 template <typename T> typename ColumnMapping<T>::ColumnMaps
-ColumnMapping<T>::MakeMaps(const ColumnSelection & column_selection, Direction direction)
+ColumnMapping<T>::MakeMaps(const ColumnSelection & column_selection)
 {
   assert(column_selection.size() > 0);
   for(const auto & c: column_selection) assert(c.size() > 0);
@@ -294,15 +349,9 @@ ColumnMapping<T>::MakeMaps(const ColumnSelection & column_selection, Direction d
             column_map.push_back({*it, to});
       }
 
-      if(direction == FORWARD) {
-          std::sort(std::begin(column_map), std::end(column_map),
-                  [](const auto & lhs, const auto & rhs) {
-                      return lhs.from < rhs.from; });
-      } else {
-          std::sort(std::begin(column_map), std::end(column_map),
-                  [](const auto & lhs, const auto & rhs) {
-                      return lhs.to < rhs.to; });
-      }
+      std::sort(std::begin(column_map), std::end(column_map),
+              [](const auto & lhs, const auto & rhs) {
+                  return lhs.from < rhs.from; });
 
       column_maps.emplace_back(std::move(column_map));
   }
@@ -311,7 +360,7 @@ ColumnMapping<T>::MakeMaps(const ColumnSelection & column_selection, Direction d
 }
 
 template <typename T> typename ColumnMapping<T>::ColumnRanges
-ColumnMapping<T>::MakeRanges(const ColumnMaps & maps, Direction direction) {
+ColumnMapping<T>::MakeRanges(const ColumnMaps & maps) {
   ColumnRanges column_ranges;
   column_ranges.reserve(maps.size());
 
@@ -328,10 +377,8 @@ ColumnMapping<T>::MakeRanges(const ColumnMaps & maps, Direction direction) {
               std::next(std::begin(column_map))};
           next != std::end(column_map); ++i, ++prev, ++next) {
 
-          if(direction == FORWARD && next->from - prev->from == 1) {
-              current.end += 1;
-          } else if(direction == BACKWARD && next->to - prev->to == 1) {
-              current.end += 1;
+          if(next->from - prev->from == 1) {
+            current.end += 1;
           } else {
               column_range.push_back(current);
               current = Range{i, i + 1};
