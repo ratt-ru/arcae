@@ -19,7 +19,7 @@ class ColumnMapping {
   static_assert(std::is_integral_v<T>, "T is not integral");
 
 public:
-
+  // Public Types
   // Describes a mapping between two dimension id's
   struct IdMap {
     T from;
@@ -60,7 +60,7 @@ public:
       // of the encapsulated RangeIterator
       static std::vector<T> CurrentFromRangeIterator(const RangeIterator & rit) {
         auto result = std::vector<T>(rit.nDim(), T{0});
-        for(auto dim=std::ptrdiff_t{0}; dim < rit.nDim(); ++dim) {
+        for(std::ptrdiff_t dim=0; dim < rit.nDim(); ++dim) {
           result[dim] = rit.DimRange(dim).start;
         }
         return result;
@@ -71,8 +71,8 @@ public:
         auto product = std::size_t{1};
         auto result = std::size_t{0};
 
-        for(auto dim = rit_.nDim() - 1; dim >= 0; --dim) {
-          result += product * rit_.DimMaps(dim)[current_[dim]].to;
+        for(std::ptrdiff_t dim = rit_.nDim() - 1; dim >= 0; --dim) {
+          result += product * CurrentId(dim).to;
           product *= shape[dim];
         }
 
@@ -84,8 +84,8 @@ public:
         auto product = std::size_t{1};
         auto result = std::size_t{0};
 
-        for(auto dim = rit_.nDim() - 1; dim >= 0; --dim) {
-          result += product * rit_.DimMaps(dim)[current_[dim]].from;
+        for(std::ptrdiff_t dim = rit_.nDim() - 1; dim >= 0; --dim) {
+          result += product * CurrentId(dim).from;
           product *= shape[dim];
         }
 
@@ -100,7 +100,7 @@ public:
         auto result = std::pair<T, T>{0, 0};
 
         for(auto dim = rit_.nDim() - 1; dim >= 0; --dim) {
-          const auto & id_map = rit_.DimMaps(dim)[current_[dim]];
+          const auto & id_map = CurrentId(dim);
           result.first += product.first * id_map.from;
           result.second += product.second * id_map.to;
           product.first *= source[dim];
@@ -108,6 +108,10 @@ public:
         }
 
         return result;
+      }
+
+      inline const IdMap & CurrentId(std::size_t dim) const {
+        return rit_.DimMaps(dim)[current_[dim]];
       }
 
       MapIterator(const RangeIterator & rit, bool done)
@@ -174,10 +178,15 @@ public:
       }
   };
 
+private:
+  // Private members
+  ColumnMaps maps_;
+  ColumnRanges ranges_;
 
+public:
+  // Public methods
   ColumnMapping(const ColumnSelection & column_selection={})
-    : maps_(MakeMaps(column_selection)),
-      ranges_(MakeRanges(maps_)) {}
+    : maps_(MakeMaps(column_selection)), ranges_(MakeRanges(maps_)) {}
 
   /// Construct ColumnMaps from the provided Column Selection
   static ColumnMaps MakeMaps(const ColumnSelection & column_selection);
@@ -235,9 +244,6 @@ public:
   inline const ColumnMaps & GetMaps() const { return maps_;  }
   inline const ColumnRanges & GetRanges() const { return ranges_; }
   inline const std::size_t nDim() const { return ranges_.size(); }
-
-  ColumnMaps maps_;
-  ColumnRanges ranges_;
 };
 
 
