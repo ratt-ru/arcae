@@ -254,7 +254,7 @@ ColumnMapping<T>::MapIterator::operator*() const {
   auto result = std::vector<IdMap>(current_.size(), {0, 0});
 
   for(auto dim=0; dim < current_.size(); ++dim) {
-    result[dim] = rit_.DimMaps(dim)[current_[dim]];
+    result[dim] = CurrentId(dim);
   }
 
   return result;
