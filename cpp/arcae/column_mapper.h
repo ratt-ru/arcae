@@ -5,6 +5,8 @@
 #include <cassert>
 #include <cstddef>
 #include <numeric>
+#include <type_traits>
+#include <variant>
 #include <vector>
 
 #include <casacore/casa/aipsxtype.h>
@@ -38,6 +40,7 @@ public:
         { return start == lhs.start && end == lhs.end; }
   };
 
+  using ShapeTypes = std::variant<casacore::IPosition, std::vector<casacore::IPosition>>;
   using ColumnIds = std::vector<T>;
   using ColumnSelection = std::vector<ColumnIds>;
   using ColumnMap = std::vector<IdMap>;
@@ -182,14 +185,19 @@ private:
   // Private members
   ColumnMaps maps_;
   ColumnRanges ranges_;
+  ShapeTypes shape_;
 
 public:
   // Public methods
-  ColumnMapping(const ColumnSelection & column_selection={})
-    : maps_(MakeMaps(column_selection)), ranges_(MakeRanges(maps_)) {}
+  ColumnMapping(const ColumnSelection & column_selection={},
+                const ShapeTypes & shape=casacore::IPosition())
+    : maps_(MakeMaps(column_selection, shape)),
+      ranges_(MakeRanges(maps_)),
+      shape_(shape) {}
 
   /// Construct ColumnMaps from the provided Column Selection
-  static ColumnMaps MakeMaps(const ColumnSelection & column_selection);
+  static ColumnMaps MakeMaps(const ColumnSelection & column_selection,
+                             const ShapeTypes & shape);
   /// Construct ColumnRanges from the provided maps (derived from MakeMaps)
   static ColumnRanges MakeRanges(const ColumnMaps & maps);
 
@@ -369,15 +377,36 @@ bool ColumnMapping<T>::RangeIterator::operator==(const RangeIterator & other) co
   return done_ ? true : index_ == other.index_;
 }
 
+template <class>
+inline constexpr bool always_false_v = false;
 
 template <typename T> typename ColumnMapping<T>::ColumnMaps
-ColumnMapping<T>::MakeMaps(const ColumnSelection & column_selection)
+ColumnMapping<T>::MakeMaps(const ColumnSelection & column_selection,
+                           const ShapeTypes & shape)
 {
   ColumnMaps column_maps;
   column_maps.reserve(column_selection.size());
 
   for(std::size_t dim=0; dim < column_selection.size(); ++dim) {
       const auto & column_ids = column_selection[dim];
+      if(column_ids.size() == 0) {
+        std::visit([&](auto && arg) {
+          using VT = std::decay_t<decltype(arg)>;
+          if constexpr (std::is_same_v<VT, casacore::IPosition>) {
+            auto ids = ColumnMap(arg[arg.size() - dim - 1], {0, 0});
+            for(auto i = T{0}; i < ids.size(); ++i) {
+              ids[i] = {i, i};
+            }
+            column_maps.emplace_back(std::move(ids));
+          } else if constexpr (std::is_same_v<VT, std::vector<casacore::IPosition>>) {
+            assert(false);
+          } else {
+            static_assert(always_false_v<VT>, "non-exhaustive visitor");
+          }
+        }, shape);
+        continue;
+      }
+
       ColumnMap column_map;
       column_map.reserve(column_ids.size());
 

@@ -220,3 +220,27 @@ TEST(RangeTest, MapIteratorTest) {
     EXPECT_EQ(rit, map.RangeEnd());
     EXPECT_EQ(n, map.nElements());
 }
+
+TEST(RangeTest, UnboundedIds) {
+    // Two unbounded ranges
+    // shape provided in FORTRAN order
+    auto map = C({{}, {}}, IPos({4, 6}));
+
+    const auto & maps = map.GetMaps();
+    const auto & ranges = map.GetRanges();
+
+    // Default Maps auto-generated from shape
+    EXPECT_THAT(maps[0], ::testing::ElementsAre(
+        C::IdMap{0, 0},
+        C::IdMap{1, 1},
+        C::IdMap{2, 2},
+        C::IdMap{3, 3},
+        C::IdMap{4, 4},
+        C::IdMap{5, 5}));
+
+    EXPECT_THAT(maps[1], ::testing::ElementsAre(
+        C::IdMap{0, 0},
+        C::IdMap{1, 1},
+        C::IdMap{2, 2},
+        C::IdMap{3, 3}));
+}
