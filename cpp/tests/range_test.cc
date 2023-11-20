@@ -14,14 +14,6 @@ using IPos = casacore::IPosition;
 
 using C = arcae::ColumnMapping<casacore::rownr_t>;
 
-TEST(RangeDeathTest, CheckMapsAndRangeNull) {
-    GTEST_FLAG_SET(death_test_style, "threadsafe");
-    EXPECT_DEATH(C(C::ColumnSelection{}),
-                 "column_selection.size\\(\\) > 0");
-    ASSERT_DEATH(C(C::ColumnSelection{{}, {0}}),
-                 "c.size\\(\\) > 0");
-}
-
 TEST(RangeTest, CheckMapsAndRangesSingleton) {
     auto map = C(C::ColumnSelection{{0}});
 

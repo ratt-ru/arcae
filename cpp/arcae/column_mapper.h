@@ -373,15 +373,12 @@ bool ColumnMapping<T>::RangeIterator::operator==(const RangeIterator & other) co
 template <typename T> typename ColumnMapping<T>::ColumnMaps
 ColumnMapping<T>::MakeMaps(const ColumnSelection & column_selection)
 {
-  assert(column_selection.size() > 0);
-  for(const auto & c: column_selection) assert(c.size() > 0);
-
   ColumnMaps column_maps;
   column_maps.reserve(column_selection.size());
 
   for(std::size_t dim=0; dim < column_selection.size(); ++dim) {
       const auto & column_ids = column_selection[dim];
-      auto column_map = ColumnMap{};
+      ColumnMap column_map;
       column_map.reserve(column_ids.size());
 
       for(auto [it, to] = std::tuple{std::begin(column_ids), T{0}};
@@ -406,6 +403,11 @@ ColumnMapping<T>::MakeRanges(const ColumnMaps & maps) {
 
   for(std::size_t dim=0; dim < maps.size(); ++dim) {
       const auto & column_map = maps[dim];
+      if(column_map.size() == 0) {
+        column_ranges.emplace_back(ColumnRange{});
+        continue;
+      }
+
       auto column_range = ColumnRange{};
       assert(column_map.size() > 0);
       auto begin_it = std::begin(column_map);
