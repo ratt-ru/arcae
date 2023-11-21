@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Upgrade vcpkg version to include wcslib 8.2.1 (:pr:`82`)
 * Export compile_commands.json by default (:pr:`81`)
 * Make export application dependencies optional (:pr:`80`)
 * Fix ENV access within cmake files (:pr:`79`)
