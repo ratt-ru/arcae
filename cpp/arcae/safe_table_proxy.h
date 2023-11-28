@@ -18,16 +18,6 @@ namespace arcae {
 static constexpr char ARCAE_METADATA[]  = "__arcae_metadata__";
 static constexpr char CASA_DESCRIPTOR[]  = "__casa_descriptor__";
 
-
-template <typename Fn, typename ...Args>
-using FunctorReturnType = decltype(std::invoke(std::declval<Fn>(), std::declval<Args>()...));
-
-template <typename T>
-struct is_arrow_result : std::false_type {};
-
-template <typename R>
-struct is_arrow_result<arrow::Result<R>> : std::true_type {};
-
 /// @class SafeTableProxy
 /// @brief Constrains Table access to an arrow::ThreadPool containing a single thread.
 class SafeTableProxy {
