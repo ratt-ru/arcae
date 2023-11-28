@@ -52,13 +52,13 @@ protected:
     /// Run the given functor in the isolated Threadpool
     template <typename Fn>
     std::invoke_result_t<Fn> run_isolated(Fn && functor) {
-        return arrow::DeferNotOk(this->io_pool->Submit(std::forward<Fn>(functor))).result();
+        return arrow::DeferNotOk(this->io_pool->Submit(std::forward<Fn>(functor))).MoveResult();
     }
 
     /// Run the given functor in the isolated Threadpool
     template <typename Fn>
     std::invoke_result_t<Fn> run_isolated(Fn && functor) const {
-        return arrow::DeferNotOk(this->io_pool->Submit(std::forward<Fn>(functor))).result();
+        return arrow::DeferNotOk(this->io_pool->Submit(std::forward<Fn>(functor))).MoveResult();
     }
 
 public:
