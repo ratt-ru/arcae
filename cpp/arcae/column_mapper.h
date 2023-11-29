@@ -6,7 +6,6 @@
 #include <cstddef>
 #include <numeric>
 #include <type_traits>
-#include <variant>
 #include <vector>
 
 #include <casacore/casa/aipsxtype.h>
@@ -40,7 +39,6 @@ public:
         { return start == lhs.start && end == lhs.end; }
   };
 
-  using ShapeTypes = std::variant<casacore::IPosition, std::vector<casacore::IPosition>>;
   using ColumnIds = std::vector<T>;
   using ColumnSelection = std::vector<ColumnIds>;
   using ColumnMap = std::vector<IdMap>;
@@ -185,19 +183,18 @@ private:
   // Private members
   ColumnMaps maps_;
   ColumnRanges ranges_;
-  ShapeTypes shape_;
+  casacore::IPosition shape_;
 
 public:
   // Public methods
   ColumnMapping(const ColumnSelection & column_selection={},
-                const ShapeTypes & shape=casacore::IPosition())
-    : maps_(MakeMaps(column_selection, shape)),
+                const casacore::IPosition & shape=casacore::IPosition())
+    : maps_(MakeMaps(column_selection)),
       ranges_(MakeRanges(maps_)),
       shape_(shape) {}
 
   /// Construct ColumnMaps from the provided Column Selection
-  static ColumnMaps MakeMaps(const ColumnSelection & column_selection,
-                             const ShapeTypes & shape);
+  static ColumnMaps MakeMaps(const ColumnSelection & column_selection);
   /// Construct ColumnRanges from the provided maps (derived from MakeMaps)
   static ColumnRanges MakeRanges(const ColumnMaps & maps);
 
@@ -239,15 +236,7 @@ public:
   /// 2. Each IdMap in the mapping range is monotically increasing
   ///    in both the from and to field
   bool IsSimple() const;
-  const casacore::IPosition GetShape() const {
-    casacore::IPosition shape(nDim(), 0);
-
-    for(auto dim = std::size_t{0}; dim < nDim(); ++dim) {
-      shape[dim] = DimMaps(dim).size();
-    }
-
-    return shape;
-  }
+  casacore::IPosition GetShape() const;
 
   inline const ColumnMaps & GetMaps() const { return maps_;  }
   inline const ColumnRanges & GetRanges() const { return ranges_; }
@@ -381,8 +370,7 @@ template <class>
 inline constexpr bool always_false_v = false;
 
 template <typename T> typename ColumnMapping<T>::ColumnMaps
-ColumnMapping<T>::MakeMaps(const ColumnSelection & column_selection,
-                           const ShapeTypes & shape)
+ColumnMapping<T>::MakeMaps(const ColumnSelection & column_selection)
 {
   ColumnMaps column_maps;
   column_maps.reserve(column_selection.size());
@@ -390,22 +378,37 @@ ColumnMapping<T>::MakeMaps(const ColumnSelection & column_selection,
   for(std::size_t dim=0; dim < column_selection.size(); ++dim) {
       const auto & column_ids = column_selection[dim];
       if(column_ids.size() == 0) {
-        std::visit([&](auto && arg) {
-          using VT = std::decay_t<decltype(arg)>;
-          if constexpr (std::is_same_v<VT, casacore::IPosition>) {
-            auto ids = ColumnMap(arg[arg.size() - dim - 1], {0, 0});
-            for(auto i = T{0}; i < ids.size(); ++i) {
-              ids[i] = {i, i};
-            }
-            column_maps.emplace_back(std::move(ids));
-          } else if constexpr (std::is_same_v<VT, std::vector<casacore::IPosition>>) {
-            assert(false);
-          } else {
-            static_assert(always_false_v<VT>, "non-exhaustive visitor");
-          }
-        }, shape);
         continue;
       }
+      // if(column_ids.size() == 0) {
+      //   auto dim_size = std::visit([&](auto && arg) -> std::size_t {
+      //     using VT = std::decay_t<decltype(arg)>;
+      //     if constexpr (std::is_same_v<VT, casacore::IPosition>) {
+      //       assert(arg.size() == column_selection.size());
+      //       return arg[arg.size() - dim - 1];
+      //     } else if constexpr (std::is_same_v<VT, std::vector<casacore::IPosition>>) {
+      //       // rows
+      //       if(dim == 0) {
+      //         return arg.size();
+      //       }
+      //       return std::accumulate(std::begin(arg), std::end(arg), std::size_t{0},
+      //         [&](const auto & init, auto & row_shape) {
+      //           assert(row_shape.size() + 1 < dim);
+      //           return std::max(init, row_shape.size() - dim - 1);
+      //       });
+      //     } else {
+      //       static_assert(always_false_v<VT>, "non-exhaustive visitor");
+      //     }
+      //   }, shape);
+
+      //   auto ids = ColumnMap(dim_size, {0, 0});
+      //   for(std::size_t i=0; i < ids.size(); ++i) {
+      //     ids[i] = {i, i};
+      //   }
+
+      //   column_maps.emplace_back(std::move(ids));
+      //   continue;
+      // }
 
       ColumnMap column_map;
       column_map.reserve(column_ids.size());
@@ -433,13 +436,10 @@ ColumnMapping<T>::MakeRanges(const ColumnMaps & maps) {
   for(std::size_t dim=0; dim < maps.size(); ++dim) {
       const auto & column_map = maps[dim];
       if(column_map.size() == 0) {
-        column_ranges.emplace_back(ColumnRange{});
         continue;
       }
 
       auto column_range = ColumnRange{};
-      assert(column_map.size() > 0);
-      auto begin_it = std::begin(column_map);
       auto current = Range{0, 1};
 
       for(auto [i, prev, next] = std::tuple{
@@ -486,6 +486,18 @@ bool ColumnMapping<T>::IsSimple() const {
 
   return true;
 }
+
+
+template <typename T>
+casacore::IPosition ColumnMapping<T>::GetShape() const {
+    casacore::IPosition shape(nDim(), 0);
+
+    for(auto dim = std::size_t{0}; dim < nDim(); ++dim) {
+      shape[dim] = DimMaps(dim).size();
+    }
+
+    return shape;
+  }
 
 } // namespace arcae
 

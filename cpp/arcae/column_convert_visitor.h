@@ -8,6 +8,7 @@
 
 #include <arrow/util/logging.h>  // IWYU pragma: keep
 
+#include "arcae/array_util.h"
 #include "arcae/casa_visitors.h"
 #include "arcae/complex_type.h"
 #include "arcae/service_locator.h"
@@ -43,9 +44,6 @@ public:
 #undef VISIT
 
 private:
-
-    static arrow::Status ValidateArray(const std::shared_ptr<arrow::Array> & array);
-
     inline casacore::uInt local_row(casacore::uInt row)
         { assert(row >= startrow_); return row - startrow_; }
 
@@ -99,7 +97,7 @@ private:
 
     template <typename T>
     arrow::Status ConvertFixedArrayColumn(const std::shared_ptr<arrow::DataType> & arrow_dtype,
-                                   const casacore::IPosition & shape) {
+                                          const casacore::IPosition & shape) {
         auto column = casacore::ArrayColumn<T>(column_);
         column.setMaximumCacheSize(1);
 
