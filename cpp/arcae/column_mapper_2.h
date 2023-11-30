@@ -230,23 +230,122 @@ public:
   }
 };
 
-
-
 class ColMap2 {
 public:
+  class RangeIterator;
+
+  // Iterates over the current mapping in the RangeIterator
+  class MapIterator {
+    private:
+      const RangeIterator & rit_;
+      std::vector<casacore::rownr_t> current_;
+      bool done_;
+    public:
+      // Initialise the current map from the range starts
+      // of the encapsulated RangeIterator
+      static std::vector<casacore::rownr_t> CurrentFromRangeIterator(const RangeIterator & rit) {
+        auto result = std::vector<casacore::rownr_t>(rit.nDim(), 0);
+        for(std::size_t dim=0; dim < rit.nDim(); ++dim) {
+          result[dim] = rit.DimRange(dim).start;
+        }
+        return result;
+      }
+
+      MapIterator(const RangeIterator & rit, bool done)
+        : rit_(rit), current_(CurrentFromRangeIterator(rit)), done_(done) {}
+
+      inline IdMap CurrentId(std::size_t dim) const {
+        assert(dim < rit_.nDim());
+        const auto & range = rit_.DimRange(dim);
+
+        switch(range.type) {
+          case Range::FREE:
+          case Range::UNCONSTRAINED:
+            // Free and unconstrained ranges have contiguous from and to ranges
+            return IdMap{rit_.offset_[dim] + current_[dim] - range.start, current_[dim]};
+            // return IdMap{current_[dim], rit_.offset_[dim] + current_[dim] - range.start};
+            break;
+          case Range::MAP:
+            // Maps refer to individual
+            return rit_.DimMaps(dim)[current_[dim]];
+            break;
+          default:
+            assert((false) && "Unhandled range.type switch case");
+        }
+      }
+
+      std::size_t FlatDestination(const casacore::IPosition & shape) {
+        auto product = std::size_t{1};
+        auto result = std::size_t{0};
+        auto ndim = rit_.nDim();
+        assert(ndim > 0);
+
+        for(auto dim = std::ptrdiff_t(ndim) - 1; dim >= 1; --dim) {
+          result += product * CurrentId(dim).to;
+          product *= shape[ndim - dim - 1];
+        }
+
+        return result + product * CurrentId(0).to;
+      }
+
+      std::size_t FlatSource(const casacore::IPosition & shape) {
+        auto product = std::size_t{1};
+        auto result = std::size_t{0};
+        auto ndim = rit_.nDim();
+        assert(ndim > 0);
+
+        for(auto dim = std::ptrdiff_t(ndim) - 1; dim >= 1; --dim) {
+          result += product * CurrentId(dim).from;
+          product *= shape[ndim - dim - 1];
+        }
+
+        return result + product * CurrentId(0).from;
+      }
+
+      MapIterator & operator++() {
+        assert(!done_);
+        // Iterate from fastest to slowest changing dimension
+        for(std::size_t dim = current_.size() - 1; dim >= 0;) {
+          current_[dim]++;
+          // We've achieved a successful iteration in this dimension
+          if(current_[dim] < rit_.DimRange(dim).end) { break; }
+          // Reset to zero and retry in the next dimension
+          else if(dim > 0) { current_[dim] = rit_.DimRange(dim).start; --dim; }
+          // This was the slowest changing dimension so we're done
+          else { done_ = true; break; }
+        }
+
+        return *this;
+      }
+
+      bool operator==(const MapIterator & other) const {
+        if(&rit_ != &other.rit_ || done_ != other.done_) return false;
+        return done_ ? true : current_ == other.current_;
+      }
+
+      inline bool operator!=(const MapIterator & other) const {
+        return !(*this == other);
+      }
+  };
+
+
   // Iterates over the Disjoint Ranges defined by a ColumnMapping
   class RangeIterator {
     public:
       const ColMap2 & map_;
       std::vector<std::size_t> index_;
+      std::vector<casacore::rownr_t> offset_;
       bool done_;
 
     public:
       RangeIterator(ColMap2 & column_map, bool done=false) :
-        map_(column_map), done_(done), index_(column_map.nDim(), 0) {}
+        map_(column_map),
+        index_(column_map.nDim(), 0),
+        offset_(column_map.nDim(), 0),
+        done_(done) {}
 
       // Return the number of dimensions in the index
-      inline const std::size_t nDim() const {
+      inline std::size_t nDim() const {
         return index_.size();
       }
 
@@ -268,47 +367,55 @@ public:
         return DimRanges(dim)[index_[dim]];
       }
 
-      // inline MapIterator MapBegin() const {
-      //   return MapIterator(*this, false);
-      // }
+      inline MapIterator MapBegin() const {
+        return MapIterator(*this, false);
+      }
 
-      // inline MapIterator MapEnd() const {
-      //   return MapIterator(*this, true);
-      // }
+      inline MapIterator MapEnd() const {
+        return MapIterator(*this, true);
+      }
 
       RangeIterator & operator++() {
         assert(!done_);
+
         // Iterate from fastest to slowest changing dimension
-        for(std::size_t dim = index_.size() - 1; dim >= 0;) {
+        for(auto dim = std::ptrdiff_t(index_.size()) - 1; dim >= 0;) {
+          const auto & range = DimRange(dim);
+
+          switch(range.type) {
+            case Range::FREE:
+            case Range::MAP:
+              offset_[dim] += range.nRows();
+              break;
+            case Range::UNCONSTRAINED:
+              {
+                const auto & row_range = DimRange(0);
+                assert(row_range.IsSingleRow());
+                offset_[dim] += map_.RowDimSize(row_range.start, dim);
+              }
+              break;
+            default:
+              assert((false) && "Unhandled range.type switch case");
+          }
+
           index_[dim]++;
-          // We've achieved a successful iteration in this dimension
-          if(index_[dim] < map_.ranges_[dim].size()) { break; }
-          // We've exceeded the size of the current dimension
-          // reset to zero and retry the while loop
-          else if(dim > 0) { index_[dim] = 0; --dim; }
-          // This was the slowest changing dimension so we're done
-          else { done_ = true; break; }
+
+          if(index_[dim] < map_.DimRanges(dim).size()) {
+            break;  // We've achieved a successful iteration in this dimension
+          } else if(dim > 0) {
+            // We've exceeded the size of the current dimension
+            // reset to zero and retry the while loop
+            index_[dim] = 0;
+            offset_[dim] = 0;
+            --dim;
+          } else {
+            // This was the slowest changing dimension so we're done
+            done_ = true;
+            break;
+          }
         }
 
         return *this;
-      };
-
-      casacore::Slicer operator*() const {
-        assert(!done_);
-        auto start = casacore::IPosition(index_.size());
-        auto end = casacore::IPosition(index_.size());
-
-        for(std::size_t dim=0; dim < index_.size(); ++dim) {
-          const auto & dim_maps = DimMaps(dim);
-          const auto & range = DimRange(dim);
-          // TODO: casacore rownr_t is unsigned but ssize_t is signed
-          // Find a proper solution to the narrowing conversion and
-          // possible resulting issues
-          start[dim] = static_cast<ssize_t>(dim_maps[range.start].from);
-          end[dim] = static_cast<ssize_t>(dim_maps[range.end - 1].from);
-        }
-
-        return casacore::Slicer(start, end, casacore::Slicer::endIsLast);
       };
 
       // Returns a slicer for the row dimension
@@ -359,7 +466,7 @@ public:
         casacore::IPosition start(ndim - 1, 0);
         casacore::IPosition end(ndim - 1, 0);
 
-        for(std::ptrdiff_t dim = 1; dim < ndim; ++dim) {
+        for(std::size_t dim = 1; dim < ndim; ++dim) {
           const auto & range = DimRange(dim);
 
           // TODO: casacore rownr_t is unsigned but ssize_t is signed
@@ -379,14 +486,11 @@ public:
               break;
             case Range::UNCONSTRAINED:
               {
-                // In case of variably shaped columns, the dimension
-                // size will vary by row
-                const auto & row_range = DimRange(0);
-                assert(row_range.IsSingleRow());
-                auto row_dim_size = map_.RowDimSize(row_range.start, dim) - 1;
-
+                // In case of variably shaped columns, the dimension size will vary by row
+                const auto & rr = DimRange(0);
+                assert(rr.IsSingleRow());
                 start[ndim - 1 - dim] = 0;
-                end[ndim - 1 - dim] = static_cast<ssize_t>(row_dim_size);
+                end[ndim - 1 - dim] = static_cast<ssize_t>(map_.RowDimSize(rr.start, dim)) - 1;
               }
               break;
             default:
@@ -503,6 +607,7 @@ public:
       column_ranges.emplace_back(std::move(column_range));
     }
 
+    assert(ndim == column_ranges.size());
     return column_ranges;
   }
 
@@ -540,7 +645,7 @@ public:
     // Now handle the non-row dimensions
     for(std::size_t dim=1; dim < ndim; ++dim) {
       // If no mapping exists for this dimension
-      // create an unconstrained range
+      // create a single unconstrained range
       if(dim >= maps.size() || maps[dim].size() == 0) {
         column_ranges.emplace_back(ColumnRange{Range{0, 0, Range::UNCONSTRAINED}});
         continue;
@@ -570,6 +675,7 @@ public:
       column_ranges.emplace_back(std::move(column_range));
     }
 
+    assert(ndim == column_ranges.size());
     return column_ranges;
   }
 

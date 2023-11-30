@@ -1,3 +1,4 @@
+#include <casacore/casa/Arrays/IPosition.h>
 #include <casacore/casa/BasicSL/Complexfwd.h>
 #include <casacore/tables/Tables/RefRows.h>
 #include <memory>
@@ -15,8 +16,12 @@
 #include <gmock/gmock.h>
 #include <arrow/testing/gtest_util.h>
 
+#include "arcae/column_mapper_2.h"
 #include "arrow/result.h"
 #include "arrow/status.h"
+
+using arcae::ColMap2;
+using arcae::IdMap;
 
 using casacore::Array;
 using casacore::ArrayColumn;
@@ -27,6 +32,7 @@ using MS = casacore::MeasurementSet;
 using MSColumns = casacore::MSMainEnums::PredefinedColumns;
 using casacore::SetupNewTable;
 using casacore::ScalarColumn;
+using casacore::Slicer;
 using casacore::Table;
 using casacore::TableDesc;
 using casacore::TableColumn;
@@ -36,9 +42,9 @@ using IPos = casacore::IPosition;
 
 using namespace std::string_literals;
 
-static constexpr std::size_t knrow = 10;
-static constexpr std::size_t knchan = 4;
-static constexpr std::size_t kncorr = 1;
+static constexpr std::size_t knrow = 2;
+static constexpr std::size_t knchan = 2;
+static constexpr std::size_t kncorr = 2;
 
 template <typename T> ScalarColumn<T>
 GetScalarColumn(const MS & ms, MSColumns column) {
@@ -73,45 +79,38 @@ class ColumnConvertTest : public ::testing::Test {
         auto table_desc = TableDesc(MS::requiredTableDesc());
         auto data_shape = IPos({kncorr, knchan});
         auto tile_shape = IPos({kncorr, knchan, 1});
-        auto data_column_desc = ArrayColumnDesc<CasaComplex>(
-            "MODEL_DATA", data_shape, ColumnDesc::FixedShape);
-
-        auto corrected_column_desc = ArrayColumnDesc<CasaComplex>(
-            "VAR_DATA", 2);
-
+        auto data_column_desc = ArrayColumnDesc<casacore::Int>(
+            "FIXED_DATA", data_shape, ColumnDesc::FixedShape);
         table_desc.addColumn(data_column_desc);
-        table_desc.addColumn(corrected_column_desc);
+
+        auto var_column_desc = ArrayColumnDesc<casacore::Int>("VAR_DATA", 2);
+        table_desc.addColumn(var_column_desc);
+
+        auto var_fixed_column_desc = ArrayColumnDesc<casacore::Int>("VAR_FIXED_DATA", 2);
+        table_desc.addColumn(var_fixed_column_desc);
+
         auto storage_manager = TiledColumnStMan("TiledModelData", tile_shape);
         auto setup_new_table = SetupNewTable(table_name_, table_desc, Table::New);
-        setup_new_table.bindColumn("MODEL_DATA", storage_manager);
+        setup_new_table.bindColumn("FIXED_DATA", storage_manager);
+
         auto ms = MS(setup_new_table, knrow);
 
-        auto field = GetScalarColumn<casacore::Int>(ms, MS::FIELD_ID);
-        auto ddid = GetScalarColumn<casacore::Int>(ms, MS::DATA_DESC_ID);
-        auto scan = GetScalarColumn<casacore::Int>(ms, MS::SCAN_NUMBER);
-        auto time = GetScalarColumn<casacore::Double>(ms, MS::TIME);
-        auto ant1 = GetScalarColumn<casacore::Int>(ms, MS::ANTENNA1);
-        auto ant2 = GetScalarColumn<casacore::Int>(ms, MS::ANTENNA2);
-        auto data = GetArrayColumn<CasaComplex>(ms, MS::MODEL_DATA);
-        auto corrected_data = GetArrayColumn<CasaComplex>(ms, "VAR_DATA");
+        auto var_data = GetArrayColumn<casacore::Int>(ms, "VAR_DATA");
+        auto fixed_data = GetArrayColumn<casacore::Int>(ms, "FIXED_DATA");
+        auto var_fixed_data = GetArrayColumn<casacore::Int>(ms, "VAR_FIXED_DATA");
 
-        time.putColumn({0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0});
-        field.putColumn({0, 0, 0, 0, 0, 0, 0, 0, 0, 0});
-        ddid.putColumn({0, 0, 0, 0, 0, 0, 0, 0, 0, 0});
-        ant1.putColumn({0, 0, 0, 0, 0, 0, 0, 0, 0, 0});
-        ant2.putColumn({1, 1, 1, 1, 1, 1, 1, 1, 1, 1});
-        data.putColumn(Array<CasaComplex>(IPos({kncorr, knchan, knrow}), {1, 2}));
+        for(auto [r, v] = std::tuple{ssize_t{0}, std::size_t{0}}; r < knrow; ++r) {
+          auto var_array = Array<casacore::Int>(IPos({
+            ssize_t{kncorr} - (r % 2), ssize_t{knchan} - (r % 2), 1}));
+          for(auto it = std::begin(var_array); it != std::end(var_array); ++it, ++v) *it = v;
+          var_data.putColumnCells(casacore::RefRows(r, r), var_array);
+        }
 
-        auto gen = std::mt19937{std::random_device{}()};
-        auto chan_dist = std::uniform_int_distribution<>(knchan, knchan + 2);
-        auto corr_dist = std::uniform_int_distribution<>(kncorr, kncorr + 1);
-
-        for(std::size_t i=0; i < knrow; ++i) {
-          auto corrected_array = Array<CasaComplex>(
-                  IPos({corr_dist(gen), chan_dist(gen), 1}),
-                  {static_cast<float>(i), static_cast<float>(i)});
-
-          corrected_data.putColumnCells(casacore::RefRows(i, i), corrected_array);
+        for(auto [r, v] = std::tuple{ssize_t{0}, std::size_t{0}}; r < knrow; ++r) {
+          auto fixed_array = Array<casacore::Int>(IPos({kncorr, knchan, 1}));
+          for(auto it = std::begin(fixed_array); it != std::end(fixed_array); ++it, ++v) *it = v;
+          fixed_data.putColumnCells(casacore::RefRows(r, r), fixed_array);
+          var_fixed_data.putColumnCells(casacore::RefRows(r, r), fixed_array);
         }
 
         return std::make_shared<TableProxy>(ms);
@@ -121,38 +120,194 @@ class ColumnConvertTest : public ::testing::Test {
     }
 };
 
-TEST_F(ColumnConvertTest, SelectFromRange) {
-  ASSERT_OK_AND_ASSIGN(auto result,
-      (table_proxy_->run([](const TableProxy & proxy) -> arrow::Result<std::shared_ptr<arrow::Array>> {
-    auto table = proxy.table();
-    // auto data_column = GetArrayColumn<CasaComplex>(table, "VAR_DATA");
-    // auto row_range = Slicer(IPos({0}), IPos({5}), Slicer::endIsLast);
-    // auto section = Slicer(IPos({0, 0}), IPos({0, 2}), Slicer::endIsLast);
-    // auto data = data_column.getColumnRange(row_range, section);
 
-    auto time_column = GetScalarColumn<casacore::Double>(table, "TIME");
-    auto data_column = GetArrayColumn<CasaComplex>(table, MS::MODEL_DATA);
+TEST_F(ColumnConvertTest, SelectSanityCheck) {
+  table_proxy_.reset();
 
-    using CM = arcae::ColumnMapping<casacore::rownr_t>;
-    // auto row_ids = CM::ColumnIds(time_column.nrow(), 0);
+  auto lock = casacore::TableLock(casacore::TableLock::LockOption::AutoNoReadLocking);
+  auto lockoptions = casacore::Record();
+  lockoptions.define("option", "auto");
+  lockoptions.define("internal", lock.interval());
+  lockoptions.define("maxwait", casacore::Int(lock.maxWait()));
+  auto proxy = casacore::TableProxy(table_name_, lockoptions, casacore::Table::Old);
 
-    // for(std::size_t i=0; i < row_ids.size(); ++i) {
-    //   row_ids[i] = i;
-    // }
+  {
+    auto var_data = GetArrayColumn<casacore::Int>(proxy.table(), "VAR_DATA");
+    auto row1 = var_data.getColumnRange(Slicer(IPos{0}, IPos{0}, Slicer::endIsLast));
+    ASSERT_EQ(row1.shape(), IPos({2, 2, 1}));
+    ASSERT_EQ(row1(IPos({0, 0, 0})), 0);
+    ASSERT_EQ(row1(IPos({1, 0, 0})), 1);
+    ASSERT_EQ(row1(IPos({0, 1, 0})), 2);
+    ASSERT_EQ(row1(IPos({1, 1, 0})), 3);
+    auto row2 = var_data.getColumnRange(Slicer(IPos{1}, IPos{1}, Slicer::endIsLast));
+    ASSERT_EQ(row2.shape(), IPos({1, 1, 1}));
+    ASSERT_EQ(row2(IPos({0, 0, 0})), 4);
+  }
 
-    auto row_ids = CM::ColumnIds{0, 1, 2, 3, 6, 7, 8, 9};
+  {
+    auto fixed_data = GetArrayColumn<casacore::Int>(proxy.table(), "FIXED_DATA");
+    auto data = fixed_data.getColumnRange(Slicer(IPos{0}, IPos{1}, Slicer::endIsLast));
+    ASSERT_EQ(data.shape(), IPos({2, 2, 2}));
+    ASSERT_EQ(data(IPos({0, 0, 0})), 0);
+    ASSERT_EQ(data(IPos({1, 0, 0})), 1);
+    ASSERT_EQ(data(IPos({0, 1, 0})), 2);
+    ASSERT_EQ(data(IPos({1, 1, 0})), 3);
+    ASSERT_EQ(data(IPos({0, 0, 1})), 4);
+    ASSERT_EQ(data(IPos({1, 0, 1})), 5);
+    ASSERT_EQ(data(IPos({0, 1, 1})), 6);
+    ASSERT_EQ(data(IPos({1, 1, 1})), 7);
+  }
+
+  {
+    auto fixed_data = GetArrayColumn<casacore::Int>(proxy.table(), "VAR_FIXED_DATA");
+    auto data = fixed_data.getColumnRange(Slicer(IPos{0}, IPos{1}, Slicer::endIsLast));
+    ASSERT_EQ(data.shape(), IPos({2, 2, 2}));
+    ASSERT_EQ(data(IPos({0, 0, 0})), 0);
+    ASSERT_EQ(data(IPos({1, 0, 0})), 1);
+    ASSERT_EQ(data(IPos({0, 1, 0})), 2);
+    ASSERT_EQ(data(IPos({1, 1, 0})), 3);
+    ASSERT_EQ(data(IPos({0, 0, 1})), 4);
+    ASSERT_EQ(data(IPos({1, 0, 1})), 5);
+    ASSERT_EQ(data(IPos({0, 1, 1})), 6);
+    ASSERT_EQ(data(IPos({1, 1, 1})), 7);
+  }
+}
+
+TEST_F(ColumnConvertTest, SelectionVariable) {
+  table_proxy_.reset();
+
+  auto lock = casacore::TableLock(casacore::TableLock::LockOption::AutoNoReadLocking);
+  auto lockoptions = casacore::Record();
+  lockoptions.define("option", "auto");
+  lockoptions.define("internal", lock.interval());
+  lockoptions.define("maxwait", casacore::Int(lock.maxWait()));
+  auto proxy = casacore::TableProxy(table_name_, lockoptions, casacore::Table::Old);
+
+  {
+    // Variable data column
+    auto var_data = GetArrayColumn<casacore::Int>(proxy.table(), "VAR_DATA");
     {
-      auto column_map = CM{CM::ColumnSelection{{row_ids}}};
-      auto visitor = arcae::NewConvertVisitor(time_column, column_map);
-      ARROW_RETURN_NOT_OK(visitor.Visit(time_column.columnDesc().dataType()));
+      // Get row 1
+      ASSERT_OK_AND_ASSIGN(auto map, ColMap2::Make(var_data, {{0}}));
+      ASSERT_EQ(map.nRanges(), 1);
+      ASSERT_EQ(map.nElements(), 4);
+      auto rit = map.RangeBegin();
+      ASSERT_EQ(rit.GetRowSlicer(), Slicer(IPos({0}), IPos({0}), Slicer::endIsLast));
+      ASSERT_EQ(rit.GetSectionSlicer(), Slicer(IPos({0, 0}), IPos({1, 1}), Slicer::endIsLast));
+      auto array = var_data.getColumnRange(rit.GetRowSlicer(), rit.GetSectionSlicer());
+      auto mit = rit.MapBegin();
+      ASSERT_EQ(mit.FlatSource(array.shape()), 0);
+      ASSERT_EQ(mit.FlatDestination(array.shape()), 0);
+      ASSERT_EQ(mit.CurrentId(0), (IdMap{0, 0}));
+      ASSERT_EQ(mit.CurrentId(1), (IdMap{0, 0}));
+      ASSERT_EQ(mit.CurrentId(2), (IdMap{0, 0}));
+      ++mit;
+      ASSERT_EQ(mit.FlatSource(array.shape()), 1);
+      ASSERT_EQ(mit.FlatDestination(array.shape()), 1);
+      ASSERT_EQ(mit.CurrentId(0), (IdMap{0, 0}));
+      ASSERT_EQ(mit.CurrentId(1), (IdMap{0, 0}));
+      ASSERT_EQ(mit.CurrentId(2), (IdMap{1, 1}));
+      ++mit;
+      ASSERT_EQ(mit.FlatSource(array.shape()), 2);
+      ASSERT_EQ(mit.FlatDestination(array.shape()), 2);
+      ASSERT_EQ(mit.CurrentId(0), (IdMap{0, 0}));
+      ASSERT_EQ(mit.CurrentId(1), (IdMap{1, 1}));
+      ASSERT_EQ(mit.CurrentId(2), (IdMap{0, 0}));
+      ++mit;
+      ASSERT_EQ(mit.FlatSource(array.shape()), 3);
+      ASSERT_EQ(mit.FlatDestination(array.shape()), 3);
+      ASSERT_EQ(mit.CurrentId(0), (IdMap{0, 0}));
+      ASSERT_EQ(mit.CurrentId(1), (IdMap{1, 1}));
+      ASSERT_EQ(mit.CurrentId(2), (IdMap{1, 1}));
+      ++mit;
+      ASSERT_EQ(mit, rit.MapEnd());
+      ++rit;
+      ASSERT_EQ(map.RangeEnd(), rit);
     }
     {
-      auto column_map = CM{CM::ColumnSelection{{0}, {0, 1, 3}, {0}}};
-      auto visitor = arcae::NewConvertVisitor(data_column, column_map);
-      ARROW_RETURN_NOT_OK(visitor.Visit(data_column.columnDesc().dataType()));
-      return visitor.array_;
+      ASSERT_OK_AND_ASSIGN(auto map, ColMap2::Make(var_data, {{1}}));
+      ASSERT_EQ(map.nRanges(), 1);
+      ASSERT_EQ(map.nElements(), 1);
+      auto rit = map.RangeBegin();
+      ASSERT_EQ(rit.GetRowSlicer(), Slicer(IPos({1}), IPos({1}), Slicer::endIsLast));
+      ASSERT_EQ(rit.GetSectionSlicer(), Slicer(IPos({0, 0}), IPos({0, 0}), Slicer::endIsLast));
+      auto array = var_data.getColumnRange(rit.GetRowSlicer(), rit.GetSectionSlicer());
+      auto mit = rit.MapBegin();
+      ASSERT_EQ(mit.CurrentId(0), (IdMap{1, 0}));
+      ASSERT_EQ(mit.CurrentId(1), (IdMap{0, 0}));
+      ASSERT_EQ(mit.CurrentId(2), (IdMap{0, 0}));
+      ASSERT_EQ(mit.FlatSource(array.shape()), 1);
+      ASSERT_EQ(mit.FlatDestination(array.shape()), 0);
+      ++rit;
+      ASSERT_EQ(map.RangeEnd(), rit);
     }
-})));
+    {
+      // Get row 0 and 1
+      // ASSERT_OK_AND_ASSIGN(auto map, ColMap2::Make(var_data, {{0, 1}}));
+      // ASSERT_EQ(map.nRanges(), 2);
+      // ASSERT_EQ(map.nElements(), 5);
+      // auto rit = map.RangeBegin();
+      // ASSERT_EQ(rit.GetRowSlicer(), Slicer(IPos({0}), IPos({0}), Slicer::endIsLast));
+      // ASSERT_EQ(rit.GetSectionSlicer(), Slicer(IPos({0, 0}), IPos({1, 1}), Slicer::endIsLast));
+      // auto array = var_data.getColumnRange(rit.GetRowSlicer(), rit.GetSectionSlicer());
+      // auto mit = rit.MapBegin();
+      // ASSERT_EQ(mit.CurrentId(0), (IdMap{0, 0}));
+      // ASSERT_EQ(mit.CurrentId(1), (IdMap{0, 0}));
+      // ASSERT_EQ(mit.CurrentId(2), (IdMap{0, 0}));
+      // ASSERT_EQ(mit.FlatSource(array.shape()), 0);
+      // ASSERT_EQ(mit.FlatDestination(array.shape()), 0);
+      // ++mit;
+      // ASSERT_EQ(mit.CurrentId(0), (IdMap{0, 0}));
+      // ASSERT_EQ(mit.CurrentId(1), (IdMap{0, 0}));
+      // ASSERT_EQ(mit.CurrentId(2), (IdMap{1, 1}));
+      // ASSERT_EQ(mit.FlatSource(array.shape()), 1);
+      // ASSERT_EQ(mit.FlatDestination(array.shape()), 1);
+      // ++mit;
+      // ASSERT_EQ(mit.CurrentId(0), (IdMap{0, 0}));
+      // ASSERT_EQ(mit.CurrentId(1), (IdMap{1, 1}));
+      // ASSERT_EQ(mit.CurrentId(2), (IdMap{0, 0}));
+      // ASSERT_EQ(mit.FlatSource(array.shape()), 2);
+      // ASSERT_EQ(mit.FlatDestination(array.shape()), 2);
+      // ++mit;
+      // ASSERT_EQ(mit.CurrentId(0), (IdMap{0, 0}));
+      // ASSERT_EQ(mit.CurrentId(1), (IdMap{1, 1}));
+      // ASSERT_EQ(mit.CurrentId(2), (IdMap{1, 1}));
+      // ASSERT_EQ(mit.FlatSource(array.shape()), 3);
+      // ASSERT_EQ(mit.FlatDestination(array.shape()), 3);
+      // ++mit;
+      // ASSERT_EQ(mit, rit.MapEnd());
+      // ++rit;
+      // ASSERT_EQ(map.RangeEnd(), rit);
+    }
 
-  std::cout << result->ToString() << std::endl;
+
+  }
+
+  {
+    auto fixed_data = GetArrayColumn<casacore::Int>(proxy.table(), "FIXED_DATA");
+    auto data = fixed_data.getColumnRange(Slicer(IPos{0}, IPos{1}, Slicer::endIsLast));
+    ASSERT_EQ(data.shape(), IPos({2, 2, 2}));
+    ASSERT_EQ(data(IPos({0, 0, 0})), 0);
+    ASSERT_EQ(data(IPos({1, 0, 0})), 1);
+    ASSERT_EQ(data(IPos({0, 1, 0})), 2);
+    ASSERT_EQ(data(IPos({1, 1, 0})), 3);
+    ASSERT_EQ(data(IPos({0, 0, 1})), 4);
+    ASSERT_EQ(data(IPos({1, 0, 1})), 5);
+    ASSERT_EQ(data(IPos({0, 1, 1})), 6);
+    ASSERT_EQ(data(IPos({1, 1, 1})), 7);
+  }
+
+  {
+    auto fixed_data = GetArrayColumn<casacore::Int>(proxy.table(), "VAR_FIXED_DATA");
+    auto data = fixed_data.getColumnRange(Slicer(IPos{0}, IPos{1}, Slicer::endIsLast));
+    ASSERT_EQ(data.shape(), IPos({2, 2, 2}));
+    ASSERT_EQ(data(IPos({0, 0, 0})), 0);
+    ASSERT_EQ(data(IPos({1, 0, 0})), 1);
+    ASSERT_EQ(data(IPos({0, 1, 0})), 2);
+    ASSERT_EQ(data(IPos({1, 1, 0})), 3);
+    ASSERT_EQ(data(IPos({0, 0, 1})), 4);
+    ASSERT_EQ(data(IPos({1, 0, 1})), 5);
+    ASSERT_EQ(data(IPos({0, 1, 1})), 6);
+    ASSERT_EQ(data(IPos({1, 1, 1})), 7);
+  }
 }
