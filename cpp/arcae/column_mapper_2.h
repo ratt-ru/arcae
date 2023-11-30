@@ -20,6 +20,8 @@
 
 namespace arcae {
 
+enum InputOrder {C=0, F};
+
 using RowIds = std::vector<casacore::rownr_t>;
 using ColumnSelection = std::vector<RowIds>;
 
@@ -84,10 +86,12 @@ struct VariableShapeData {
     auto row_shapes = decltype(VariableShapeData::row_shapes_){};
     bool fixed_shape = true;
     bool fixed_dims = true;
+    // Row dimension is last in FORTRAN ordering
+    auto row_dim = selection.size() - 1;
 
     // No selection
     // Create row shape data from column.nrow()
-    if(selection.size() == 0 || selection[0].size() == 0) {
+    if(selection.size() == 0 || selection[row_dim].size() == 0) {
       row_shapes.reserve(column.nrow());
 
       for(auto [r, first] = std::tuple{std::size_t{0}, true}; r < column.nrow(); ++r, first=false) {
@@ -103,7 +107,7 @@ struct VariableShapeData {
       }
     } else {
       // Create row shape data from row id selection
-      const auto & row_ids = selection[0];
+      const auto & row_ids = selection[row_dim];
       row_shapes.reserve(row_ids.size());
 
       for(auto [r, first] = std::tuple{0, true}; r < row_ids.size(); ++r, first=false) {
@@ -186,12 +190,26 @@ public:
     return (IsDefinitelyFixed() ? column_.columnDesc().ndim() : var_data_->nDim()) + 1;
   }
 
-  // Returns the Row-Major (C) dimension size of this column
+  inline std::size_t RowDim() const { return nDim() - 1; }
+
+  // Returns the dimension size of this column
   arrow::Result<std::size_t> DimSize(std::size_t dim) const {
+    auto adim = std::ptrdiff_t(dim + selection_.size()) - std::ptrdiff_t(nDim());
+    // ndim == 3 and selection.size() == 1, requesting dim 2
+    // then diff = 2, so we need dim - diff == 0
+    //
+    // request dim = 1, diff still = 2, so we have 1 - 2  == - 1 < 0
+
+    // ndim == 3 and selection.size() == 2, requesting dim 2
+    // then diff = 1, so we need dim - diff == 1
+
+    // request dim = 1, dim - diff == 0
+    // request dim = 0, dim - diff == -1 < 0
+
     // If we have a selection of row id's,
     // derive the dimension size from these
-    if(dim < selection_.size() && selection_[dim].size() > 0) {
-      return selection_[dim].size();
+    if(adim > 0 && selection_[adim].size() > 0) {
+      return selection_[adim].size();
     }
 
     assert(dim < nDim());
@@ -199,12 +217,12 @@ public:
     // There's no selection for this dimension
     // so we must derive the dimension size
     // from the column shape information
-    if(dim == 0) {
+    if(dim == RowDim()) {
       // First dimension is just row
       return column_.nrow();
     } else if(IsDefinitelyFixed()) {
       // Fixed shape column, we have the size information
-      return column_.shapeColumn()[nDim() - dim - 1];
+      return column_.shapeColumn()[dim];
     } else {
       const auto & shape = var_data_->shape_;
 
@@ -216,17 +234,16 @@ public:
 
       // Even though the column is marked as variable
       // the individual row shapes are the same
-      return shape.value()[nDim() - dim - 1];
+      return shape.value()[dim];
     }
   }
 
-  // Returns the Row-Major (C) dimension size of the column
-  // for the given row
+  // Returns the dimension size of the colum for the given row
   std::size_t RowDimSize(casacore::rownr_t row, std::size_t dim) const {
     assert(IsVarying());
     assert(row < var_data_->row_shapes_.size());
-    assert(dim > 0);
-    return var_data_->row_shapes_[row][nDim() - dim - 1];
+    assert(dim < RowDim());
+    return var_data_->row_shapes_[row][dim];
   }
 };
 
@@ -254,6 +271,14 @@ public:
       MapIterator(const RangeIterator & rit, bool done)
         : rit_(rit), current_(CurrentFromRangeIterator(rit)), done_(done) {}
 
+      inline std::size_t nDim() const {
+        return current_.size();
+      }
+
+      inline std::size_t RowDim() const {
+        return nDim() - 1;
+      }
+
       inline IdMap CurrentId(std::size_t dim) const {
         assert(dim < rit_.nDim());
         const auto & range = rit_.DimRange(dim);
@@ -280,12 +305,12 @@ public:
         auto ndim = rit_.nDim();
         assert(ndim > 0);
 
-        for(auto dim = std::ptrdiff_t(ndim) - 1; dim >= 1; --dim) {
+        for(auto dim=0; dim < ndim - 1; ++dim) {
           result += product * CurrentId(dim).to;
-          product *= shape[ndim - dim - 1];
+          product *= shape[dim];
         }
 
-        return result + product * CurrentId(0).to;
+        return result + product * CurrentId(ndim - 1).to;
       }
 
       std::size_t FlatSource(const casacore::IPosition & shape) {
@@ -294,23 +319,23 @@ public:
         auto ndim = rit_.nDim();
         assert(ndim > 0);
 
-        for(auto dim = std::ptrdiff_t(ndim) - 1; dim >= 1; --dim) {
+        for(auto dim=0; dim < ndim - 1; ++dim) {
           result += product * CurrentId(dim).from;
-          product *= shape[ndim - dim - 1];
+          product *= shape[dim];
         }
 
-        return result + product * CurrentId(0).from;
+        return result + product * CurrentId(ndim - 1).from;
       }
 
       MapIterator & operator++() {
         assert(!done_);
         // Iterate from fastest to slowest changing dimension
-        for(std::size_t dim = current_.size() - 1; dim >= 0;) {
+        for(auto dim = std::size_t{0}; dim <= nDim();) {
           current_[dim]++;
           // We've achieved a successful iteration in this dimension
           if(current_[dim] < rit_.DimRange(dim).end) { break; }
           // Reset to zero and retry in the next dimension
-          else if(dim > 0) { current_[dim] = rit_.DimRange(dim).start; --dim; }
+          else if(dim < RowDim()) { current_[dim] = rit_.DimRange(dim).start; ++dim; }
           // This was the slowest changing dimension so we're done
           else { done_ = true; break; }
         }
@@ -349,6 +374,10 @@ public:
         return index_.size();
       }
 
+      inline std::size_t RowDim() const {
+        return nDim() - 1;
+      }
+
       // Return the Ranges for the given dimension
       inline const ColumnRange & DimRanges(std::size_t dim) const {
         assert(dim < nDim());
@@ -379,7 +408,8 @@ public:
         assert(!done_);
 
         // Iterate from fastest to slowest changing dimension
-        for(auto dim = std::ptrdiff_t(index_.size()) - 1; dim >= 0;) {
+        // FORTRAN order
+        for(auto dim = 0; dim < nDim();) {
           const auto & range = DimRange(dim);
 
           switch(range.type) {
@@ -389,9 +419,9 @@ public:
               break;
             case Range::UNCONSTRAINED:
               {
-                const auto & row_range = DimRange(0);
-                assert(row_range.IsSingleRow());
-                offset_[dim] += map_.RowDimSize(row_range.start, dim);
+                const auto & rr = DimRange(RowDim());
+                assert(rr.IsSingleRow());
+                offset_[dim] += map_.RowDimSize(rr.start, dim);
               }
               break;
             default:
@@ -402,14 +432,14 @@ public:
 
           if(index_[dim] < map_.DimRanges(dim).size()) {
             break;  // We've achieved a successful iteration in this dimension
-          } else if(dim > 0) {
+          } else if(dim < RowDim()) {
             // We've exceeded the size of the current dimension
             // reset to zero and retry the while loop
             index_[dim] = 0;
             offset_[dim] = 0;
-            --dim;
+            ++dim;
           } else {
-            // This was the slowest changing dimension so we're done
+            // Row is the slowest changing dimension so we're done
             done_ = true;
             break;
           }
@@ -423,7 +453,7 @@ public:
         assert(!done_);
         assert(index_.size() > 0);
         assert(nDim() > 0);
-        const auto & range = DimRange(0);
+        const auto & range = DimRange(RowDim());
 
         ssize_t start;
         ssize_t end;
@@ -435,7 +465,7 @@ public:
             break;
           case Range::MAP:
           {
-            const auto & dim_maps = DimMaps(0);
+            const auto & dim_maps = DimMaps(RowDim());
             assert(range.start < dim_maps.size());
             assert(range.end - 1 < dim_maps.size());
             start = static_cast<ssize_t>(dim_maps[range.start].from);
@@ -466,7 +496,7 @@ public:
         casacore::IPosition start(ndim - 1, 0);
         casacore::IPosition end(ndim - 1, 0);
 
-        for(std::size_t dim = 1; dim < ndim; ++dim) {
+        for(auto dim=std::size_t{0}; dim < RowDim(); ++dim) {
           const auto & range = DimRange(dim);
 
           // TODO: casacore rownr_t is unsigned but ssize_t is signed
@@ -474,23 +504,23 @@ public:
           // possible resulting issues
           switch(range.type) {
             case Range::FREE:
-              start[ndim - 1 - dim] = static_cast<ssize_t>(range.start);
-              end[ndim - 1 - dim] = static_cast<ssize_t>(range.end - 1);
+              start[dim] = static_cast<ssize_t>(range.start);
+              end[dim] = static_cast<ssize_t>(range.end - 1);
               break;
             case Range::MAP:
               {
                 const auto & dim_maps = DimMaps(dim);
-                start[ndim - 1 - dim] = static_cast<ssize_t>(dim_maps[range.start].from);
-                end[ndim - 1 - dim] = static_cast<ssize_t>(dim_maps[range.end - 1].from);
+                start[dim] = static_cast<ssize_t>(dim_maps[range.start].from);
+                end[dim] = static_cast<ssize_t>(dim_maps[range.end - 1].from);
               }
               break;
             case Range::UNCONSTRAINED:
               {
                 // In case of variably shaped columns, the dimension size will vary by row
-                const auto & rr = DimRange(0);
+                const auto & rr = DimRange(RowDim());
                 assert(rr.IsSingleRow());
-                start[ndim - 1 - dim] = 0;
-                end[ndim - 1 - dim] = static_cast<ssize_t>(map_.RowDimSize(rr.start, dim)) - 1;
+                start[dim] = 0;
+                end[dim] = static_cast<ssize_t>(map_.RowDimSize(rr.start, dim)) - 1;
               }
               break;
             default:
@@ -521,6 +551,7 @@ public:
   inline const ColumnMap & DimMaps(std::size_t dim) const { return maps_[dim]; }
   inline const ColumnRange & DimRanges(std::size_t dim) const { return ranges_[dim]; }
   inline std::size_t nDim() const { return shape_provider_.nDim(); }
+  inline std::size_t RowDim() const { return nDim() - 1; }
 
   inline RangeIterator RangeBegin() const {
     return RangeIterator{const_cast<ColMap2 &>(*this), false};
@@ -535,16 +566,12 @@ public:
   }
 
   // Create a Column Map from a selection of row id's in different dimensions
-  static ColumnMaps MakeMaps(const ColumnSelection & selection) {
-    // Empty selection
-    if(selection.size() == 0) {
-      return ColumnMaps{ColumnMap{}};
-    }
-
+  static ColumnMaps MakeMaps(const ShapeProvider & shape_prov, const ColumnSelection & selection) {
     ColumnMaps column_maps;
-    column_maps.reserve(selection.size());
+    auto ndim = shape_prov.nDim();
+    column_maps.reserve(ndim);
 
-    for(std::size_t dim=0; dim < selection.size(); ++dim) {
+    for(auto dim=std::size_t{0}; dim < selection.size(); ++dim) {
         const auto & dim_ids = selection[dim];
         ColumnMap column_map;
         column_map.reserve(dim_ids.size());
@@ -560,6 +587,12 @@ public:
 
         column_maps.emplace_back(std::move(column_map));
     }
+
+    for(auto dim=selection.size(); dim < ndim; ++dim) {
+      column_maps.emplace_back(ColumnMap{});
+    }
+
+    std::reverse(std::begin(column_maps), std::end(column_maps));
 
     return column_maps;
   }
@@ -619,31 +652,13 @@ public:
   MakeVariableRanges(const ShapeProvider & shape_prov, const ColumnMaps & maps) {
     assert(!shape_prov.IsActuallyFixed());
     auto ndim = shape_prov.nDim();
+    auto row_dim = ndim - 1;
     ColumnRanges column_ranges;
     column_ranges.reserve(ndim);
-    auto row_range = ColumnRange{};
 
-    // Split the row dimension into ranges of exactly one row
-    if(maps.size() == 0 || maps[0].size() == 0) {
-      // No maps provided, derive from shape
-      ARROW_ASSIGN_OR_RAISE(auto dim_size, shape_prov.DimSize(0));
-      row_range.reserve(dim_size);
-      for(std::size_t r=0; r < dim_size; ++r) {
-        row_range.emplace_back(Range{r, r + 1, Range::FREE});
-      }
-    } else {
-      // Derive from mapping
-      const auto & row_maps = maps[0];
-      row_range.reserve(row_maps.size());
-      for(std::size_t r=0; r < row_maps.size(); ++r) {
-        row_range.emplace_back(Range{r, r + 1, Range::MAP});
-      }
-    }
 
-    column_ranges.emplace_back(std::move(row_range));
-
-    // Now handle the non-row dimensions
-    for(std::size_t dim=1; dim < ndim; ++dim) {
+    // Handle non-row dimensions first
+    for(std::size_t dim=0; dim < row_dim; ++dim) {
       // If no mapping exists for this dimension
       // create a single unconstrained range
       if(dim >= maps.size() || maps[dim].size() == 0) {
@@ -675,6 +690,29 @@ public:
       column_ranges.emplace_back(std::move(column_range));
     }
 
+    // Lastly, the row dimension
+    auto row_range = ColumnRange{};
+
+    // Split the row dimension into ranges of exactly one row
+    if(maps.size() == 0 || maps[row_dim].size() == 0) {
+      // No maps provided, derive from shape
+      ARROW_ASSIGN_OR_RAISE(auto dim_size, shape_prov.DimSize(row_dim));
+      row_range.reserve(dim_size);
+      for(std::size_t r=0; r < dim_size; ++r) {
+        row_range.emplace_back(Range{r, r + 1, Range::FREE});
+      }
+    } else {
+      // Derive from mapping
+      const auto & row_maps = maps[row_dim];
+      row_range.reserve(row_maps.size());
+      for(std::size_t r=0; r < row_maps.size(); ++r) {
+        row_range.emplace_back(Range{r, r + 1, Range::MAP});
+      }
+    }
+
+    column_ranges.emplace_back(std::move(row_range));
+
+
     assert(ndim == column_ranges.size());
     return column_ranges;
   }
@@ -692,10 +730,16 @@ public:
   // Factory method for making a ColumnMapping object
   static arrow::Result<ColMap2> Make(
       const casacore::TableColumn & column,
-      const ColumnSelection & selection) {
+      ColumnSelection selection,
+      InputOrder order=InputOrder::C) {
+
+    if(order == InputOrder::C) {
+      std::reverse(std::begin(selection), std::end(selection));
+    }
 
     ARROW_ASSIGN_OR_RAISE(auto shape_prov, ShapeProvider::Make(column, selection));
-    auto maps = MakeMaps(selection);
+
+    auto maps = MakeMaps(shape_prov, selection);
     ARROW_ASSIGN_OR_RAISE(auto ranges, MakeRanges(shape_prov, maps));
 
     if(ranges.size() == 0) {
@@ -717,15 +761,14 @@ public:
   // by the disjoint ranges in this map
   std::size_t nElements() const {
     assert(ranges_.size() > 0);
-    const auto & row_ranges = ranges_[0];
+    const auto & row_ranges = DimRanges(RowDim());
     auto elements = std::size_t{0};
-    auto row_range_id = std::size_t{0};
 
-    for(auto rr_id = std::size_t{0}; rr_id < row_ranges.size(); ++rr_id) {
+    for(std::size_t rr_id=0; rr_id < row_ranges.size(); ++rr_id) {
       const auto & row_range = row_ranges[rr_id];
       auto row_elements = std::size_t{row_range.nRows()};
-      for(std::size_t dim = 1; dim < ranges_.size(); ++dim) {
-        const auto & dim_range = ranges_[dim];
+      for(std::size_t dim = 0; dim < RowDim(); ++dim) {
+        const auto & dim_range = DimRanges(dim);
         auto dim_elements = std::size_t{0};
         for(const auto & range: dim_range) {
           if(range.IsUnconstrained()) {

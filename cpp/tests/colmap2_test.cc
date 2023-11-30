@@ -184,6 +184,7 @@ TEST_F(ColumnConvertTest, SelectFromRange) {
     ASSERT_FALSE(map.shape_provider_.IsActuallyFixed());
     ASSERT_EQ(map.shape_provider_.nDim(), 3);
     ASSERT_EQ(map.ranges_.size(), 3);
+    ASSERT_EQ(map.ranges_[2].size(), 8);
     ASSERT_EQ(map.nRanges(), 8);
     ASSERT_EQ(map.nElements(), 22 + 18);
     ASSERT_EQ(map.shape_provider_.var_data_->row_shapes_.size(), 8);
