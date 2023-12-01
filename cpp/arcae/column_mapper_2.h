@@ -749,6 +749,13 @@ public:
                             { return init * range.size(); });
   }
 
+  // Returns true if this is a simple map or, a map that only contains
+  // a single range and thereby removes the need to read separate ranges of the
+  // data and copy those into a final buffer.
+  bool IsSimple() const {
+    return nRanges() == 1;
+  }
+
   // Find the total number of elements formed
   // by the disjoint ranges in this map
   std::size_t nElements() const {
