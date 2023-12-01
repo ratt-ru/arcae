@@ -1,7 +1,7 @@
 #ifndef ARCAE_COLUMN_MAPPER_2
 #define ARCAE_COLUMN_MAPPER_2
 
-#include <casacore/casa/Arrays/Slicer.h>
+#include <cassert>
 #include <cstddef>
 #include <iterator>
 #include <memory>
@@ -10,13 +10,12 @@
 #include <sys/types.h>
 #include <vector>
 
-#include <arrow/api.h>
 #include <arrow/result.h>
 #include <arrow/status.h>
 #include <arrow/util/logging.h>
 #include <casacore/casa/aipsxtype.h>
 #include <casacore/casa/Arrays/IPosition.h>
-#include <casacore/tables/Tables.h>
+#include <casacore/casa/Arrays/Slicer.h>
 #include <casacore/tables/Tables/TableColumn.h>
 
 namespace arcae {
