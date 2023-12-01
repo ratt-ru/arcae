@@ -129,13 +129,29 @@ struct VariableShapeData {
                                            " dimensions vary per row.");
     }
 
+    // Create offset arrays
+    auto nrow = row_shapes.size();
+    auto ndim = std::begin(row_shapes)->size();
+    auto offsets = std::vector<std::vector<std::size_t>>(ndim, std::vector<std::size_t>(nrow, 0));
+
+    for(auto r=0; r < nrow; ++r) {
+      auto product = std::size_t{1};
+
+      for(auto dim=0; dim < ndim; ++dim) {
+        product = offsets[dim][r] = product * row_shapes[r][dim];
+      }
+    }
+
+
     // We may have a fixed shape in practice
     auto shape = fixed_shape ? std::make_optional(*std::begin(row_shapes))
                              : std::nullopt;
 
+
     return std::unique_ptr<VariableShapeData>(
       new VariableShapeData{std::move(row_shapes),
-                            std::begin(row_shapes)->size(),
+                            std::move(offsets),
+                            ndim,
                             std::move(shape)});
   }
 
@@ -145,6 +161,7 @@ struct VariableShapeData {
   inline std::size_t nDim() const { return ndim_; }
 
   std::vector<casacore::IPosition> row_shapes_;
+  std::vector<std::vector<std::size_t>> offsets_;
   std::size_t ndim_;
   std::optional<casacore::IPosition> shape_;
 };

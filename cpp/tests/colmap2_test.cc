@@ -167,6 +167,12 @@ TEST_F(ColumnConvertTest, SelectFromRange) {
                 ::testing::ElementsAre(IPos{3, 2}, IPos{4, 1}, IPos{4, 2}, IPos{2, 2}, IPos{2, 1},
                                        IPos{3, 2}, IPos{4, 1}, IPos{4, 2}, IPos{2, 2}, IPos{2, 1}));
 
+    ASSERT_EQ(map.shape_provider_.var_data_->offsets_.size(), 2);
+    EXPECT_THAT(map.shape_provider_.var_data_->offsets_[0],
+                ::testing::ElementsAre(3, 4, 4, 2, 2, 3, 4, 4, 2, 2));
+    EXPECT_THAT(map.shape_provider_.var_data_->offsets_[1],
+                ::testing::ElementsAre(6, 4, 8, 4, 2, 6, 4, 8, 4, 2));
+
     for(auto [r, rit]=std::tuple{0, map.RangeBegin()}; rit != map.RangeEnd(); ++rit, ++r) {
       ASSERT_EQ(rit.GetRowSlicer(), Slicer(IPos({r}), IPos({r}), Slicer::endIsLast));
       ASSERT_EQ(rit.GetSectionSlicer().length(), map.shape_provider_.var_data_->row_shapes_[r]);
@@ -191,6 +197,12 @@ TEST_F(ColumnConvertTest, SelectFromRange) {
     EXPECT_THAT(map.shape_provider_.var_data_->row_shapes_,
                 ::testing::ElementsAre(IPos{3, 2}, IPos{4, 1}, IPos{4, 2}, IPos{2, 2},
                                        IPos{4, 1}, IPos{4, 2}, IPos{2, 2}, IPos{2, 1}));
+
+    EXPECT_EQ(map.shape_provider_.var_data_->offsets_.size(), 2);
+    EXPECT_THAT(map.shape_provider_.var_data_->offsets_[0],
+                ::testing::ElementsAre(3, 4, 4, 2, 4, 4, 2, 2));
+    EXPECT_THAT(map.shape_provider_.var_data_->offsets_[1],
+                ::testing::ElementsAre(6, 4, 8, 4, 4, 8, 4, 2));
 
     for(auto [r, rit]=std::tuple{0, map.RangeBegin()}; rit != map.RangeEnd(); ++rit, ++r) {
       auto rid = static_cast<ssize_t>(row_ids[r]);
