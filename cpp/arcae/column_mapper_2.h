@@ -332,8 +332,26 @@ public:
         // Iterate from fastest to slowest changing dimension
         for(auto dim = std::size_t{0}; dim <= nDim();) {
           current_[dim]++;
+
+          auto end = [&, this]() -> std::size_t {
+            const auto & range = rit_.DimRange(dim);
+            switch(range.type) {
+              case Range::FREE:
+              case Range::MAP:
+                return range.end;
+              case Range::UNCONSTRAINED:
+                {
+                  const auto & rr = rit_.DimRange(RowDim());
+                  assert(rr.IsSingleRow());
+                  return rit_.map_.RowDimSize(rr.start, dim);
+                }
+              default:
+                assert((false) && "Unhandled range.type switch case");
+            }
+          }();
+
           // We've achieved a successful iteration in this dimension
-          if(current_[dim] < rit_.DimRange(dim).end) { break; }
+          if(current_[dim] < end) { break; }
           // Reset to zero and retry in the next dimension
           else if(dim < RowDim()) { current_[dim] = rit_.DimRange(dim).start; ++dim; }
           // This was the slowest changing dimension so we're done

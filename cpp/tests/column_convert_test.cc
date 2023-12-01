@@ -1,24 +1,20 @@
-#include <casacore/casa/Arrays/IPosition.h>
-#include <casacore/casa/BasicSL/Complexfwd.h>
-#include <casacore/tables/Tables/RefRows.h>
 #include <memory>
-#include <random>
 
-#include <arcae/new_convert_visitor.h>
-#include <arcae/safe_table_proxy.h>
-#include <arcae/table_factory.h>
-#include <casacore/tables/Tables.h>
-#include <casacore/tables/Tables/TableColumn.h>
+
+#include <arrow/result.h>
+#include <casacore/casa/Arrays/IPosition.h>
 #include <casacore/ms/MeasurementSets/MeasurementSet.h>
+#include <casacore/tables/Tables.h>
+#include <casacore/tables/Tables/RefRows.h>
+#include <casacore/tables/Tables/TableColumn.h>
 #include <tests/test_utils.h>
 
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 #include <arrow/testing/gtest_util.h>
 
+#include "arcae/safe_table_proxy.h"
 #include "arcae/column_mapper_2.h"
-#include "arrow/result.h"
-#include "arrow/status.h"
 
 using arcae::ColMap2;
 using arcae::IdMap;
@@ -27,7 +23,6 @@ using casacore::Array;
 using casacore::ArrayColumn;
 using casacore::ArrayColumnDesc;
 using casacore::ColumnDesc;
-using CasaComplex = casacore::Complex;
 using MS = casacore::MeasurementSet;
 using MSColumns = casacore::MSMainEnums::PredefinedColumns;
 using casacore::SetupNewTable;
@@ -243,44 +238,60 @@ TEST_F(ColumnConvertTest, SelectionVariable) {
     }
     {
       // Get row 0 and 1
-      // ASSERT_OK_AND_ASSIGN(auto map, ColMap2::Make(var_data, {{0, 1}}));
-      // ASSERT_EQ(map.nRanges(), 2);
-      // ASSERT_EQ(map.nElements(), 5);
-      // auto rit = map.RangeBegin();
-      // ASSERT_EQ(rit.GetRowSlicer(), Slicer(IPos({0}), IPos({0}), Slicer::endIsLast));
-      // ASSERT_EQ(rit.GetSectionSlicer(), Slicer(IPos({0, 0}), IPos({1, 1}), Slicer::endIsLast));
-      // auto array = var_data.getColumnRange(rit.GetRowSlicer(), rit.GetSectionSlicer());
-      // auto mit = rit.MapBegin();
-      // ASSERT_EQ(mit.CurrentId(0), (IdMap{0, 0}));
-      // ASSERT_EQ(mit.CurrentId(1), (IdMap{0, 0}));
-      // ASSERT_EQ(mit.CurrentId(2), (IdMap{0, 0}));
-      // ASSERT_EQ(mit.FlatSource(array.shape()), 0);
-      // ASSERT_EQ(mit.FlatDestination(array.shape()), 0);
-      // ++mit;
-      // ASSERT_EQ(mit.CurrentId(0), (IdMap{0, 0}));
-      // ASSERT_EQ(mit.CurrentId(1), (IdMap{0, 0}));
-      // ASSERT_EQ(mit.CurrentId(2), (IdMap{1, 1}));
-      // ASSERT_EQ(mit.FlatSource(array.shape()), 1);
-      // ASSERT_EQ(mit.FlatDestination(array.shape()), 1);
-      // ++mit;
-      // ASSERT_EQ(mit.CurrentId(0), (IdMap{0, 0}));
-      // ASSERT_EQ(mit.CurrentId(1), (IdMap{1, 1}));
-      // ASSERT_EQ(mit.CurrentId(2), (IdMap{0, 0}));
-      // ASSERT_EQ(mit.FlatSource(array.shape()), 2);
-      // ASSERT_EQ(mit.FlatDestination(array.shape()), 2);
-      // ++mit;
-      // ASSERT_EQ(mit.CurrentId(0), (IdMap{0, 0}));
-      // ASSERT_EQ(mit.CurrentId(1), (IdMap{1, 1}));
-      // ASSERT_EQ(mit.CurrentId(2), (IdMap{1, 1}));
-      // ASSERT_EQ(mit.FlatSource(array.shape()), 3);
-      // ASSERT_EQ(mit.FlatDestination(array.shape()), 3);
-      // ++mit;
-      // ASSERT_EQ(mit, rit.MapEnd());
-      // ++rit;
-      // ASSERT_EQ(map.RangeEnd(), rit);
+      ASSERT_OK_AND_ASSIGN(auto map, ColMap2::Make(var_data, {{0, 1}}));
+      ASSERT_EQ(map.nRanges(), 2);
+      ASSERT_EQ(map.nElements(), 5);
+      auto rit = map.RangeBegin();
+      ASSERT_EQ(rit.GetRowSlicer(), Slicer(IPos({0}), IPos({0}), Slicer::endIsLast));
+      ASSERT_EQ(rit.GetSectionSlicer(), Slicer(IPos({0, 0}), IPos({1, 1}), Slicer::endIsLast));
+      auto array = var_data.getColumnRange(rit.GetRowSlicer(), rit.GetSectionSlicer());
+      {
+        auto mit = rit.MapBegin();
+        ASSERT_EQ(mit.CurrentId(0), (IdMap{0, 0}));
+        ASSERT_EQ(mit.CurrentId(1), (IdMap{0, 0}));
+        ASSERT_EQ(mit.CurrentId(2), (IdMap{0, 0}));
+        ASSERT_EQ(mit.FlatSource(array.shape()), 0);
+        ASSERT_EQ(mit.FlatDestination(array.shape()), 0);
+        ++mit;
+        ASSERT_EQ(mit.CurrentId(0), (IdMap{1, 1}));
+        ASSERT_EQ(mit.CurrentId(1), (IdMap{0, 0}));
+        ASSERT_EQ(mit.CurrentId(2), (IdMap{0, 0}));
+        ASSERT_EQ(mit.FlatSource(array.shape()), 1);
+        ASSERT_EQ(mit.FlatDestination(array.shape()), 1);
+        ++mit;
+        ASSERT_EQ(mit.CurrentId(0), (IdMap{0, 0}));
+        ASSERT_EQ(mit.CurrentId(1), (IdMap{1, 1}));
+        ASSERT_EQ(mit.CurrentId(2), (IdMap{0, 0}));
+        ASSERT_EQ(mit.FlatSource(array.shape()), 2);
+        ASSERT_EQ(mit.FlatDestination(array.shape()), 2);
+        ++mit;
+        ASSERT_EQ(mit.CurrentId(1), (IdMap{1, 1}));
+        ASSERT_EQ(mit.CurrentId(0), (IdMap{1, 1}));
+        ASSERT_EQ(mit.CurrentId(2), (IdMap{0, 0}));
+        ASSERT_EQ(mit.FlatSource(array.shape()), 3);
+        ASSERT_EQ(mit.FlatDestination(array.shape()), 3);
+        ++mit;
+        ASSERT_EQ(mit, rit.MapEnd());
+      }
+      ++rit;
+
+      ASSERT_EQ(rit.GetRowSlicer(), Slicer(IPos({1}), IPos({1}), Slicer::endIsLast));
+      ASSERT_EQ(rit.GetSectionSlicer(), Slicer(IPos({0, 0}), IPos({0, 0}), Slicer::endIsLast));
+
+      {
+        auto mit = rit.MapBegin();
+        ASSERT_EQ(mit.CurrentId(0), (IdMap{0, 0}));
+        ASSERT_EQ(mit.CurrentId(1), (IdMap{0, 0}));
+        ASSERT_EQ(mit.CurrentId(2), (IdMap{1, 1}));
+        ASSERT_EQ(mit.FlatSource(array.shape()), 4);
+        ASSERT_EQ(mit.FlatDestination(array.shape()), 4);
+        ++mit;
+        ASSERT_EQ(mit, rit.MapEnd());
+      }
+
+      ++rit;
+      ASSERT_EQ(map.RangeEnd(), rit);
     }
-
-
   }
 
   {
