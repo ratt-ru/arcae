@@ -1,6 +1,7 @@
 #ifndef ARCAE_COLUMN_MAPPER_2
 #define ARCAE_COLUMN_MAPPER_2
 
+#include <casacore/casa/Arrays/Slicer.h>
 #include <cstddef>
 #include <iterator>
 #include <memory>
@@ -369,18 +370,18 @@ public:
     public:
       const ColMap2 & map_;
       std::vector<std::size_t> index_;
-      casacore::IPosition start_;
-      casacore::IPosition end_;
-      std::vector<casacore::rownr_t> offset_;
+      casacore::IPosition disk_start_;
+      casacore::IPosition disk_end_;
+      std::size_t flat_mem_offset_;
       bool done_;
 
     public:
       RangeIterator(ColMap2 & column_map, bool done=false) :
         map_(column_map),
         index_(column_map.nDim(), 0),
-        start_(column_map.nDim(), 0),
-        end_(column_map.nDim(), 0),
-        offset_(column_map.nDim(), 0),
+        disk_start_(column_map.nDim(), 0),
+        disk_end_(column_map.nDim(), 0),
+        flat_mem_offset_(0),
         done_(done) {
           UpdateState();
       }
@@ -420,76 +421,64 @@ public:
         return MapIterator(*this, true);
       }
 
+      std::size_t RangeElements() const {
+        auto product = std::size_t{0};
+
+        for(auto dim=0; dim < nDim(); ++dim) {
+          product *= disk_end_[dim] - disk_start_[dim];
+        }
+
+        return product;
+      }
+
       RangeIterator & operator++() {
         assert(!done_);
+        // Get the number of elements in the current range
+        auto nelements = RangeElements();
 
         // Iterate from fastest to slowest changing dimension: FORTRAN order
         for(auto dim = 0; dim < nDim();) {
-          const auto & range = DimRange(dim);
-
-          switch(range.type) {
-            case Range::FREE:
-            case Range::MAP:
-              offset_[dim] += range.nRows();
-              break;
-            case Range::UNCONSTRAINED:
-              {
-                const auto & rr = DimRange(RowDim());
-                assert(rr.IsSingleRow());
-                offset_[dim] += map_.RowDimSize(rr.start, dim);
-              }
-              break;
-            default:
-              assert((false) && "Unhandled range.type switch case");
-          }
-
           index_[dim]++;
 
-          if(index_[dim] < map_.DimRanges(dim).size()) {
-            break;  // We've achieved a successful iteration in this dimension
-          } else if(dim < RowDim()) {
-            // We've exceeded the size of the current dimension
-            // reset to zero and retry the while loop
-            index_[dim] = 0;
-            offset_[dim] = 0;
-            ++dim;
-          } else {
-            // Row is the slowest changing dimension
-            // return without further updates
-            // of the iterator state
-            done_ = true;
-            return *this;
-          }
+          // We've achieved a successful iteration in this dimension
+          if(index_[dim] < map_.DimRanges(dim).size()) { break; }
+          // We've exceeded the size of the current dimension
+          // reset to zero and retry the while loop
+          else if(dim < RowDim()) { index_[dim] = 0; ++dim; }
+          // Row is the slowest changing dimension so we're done
+          // return without updating the iterator state
+          else { done_ = true; return *this; }
         }
 
+        // Increment output memory buffer offset
+        flat_mem_offset_ += nelements;
         UpdateState();
         return *this;
       };
-
 
       void UpdateState() {
         for(auto dim=std::size_t{0}; dim < nDim(); ++dim) {
           const auto & range = DimRange(dim);
           switch(range.type) {
             case Range::FREE: {
-              start_[dim] = static_cast<ssize_t>(range.start);
-              end_[dim] = static_cast<ssize_t>(range.end) - 1;
+              disk_start_[dim] = static_cast<ssize_t>(range.start);
+              disk_end_[dim] = static_cast<ssize_t>(range.end) - 1;
               break;
             }
             case Range::MAP: {
               const auto & dim_maps = DimMaps(dim);
               assert(range.start < dim_maps.size());
               assert(range.end - 1 < dim_maps.size());
-              start_[dim] = static_cast<ssize_t>(dim_maps[range.start].disk);
-              end_[dim] = static_cast<ssize_t>(dim_maps[range.end - 1].disk);
+              disk_start_[dim] = static_cast<ssize_t>(dim_maps[range.start].disk);
+              disk_end_[dim] = static_cast<ssize_t>(dim_maps[range.end - 1].disk);
               break;
             }
             case Range::UNCONSTRAINED: {
               // In case of variably shaped columns, the dimension size will vary by row
               const auto & rr = DimRange(RowDim());
               assert(rr.IsSingleRow());
-              start_[dim] = 0;
-              end_[dim] = static_cast<ssize_t>(map_.RowDimSize(rr.start, dim)) - 1;
+              disk_start_[dim] = 0;
+              disk_end_[dim] = static_cast<ssize_t>(map_.RowDimSize(rr.start, dim)) - 1;
               break;
             }
             default:
@@ -503,8 +492,8 @@ public:
         assert(!done_);
         assert(nDim() > 0);
         return casacore::Slicer(
-          casacore::IPosition({start_[RowDim()]}),
-          casacore::IPosition({end_[RowDim()]}),
+          casacore::IPosition({disk_start_[RowDim()]}),
+          casacore::IPosition({disk_end_[RowDim()]}),
           casacore::Slicer::endIsLast);
       };
 
@@ -516,8 +505,8 @@ public:
         casacore::IPosition end(RowDim(), 0);
 
         for(auto dim=std::size_t{0}; dim < RowDim(); ++dim) {
-          start[dim] = start_[dim];
-          end[dim] = end_[dim];
+          start[dim] = disk_start_[dim];
+          end[dim] = disk_end_[dim];
         }
 
         return casacore::Slicer(start, end, casacore::Slicer::endIsLast);
@@ -725,6 +714,7 @@ public:
       ColumnSelection selection,
       InputOrder order=InputOrder::C) {
 
+    // Convert to FORTRAN ordering, which the casacore internals use
     if(order == InputOrder::C) {
       std::reverse(std::begin(selection), std::end(selection));
     }
