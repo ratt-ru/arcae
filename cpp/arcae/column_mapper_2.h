@@ -369,6 +369,8 @@ public:
     public:
       const ColMap2 & map_;
       std::vector<std::size_t> index_;
+      casacore::IPosition start_;
+      casacore::IPosition end_;
       std::vector<casacore::rownr_t> offset_;
       bool done_;
 
@@ -376,8 +378,12 @@ public:
       RangeIterator(ColMap2 & column_map, bool done=false) :
         map_(column_map),
         index_(column_map.nDim(), 0),
+        start_(column_map.nDim(), 0),
+        end_(column_map.nDim(), 0),
         offset_(column_map.nDim(), 0),
-        done_(done) {}
+        done_(done) {
+          UpdateState();
+      }
 
       // Return the number of dimensions in the index
       inline std::size_t nDim() const {
@@ -417,8 +423,7 @@ public:
       RangeIterator & operator++() {
         assert(!done_);
 
-        // Iterate from fastest to slowest changing dimension
-        // FORTRAN order
+        // Iterate from fastest to slowest changing dimension: FORTRAN order
         for(auto dim = 0; dim < nDim();) {
           const auto & range = DimRange(dim);
 
@@ -449,93 +454,70 @@ public:
             offset_[dim] = 0;
             ++dim;
           } else {
-            // Row is the slowest changing dimension so we're done
+            // Row is the slowest changing dimension
+            // return without further updates
+            // of the iterator state
             done_ = true;
-            break;
+            return *this;
           }
         }
 
+        UpdateState();
         return *this;
       };
+
+
+      void UpdateState() {
+        for(auto dim=std::size_t{0}; dim < nDim(); ++dim) {
+          const auto & range = DimRange(dim);
+          switch(range.type) {
+            case Range::FREE: {
+              start_[dim] = static_cast<ssize_t>(range.start);
+              end_[dim] = static_cast<ssize_t>(range.end) - 1;
+              break;
+            }
+            case Range::MAP: {
+              const auto & dim_maps = DimMaps(dim);
+              assert(range.start < dim_maps.size());
+              assert(range.end - 1 < dim_maps.size());
+              start_[dim] = static_cast<ssize_t>(dim_maps[range.start].from);
+              end_[dim] = static_cast<ssize_t>(dim_maps[range.end - 1].from);
+              break;
+            }
+            case Range::UNCONSTRAINED: {
+              // In case of variably shaped columns, the dimension size will vary by row
+              const auto & rr = DimRange(RowDim());
+              assert(rr.IsSingleRow());
+              start_[dim] = 0;
+              end_[dim] = static_cast<ssize_t>(map_.RowDimSize(rr.start, dim)) - 1;
+              break;
+            }
+            default:
+              assert((false) && "Unhandled Range.type switch case");
+          }
+        }
+      }
 
       // Returns a slicer for the row dimension
       casacore::Slicer GetRowSlicer() const {
         assert(!done_);
-        assert(index_.size() > 0);
         assert(nDim() > 0);
-        const auto & range = DimRange(RowDim());
-
-        ssize_t start;
-        ssize_t end;
-
-        switch(range.type) {
-          case Range::FREE:
-            start = static_cast<ssize_t>(range.start);
-            end = static_cast<ssize_t>(range.end - 1);
-            break;
-          case Range::MAP:
-          {
-            const auto & dim_maps = DimMaps(RowDim());
-            assert(range.start < dim_maps.size());
-            assert(range.end - 1 < dim_maps.size());
-            start = static_cast<ssize_t>(dim_maps[range.start].from);
-            end = static_cast<ssize_t>(dim_maps[range.end - 1].from);
-          }
-          break;
-          case Range::UNCONSTRAINED:
-            assert((false) && "Unconstrained Range forbidden for the row dimension");
-            break;
-          default:
-            assert((false) && "Unhandled Range.type switch case");
-            break;
-        }
-
         return casacore::Slicer(
-          casacore::IPosition({start}),
-          casacore::IPosition({end}),
+          casacore::IPosition({start_[RowDim()]}),
+          casacore::IPosition({end_[RowDim()]}),
           casacore::Slicer::endIsLast);
       };
 
       // Returns a slicer for secondary dimensions
       casacore::Slicer GetSectionSlicer() const {
         assert(!done_);
-        assert(index_.size() > 1);
         assert(nDim() > 1);
-        auto ndim = nDim();
-
-        casacore::IPosition start(ndim - 1, 0);
-        casacore::IPosition end(ndim - 1, 0);
+        casacore::IPosition start(RowDim(), 0);
+        casacore::IPosition end(RowDim(), 0);
 
         for(auto dim=std::size_t{0}; dim < RowDim(); ++dim) {
-          const auto & range = DimRange(dim);
-
-          // TODO: casacore rownr_t is unsigned but ssize_t is signed
-          // Find a proper solution to the narrowing conversion and
-          // possible resulting issues
-          switch(range.type) {
-            case Range::FREE:
-              start[dim] = static_cast<ssize_t>(range.start);
-              end[dim] = static_cast<ssize_t>(range.end - 1);
-              break;
-            case Range::MAP:
-              {
-                const auto & dim_maps = DimMaps(dim);
-                start[dim] = static_cast<ssize_t>(dim_maps[range.start].from);
-                end[dim] = static_cast<ssize_t>(dim_maps[range.end - 1].from);
-              }
-              break;
-            case Range::UNCONSTRAINED:
-              {
-                // In case of variably shaped columns, the dimension size will vary by row
-                const auto & rr = DimRange(RowDim());
-                assert(rr.IsSingleRow());
-                start[dim] = 0;
-                end[dim] = static_cast<ssize_t>(map_.RowDimSize(rr.start, dim)) - 1;
-              }
-              break;
-            default:
-              assert((false) && "Unhandled Range.type switch case");
-          }
+          start[dim] = start_[dim];
+          end[dim] = end_[dim];
         }
 
         return casacore::Slicer(start, end, casacore::Slicer::endIsLast);
