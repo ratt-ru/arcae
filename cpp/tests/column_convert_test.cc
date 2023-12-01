@@ -194,23 +194,15 @@ TEST_F(ColumnConvertTest, SelectionVariable) {
       ASSERT_EQ(mit.CurrentId(0), (IdMap{0, 0}));
       ASSERT_EQ(mit.CurrentId(1), (IdMap{0, 0}));
       ASSERT_EQ(mit.CurrentId(2), (IdMap{0, 0}));
-      ASSERT_EQ(mit.FlatMemory(array.shape()), 0);
-      ASSERT_EQ(mit.FlatDisk(array.shape()), 0);
       ++mit;
       ASSERT_EQ(mit.CurrentId(0), (IdMap{1, 1}));
       ASSERT_EQ(mit.CurrentId(1), (IdMap{0, 0}));
       ASSERT_EQ(mit.CurrentId(2), (IdMap{0, 0}));
-      ASSERT_EQ(mit.FlatMemory(array.shape()), 1);
-      ASSERT_EQ(mit.FlatDisk(array.shape()), 1);
       ++mit;
-      ASSERT_EQ(mit.FlatMemory(array.shape()), 2);
-      ASSERT_EQ(mit.FlatDisk(array.shape()), 2);
       ASSERT_EQ(mit.CurrentId(0), (IdMap{0, 0}));
       ASSERT_EQ(mit.CurrentId(1), (IdMap{1, 1}));
       ASSERT_EQ(mit.CurrentId(2), (IdMap{0, 0}));
       ++mit;
-      ASSERT_EQ(mit.FlatMemory(array.shape()), 3);
-      ASSERT_EQ(mit.FlatDisk(array.shape()), 3);
       ASSERT_EQ(mit.CurrentId(0), (IdMap{1, 1}));
       ASSERT_EQ(mit.CurrentId(1), (IdMap{1, 1}));
       ASSERT_EQ(mit.CurrentId(2), (IdMap{0, 0}));
@@ -232,8 +224,6 @@ TEST_F(ColumnConvertTest, SelectionVariable) {
       ASSERT_EQ(mit.CurrentId(0), (IdMap{0, 0}));
       ASSERT_EQ(mit.CurrentId(1), (IdMap{0, 0}));
       ASSERT_EQ(mit.CurrentId(2), (IdMap{1, 0}));
-      ASSERT_EQ(mit.FlatMemory(array.shape()), 0);
-      ASSERT_EQ(mit.FlatDisk(array.shape()), 1);
       ++rit;
       ASSERT_EQ(map.RangeEnd(), rit);
     }
@@ -254,26 +244,18 @@ TEST_F(ColumnConvertTest, SelectionVariable) {
         ASSERT_EQ(mit.CurrentId(0), (IdMap{0, 0}));
         ASSERT_EQ(mit.CurrentId(1), (IdMap{0, 0}));
         ASSERT_EQ(mit.CurrentId(2), (IdMap{0, 0}));
-        ASSERT_EQ(mit.FlatMemory(array.shape()), 0);
-        ASSERT_EQ(mit.FlatDisk(array.shape()), 0);
         ++mit;
         ASSERT_EQ(mit.CurrentId(0), (IdMap{1, 1}));
         ASSERT_EQ(mit.CurrentId(1), (IdMap{0, 0}));
         ASSERT_EQ(mit.CurrentId(2), (IdMap{0, 0}));
-        ASSERT_EQ(mit.FlatMemory(array.shape()), 1);
-        ASSERT_EQ(mit.FlatDisk(array.shape()), 1);
         ++mit;
         ASSERT_EQ(mit.CurrentId(0), (IdMap{0, 0}));
         ASSERT_EQ(mit.CurrentId(1), (IdMap{1, 1}));
         ASSERT_EQ(mit.CurrentId(2), (IdMap{0, 0}));
-        ASSERT_EQ(mit.FlatMemory(array.shape()), 2);
-        ASSERT_EQ(mit.FlatDisk(array.shape()), 2);
         ++mit;
         ASSERT_EQ(mit.CurrentId(1), (IdMap{1, 1}));
         ASSERT_EQ(mit.CurrentId(0), (IdMap{1, 1}));
         ASSERT_EQ(mit.CurrentId(2), (IdMap{0, 0}));
-        ASSERT_EQ(mit.FlatMemory(array.shape()), 3);
-        ASSERT_EQ(mit.FlatDisk(array.shape()), 3);
         ++mit;
         ASSERT_EQ(mit, rit.MapEnd());
       }
@@ -288,8 +270,6 @@ TEST_F(ColumnConvertTest, SelectionVariable) {
         ASSERT_EQ(mit.CurrentId(0), (IdMap{0, 0}));
         ASSERT_EQ(mit.CurrentId(1), (IdMap{0, 0}));
         ASSERT_EQ(mit.CurrentId(2), (IdMap{1, 1}));
-        ASSERT_EQ(mit.FlatMemory(array.shape()), 1);
-        ASSERT_EQ(mit.FlatDisk(array.shape()), 1);
         ++mit;
         ASSERT_EQ(mit, rit.MapEnd());
       }

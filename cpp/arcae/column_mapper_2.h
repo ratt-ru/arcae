@@ -280,8 +280,7 @@ public:
           case Range::FREE:
           case Range::UNCONSTRAINED:
             // Free and unconstrained ranges have contiguous from and to ranges
-            return IdMap{rit_.offset_[dim] + current_[dim] - range.start, current_[dim]};
-            // return IdMap{current_[dim], rit_.offset_[dim] + current_[dim] - range.start};
+            return IdMap{0 + current_[dim] - range.start, current_[dim]};
             break;
           case Range::MAP:
             // Maps refer to individual

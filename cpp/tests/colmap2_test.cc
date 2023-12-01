@@ -198,7 +198,6 @@ TEST_F(ColumnConvertTest, SelectFromRange) {
       ASSERT_EQ(rit.GetSectionSlicer().length(), map.shape_provider_.var_data_->row_shapes_[r]);
       data_column.getColumnRange(rit.GetRowSlicer(), rit.GetSectionSlicer());
     }
-
   }
 
   {
@@ -222,7 +221,6 @@ TEST_F(ColumnConvertTest, SelectFromRange) {
     ++rit;
     ASSERT_EQ(rit, map.RangeEnd());
   }
-
 
   {
     auto data_column = GetArrayColumn<CasaComplex>(proxy.table(), MS::MODEL_DATA);
