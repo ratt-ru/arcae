@@ -325,17 +325,17 @@ public:
         for(auto dim = std::size_t{0}; dim <= nDim();) {
           current_[dim]++;
 
-          auto end = [&, this]() -> std::size_t {
+          auto [start, end] = [&, this]() -> std::tuple<std::size_t, std::size_t> {
             const auto & range = rit_.DimRange(dim);
             switch(range.type) {
               case Range::FREE:
               case Range::MAP:
-                return range.end;
+                return {range.start, range.end};
               case Range::UNCONSTRAINED:
                 {
                   const auto & rr = rit_.DimRange(RowDim());
                   assert(rr.IsSingleRow());
-                  return rit_.map_.RowDimSize(rr.start, dim);
+                  return {0, rit_.map_.RowDimSize(rr.start, dim)};
                 }
               default:
                 assert((false) && "Unhandled range.type switch case");
@@ -345,7 +345,7 @@ public:
           // We've achieved a successful iteration in this dimension
           if(current_[dim] < end) { break; }
           // Reset to zero and retry in the next dimension
-          else if(dim < RowDim()) { current_[dim] = rit_.DimRange(dim).start; ++dim; }
+          else if(dim < RowDim()) { current_[dim] = start; ++dim; }
           // This was the slowest changing dimension so we're done
           else { done_ = true; break; }
         }
