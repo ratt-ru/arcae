@@ -194,18 +194,10 @@ public:
 
   // Returns the dimension size of this column
   arrow::Result<std::size_t> DimSize(std::size_t dim) const {
+    // Dimension needs to be adjusted for
+    // 1. We may not have selections matching all dimensions
+    // 2. Selections are FORTRAN ordered
     auto adim = std::ptrdiff_t(dim + selection_.size()) - std::ptrdiff_t(nDim());
-    // ndim == 3 and selection.size() == 1, requesting dim 2
-    // then diff = 2, so we need dim - diff == 0
-    //
-    // request dim = 1, diff still = 2, so we have 1 - 2  == - 1 < 0
-
-    // ndim == 3 and selection.size() == 2, requesting dim 2
-    // then diff = 1, so we need dim - diff == 1
-
-    // request dim = 1, dim - diff == 0
-    // request dim = 0, dim - diff == -1 < 0
-
     // If we have a selection of row id's,
     // derive the dimension size from these
     if(adim > 0 && selection_[adim].size() > 0) {
