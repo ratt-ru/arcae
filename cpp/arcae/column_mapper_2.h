@@ -27,11 +27,11 @@ using ColumnSelection = std::vector<RowIds>;
 
 // Describes a mapping between two dimension id's
 struct IdMap {
-  casacore::rownr_t from;
-  casacore::rownr_t to;
+  casacore::rownr_t disk;
+  casacore::rownr_t mem;
 
   constexpr inline bool operator==(const IdMap & lhs) const
-      { return from == lhs.from && to == lhs.to; }
+      { return disk == lhs.disk && mem == lhs.mem; }
 };
 
 // Vectors of ids
@@ -291,32 +291,32 @@ public:
         }
       }
 
-      std::size_t FlatDestination(const casacore::IPosition & shape) {
+      std::size_t FlatMemory(const casacore::IPosition & shape) {
         auto product = std::size_t{1};
         auto result = std::size_t{0};
         auto ndim = rit_.nDim();
         assert(ndim > 0);
 
         for(auto dim=0; dim < ndim - 1; ++dim) {
-          result += product * CurrentId(dim).to;
+          result += product * CurrentId(dim).mem;
           product *= shape[dim];
         }
 
-        return result + product * CurrentId(ndim - 1).to;
+        return result + product * CurrentId(ndim - 1).mem;
       }
 
-      std::size_t FlatSource(const casacore::IPosition & shape) {
+      std::size_t FlatDisk(const casacore::IPosition & shape) {
         auto product = std::size_t{1};
         auto result = std::size_t{0};
         auto ndim = rit_.nDim();
         assert(ndim > 0);
 
         for(auto dim=0; dim < ndim - 1; ++dim) {
-          result += product * CurrentId(dim).from;
+          result += product * CurrentId(dim).disk;
           product *= shape[dim];
         }
 
-        return result + product * CurrentId(ndim - 1).from;
+        return result + product * CurrentId(ndim - 1).disk;
       }
 
       MapIterator & operator++() {
@@ -480,8 +480,8 @@ public:
               const auto & dim_maps = DimMaps(dim);
               assert(range.start < dim_maps.size());
               assert(range.end - 1 < dim_maps.size());
-              start_[dim] = static_cast<ssize_t>(dim_maps[range.start].from);
-              end_[dim] = static_cast<ssize_t>(dim_maps[range.end - 1].from);
+              start_[dim] = static_cast<ssize_t>(dim_maps[range.start].disk);
+              end_[dim] = static_cast<ssize_t>(dim_maps[range.end - 1].disk);
               break;
             }
             case Range::UNCONSTRAINED: {
@@ -575,7 +575,7 @@ public:
 
         std::sort(std::begin(column_map), std::end(column_map),
                  [](const auto & lhs, const auto & rhs) {
-                    return lhs.from < rhs.from; });
+                    return lhs.disk < rhs.disk; });
 
         column_maps.emplace_back(std::move(column_map));
     }
@@ -620,7 +620,7 @@ public:
               std::next(std::begin(column_map))};
           next != std::end(column_map); ++i, ++prev, ++next) {
 
-        if(next->from - prev->from == 1) {
+        if(next->disk - prev->disk == 1) {
           current.end += 1;
         } else {
           column_range.push_back(current);
@@ -670,7 +670,7 @@ public:
               std::next(std::begin(column_map))};
           next != std::end(column_map); ++i, ++prev, ++next) {
 
-        if(next->from - prev->from == 1) {
+        if(next->disk - prev->disk == 1) {
           current.end += 1;
         } else {
           column_range.push_back(current);

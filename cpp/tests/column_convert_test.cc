@@ -182,7 +182,7 @@ TEST_F(ColumnConvertTest, SelectionVariable) {
     // Variable data column
     auto var_data = GetArrayColumn<casacore::Int>(proxy.table(), "VAR_DATA");
     {
-      // Get row 1
+      // Get row 0
       ASSERT_OK_AND_ASSIGN(auto map, ColMap2::Make(var_data, {{0}}));
       ASSERT_EQ(map.nRanges(), 1);
       ASSERT_EQ(map.nElements(), 4);
@@ -194,23 +194,23 @@ TEST_F(ColumnConvertTest, SelectionVariable) {
       ASSERT_EQ(mit.CurrentId(0), (IdMap{0, 0}));
       ASSERT_EQ(mit.CurrentId(1), (IdMap{0, 0}));
       ASSERT_EQ(mit.CurrentId(2), (IdMap{0, 0}));
-      ASSERT_EQ(mit.FlatSource(array.shape()), 0);
-      ASSERT_EQ(mit.FlatDestination(array.shape()), 0);
+      ASSERT_EQ(mit.FlatMemory(array.shape()), 0);
+      ASSERT_EQ(mit.FlatDisk(array.shape()), 0);
       ++mit;
       ASSERT_EQ(mit.CurrentId(0), (IdMap{1, 1}));
       ASSERT_EQ(mit.CurrentId(1), (IdMap{0, 0}));
       ASSERT_EQ(mit.CurrentId(2), (IdMap{0, 0}));
-      ASSERT_EQ(mit.FlatSource(array.shape()), 1);
-      ASSERT_EQ(mit.FlatDestination(array.shape()), 1);
+      ASSERT_EQ(mit.FlatMemory(array.shape()), 1);
+      ASSERT_EQ(mit.FlatDisk(array.shape()), 1);
       ++mit;
-      ASSERT_EQ(mit.FlatSource(array.shape()), 2);
-      ASSERT_EQ(mit.FlatDestination(array.shape()), 2);
+      ASSERT_EQ(mit.FlatMemory(array.shape()), 2);
+      ASSERT_EQ(mit.FlatDisk(array.shape()), 2);
       ASSERT_EQ(mit.CurrentId(0), (IdMap{0, 0}));
       ASSERT_EQ(mit.CurrentId(1), (IdMap{1, 1}));
       ASSERT_EQ(mit.CurrentId(2), (IdMap{0, 0}));
       ++mit;
-      ASSERT_EQ(mit.FlatSource(array.shape()), 3);
-      ASSERT_EQ(mit.FlatDestination(array.shape()), 3);
+      ASSERT_EQ(mit.FlatMemory(array.shape()), 3);
+      ASSERT_EQ(mit.FlatDisk(array.shape()), 3);
       ASSERT_EQ(mit.CurrentId(0), (IdMap{1, 1}));
       ASSERT_EQ(mit.CurrentId(1), (IdMap{1, 1}));
       ASSERT_EQ(mit.CurrentId(2), (IdMap{0, 0}));
@@ -219,6 +219,7 @@ TEST_F(ColumnConvertTest, SelectionVariable) {
       ++rit;
       ASSERT_EQ(map.RangeEnd(), rit);
     }
+    // Get row 1
     {
       ASSERT_OK_AND_ASSIGN(auto map, ColMap2::Make(var_data, {{1}}));
       ASSERT_EQ(map.nRanges(), 1);
@@ -231,8 +232,8 @@ TEST_F(ColumnConvertTest, SelectionVariable) {
       ASSERT_EQ(mit.CurrentId(0), (IdMap{0, 0}));
       ASSERT_EQ(mit.CurrentId(1), (IdMap{0, 0}));
       ASSERT_EQ(mit.CurrentId(2), (IdMap{1, 0}));
-      ASSERT_EQ(mit.FlatSource(array.shape()), 1);
-      ASSERT_EQ(mit.FlatDestination(array.shape()), 0);
+      ASSERT_EQ(mit.FlatMemory(array.shape()), 0);
+      ASSERT_EQ(mit.FlatDisk(array.shape()), 1);
       ++rit;
       ASSERT_EQ(map.RangeEnd(), rit);
     }
@@ -244,32 +245,35 @@ TEST_F(ColumnConvertTest, SelectionVariable) {
       auto rit = map.RangeBegin();
       ASSERT_EQ(rit.GetRowSlicer(), Slicer(IPos({0}), IPos({0}), Slicer::endIsLast));
       ASSERT_EQ(rit.GetSectionSlicer(), Slicer(IPos({0, 0}), IPos({1, 1}), Slicer::endIsLast));
-      auto array = var_data.getColumnRange(rit.GetRowSlicer(), rit.GetSectionSlicer());
+
       {
+        auto array = var_data.getColumnRange(rit.GetRowSlicer(), rit.GetSectionSlicer());
+        ASSERT_EQ(array(IPos(0, 0, 0)), 0);
+
         auto mit = rit.MapBegin();
         ASSERT_EQ(mit.CurrentId(0), (IdMap{0, 0}));
         ASSERT_EQ(mit.CurrentId(1), (IdMap{0, 0}));
         ASSERT_EQ(mit.CurrentId(2), (IdMap{0, 0}));
-        ASSERT_EQ(mit.FlatSource(array.shape()), 0);
-        ASSERT_EQ(mit.FlatDestination(array.shape()), 0);
+        ASSERT_EQ(mit.FlatMemory(array.shape()), 0);
+        ASSERT_EQ(mit.FlatDisk(array.shape()), 0);
         ++mit;
         ASSERT_EQ(mit.CurrentId(0), (IdMap{1, 1}));
         ASSERT_EQ(mit.CurrentId(1), (IdMap{0, 0}));
         ASSERT_EQ(mit.CurrentId(2), (IdMap{0, 0}));
-        ASSERT_EQ(mit.FlatSource(array.shape()), 1);
-        ASSERT_EQ(mit.FlatDestination(array.shape()), 1);
+        ASSERT_EQ(mit.FlatMemory(array.shape()), 1);
+        ASSERT_EQ(mit.FlatDisk(array.shape()), 1);
         ++mit;
         ASSERT_EQ(mit.CurrentId(0), (IdMap{0, 0}));
         ASSERT_EQ(mit.CurrentId(1), (IdMap{1, 1}));
         ASSERT_EQ(mit.CurrentId(2), (IdMap{0, 0}));
-        ASSERT_EQ(mit.FlatSource(array.shape()), 2);
-        ASSERT_EQ(mit.FlatDestination(array.shape()), 2);
+        ASSERT_EQ(mit.FlatMemory(array.shape()), 2);
+        ASSERT_EQ(mit.FlatDisk(array.shape()), 2);
         ++mit;
         ASSERT_EQ(mit.CurrentId(1), (IdMap{1, 1}));
         ASSERT_EQ(mit.CurrentId(0), (IdMap{1, 1}));
         ASSERT_EQ(mit.CurrentId(2), (IdMap{0, 0}));
-        ASSERT_EQ(mit.FlatSource(array.shape()), 3);
-        ASSERT_EQ(mit.FlatDestination(array.shape()), 3);
+        ASSERT_EQ(mit.FlatMemory(array.shape()), 3);
+        ASSERT_EQ(mit.FlatDisk(array.shape()), 3);
         ++mit;
         ASSERT_EQ(mit, rit.MapEnd());
       }
@@ -279,12 +283,13 @@ TEST_F(ColumnConvertTest, SelectionVariable) {
       ASSERT_EQ(rit.GetSectionSlicer(), Slicer(IPos({0, 0}), IPos({0, 0}), Slicer::endIsLast));
 
       {
+        auto array = var_data.getColumnRange(rit.GetRowSlicer(), rit.GetSectionSlicer());
         auto mit = rit.MapBegin();
         ASSERT_EQ(mit.CurrentId(0), (IdMap{0, 0}));
         ASSERT_EQ(mit.CurrentId(1), (IdMap{0, 0}));
         ASSERT_EQ(mit.CurrentId(2), (IdMap{1, 1}));
-        ASSERT_EQ(mit.FlatSource(array.shape()), 4);
-        ASSERT_EQ(mit.FlatDestination(array.shape()), 4);
+        ASSERT_EQ(mit.FlatMemory(array.shape()), 1);
+        ASSERT_EQ(mit.FlatDisk(array.shape()), 1);
         ++mit;
         ASSERT_EQ(mit, rit.MapEnd());
       }
@@ -293,6 +298,18 @@ TEST_F(ColumnConvertTest, SelectionVariable) {
       ASSERT_EQ(map.RangeEnd(), rit);
     }
   }
+}
+
+
+TEST_F(ColumnConvertTest, SelectionFixed) {
+  table_proxy_.reset();
+
+  auto lock = casacore::TableLock(casacore::TableLock::LockOption::AutoNoReadLocking);
+  auto lockoptions = casacore::Record();
+  lockoptions.define("option", "auto");
+  lockoptions.define("internal", lock.interval());
+  lockoptions.define("maxwait", casacore::Int(lock.maxWait()));
+  auto proxy = casacore::TableProxy(table_name_, lockoptions, casacore::Table::Old);
 
   {
     auto fixed_data = GetArrayColumn<casacore::Int>(proxy.table(), "FIXED_DATA");
