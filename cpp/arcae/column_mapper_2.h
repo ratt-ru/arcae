@@ -25,7 +25,7 @@ enum InputOrder {C=0, F};
 using RowIds = std::vector<casacore::rownr_t>;
 using ColumnSelection = std::vector<RowIds>;
 
-// Describes a mapping between two dimension id's
+// Describes a mapping between disk and memory
 struct IdMap {
   casacore::rownr_t disk;
   casacore::rownr_t mem;
@@ -755,7 +755,7 @@ public:
   }
 
   // Returns true if this is a simple map or, a map that only contains
-  // a single range and thereby removes the need to read separate ranges of the
+  // a single range and thereby removes the need to read separate ranges of
   // data and copy those into a final buffer.
   bool IsSimple() const {
     return nRanges() == 1;
