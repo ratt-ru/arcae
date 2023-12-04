@@ -299,11 +299,11 @@ public:
             return IdMap{0 + current_[dim] - range.start, current_[dim]};
             break;
           case Range::MAP:
-            // Maps refer to individual
+            // Maps refer to individual rows
             return rit_.DimMaps(dim)[current_[dim]];
             break;
           default:
-            assert((false) && "Unhandled range.type switch case");
+            assert(false && "Unhandled Range::Type enum");
         }
       }
 
@@ -354,7 +354,7 @@ public:
                   return {0, rit_.map_.RowDimSize(rr.start, dim)};
                 }
               default:
-                assert((false) && "Unhandled range.type switch case");
+                assert(false && "Unhandled Range::Type enum");
             }
           }();
 
@@ -497,7 +497,7 @@ public:
               break;
             }
             default:
-              assert((false) && "Unhandled Range.type switch case");
+              assert(false && "Unhandled Range::Type enum");
           }
         }
       }
