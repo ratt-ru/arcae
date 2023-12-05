@@ -153,6 +153,7 @@ TEST_F(ColumnConvertTest, SelectFromRange) {
   auto proxy = casacore::TableProxy(table_name_, lockoptions, casacore::Table::Old);
 
   {
+    // Select all data from the VAR_DATA column
     auto data_column = GetArrayColumn<CasaComplex>(proxy.table(), "VAR_DATA");
     ASSERT_OK_AND_ASSIGN(auto map, ColMap2::Make(data_column, arcae::ColumnSelection{{}}));
     ASSERT_TRUE(map.shape_provider_.IsVarying());
@@ -181,6 +182,7 @@ TEST_F(ColumnConvertTest, SelectFromRange) {
   }
 
   {
+    // Select some rows from the VAR_DATA column
     auto data_column = GetArrayColumn<CasaComplex>(proxy.table(), "VAR_DATA");
     auto row_ids = arcae::RowIds{0, 1, 2, 3, 6, 7, 8, 9};
     ASSERT_OK_AND_ASSIGN(auto map, ColMap2::Make(data_column, arcae::ColumnSelection{{row_ids}}));
@@ -214,6 +216,7 @@ TEST_F(ColumnConvertTest, SelectFromRange) {
 
 
   {
+    // Select some rows and a channel from the VAR_DATA column
     auto data_column = GetArrayColumn<CasaComplex>(proxy.table(), "VAR_DATA");
     auto row_ids = arcae::RowIds{0, 1, 2, 3, 6, 7, 8, 9};
     auto chan_ids = arcae::RowIds{0};
@@ -249,6 +252,80 @@ TEST_F(ColumnConvertTest, SelectFromRange) {
 
 
   {
+    // Select some rows and a corr from the VAR_DATA column
+    auto data_column = GetArrayColumn<CasaComplex>(proxy.table(), "VAR_DATA");
+    auto row_ids = arcae::RowIds{0, 1, 2, 3, 6, 7, 8, 9};
+    auto corr_ids = arcae::RowIds{0};
+    ASSERT_OK_AND_ASSIGN(auto map, ColMap2::Make(data_column, arcae::ColumnSelection{{row_ids, {}, corr_ids}}));
+
+    ASSERT_TRUE(map.shape_provider_.IsVarying());
+    ASSERT_FALSE(map.shape_provider_.IsDefinitelyFixed());
+    ASSERT_FALSE(map.shape_provider_.IsActuallyFixed());
+    ASSERT_EQ(map.shape_provider_.nDim(), 3);
+    ASSERT_EQ(map.ranges_.size(), 3);
+    ASSERT_EQ(map.ranges_[2].size(), 8);
+    ASSERT_EQ(map.nRanges(), 8);
+    ASSERT_EQ(map.nElements(), 13);
+    ASSERT_EQ(map.shape_provider_.var_data_->row_shapes_.size(), 8);
+    EXPECT_THAT(map.shape_provider_.var_data_->row_shapes_,
+                ::testing::ElementsAre(IPos{3, 2}, IPos{4, 1}, IPos{4, 2}, IPos{2, 2},
+                                       IPos{4, 1}, IPos{4, 2}, IPos{2, 2}, IPos{2, 1}));
+
+    EXPECT_EQ(map.shape_provider_.var_data_->offsets_.size(), 2);
+    EXPECT_THAT(map.shape_provider_.var_data_->offsets_[0],
+                ::testing::ElementsAre(3, 4, 4, 2, 4, 4, 2, 2));
+    EXPECT_THAT(map.shape_provider_.var_data_->offsets_[1],
+                ::testing::ElementsAre(6, 4, 8, 4, 4, 8, 4, 2));
+
+    for(auto [r, rit]=std::tuple{0, map.RangeBegin()}; rit != map.RangeEnd(); ++rit, ++r) {
+      auto rid = static_cast<ssize_t>(row_ids[r]);
+      ASSERT_EQ(rit.GetRowSlicer(), Slicer(IPos({rid}), IPos({rid}), Slicer::endIsLast));
+      ASSERT_EQ(rit.GetSectionSlicer().length(),
+                IPos({1, map.shape_provider_.var_data_->row_shapes_[r][1]}));
+      data_column.getColumnRange(rit.GetRowSlicer(), rit.GetSectionSlicer());
+    }
+  }
+
+  {
+    // Select some rows a channel and a correlation in the VAR_DATA column
+    auto data_column = GetArrayColumn<CasaComplex>(proxy.table(), "VAR_DATA");
+    auto row_ids = arcae::RowIds{0, 1, 2, 3, 6, 7, 8, 9};
+    auto chan_ids = arcae::RowIds{0};
+    auto corr_ids = arcae::RowIds{0};
+    ASSERT_OK_AND_ASSIGN(auto map, ColMap2::Make(data_column, arcae::ColumnSelection{{row_ids, chan_ids, corr_ids}}));
+
+    ASSERT_TRUE(map.shape_provider_.IsVarying());
+    ASSERT_FALSE(map.shape_provider_.IsDefinitelyFixed());
+    ASSERT_FALSE(map.shape_provider_.IsActuallyFixed());
+    ASSERT_EQ(map.shape_provider_.nDim(), 3);
+    ASSERT_EQ(map.ranges_.size(), 3);
+    ASSERT_EQ(map.ranges_[2].size(), 8);
+    ASSERT_EQ(map.nRanges(), 8);
+    ASSERT_EQ(map.nElements(), 8);
+    ASSERT_EQ(map.shape_provider_.var_data_->row_shapes_.size(), 8);
+    EXPECT_THAT(map.shape_provider_.var_data_->row_shapes_,
+                ::testing::ElementsAre(IPos{3, 2}, IPos{4, 1}, IPos{4, 2}, IPos{2, 2},
+                                       IPos{4, 1}, IPos{4, 2}, IPos{2, 2}, IPos{2, 1}));
+
+    EXPECT_EQ(map.shape_provider_.var_data_->offsets_.size(), 2);
+    EXPECT_THAT(map.shape_provider_.var_data_->offsets_[0],
+                ::testing::ElementsAre(3, 4, 4, 2, 4, 4, 2, 2));
+    EXPECT_THAT(map.shape_provider_.var_data_->offsets_[1],
+                ::testing::ElementsAre(6, 4, 8, 4, 4, 8, 4, 2));
+
+    for(auto [r, rit]=std::tuple{0, map.RangeBegin()}; rit != map.RangeEnd(); ++rit, ++r) {
+      auto rid = static_cast<ssize_t>(row_ids[r]);
+      ASSERT_EQ(rit.GetRowSlicer(), Slicer(IPos({rid}), IPos({rid}), Slicer::endIsLast));
+      ASSERT_EQ(rit.GetSectionSlicer().length(), IPos({1, 1}));
+      data_column.getColumnRange(rit.GetRowSlicer(), rit.GetSectionSlicer());
+    }
+  }
+
+
+  {
+    // Select all data in the VAR_FIXED_DATA column
+    // Even though VAR_FIXED_DATA is defined as variable the data
+    // is treated as fixed
     auto data_column = GetArrayColumn<CasaComplex>(proxy.table(), "VAR_FIXED_DATA");
     ASSERT_OK_AND_ASSIGN(auto map, ColMap2::Make(data_column, arcae::ColumnSelection{{}}));
 
@@ -271,6 +348,7 @@ TEST_F(ColumnConvertTest, SelectFromRange) {
   }
 
   {
+    // Select all data in a MODEL_DATA, which is defined as fixed
     auto data_column = GetArrayColumn<CasaComplex>(proxy.table(), MS::MODEL_DATA);
     ASSERT_OK_AND_ASSIGN(auto map, ColMap2::Make(data_column, arcae::ColumnSelection{{}}));
 
