@@ -271,7 +271,7 @@ public:
 
       return result + product * index[RowDim()];
     } else {
-      // Variably shaped output, offsets are needed
+      // Variably shaped output, per-row offsets are needed
       // There is no offset array for the fast changing dimension
       auto result = index[0];
       auto row = index[RowDim()];
@@ -576,8 +576,18 @@ public:
     auto ndim = shape_prov.nDim();
     column_maps.reserve(ndim);
 
-    for(auto dim=std::size_t{0}; dim < selection.size(); ++dim) {
-        const auto & dim_ids = selection[dim];
+    for(auto dim=std::size_t{0}; dim < ndim; ++dim) {
+        // Dimension needs to be adjusted for
+        // 1. We may not have selections matching all dimensions
+        // 2. Selections are FORTRAN ordered
+        auto sdim = std::ptrdiff_t(dim + selection.size()) - std::ptrdiff_t(ndim);
+
+        if(sdim < 0 || selection.size() == 0 || selection[sdim].size() == 0) {
+          column_maps.emplace_back(ColumnMap{});
+          continue;
+        }
+
+        const auto & dim_ids = selection[sdim];
         ColumnMap column_map;
         column_map.reserve(dim_ids.size());
 
@@ -592,12 +602,6 @@ public:
 
         column_maps.emplace_back(std::move(column_map));
     }
-
-    for(auto dim=selection.size(); dim < ndim; ++dim) {
-      column_maps.emplace_back(ColumnMap{});
-    }
-
-    std::reverse(std::begin(column_maps), std::end(column_maps));
 
     return column_maps;
   }
@@ -744,7 +748,6 @@ public:
     }
 
     ARROW_ASSIGN_OR_RAISE(auto shape_prov, ShapeProvider::Make(column, selection));
-
     auto maps = MakeMaps(shape_prov, selection);
     ARROW_ASSIGN_OR_RAISE(auto ranges, MakeRanges(shape_prov, maps));
 
