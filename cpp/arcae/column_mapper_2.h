@@ -89,13 +89,14 @@ struct VariableShapeData {
     bool fixed_dims = true;
     // Row dimension is last in FORTRAN ordering
     auto row_dim = selection.size() - 1;
+    using ItType = std::tuple<std::size_t, bool>;
 
     // No selection
     // Create row shape data from column.nrow()
     if(selection.size() == 0 || selection[row_dim].size() == 0) {
       row_shapes.reserve(column.nrow());
 
-      for(auto [r, first] = std::tuple{std::size_t{0}, true}; r < column.nrow(); ++r, first=false) {
+      for(auto [r, first] = ItType{0, true}; r < column.nrow(); ++r, first=false) {
         if(!column.isDefined(r)) {
           return arrow::Status::NotImplemented("Row ", r, " in column ",
                                                column.columnDesc().name(),
@@ -111,7 +112,7 @@ struct VariableShapeData {
       const auto & row_ids = selection[row_dim];
       row_shapes.reserve(row_ids.size());
 
-      for(auto [r, first] = std::tuple{0, true}; r < row_ids.size(); ++r, first=false) {
+      for(auto [r, first] = ItType{0, true}; r < row_ids.size(); ++r, first=false) {
         if(!column.isDefined(row_ids[r])) {
           return arrow::Status::NotImplemented("Row ", r, " in column ",
                                                column.columnDesc().name(),
@@ -265,13 +266,14 @@ public:
   class MapIterator {
     public:
       std::reference_wrapper<const RangeIterator> rit_;
-      std::vector<ssize_t> current_;
-      std::vector<ssize_t> strides_;
+      std::vector<std::size_t> current_;
+      std::vector<std::size_t> strides_;
       bool done_;
 
       MapIterator(const RangeIterator & rit,
-                  std::vector<ssize_t> && current,
-                  std::vector<ssize_t> && strides, bool done) :
+                  std::vector<std::size_t> && current,
+                  std::vector<std::size_t> && strides,
+                  bool done) :
         rit_(std::cref(rit)),
         current_(std::move(current)),
         strides_(std::move(strides)),
@@ -280,13 +282,12 @@ public:
 
       static MapIterator Make(const RangeIterator & rit, bool done) {
         auto current = decltype(MapIterator::current_)(rit.nDim(), 0);
-        auto strides = decltype(MapIterator::strides_)(rit.nDim(), 0);
+        auto strides = decltype(MapIterator::strides_)(rit.nDim(), 1);
         using ItType = std::tuple<std::size_t, std::size_t>;
 
-        for(auto [dim, product]=ItType{0, 1}; dim < rit.nDim(); ++dim) {
-          current[dim] = rit.disk_start_[dim];
-          strides[dim] = rit.disk_end_[dim] - rit.disk_start_[dim];
-          product *= strides[dim];
+        for(auto [dim, product]=ItType{1, 1}; dim < rit.nDim(); ++dim) {
+          auto diff = rit.range_length_[dim] - rit.disk_start_[dim];
+          product = strides[dim] = product * diff;
         }
 
         return MapIterator{rit, std::move(current), std::move(strides), done};
@@ -301,32 +302,31 @@ public:
       }
 
       std::size_t FromBufferOffset() const {
-        return 0;
+        std::size_t offset = 0;
+        for(auto dim = std::size_t{0}; dim < nDim(); ++dim) {
+          offset += current_[dim] * strides_[dim];
+        }
+        return offset;
       }
 
       std::size_t ToBufferOffset() const {
-        return 0;
+        return rit_.get().flat_out_offset_ + FromBufferOffset();
       }
 
-      inline ssize_t RangeStart(std::size_t dim) {
-        return rit_.get().disk_start_[dim];
-      }
-
-      inline ssize_t RangeEnd(std::size_t dim) {
-        return rit_.get().disk_end_[dim];
+      inline std::size_t RangeSize(std::size_t dim) const {
+        return rit_.get().range_length_[dim];
       }
 
       MapIterator & operator++() {
         assert(!done_);
-        auto product = std::size_t{1};
 
         // Iterate from fastest to slowest changing dimension
         for(auto dim = std::size_t{0}; dim < nDim();) {
           current_[dim]++;
           // We've achieved a successful iteration in this dimension
-          if(current_[dim] < RangeEnd(dim)) { break; }
+          if(current_[dim] < RangeSize(dim)) { break; }
           // Reset to zero and retry in the next dimension
-          else if(dim < RowDim()) { current_[dim] = RangeStart(dim); ++dim; }
+          else if(dim < RowDim()) { current_[dim] = 0; ++dim; }
           // This was the slowest changing dimension so we're done
           else { done_ = true; break; }
         }
@@ -353,9 +353,10 @@ public:
       std::vector<std::size_t> index_;
       // Starting position of the disk index
       std::vector<std::size_t> disk_start_;
-      // Ending position of the disk index (exclusive)
-      std::vector<std::size_t> disk_end_;
-      std::size_t flat_mem_offset_;
+      // Length of the range
+      std::vector<std::size_t> range_length_;
+      // Offset into the output buffer
+      std::size_t flat_out_offset_;
       bool done_;
 
     public:
@@ -363,8 +364,8 @@ public:
         map_(std::cref(column_map)),
         index_(column_map.nDim(), 0),
         disk_start_(column_map.nDim(), 0),
-        disk_end_(column_map.nDim(), 0),
-        flat_mem_offset_(0),
+        range_length_(column_map.nDim(), 0),
+        flat_out_offset_(0),
         done_(done) {
           UpdateState();
       }
@@ -404,14 +405,9 @@ public:
         return MapIterator::Make(*this, true);
       }
 
-      std::size_t RangeElements() const {
-        auto product = std::size_t{1};
-
-        for(auto dim=0; dim < nDim(); ++dim) {
-          product *= disk_end_[dim] - disk_start_[dim];
-        }
-
-        return product;
+      inline std::size_t RangeElements() const {
+        return std::accumulate(std::begin(index_), std::end(index_), std::size_t{1},
+                               [](const auto i, auto v) { return i*v; });
       }
 
       RangeIterator & operator++() {
@@ -424,7 +420,7 @@ public:
           index_[dim]++;
 
           // We've achieved a successful iteration in this dimension
-          if(index_[dim] < map_.get().DimRanges(dim).size()) { break; }
+          if(index_[dim] < DimRanges(dim).size()) { break; }
           // We've exceeded the size of the current dimension
           // reset to zero and retry the while loop
           else if(dim < RowDim()) { index_[dim] = 0; ++dim; }
@@ -434,7 +430,7 @@ public:
         }
 
         // Increment output memory buffer offset
-        flat_mem_offset_ += nelements;
+        flat_out_offset_ += nelements;
         UpdateState();
         return *this;
       };
@@ -445,23 +441,24 @@ public:
           switch(range.type) {
             case Range::FREE: {
               disk_start_[dim] = range.start;
-              disk_end_[dim] = range.end;
+              range_length_[dim] = range.end - range.start;
               break;
             }
             case Range::MAP: {
               const auto & dim_maps = DimMaps(dim);
               assert(range.start < dim_maps.size());
               assert(range.end - 1 < dim_maps.size());
-              disk_start_[dim] = dim_maps[range.start].disk;
-              disk_end_[dim] = dim_maps[range.end - 1].disk + 1;
+              auto start = disk_start_[dim] = dim_maps[range.start].disk;
+              range_length_[dim] = dim_maps[range.end - 1].disk - start + 1;
               break;
             }
             case Range::UNCONSTRAINED: {
-              // In case of variably shaped columns, the dimension size will vary by row
+              // In case of variably shaped columns,
+              // the dimension size will vary by row
               const auto & rr = DimRange(RowDim());
               assert(rr.IsSingleRow());
               disk_start_[dim] = 0;
-              disk_end_[dim] = map_.get().RowDimSize(rr.start, dim);
+              range_length_[dim] = map_.get().RowDimSize(rr.start, dim);
               break;
             }
             default:
@@ -474,9 +471,12 @@ public:
       casacore::Slicer GetRowSlicer() const {
         assert(!done_);
         assert(nDim() > 0);
+        auto start = static_cast<ssize_t>(disk_start_[RowDim()]);
+        auto length = static_cast<ssize_t>(range_length_[RowDim()]);
+
         return casacore::Slicer(
-          casacore::IPosition({static_cast<ssize_t>(disk_start_[RowDim()])}),
-          casacore::IPosition({static_cast<ssize_t>(disk_end_[RowDim()]) - 1}),
+          casacore::IPosition({start}),
+          casacore::IPosition({start + length - 1}),
           casacore::Slicer::endIsLast);
       };
 
@@ -485,14 +485,14 @@ public:
         assert(!done_);
         assert(nDim() > 1);
         casacore::IPosition start(RowDim(), 0);
-        casacore::IPosition end(RowDim(), 0);
+        casacore::IPosition length(RowDim(), 0);
 
         for(auto dim=std::size_t{0}; dim < RowDim(); ++dim) {
           start[dim] = static_cast<ssize_t>(disk_start_[dim]);
-          end[dim] = static_cast<ssize_t>(disk_end_[dim]) - 1;
+          length[dim] = start[dim] + static_cast<ssize_t>(range_length_[dim]) - 1;
         }
 
-        return casacore::Slicer(start, end, casacore::Slicer::endIsLast);
+        return casacore::Slicer(start, length, casacore::Slicer::endIsLast);
       };
 
       bool operator==(const RangeIterator & other) const {
