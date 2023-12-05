@@ -281,13 +281,12 @@ public:
       static MapIterator Make(const RangeIterator & rit, bool done) {
         auto current = decltype(MapIterator::current_)(rit.nDim(), 0);
         auto strides = decltype(MapIterator::strides_)(rit.nDim(), 0);
-
         using ItType = std::tuple<std::size_t, std::size_t>;
 
-        for(auto [dim, prod]=ItType{0, 1}; dim < rit.nDim(); ++dim) {
+        for(auto [dim, product]=ItType{0, 1}; dim < rit.nDim(); ++dim) {
           current[dim] = rit.disk_start_[dim];
-          strides[dim] = rit.disk_end_[dim] - rit.disk_start_[dim] + 1;
-          prod *= strides[dim];
+          strides[dim] = rit.disk_end_[dim] - rit.disk_start_[dim];
+          product *= strides[dim];
         }
 
         return MapIterator{rit, std::move(current), std::move(strides), done};
@@ -301,11 +300,11 @@ public:
         return nDim() - 1;
       }
 
-      std::size_t BufferOffset() const {
+      std::size_t FromBufferOffset() const {
         return 0;
       }
 
-      std::size_t RangeOffset() const {
+      std::size_t ToBufferOffset() const {
         return 0;
       }
 
@@ -314,7 +313,7 @@ public:
       }
 
       inline ssize_t RangeEnd(std::size_t dim) {
-        return rit_.get().disk_end_[dim] + 1;
+        return rit_.get().disk_end_[dim];
       }
 
       MapIterator & operator++() {
@@ -324,7 +323,6 @@ public:
         // Iterate from fastest to slowest changing dimension
         for(auto dim = std::size_t{0}; dim < nDim();) {
           current_[dim]++;
-
           // We've achieved a successful iteration in this dimension
           if(current_[dim] < RangeEnd(dim)) { break; }
           // Reset to zero and retry in the next dimension
@@ -354,9 +352,9 @@ public:
       // Index of the Disjoint Range
       std::vector<std::size_t> index_;
       // Starting position of the disk index
-      casacore::IPosition disk_start_;
-      // Ending position of the disk index (inclusive)
-      casacore::IPosition disk_end_;
+      std::vector<std::size_t> disk_start_;
+      // Ending position of the disk index (exclusive)
+      std::vector<std::size_t> disk_end_;
       std::size_t flat_mem_offset_;
       bool done_;
 
@@ -446,16 +444,16 @@ public:
           const auto & range = DimRange(dim);
           switch(range.type) {
             case Range::FREE: {
-              disk_start_[dim] = static_cast<ssize_t>(range.start);
-              disk_end_[dim] = static_cast<ssize_t>(range.end) - 1;
+              disk_start_[dim] = range.start;
+              disk_end_[dim] = range.end;
               break;
             }
             case Range::MAP: {
               const auto & dim_maps = DimMaps(dim);
               assert(range.start < dim_maps.size());
               assert(range.end - 1 < dim_maps.size());
-              disk_start_[dim] = static_cast<ssize_t>(dim_maps[range.start].disk);
-              disk_end_[dim] = static_cast<ssize_t>(dim_maps[range.end - 1].disk);
+              disk_start_[dim] = dim_maps[range.start].disk;
+              disk_end_[dim] = dim_maps[range.end - 1].disk + 1;
               break;
             }
             case Range::UNCONSTRAINED: {
@@ -463,7 +461,7 @@ public:
               const auto & rr = DimRange(RowDim());
               assert(rr.IsSingleRow());
               disk_start_[dim] = 0;
-              disk_end_[dim] = static_cast<ssize_t>(map_.get().RowDimSize(rr.start, dim)) - 1;
+              disk_end_[dim] = map_.get().RowDimSize(rr.start, dim);
               break;
             }
             default:
@@ -477,8 +475,8 @@ public:
         assert(!done_);
         assert(nDim() > 0);
         return casacore::Slicer(
-          casacore::IPosition({disk_start_[RowDim()]}),
-          casacore::IPosition({disk_end_[RowDim()]}),
+          casacore::IPosition({static_cast<ssize_t>(disk_start_[RowDim()])}),
+          casacore::IPosition({static_cast<ssize_t>(disk_end_[RowDim()]) - 1}),
           casacore::Slicer::endIsLast);
       };
 
@@ -490,8 +488,8 @@ public:
         casacore::IPosition end(RowDim(), 0);
 
         for(auto dim=std::size_t{0}; dim < RowDim(); ++dim) {
-          start[dim] = disk_start_[dim];
-          end[dim] = disk_end_[dim];
+          start[dim] = static_cast<ssize_t>(disk_start_[dim]);
+          end[dim] = static_cast<ssize_t>(disk_end_[dim]) - 1;
         }
 
         return casacore::Slicer(start, end, casacore::Slicer::endIsLast);
