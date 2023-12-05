@@ -133,13 +133,13 @@ struct VariableShapeData {
 
     // Create offset arrays
     auto nrow = row_shapes.size();
+    // Number of dimensions without row
     auto ndim = std::begin(row_shapes)->size();
     auto offsets = decltype(VariableShapeData::offsets_)(ndim, std::vector<std::size_t>(nrow, 0));
 
     for(auto r=0; r < nrow; ++r) {
-      auto product = std::size_t{1};
-
-      for(auto dim=0; dim < ndim; ++dim) {
+      using ItType = std::tuple<std::size_t, std::size_t>;
+      for(auto [dim, product]=ItType{0, 1}; dim < ndim; ++dim) {
         product = offsets[dim][r] = product * row_shapes[r][dim];
       }
     }
@@ -209,6 +209,14 @@ public:
     return (IsDefinitelyFixed() ? column_.get().columnDesc().ndim() : var_data_->nDim()) + 1;
   }
 
+  std::optional<casacore::IPosition> MaybeGetShape() const {
+    if(IsDefinitelyFixed()) {
+      return column_.get().shapeColumn();
+    }
+
+    return var_data_->shape_;
+  }
+
   inline std::size_t RowDim() const { return nDim() - 1; }
 
   // Returns the dimension size of this column
@@ -246,6 +254,37 @@ public:
       // Even though the column is marked as variable
       // the individual row shapes are the same
       return shape.value()[dim];
+    }
+  }
+
+  std::size_t FlatOffset(const std::vector<std::size_t> & index) const {
+    if(auto opt_shape = MaybeGetShape(); opt_shape) {
+      // Fixed shape output, easy case
+      const auto & shape = opt_shape.value();
+      auto result = std::size_t{0};
+      auto product = std::size_t{1};
+
+      for(auto dim = 0; dim < RowDim(); ++dim) {
+        result += index[dim] * product;
+        product *= shape[dim];
+      }
+
+      return result + product * index[RowDim()];
+    } else {
+      // Variably shaped output, offsets are needed
+      // There is no offset array for the fast changing dimension
+      auto result = index[0];
+      auto row = index[RowDim()];
+      const auto & offsets = var_data_->offsets_;
+
+      for(auto dim = 1; dim < RowDim(); ++dim) {
+        result += index[dim] * offsets[dim - 1][row];
+      }
+
+      const auto & row_offsets = offsets[offsets.size() - 1];
+      return std::accumulate(std::begin(row_offsets),
+                             std::begin(row_offsets) + row,
+                             result);
     }
   }
 
@@ -310,7 +349,7 @@ public:
       }
 
       std::size_t ToBufferOffset() const {
-        return rit_.get().flat_out_offset_ + FromBufferOffset();
+        return rit_.get().base_out_offset_ + FromBufferOffset();
       }
 
       inline std::size_t RangeSize(std::size_t dim) const {
@@ -355,8 +394,8 @@ public:
       std::vector<std::size_t> disk_start_;
       // Length of the range
       std::vector<std::size_t> range_length_;
-      // Offset into the output buffer
-      std::size_t flat_out_offset_;
+      // Base offset into the output buffer for the current range
+      std::size_t base_out_offset_;
       bool done_;
 
     public:
@@ -365,7 +404,7 @@ public:
         index_(column_map.nDim(), 0),
         disk_start_(column_map.nDim(), 0),
         range_length_(column_map.nDim(), 0),
-        flat_out_offset_(0),
+        base_out_offset_(0),
         done_(done) {
           UpdateState();
       }
@@ -412,9 +451,6 @@ public:
 
       RangeIterator & operator++() {
         assert(!done_);
-        // Get the number of elements in the current range
-        auto nelements = RangeElements();
-
         // Iterate from fastest to slowest changing dimension: FORTRAN order
         for(auto dim = 0; dim < nDim();) {
           index_[dim]++;
@@ -430,7 +466,6 @@ public:
         }
 
         // Increment output memory buffer offset
-        flat_out_offset_ += nelements;
         UpdateState();
         return *this;
       };
@@ -455,6 +490,7 @@ public:
             case Range::UNCONSTRAINED: {
               // In case of variably shaped columns,
               // the dimension size will vary by row
+              // and there will only be a single row
               const auto & rr = DimRange(RowDim());
               assert(rr.IsSingleRow());
               disk_start_[dim] = 0;
@@ -465,6 +501,8 @@ public:
               assert(false && "Unhandled Range::Type enum");
           }
         }
+
+        base_out_offset_ = map_.get().FlatOffset(disk_start_);
       }
 
       // Returns a slicer for the row dimension
@@ -516,6 +554,9 @@ public:
   inline const ColumnRange & DimRanges(std::size_t dim) const { return ranges_[dim]; }
   inline std::size_t nDim() const { return shape_provider_.nDim(); }
   inline std::size_t RowDim() const { return nDim() - 1; }
+  inline std::size_t FlatOffset(const std::vector<std::size_t> & index) const {
+    return shape_provider_.FlatOffset(index);
+  }
 
   inline RangeIterator RangeBegin() const {
     return RangeIterator{const_cast<ColMap2 &>(*this), false};
