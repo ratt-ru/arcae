@@ -309,6 +309,14 @@ public:
         return 0;
       }
 
+      inline ssize_t RangeStart(std::size_t dim) {
+        return rit_.get().disk_start_[dim];
+      }
+
+      inline ssize_t RangeEnd(std::size_t dim) {
+        return rit_.get().disk_end_[dim] + 1;
+      }
+
       MapIterator & operator++() {
         assert(!done_);
         auto product = std::size_t{1};
@@ -318,9 +326,9 @@ public:
           current_[dim]++;
 
           // We've achieved a successful iteration in this dimension
-          if(current_[dim] < rit_.get().disk_end_[dim] + 1) { break; }
+          if(current_[dim] < RangeEnd(dim)) { break; }
           // Reset to zero and retry in the next dimension
-          else if(dim < RowDim()) { current_[dim] = rit_.get().disk_start_[dim]; ++dim; }
+          else if(dim < RowDim()) { current_[dim] = RangeStart(dim); ++dim; }
           // This was the slowest changing dimension so we're done
           else { done_ = true; break; }
         }
