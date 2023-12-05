@@ -405,7 +405,7 @@ public:
       }
 
       std::size_t RangeElements() const {
-        auto product = std::size_t{0};
+        auto product = std::size_t{1};
 
         for(auto dim=0; dim < nDim(); ++dim) {
           product *= disk_end_[dim] - disk_start_[dim];
