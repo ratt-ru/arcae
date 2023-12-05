@@ -132,7 +132,7 @@ struct VariableShapeData {
     // Create offset arrays
     auto nrow = row_shapes.size();
     auto ndim = std::begin(row_shapes)->size();
-    auto offsets = std::vector<std::vector<std::size_t>>(ndim, std::vector<std::size_t>(nrow, 0));
+    auto offsets = decltype(VariableShapeData::offsets_)(ndim, std::vector<std::size_t>(nrow, 0));
 
     for(auto r=0; r < nrow; ++r) {
       auto product = std::size_t{1};
@@ -262,23 +262,35 @@ public:
 
   // Iterates over the current mapping in the RangeIterator
   class MapIterator {
-    private:
-      const RangeIterator & rit_;
-      std::vector<casacore::rownr_t> current_;
-      bool done_;
     public:
-      // Initialise the current map from the range starts
-      // of the encapsulated RangeIterator
-      static std::vector<casacore::rownr_t> CurrentFromRangeIterator(const RangeIterator & rit) {
-        auto result = std::vector<casacore::rownr_t>(rit.nDim(), 0);
-        for(std::size_t dim=0; dim < rit.nDim(); ++dim) {
-          result[dim] = rit.DimRange(dim).start;
-        }
-        return result;
-      }
+      const RangeIterator & rit_;
+      std::vector<ssize_t> current_;
+      std::vector<ssize_t> strides_;
+      bool done_;
 
-      MapIterator(const RangeIterator & rit, bool done)
-        : rit_(rit), current_(CurrentFromRangeIterator(rit)), done_(done) {}
+      MapIterator(const RangeIterator & rit,
+                  std::vector<ssize_t> && current,
+                  std::vector<ssize_t> && strides, bool done) :
+        rit_(rit),
+        current_(std::move(current)),
+        strides_(std::move(strides)),
+        done_(done) {}
+    public:
+
+      static MapIterator Make(const RangeIterator & rit, bool done) {
+        auto current = decltype(MapIterator::current_)(rit.nDim(), 0);
+        auto strides = decltype(MapIterator::strides_)(rit.nDim(), 0);
+
+        using ItType = std::tuple<std::size_t, std::size_t>;
+
+        for(auto [dim, prod]=ItType{0, 1}; dim < rit.nDim(); ++dim) {
+          current[dim] = rit.disk_start_[dim];
+          strides[dim] = rit.disk_end_[dim] - rit.disk_start_[dim] + 1;
+          prod *= strides[dim];
+        }
+
+        return MapIterator{rit, std::move(current), std::move(strides), done};
+      }
 
       inline std::size_t nDim() const {
         return current_.size();
@@ -288,80 +300,26 @@ public:
         return nDim() - 1;
       }
 
-      inline IdMap CurrentId(std::size_t dim) const {
-        assert(dim < rit_.nDim());
-        const auto & range = rit_.DimRange(dim);
-
-        switch(range.type) {
-          case Range::FREE:
-          case Range::UNCONSTRAINED:
-            // Free and unconstrained ranges have contiguous from and to ranges
-            return IdMap{0 + current_[dim] - range.start, current_[dim]};
-            break;
-          case Range::MAP:
-            // Maps refer to individual rows
-            return rit_.DimMaps(dim)[current_[dim]];
-            break;
-          default:
-            assert(false && "Unhandled Range::Type enum");
-        }
+      std::size_t BufferOffset() const {
+        return 0;
       }
 
-      std::size_t FlatMemory(const casacore::IPosition & shape) {
-        auto product = std::size_t{1};
-        auto result = std::size_t{0};
-        auto ndim = rit_.nDim();
-        assert(ndim > 0);
-
-        for(auto dim=0; dim < ndim - 1; ++dim) {
-          result += product * CurrentId(dim).mem;
-          product *= shape[dim];
-        }
-
-        return result + product * CurrentId(ndim - 1).mem;
-      }
-
-      std::size_t FlatDisk(const casacore::IPosition & shape) {
-        auto product = std::size_t{1};
-        auto result = std::size_t{0};
-        auto ndim = rit_.nDim();
-        assert(ndim > 0);
-
-        for(auto dim=0; dim < ndim - 1; ++dim) {
-          result += product * CurrentId(dim).disk;
-          product *= shape[dim];
-        }
-
-        return result + product * CurrentId(ndim - 1).disk;
+      std::size_t RangeOffset() const {
+        return 0;
       }
 
       MapIterator & operator++() {
         assert(!done_);
+        auto product = std::size_t{1};
+
         // Iterate from fastest to slowest changing dimension
-        for(auto dim = std::size_t{0}; dim <= nDim();) {
+        for(auto dim = std::size_t{0}; dim < nDim();) {
           current_[dim]++;
 
-          auto [start, end] = [&, this]() -> std::tuple<std::size_t, std::size_t> {
-            const auto & range = rit_.DimRange(dim);
-            switch(range.type) {
-              case Range::FREE:
-              case Range::MAP:
-                return {range.start, range.end};
-              case Range::UNCONSTRAINED:
-                {
-                  const auto & rr = rit_.DimRange(RowDim());
-                  assert(rr.IsSingleRow());
-                  return {0, rit_.map_.RowDimSize(rr.start, dim)};
-                }
-              default:
-                assert(false && "Unhandled Range::Type enum");
-            }
-          }();
-
           // We've achieved a successful iteration in this dimension
-          if(current_[dim] < end) { break; }
+          if(current_[dim] < rit_.disk_end_[dim] + 1) { break; }
           // Reset to zero and retry in the next dimension
-          else if(dim < RowDim()) { current_[dim] = start; ++dim; }
+          else if(dim < RowDim()) { current_[dim] = rit_.disk_start_[dim]; ++dim; }
           // This was the slowest changing dimension so we're done
           else { done_ = true; break; }
         }
@@ -384,8 +342,11 @@ public:
   class RangeIterator {
     public:
       const ColMap2 & map_;
+      // Index of the Disjoint Range
       std::vector<std::size_t> index_;
+      // Starting position of the disk index
       casacore::IPosition disk_start_;
+      // Ending position of the disk index (inclusive)
       casacore::IPosition disk_end_;
       std::size_t flat_mem_offset_;
       bool done_;
@@ -429,11 +390,11 @@ public:
       }
 
       inline MapIterator MapBegin() const {
-        return MapIterator(*this, false);
+        return MapIterator::Make(*this, false);
       }
 
       inline MapIterator MapEnd() const {
-        return MapIterator(*this, true);
+        return MapIterator::Make(*this, true);
       }
 
       std::size_t RangeElements() const {

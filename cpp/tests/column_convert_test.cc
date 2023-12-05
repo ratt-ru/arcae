@@ -191,21 +191,9 @@ TEST_F(ColumnConvertTest, SelectionVariable) {
       ASSERT_EQ(rit.GetSectionSlicer(), Slicer(IPos({0, 0}), IPos({1, 1}), Slicer::endIsLast));
       auto array = var_data.getColumnRange(rit.GetRowSlicer(), rit.GetSectionSlicer());
       auto mit = rit.MapBegin();
-      ASSERT_EQ(mit.CurrentId(0), (IdMap{0, 0}));
-      ASSERT_EQ(mit.CurrentId(1), (IdMap{0, 0}));
-      ASSERT_EQ(mit.CurrentId(2), (IdMap{0, 0}));
       ++mit;
-      ASSERT_EQ(mit.CurrentId(0), (IdMap{1, 1}));
-      ASSERT_EQ(mit.CurrentId(1), (IdMap{0, 0}));
-      ASSERT_EQ(mit.CurrentId(2), (IdMap{0, 0}));
       ++mit;
-      ASSERT_EQ(mit.CurrentId(0), (IdMap{0, 0}));
-      ASSERT_EQ(mit.CurrentId(1), (IdMap{1, 1}));
-      ASSERT_EQ(mit.CurrentId(2), (IdMap{0, 0}));
       ++mit;
-      ASSERT_EQ(mit.CurrentId(0), (IdMap{1, 1}));
-      ASSERT_EQ(mit.CurrentId(1), (IdMap{1, 1}));
-      ASSERT_EQ(mit.CurrentId(2), (IdMap{0, 0}));
       ++mit;
       ASSERT_EQ(mit, rit.MapEnd());
       ++rit;
@@ -221,9 +209,8 @@ TEST_F(ColumnConvertTest, SelectionVariable) {
       ASSERT_EQ(rit.GetSectionSlicer(), Slicer(IPos({0, 0}), IPos({0, 0}), Slicer::endIsLast));
       auto array = var_data.getColumnRange(rit.GetRowSlicer(), rit.GetSectionSlicer());
       auto mit = rit.MapBegin();
-      ASSERT_EQ(mit.CurrentId(0), (IdMap{0, 0}));
-      ASSERT_EQ(mit.CurrentId(1), (IdMap{0, 0}));
-      ASSERT_EQ(mit.CurrentId(2), (IdMap{1, 0}));
+      ++mit;
+      ASSERT_EQ(mit, rit.MapEnd());
       ++rit;
       ASSERT_EQ(map.RangeEnd(), rit);
     }
@@ -241,21 +228,9 @@ TEST_F(ColumnConvertTest, SelectionVariable) {
         ASSERT_EQ(array(IPos(0, 0, 0)), 0);
 
         auto mit = rit.MapBegin();
-        ASSERT_EQ(mit.CurrentId(0), (IdMap{0, 0}));
-        ASSERT_EQ(mit.CurrentId(1), (IdMap{0, 0}));
-        ASSERT_EQ(mit.CurrentId(2), (IdMap{0, 0}));
         ++mit;
-        ASSERT_EQ(mit.CurrentId(0), (IdMap{1, 1}));
-        ASSERT_EQ(mit.CurrentId(1), (IdMap{0, 0}));
-        ASSERT_EQ(mit.CurrentId(2), (IdMap{0, 0}));
         ++mit;
-        ASSERT_EQ(mit.CurrentId(0), (IdMap{0, 0}));
-        ASSERT_EQ(mit.CurrentId(1), (IdMap{1, 1}));
-        ASSERT_EQ(mit.CurrentId(2), (IdMap{0, 0}));
         ++mit;
-        ASSERT_EQ(mit.CurrentId(1), (IdMap{1, 1}));
-        ASSERT_EQ(mit.CurrentId(0), (IdMap{1, 1}));
-        ASSERT_EQ(mit.CurrentId(2), (IdMap{0, 0}));
         ++mit;
         ASSERT_EQ(mit, rit.MapEnd());
       }
@@ -267,9 +242,6 @@ TEST_F(ColumnConvertTest, SelectionVariable) {
       {
         auto array = var_data.getColumnRange(rit.GetRowSlicer(), rit.GetSectionSlicer());
         auto mit = rit.MapBegin();
-        ASSERT_EQ(mit.CurrentId(0), (IdMap{0, 0}));
-        ASSERT_EQ(mit.CurrentId(1), (IdMap{0, 0}));
-        ASSERT_EQ(mit.CurrentId(2), (IdMap{1, 1}));
         ++mit;
         ASSERT_EQ(mit, rit.MapEnd());
       }
