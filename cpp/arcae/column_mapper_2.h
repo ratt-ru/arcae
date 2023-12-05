@@ -224,11 +224,11 @@ public:
     // Dimension needs to be adjusted for
     // 1. We may not have selections matching all dimensions
     // 2. Selections are FORTRAN ordered
-    auto adim = std::ptrdiff_t(dim + selection_.size()) - std::ptrdiff_t(nDim());
+    auto sdim = std::ptrdiff_t(dim + selection_.size()) - std::ptrdiff_t(nDim());
     // If we have a selection of row id's,
     // derive the dimension size from these
-    if(adim > 0 && selection_[adim].size() > 0) {
-      return selection_[adim].size();
+    if(sdim > 0 && selection_.size() > 0 && selection_[sdim].size() > 0) {
+      return selection_[sdim].size();
     }
 
     assert(dim < nDim());
