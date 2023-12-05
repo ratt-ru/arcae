@@ -4,6 +4,7 @@
 #include <cassert>
 #include <cstddef>
 #include <iterator>
+#include <functional>
 #include <memory>
 #include <numeric>
 #include <optional>
@@ -172,7 +173,7 @@ struct VariableShapeData {
 // This may not be possible in the Variable column case.
 struct ShapeProvider {
 public:
-  const casacore::TableColumn & column_;
+  std::reference_wrapper<const casacore::TableColumn> column_;
   const ColumnSelection & selection_;
   std::unique_ptr<VariableShapeData> var_data_;
 
@@ -180,11 +181,11 @@ public:
                                            const ColumnSelection & selection) {
 
     if(column.columnDesc().isFixedShape()) {
-      return ShapeProvider{column, selection, nullptr};
+      return ShapeProvider{std::cref(column), selection, nullptr};
     }
 
     ARROW_ASSIGN_OR_RAISE(auto var_data, VariableShapeData::Make(column, selection));
-    return ShapeProvider{column, selection, std::move(var_data)};
+    return ShapeProvider{std::cref(column), selection, std::move(var_data)};
   }
 
   // Returns true if the column is defined as having a fixed shape
@@ -204,7 +205,7 @@ public:
 
   // Returns the number of dimensions, including row
   std::size_t nDim() const {
-    return (IsDefinitelyFixed() ? column_.columnDesc().ndim() : var_data_->nDim()) + 1;
+    return (IsDefinitelyFixed() ? column_.get().columnDesc().ndim() : var_data_->nDim()) + 1;
   }
 
   inline std::size_t RowDim() const { return nDim() - 1; }
@@ -228,16 +229,16 @@ public:
     // from the column shape information
     if(dim == RowDim()) {
       // First dimension is just row
-      return column_.nrow();
+      return column_.get().nrow();
     } else if(IsDefinitelyFixed()) {
       // Fixed shape column, we have the size information
-      return column_.shapeColumn()[dim];
+      return column_.get().shapeColumn()[dim];
     } else {
       const auto & shape = var_data_->shape_;
 
       if(!shape) {
         return arrow::Status::IndexError("Dimension ", dim, " in  column ",
-                                         column_.columnDesc().name(),
+                                         column_.get().columnDesc().name(),
                                          " is not fixed.");
       }
 
@@ -263,7 +264,7 @@ public:
   // Iterates over the current mapping in the RangeIterator
   class MapIterator {
     public:
-      const RangeIterator & rit_;
+      std::reference_wrapper<const RangeIterator> rit_;
       std::vector<ssize_t> current_;
       std::vector<ssize_t> strides_;
       bool done_;
@@ -271,7 +272,7 @@ public:
       MapIterator(const RangeIterator & rit,
                   std::vector<ssize_t> && current,
                   std::vector<ssize_t> && strides, bool done) :
-        rit_(rit),
+        rit_(std::cref(rit)),
         current_(std::move(current)),
         strides_(std::move(strides)),
         done_(done) {}
@@ -317,9 +318,9 @@ public:
           current_[dim]++;
 
           // We've achieved a successful iteration in this dimension
-          if(current_[dim] < rit_.disk_end_[dim] + 1) { break; }
+          if(current_[dim] < rit_.get().disk_end_[dim] + 1) { break; }
           // Reset to zero and retry in the next dimension
-          else if(dim < RowDim()) { current_[dim] = rit_.disk_start_[dim]; ++dim; }
+          else if(dim < RowDim()) { current_[dim] = rit_.get().disk_start_[dim]; ++dim; }
           // This was the slowest changing dimension so we're done
           else { done_ = true; break; }
         }
@@ -328,7 +329,7 @@ public:
       }
 
       bool operator==(const MapIterator & other) const {
-        if(&rit_ != &other.rit_ || done_ != other.done_) return false;
+        if(&rit_.get() != &other.rit_.get() || done_ != other.done_) return false;
         return done_ ? true : current_ == other.current_;
       }
 
@@ -341,7 +342,7 @@ public:
   // Iterates over the Disjoint Ranges defined by a ColumnMapping
   class RangeIterator {
     public:
-      const ColMap2 & map_;
+      std::reference_wrapper<const ColMap2> map_;
       // Index of the Disjoint Range
       std::vector<std::size_t> index_;
       // Starting position of the disk index
@@ -353,7 +354,7 @@ public:
 
     public:
       RangeIterator(ColMap2 & column_map, bool done=false) :
-        map_(column_map),
+        map_(std::cref(column_map)),
         index_(column_map.nDim(), 0),
         disk_start_(column_map.nDim(), 0),
         disk_end_(column_map.nDim(), 0),
@@ -374,13 +375,13 @@ public:
       // Return the Ranges for the given dimension
       inline const ColumnRange & DimRanges(std::size_t dim) const {
         assert(dim < nDim());
-        return map_.DimRanges(dim);
+        return map_.get().DimRanges(dim);
       }
 
       // Return the Maps for the given dimension
       inline const ColumnMap & DimMaps(std::size_t dim) const {
         assert(dim < nDim());
-        return map_.DimMaps(dim);
+        return map_.get().DimMaps(dim);
       }
 
       // Return the currently selected Range of the given dimension
@@ -417,7 +418,7 @@ public:
           index_[dim]++;
 
           // We've achieved a successful iteration in this dimension
-          if(index_[dim] < map_.DimRanges(dim).size()) { break; }
+          if(index_[dim] < map_.get().DimRanges(dim).size()) { break; }
           // We've exceeded the size of the current dimension
           // reset to zero and retry the while loop
           else if(dim < RowDim()) { index_[dim] = 0; ++dim; }
@@ -454,7 +455,7 @@ public:
               const auto & rr = DimRange(RowDim());
               assert(rr.IsSingleRow());
               disk_start_[dim] = 0;
-              disk_end_[dim] = static_cast<ssize_t>(map_.RowDimSize(rr.start, dim)) - 1;
+              disk_end_[dim] = static_cast<ssize_t>(map_.get().RowDimSize(rr.start, dim)) - 1;
               break;
             }
             default:
@@ -489,7 +490,7 @@ public:
       };
 
       bool operator==(const RangeIterator & other) const {
-        if(&map_ != &other.map_ || done_ != other.done_) return false;
+        if(&map_.get() != &other.map_.get() || done_ != other.done_) return false;
         return done_ ? true : index_ == other.index_;
       };
 
