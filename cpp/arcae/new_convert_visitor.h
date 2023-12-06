@@ -14,6 +14,7 @@
 #include "arcae/complex_type.h"
 #include "arcae/service_locator.h"
 #include "arcae/utility.h"
+#include "arrow/result.h"
 
 namespace arcae {
 
@@ -24,14 +25,14 @@ public:
 public:
     const casacore::TableColumn & column_;
     const casacore::ColumnDesc & column_desc_;
-    const ColumnMapping<casacore::rownr_t> & column_map_;
+    const ColumnMapping & column_map_;
     std::shared_ptr<arrow::Array> array_;
     arrow::MemoryPool * pool_;
 
 public:
     explicit NewConvertVisitor(
         const casacore::TableColumn & column,
-        const ColumnMapping<casacore::rownr_t> & column_map,
+        const ColumnMapping & column_map,
         arrow::MemoryPool * pool=arrow::default_memory_pool()) :
             column_(column),
             column_desc_(column_.columnDesc()),
@@ -79,20 +80,20 @@ public:
             if(column_map_.IsSimple()) {
                 try {
                     // Dump column data straight into the Arrow Buffer
-                    column.getColumnRange(*column_map_.RangeBegin(), casa_vector);
+                    auto it = column_map_.RangeBegin();
+                    column.getColumnRange(it.GetRowSlicer(), casa_vector);
                 } catch(std::exception & e) {
                     return arrow::Status::Invalid("ConvertScalarColumn ", column_desc_.name(), " ", e.what());
                 }
             } else {
                 for(auto it = column_map_.RangeBegin(); it != column_map_.RangeEnd(); ++it) {
-
                     // Copy sections of data into the Arrow Buffer
                     try {
                         auto chunk = column.getColumnRange(it.GetRowSlicer());
                         auto chunk_ptr = chunk.data();
 
                         for(auto [i, mit] = std::tuple{int{0}, it.MapBegin()}; mit != it.MapEnd(); ++mit, ++i) {
-                            auto out = mit.FlatDestination(casa_vector.shape());
+                            auto out = mit.ToBufferOffset();
                             casa_ptr[out] = chunk_ptr[i];
                         }
                     } catch(std::exception & e) {
@@ -120,7 +121,7 @@ public:
 
             for(auto it = column_map_.RangeBegin(); it != column_map_.RangeEnd(); ++it) {
                 try {
-                    auto strings = column.getColumnRange(*it);
+                    auto strings = column.getColumnRange(it.GetRowSlicer(), it.GetSectionSlicer());
                     for(auto & s: strings) { ARROW_RETURN_NOT_OK(builder.Append(s)); }
                 } catch(std::exception & e) {
                     return arrow::Status::Invalid("ConvertFixedColumn ", column_desc_.name(), " ", e.what());
@@ -129,9 +130,9 @@ public:
 
             ARROW_ASSIGN_OR_RAISE(array_, builder.Finish());
         } else {
-            // Wrap Arrow Buffer in casacore Vector
-            auto shape = column_map_.GetShape();
-            auto nelements = shape.product();
+            // Wrap Arrow Buffer in casacore Array
+            auto nelements = column_map_.nElements();
+            ARROW_ASSIGN_OR_RAISE(auto shape, column_map_.GetShape());
             ARROW_ASSIGN_OR_RAISE(auto allocation, arrow::AllocateBuffer(nelements*sizeof(T), pool_));
             auto buffer = std::shared_ptr<arrow::Buffer>(std::move(allocation));
             auto * buf_ptr = reinterpret_cast<T *>(buffer->mutable_data());
@@ -155,7 +156,7 @@ public:
                         auto chunk_ptr = chunk.data();
 
                         for(auto [i, mit] = std::tuple{int{0}, it.MapBegin()}; mit != it.MapEnd(); ++mit, ++i) {
-                            auto out = mit.FlatDestination(casa_vector.shape());
+                            auto out = mit.ToBufferOffset();
                             casa_ptr[out] = chunk_ptr[i];
                         }
                     } catch(std::exception & e) {

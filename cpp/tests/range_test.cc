@@ -1,222 +1,187 @@
 
+#include "gmock/gmock.h"
+
+#include <arrow/result.h>
+#include <arrow/testing/gtest_util.h>
+
+#include <casacore/casa/Arrays/IPosition.h>
+#include <casacore/casa/BasicSL/Complexfwd.h>
+#include <casacore/tables/Tables/ArrColDesc.h>
+#include <casacore/tables/Tables/RefRows.h>
+#include <casacore/tables/Tables/Table.h>
+#include <casacore/tables/Tables/TableProxy.h>
+#include <casacore/tables/Tables.h>
+#include <casacore/tables/Tables/TableColumn.h>
+#include <casacore/ms/MeasurementSets/MeasurementSet.h>
+
+
 #include <arcae/column_mapper.h>
 #include <arcae/safe_table_proxy.h>
 #include <arcae/table_factory.h>
+
 #include <tests/test_utils.h>
 
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
-#include <arrow/testing/gtest_util.h>
 
-using casacore::Slicer;
+using arcae::ColumnMapping;
+using arcae::ColumnSelection;
+using arcae::IdMap;
+using arcae::Range;
+using casacore::ArrayColumn;
+using casacore::ArrayColumnDesc;
+using casacore::ColumnDesc;
+using CasaComplex = casacore::Complex;
+using MS = casacore::MeasurementSet;
+using MSColumns = casacore::MSMainEnums::PredefinedColumns;
+using casacore::SetupNewTable;
+using casacore::ScalarColumn;
+using casacore::Table;
+using casacore::TableDesc;
+using casacore::TableColumn;
+using casacore::TableProxy;
+using casacore::TiledColumnStMan;
 using IPos = casacore::IPosition;
 
+using namespace std::string_literals;
 
-using C = arcae::ColumnMapping<casacore::rownr_t>;
+static constexpr std::size_t knrow = 10;
+static constexpr std::size_t knchan = 4;
+static constexpr std::size_t kncorr = 2;
 
-TEST(RangeTest, CheckMapsAndRangesSingleton) {
-    auto map = C(C::ColumnSelection{{0}});
-
-    EXPECT_THAT(map.GetMaps()[0],
-               ::testing::ElementsAre(C::IdMap{0, 0}));
-
-    EXPECT_THAT(map.GetRanges()[0],
-                ::testing::ElementsAre(C::Range{0, 1}));
+template <typename T> ScalarColumn<T>
+GetScalarColumn(const MS & ms, MSColumns column) {
+    return ScalarColumn<T>(TableColumn(ms, MS::columnName(column)));
 }
 
-TEST(RangeTest, CheckMapsAndRangesMultiple) {
-    auto map = C({
+template <typename T> ScalarColumn<T>
+GetScalarColumn(const MS & ms, const std::string & column) {
+    return ScalarColumn<T>(TableColumn(ms, column));
+}
+
+template <typename T> ArrayColumn<T>
+GetArrayColumn(const MS & ms, MSColumns column) {
+    return ArrayColumn<T>(TableColumn(ms, MS::columnName(column)));
+}
+
+template <typename T> ArrayColumn<T>
+GetArrayColumn(const MS & ms, const std::string & column) {
+  return ArrayColumn<T>(TableColumn(ms, column));
+}
+
+class RangeTest : public ::testing::Test {
+  protected:
+    std::string table_name_;
+    casacore::TableProxy proxy_;
+
+    void SetUp() override {
+      auto factory = [this]() -> arrow::Result<std::shared_ptr<TableProxy>> {
+        auto * test_info = ::testing::UnitTest::GetInstance()->current_test_info();
+        table_name_ = std::string(test_info->name() + "-"s + arcae::hexuuid(4) + ".table"s);
+
+        auto table_desc = TableDesc(MS::requiredTableDesc());
+        auto data_shape = IPos({kncorr, knchan});
+        auto tile_shape = IPos({kncorr, knchan, 1});
+        auto data_column_desc = ArrayColumnDesc<CasaComplex>(
+            "MODEL_DATA", data_shape, ColumnDesc::FixedShape);
+
+        table_desc.addColumn(data_column_desc);
+        auto storage_manager = TiledColumnStMan("TiledModelData", tile_shape);
+        auto setup_new_table = SetupNewTable(table_name_, table_desc, Table::New);
+        setup_new_table.bindColumn("MODEL_DATA", storage_manager);
+        auto ms = MS(setup_new_table, knrow);
+        return std::make_shared<TableProxy>(ms);
+      };
+
+      ASSERT_OK_AND_ASSIGN(auto table_proxy_, arcae::SafeTableProxy::Make(factory));
+      table_proxy_.reset();
+
+      auto lock = casacore::TableLock(casacore::TableLock::LockOption::AutoNoReadLocking);
+      auto lockoptions = casacore::Record();
+      lockoptions.define("option", "auto");
+      lockoptions.define("internal", lock.interval());
+      lockoptions.define("maxwait", casacore::Int(lock.maxWait()));
+      proxy_ = casacore::TableProxy(table_name_, lockoptions, casacore::Table::Old);
+    }
+};
+
+
+
+TEST_F(RangeTest, CheckMapsAndRangesSingleton) {
+  auto data = GetArrayColumn<CasaComplex>(proxy_.table(), MS::MODEL_DATA);
+  ASSERT_OK_AND_ASSIGN(auto map, ColumnMapping::Make(data, ColumnSelection{{0}}));
+
+  EXPECT_EQ(map.DimMaps(0).size(), 0);
+  EXPECT_EQ(map.DimMaps(1).size(), 0);
+  EXPECT_THAT(map.DimMaps(2), ::testing::ElementsAre(IdMap{0, 0}));
+
+  EXPECT_THAT(map.DimRanges(0), ::testing::ElementsAre(Range{0, 2}));
+  EXPECT_THAT(map.DimRanges(1), ::testing::ElementsAre(Range{0, 4}));
+  EXPECT_THAT(map.DimRanges(2), ::testing::ElementsAre(Range{0, 1}));
+}
+
+TEST_F(RangeTest, CheckMapsAndRangesMultiple) {
+  auto data = GetArrayColumn<CasaComplex>(proxy_.table(), MS::MODEL_DATA);
+  auto selection = ColumnSelection{
         {4, 3, 2, 1, 8, 7},    // Two disjoint ranges
         {5, 6},                // One range
-        {7, 9, 8, 12, 11}});   // Two disjoint ranges
+        {7, 9, 8, 12, 11}};    // Two disjoint ranges
+  ASSERT_OK_AND_ASSIGN(auto map, ColumnMapping::Make(data, std::move(selection)));
 
-    const auto & maps = map.GetMaps();
-    const auto & ranges = map.GetRanges();
+  EXPECT_THAT(map.DimMaps(2), ::testing::ElementsAre(
+        IdMap{1, 3},
+        IdMap{2, 2},
+        IdMap{3, 1},
+        IdMap{4, 0},
+        IdMap{7, 5},
+        IdMap{8, 4}));
 
-    EXPECT_EQ(maps.size(), 3);
-    EXPECT_EQ(ranges.size(), 3);
+  EXPECT_THAT(map.DimRanges(2), ::testing::ElementsAre(
+        Range{0, 4},
+        Range{4, 6}));
 
-    EXPECT_THAT(maps[0], ::testing::ElementsAre(
-        C::IdMap{1, 3},
-        C::IdMap{2, 2},
-        C::IdMap{3, 1},
-        C::IdMap{4, 0},
-        C::IdMap{7, 5},
-        C::IdMap{8, 4}));
+  EXPECT_THAT(map.DimMaps(1), ::testing::ElementsAre(
+        IdMap{5, 0}, IdMap{6, 1}));
 
-    EXPECT_THAT(ranges[0], ::testing::ElementsAre(
-        C::Range{0, 4},
-        C::Range{4, 6}));
+  EXPECT_THAT(map.DimRanges(1), ::testing::ElementsAre(
+        Range{0, 2}));
 
-    EXPECT_THAT(maps[1], ::testing::ElementsAre(
-        C::IdMap{5, 0}, C::IdMap{6, 1}));
+  EXPECT_THAT(map.DimMaps(0), ::testing::ElementsAre(
+        IdMap{7, 0},
+        IdMap{8, 2},
+        IdMap{9, 1},
+        IdMap{11, 4},
+        IdMap{12, 3}));
 
-    EXPECT_THAT(ranges[1], ::testing::ElementsAre(
-        C::Range{0, 2}));
+  EXPECT_THAT(map.DimRanges(0), ::testing::ElementsAre(
+        Range{0, 3},
+        Range{3, 5}));
 
-    EXPECT_THAT(maps[2], ::testing::ElementsAre(
-        C::IdMap{7, 0},
-        C::IdMap{8, 2},
-        C::IdMap{9, 1},
-        C::IdMap{11, 4},
-        C::IdMap{12, 3}));
-
-    EXPECT_THAT(ranges[2], ::testing::ElementsAre(
-        C::Range{0, 3},
-        C::Range{3, 5}));
-
-    ASSERT_FALSE(map.IsSimple());
+  ASSERT_FALSE(map.IsSimple());
 }
 
-TEST(RangeTest, TestSimplicity) {
-    EXPECT_TRUE(C({{1, 2, 3, 4}}).IsSimple());
-    EXPECT_TRUE(C({{1, 2, 3, 4}, {5, 6}, {6, 7}}).IsSimple());
+TEST_F(RangeTest, TestSimplicity) {
+  auto data = GetArrayColumn<CasaComplex>(proxy_.table(), MS::MODEL_DATA);
 
+  {
+    ASSERT_OK_AND_ASSIGN(auto map, ColumnMapping::Make(data, {{1, 2, 3, 4}}));
+    ASSERT_TRUE(map.IsSimple());
+  }
+
+  {
+    ASSERT_OK_AND_ASSIGN(auto map, ColumnMapping::Make(data, {{1, 2, 3, 4}, {5, 6}, {6, 7}}));
+    ASSERT_TRUE(map.IsSimple());
+  }
+
+  {
     // Multiple mapping ranges (discontiguous)
-    EXPECT_FALSE(C({{1, 2, 4, 5}}).IsSimple());
+    ASSERT_OK_AND_ASSIGN(auto map, ColumnMapping::Make(data, {{1, 2, 4, 5}}));
+    ASSERT_FALSE(map.IsSimple());
+  }
 
+  {
     // Not monotically increasing
-    EXPECT_FALSE(C({{4, 3, 2, 1}}).IsSimple());
-}
-
-TEST(RangeTest, IteratorSingletonTest) {
-    auto last = casacore::Slicer::endIsLast;
-    auto map = C({C::ColumnIds{1}});
-    auto it = map.RangeBegin();
-    EXPECT_EQ(*it, Slicer(IPos({1}), IPos({1}), last)); ++it;
-    EXPECT_EQ(it, map.RangeEnd());
-}
-
-
-TEST(RangeTest, RangeIteratorTest) {
-    auto last = casacore::Slicer::endIsLast;
-
-    auto map = C({
-        {4, 3, 2, 1, 8, 7, 20},    // Three disjoint ranges
-        {5, 6, 8, 9},              // Two disjoint ranges
-        {7, 9, 8, 12, 11}});       // Two disjoint ranges
-
-    auto it = map.RangeBegin();
-
-    EXPECT_EQ(*it, Slicer(IPos({1, 5, 7}), IPos({4, 6, 9}), last)); ++it;
-    EXPECT_EQ(*it, Slicer(IPos({1, 5, 11}), IPos({4, 6, 12}), last)); ++it;
-    EXPECT_EQ(*it, Slicer(IPos({1, 8, 7}), IPos({4, 9, 9}), last)); ++it;
-    EXPECT_EQ(*it, Slicer(IPos({1, 8, 11}), IPos({4, 9, 12}), last)); ++it;
-
-    EXPECT_EQ(*it, Slicer(IPos({7, 5, 7}), IPos({8, 6, 9}), last)); ++it;
-    EXPECT_EQ(*it, Slicer(IPos({7, 5, 11}), IPos({8, 6, 12}), last)); ++it;
-    EXPECT_EQ(*it, Slicer(IPos({7, 8, 7}), IPos({8, 9, 9}), last)); ++it;
-    EXPECT_EQ(*it, Slicer(IPos({7, 8, 11}), IPos({8, 9, 12}), last)); ++it;
-
-    EXPECT_EQ(*it, Slicer(IPos({20, 5, 7}), IPos({20, 6, 9}), last)); ++it;
-    EXPECT_EQ(*it, Slicer(IPos({20, 5, 11}), IPos({20, 6, 12}), last)); ++it;
-    EXPECT_EQ(*it, Slicer(IPos({20, 8, 7}), IPos({20, 9, 9}), last)); ++it;
-    EXPECT_EQ(*it, Slicer(IPos({20, 8, 11}), IPos({20, 9, 12}), last)); ++it;
-
-    EXPECT_EQ(it, map.RangeEnd());
-}
-
-
-TEST(RangeTest, RowSlicerTest) {
-    auto last = casacore::Slicer::endIsLast;
-
-    auto map = C({
-        {4, 3, 2, 1, 8, 7, 20},    // Three disjoint ranges
-        {5, 6, 8, 9},              // Two disjoint ranges
-        {7, 9, 8, 12, 11}});       // Two disjoint ranges
-
-    EXPECT_NE(map.RangeBegin(), map.RangeEnd());
-
-    auto it = map.RangeBegin();
-
-    EXPECT_EQ(it.GetRowSlicer(), Slicer(IPos({1}), IPos({4}), last)); ++it;
-    EXPECT_EQ(it.GetRowSlicer(), Slicer(IPos({1}), IPos({4}), last)); ++it;
-    EXPECT_EQ(it.GetRowSlicer(), Slicer(IPos({1}), IPos({4}), last)); ++it;
-    EXPECT_EQ(it.GetRowSlicer(), Slicer(IPos({1}), IPos({4}), last)); ++it;
-
-    EXPECT_EQ(it.GetRowSlicer(), Slicer(IPos({7}), IPos({8}), last)); ++it;
-    EXPECT_EQ(it.GetRowSlicer(), Slicer(IPos({7}), IPos({8}), last)); ++it;
-    EXPECT_EQ(it.GetRowSlicer(), Slicer(IPos({7}), IPos({8}), last)); ++it;
-    EXPECT_EQ(it.GetRowSlicer(), Slicer(IPos({7}), IPos({8}), last)); ++it;
-
-    EXPECT_EQ(it.GetRowSlicer(), Slicer(IPos({20}), IPos({20}), last)); ++it;
-    EXPECT_EQ(it.GetRowSlicer(), Slicer(IPos({20}), IPos({20}), last)); ++it;
-    EXPECT_EQ(it.GetRowSlicer(), Slicer(IPos({20}), IPos({20}), last)); ++it;
-    EXPECT_EQ(it.GetRowSlicer(), Slicer(IPos({20}), IPos({20}), last)); ++it;
-
-    EXPECT_EQ(it, map.RangeEnd());
-}
-
-
-
-TEST(RangeTest, MapIteratorTest) {
-    auto last = casacore::Slicer::endIsLast;
-
-    // Worked example testing iteration over 4 ranges
-    // and the maps within these ranges:
-    //
-    // 1. 2 x 2 x 2 elements
-    // 2. 2 x 2 x 1 elements
-    // 3. 1 x 2 x 2 elements
-    // 4. 1 x 2 x 1 elements
-    auto map = C({
-        {0, 1, 3},    // Two disjoint ranges
-        {0, 1},       // One range
-        {0, 1, 3}     // Two disjoint ranges
-    });
-
-    EXPECT_NE(map.RangeBegin(), map.RangeEnd());
-
-    using IdMap = C::IdMap;
-    auto n = std::size_t{0};
-    auto rit = map.RangeBegin();
-
-    {
-        EXPECT_EQ(*rit, Slicer(IPos({0, 0, 0}), IPos({1, 1, 1}), last));
-        EXPECT_NE(rit.MapBegin(), rit.MapEnd());
-        auto mit = rit.MapBegin();
-        EXPECT_EQ(*mit, (std::vector<IdMap>{{0, 0}, {0, 0}, {0, 0}})); ++mit; ++n;
-        EXPECT_EQ(*mit, (std::vector<IdMap>{{0, 0}, {0, 0}, {1, 1}})); ++mit; ++n;
-        EXPECT_EQ(*mit, (std::vector<IdMap>{{0, 0}, {1, 1}, {0, 0}})); ++mit; ++n;
-        EXPECT_EQ(*mit, (std::vector<IdMap>{{0, 0}, {1, 1}, {1, 1}})); ++mit; ++n;
-        EXPECT_EQ(*mit, (std::vector<IdMap>{{1, 1}, {0, 0}, {0, 0}})); ++mit; ++n;
-        EXPECT_EQ(*mit, (std::vector<IdMap>{{1, 1}, {0, 0}, {1, 1}})); ++mit; ++n;
-        EXPECT_EQ(*mit, (std::vector<IdMap>{{1, 1}, {1, 1}, {0, 0}})); ++mit; ++n;
-        EXPECT_EQ(*mit, (std::vector<IdMap>{{1, 1}, {1, 1}, {1, 1}})); ++mit; ++n;
-        EXPECT_EQ(mit, rit.MapEnd()); ++rit;
-    }
-
-    {
-        EXPECT_EQ(*rit, Slicer(IPos({0, 0, 3}), IPos({1, 1, 3}), last));
-        EXPECT_NE(rit.MapBegin(), rit.MapEnd());
-        auto mit = rit.MapBegin();
-        EXPECT_EQ(*mit, (std::vector<IdMap>{{0, 0}, {0, 0}, {3, 2}})); ++mit; ++n;
-        EXPECT_EQ(*mit, (std::vector<IdMap>{{0, 0}, {1, 1}, {3, 2}})); ++mit; ++n;
-        EXPECT_EQ(*mit, (std::vector<IdMap>{{1, 1}, {0, 0}, {3, 2}})); ++mit; ++n;
-        EXPECT_EQ(*mit, (std::vector<IdMap>{{1, 1}, {1, 1}, {3, 2}})); ++mit; ++n;
-        EXPECT_EQ(mit, rit.MapEnd()); ++rit;
-    }
-
-    {
-        EXPECT_EQ(*rit, Slicer(IPos({3, 0, 0}), IPos({3, 1, 1}), last));
-        EXPECT_NE(rit.MapBegin(), rit.MapEnd());
-        auto mit = rit.MapBegin();
-        EXPECT_EQ(*mit, (std::vector<IdMap>{{3, 2}, {0, 0}, {0, 0}})); ++mit; ++n;
-        EXPECT_EQ(*mit, (std::vector<IdMap>{{3, 2}, {0, 0}, {1, 1}})); ++mit; ++n;
-        EXPECT_EQ(*mit, (std::vector<IdMap>{{3, 2}, {1, 1}, {0, 0}})); ++mit; ++n;
-        EXPECT_EQ(*mit, (std::vector<IdMap>{{3, 2}, {1, 1}, {1, 1}})); ++mit; ++n;
-        EXPECT_EQ(mit, rit.MapEnd()); ++rit;
-    }
-
-    {
-        EXPECT_EQ(*rit, Slicer(IPos({3, 0, 3}), IPos({3, 1, 3}), last));
-        EXPECT_NE(rit.MapBegin(), rit.MapEnd());
-        auto mit = rit.MapBegin();
-        EXPECT_EQ(*mit, (std::vector<IdMap>{{3, 2}, {0, 0}, {3, 2}})); ++mit; ++n;
-        EXPECT_EQ(*mit, (std::vector<IdMap>{{3, 2}, {1, 1}, {3, 2}})); ++mit; ++n;
-        EXPECT_EQ(mit, rit.MapEnd()); ++rit;
-    }
-
-    EXPECT_EQ(rit, map.RangeEnd());
-    EXPECT_EQ(n, map.nElements());
+    ASSERT_OK_AND_ASSIGN(auto map, ColumnMapping::Make(data, {{4, 3, 2, 1}}));
+    ASSERT_FALSE(map.IsSimple());
+  }
 }

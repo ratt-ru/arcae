@@ -14,9 +14,9 @@
 #include <arrow/testing/gtest_util.h>
 
 #include "arcae/safe_table_proxy.h"
-#include "arcae/column_mapper_2.h"
+#include "arcae/column_mapper.h"
 
-using arcae::ColMap2;
+using arcae::ColumnMapping;
 using arcae::IdMap;
 
 using casacore::Array;
@@ -183,7 +183,7 @@ TEST_F(ColumnConvertTest, SelectionVariable) {
     auto var_data = GetArrayColumn<casacore::Int>(proxy.table(), "VAR_DATA");
     {
       // Get row 0
-      ASSERT_OK_AND_ASSIGN(auto map, ColMap2::Make(var_data, {{0}}));
+      ASSERT_OK_AND_ASSIGN(auto map, ColumnMapping::Make(var_data, {{0}}));
       ASSERT_EQ(map.nRanges(), 1);
       ASSERT_EQ(map.nElements(), 4);
       auto rit = map.RangeBegin();
@@ -201,7 +201,7 @@ TEST_F(ColumnConvertTest, SelectionVariable) {
     }
     // Get row 1
     {
-      ASSERT_OK_AND_ASSIGN(auto map, ColMap2::Make(var_data, {{1}}));
+      ASSERT_OK_AND_ASSIGN(auto map, ColumnMapping::Make(var_data, {{1}}));
       ASSERT_EQ(map.nRanges(), 1);
       ASSERT_EQ(map.nElements(), 1);
       auto rit = map.RangeBegin();
@@ -216,7 +216,7 @@ TEST_F(ColumnConvertTest, SelectionVariable) {
     }
     {
       // Get row 0 and 1
-      ASSERT_OK_AND_ASSIGN(auto map, ColMap2::Make(var_data, {{0, 1}}));
+      ASSERT_OK_AND_ASSIGN(auto map, ColumnMapping::Make(var_data, {{0, 1}}));
       ASSERT_EQ(map.nRanges(), 2);
       ASSERT_EQ(map.nElements(), 5);
       auto rit = map.RangeBegin();
