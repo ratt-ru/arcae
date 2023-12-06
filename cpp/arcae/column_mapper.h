@@ -770,7 +770,36 @@ public:
   // a single range and thereby removes the need to read separate ranges of
   // data and copy those into a final buffer.
   bool IsSimple() const {
-    return nRanges() == 1;
+    for(std::size_t dim=0; dim < nDim(); ++dim) {
+      const auto & column_map = DimMaps(dim);
+      const auto & column_range = DimRanges(dim);
+
+      // More than one range of row ids in a dimension
+      if(column_range.size() > 1) {
+        return false;
+      }
+
+      for(auto & range: column_range) {
+        switch(range.type) {
+          // These are trivially contiguous
+          case Range::FREE:
+          case Range::UNCONSTRAINED:
+            break;
+          case Range::MAP:
+            for(std::size_t i = range.start + 1; i < range.end; ++i) {
+              if(column_map[i].mem - column_map[i-1].mem != 1) {
+                return false;
+              }
+              if(column_map[i].disk - column_map[i-1].disk != 1) {
+                return false;
+              }
+            }
+            break;
+        }
+      }
+    }
+
+    return true;
   }
 
   arrow::Result<casacore::IPosition> GetShape() const {
