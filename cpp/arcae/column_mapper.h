@@ -96,8 +96,9 @@ using ColumnRanges = std::vector<ColumnRange>;
 // Holds variable shape data for a column
 struct VariableShapeData {
   // Clip supplied shape based on the column selection
-  static casacore::IPosition ClipShape(const casacore::IPosition & shape,
-                                       const ColumnSelection & selection) {
+  static arrow::Result<casacore::IPosition> ClipShape(
+                                      const casacore::IPosition & shape,
+                                      const ColumnSelection & selection) {
     // There's no selection, or only a row selection
     // so there's no need to clip the shapes
     if(selection.size() <= 1) {
@@ -109,6 +110,14 @@ struct VariableShapeData {
     for(std::size_t dim=0; dim < shape.size(); ++dim) {
       auto sdim = SelectDim(dim, selection.size(), shape.size() + 1);
       if(sdim >= 0 && selection[sdim].size() > 0) {
+        for(auto i: selection[sdim]) {
+          if(i >= clipped[dim]) {
+            return arrow::Status::Invalid("Selection index ", i,
+                                          " exceeds dimension ", dim,
+                                          " of shape ", clipped);
+          }
+        }
+
         clipped[dim] = selection[sdim].size();
       }
     }
@@ -138,7 +147,9 @@ struct VariableShapeData {
                                                column.columnDesc().name(),
                                                " is not defined.");
         }
-        row_shapes.push_back(ClipShape(column.shape(r), selection));
+
+        ARROW_ASSIGN_OR_RAISE(auto shape, ClipShape(column.shape(r), selection));
+        row_shapes.emplace_back(std::move(shape));
         if(first) { first = false; continue; }
         fixed_shape = fixed_shape && *std::rbegin(row_shapes) == *std::begin(row_shapes);
         fixed_dims = fixed_dims && std::rbegin(row_shapes)->size() == std::begin(row_shapes)->size();
@@ -155,7 +166,8 @@ struct VariableShapeData {
                                                " is not defined.");
         }
 
-        row_shapes.push_back(ClipShape(column.shape(row_ids[r]), selection));
+        ARROW_ASSIGN_OR_RAISE(auto shape, ClipShape(column.shape(row_ids[r]), selection));
+        row_shapes.emplace_back(std::move(shape));
         if(first) { first = false; continue; }
         fixed_shape = fixed_shape && *std::rbegin(row_shapes) == *std::begin(row_shapes);
         fixed_dims = fixed_dims && std::rbegin(row_shapes)->size() == std::begin(row_shapes)->size();
