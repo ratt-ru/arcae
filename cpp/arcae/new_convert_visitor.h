@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <functional>
 #include <unordered_set>
 
 #include <casacore/tables/Tables.h>
@@ -23,8 +24,7 @@ public:
     using ShapeVectorType = std::vector<casacore::IPosition>;
 
 public:
-    const casacore::TableColumn & column_;
-    const casacore::ColumnDesc & column_desc_;
+    std::reference_wrapper<const casacore::TableColumn> column_;
     const ColumnMapping & column_map_;
     std::shared_ptr<arrow::Array> array_;
     arrow::MemoryPool * pool_;
@@ -35,7 +35,6 @@ public:
         const ColumnMapping & column_map,
         arrow::MemoryPool * pool=arrow::default_memory_pool()) :
             column_(column),
-            column_desc_(column_.columnDesc()),
             column_map_(column_map),
             array_(),
             pool_(pool) {};
@@ -63,7 +62,9 @@ public:
                     auto strings = column.getColumnRange(it.GetRowSlicer());
                     for(auto & s: strings) { ARROW_RETURN_NOT_OK(builder.Append(s)); }
                 } catch(std::exception & e) {
-                    return arrow::Status::Invalid("ConvertScalarColumn ", column_desc_.name(), " ", e.what());
+                    return arrow::Status::Invalid("ConvertScalarColumn ",
+                                                  column_.get().columnDesc().name(),
+                                                  ": ", e.what());
                 }
             }
 
@@ -83,7 +84,9 @@ public:
                     auto it = column_map_.RangeBegin();
                     column.getColumnRange(it.GetRowSlicer(), casa_vector);
                 } catch(std::exception & e) {
-                    return arrow::Status::Invalid("ConvertScalarColumn ", column_desc_.name(), " ", e.what());
+                    return arrow::Status::Invalid("ConvertScalarColumn ",
+                                                  column_.get().columnDesc().name(),
+                                                  ": ", e.what());
                 }
             } else {
                 for(auto it = column_map_.RangeBegin(); it != column_map_.RangeEnd(); ++it) {
@@ -97,7 +100,9 @@ public:
                             casa_ptr[out] = chunk_ptr[i];
                         }
                     } catch(std::exception & e) {
-                        return arrow::Status::Invalid("ConvertScalarColumn ", column_desc_.name(), " ", e.what());
+                        return arrow::Status::Invalid("ConvertScalarColumn ",
+                                                      column_.get().columnDesc().name(),
+                                                      ": ", e.what());
                     }
                 }
             }
@@ -124,7 +129,9 @@ public:
                     auto strings = column.getColumnRange(it.GetRowSlicer(), it.GetSectionSlicer());
                     for(auto & s: strings) { ARROW_RETURN_NOT_OK(builder.Append(s)); }
                 } catch(std::exception & e) {
-                    return arrow::Status::Invalid("ConvertFixedColumn ", column_desc_.name(), " ", e.what());
+                    return arrow::Status::Invalid("ConvertFixedColumn ",
+                                                  column_.get().columnDesc().name(),
+                                                  ": ", e.what());
                 }
             }
 
@@ -146,7 +153,9 @@ public:
                                           column_map_.RangeBegin().GetSectionSlicer(),
                                           carray);
                 } catch(std::exception & e) {
-                    return arrow::Status::Invalid("ConvertFixedColumn ", column_desc_.name(), " ", e.what());
+                    return arrow::Status::Invalid("ConvertFixedColumn ",
+                                                  column_.get().columnDesc().name(),
+                                                  ": ", e.what());
                 }
             } else {
                 for(auto it = column_map_.RangeBegin(); it != column_map_.RangeEnd(); ++it) {
@@ -160,7 +169,9 @@ public:
                             casa_ptr[out] = chunk_ptr[i];
                         }
                     } catch(std::exception & e) {
-                        return arrow::Status::Invalid("ConvertFixedColumn ", column_desc_.name(), " ", e.what());
+                        return arrow::Status::Invalid("ConvertFixedColumn ",
+                                                      column_.get().columnDesc().name(),
+                                                      ": ", e.what());
                     }
                 }
             }
@@ -214,16 +225,19 @@ private:
     template <typename T>
     arrow::Status ConvertColumn(const std::shared_ptr<arrow::DataType> & arrow_dtype) {
         ARROW_RETURN_NOT_OK(CheckByteWidths<T>(arrow_dtype));
+        auto column_desc = column_.get().columnDesc();
 
-        if(column_desc_.isScalar()) {
+
+        if(column_desc.isScalar()) {
             return ConvertScalarColumn<T>(arrow_dtype);
         }
 
-        if(column_desc_.isFixedShape()) {
+        if(column_desc.isFixedShape()) {
             return ConvertFixedColumn<T>(arrow_dtype);
         }
 
-        return arrow::Status::Invalid("Unable to convert column ", column_desc_.name());
+        return arrow::Status::Invalid("Unable to convert column ",
+                                      column_desc.name());
 
     };
 };
