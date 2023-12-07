@@ -136,15 +136,15 @@ public:
             ARROW_ASSIGN_OR_RAISE(auto allocation, arrow::AllocateBuffer(nelements*sizeof(T), pool_));
             auto buffer = std::shared_ptr<arrow::Buffer>(std::move(allocation));
             auto * buf_ptr = reinterpret_cast<T *>(buffer->mutable_data());
-            auto casa_vector = casacore::Array<T>(shape, buf_ptr, casacore::SHARE);
-            auto casa_ptr = casa_vector.data();
+            auto carray = casacore::Array<T>(shape, buf_ptr, casacore::SHARE);
+            auto casa_ptr = carray.data();
 
             if(column_map_.IsSimple()) {
                 try {
                     // Dump column data straight into the Arrow Buffer
                     column.getColumnRange(column_map_.RangeBegin().GetRowSlicer(),
                                           column_map_.RangeBegin().GetSectionSlicer(),
-                                          casa_vector);
+                                          carray);
                 } catch(std::exception & e) {
                     return arrow::Status::Invalid("ConvertFixedColumn ", column_desc_.name(), " ", e.what());
                 }

@@ -80,6 +80,29 @@ using ColumnRanges = std::vector<ColumnRange>;
 
 // Holds variable shape data for a column
 struct VariableShapeData {
+
+  static casacore::IPosition ClipShape(const casacore::IPosition & shape,
+                                       const ColumnSelection & selection) {
+
+    // There's no selection, or only a row selection
+    // so there's no need to clip the shapes
+    if(selection.size() <= 1) {
+      return shape;
+    }
+
+    auto clipped = shape;
+
+    // No selection or only a row selection, just return
+    for(std::size_t dim=0; dim < shape.size(); ++dim) {
+      auto sdim = std::ptrdiff_t(dim + selection.size()) - shape.size() - 1;
+      if(sdim >= 0 && sdim < selection.size() && selection[sdim].size() > 0) {
+        clipped[dim] = selection[sdim].size();
+      }
+    }
+
+    return clipped;
+  }
+
   // Factory method for creating Variable Shape Data
   static arrow::Result<std::unique_ptr<VariableShapeData>>
   Make(const casacore::TableColumn & column, const ColumnSelection & selection) {
@@ -102,7 +125,7 @@ struct VariableShapeData {
                                                column.columnDesc().name(),
                                                " is not defined.");
         }
-        row_shapes.push_back(column.shape(r));
+        row_shapes.push_back(ClipShape(column.shape(r), selection));
         if(first) { first = false; continue; }
         fixed_shape = fixed_shape && *std::rbegin(row_shapes) == *std::begin(row_shapes);
         fixed_dims = fixed_dims && std::rbegin(row_shapes)->size() == std::begin(row_shapes)->size();
@@ -118,7 +141,8 @@ struct VariableShapeData {
                                                column.columnDesc().name(),
                                                " is not defined.");
         }
-        row_shapes.push_back(column.shape(row_ids[r]));
+
+        row_shapes.push_back(ClipShape(column.shape(row_ids[r]), selection));
         if(first) { first = false; continue; }
         fixed_shape = fixed_shape && *std::rbegin(row_shapes) == *std::begin(row_shapes);
         fixed_dims = fixed_dims && std::rbegin(row_shapes)->size() == std::begin(row_shapes)->size();
@@ -209,14 +233,6 @@ public:
     return (IsDefinitelyFixed() ? column_.get().columnDesc().ndim() : var_data_->nDim()) + 1;
   }
 
-  std::optional<casacore::IPosition> MaybeGetShape() const {
-    if(IsDefinitelyFixed()) {
-      return column_.get().shapeColumn();
-    }
-
-    return var_data_->shape_;
-  }
-
   inline std::size_t RowDim() const { return nDim() - 1; }
 
   // Returns the dimension size of this column
@@ -254,37 +270,6 @@ public:
       // Even though the column is marked as variable
       // the individual row shapes are the same
       return shape.value()[dim];
-    }
-  }
-
-  std::size_t FlatOffset(const std::vector<std::size_t> & index) const {
-    if(auto opt_shape = MaybeGetShape(); opt_shape) {
-      // Fixed shape output, easy case
-      const auto & shape = opt_shape.value();
-      auto result = std::size_t{0};
-      auto product = std::size_t{1};
-
-      for(auto dim = 0; dim < RowDim(); ++dim) {
-        result += index[dim] * product;
-        product *= shape[dim];
-      }
-
-      return result + product * index[RowDim()];
-    } else {
-      // Variably shaped output, per-row offsets are needed
-      // There is no offset array for the fast changing dimension
-      auto result = index[0];
-      auto row = index[RowDim()];
-      const auto & offsets = var_data_->offsets_;
-
-      for(auto dim = 1; dim < RowDim(); ++dim) {
-        result += index[dim] * offsets[dim - 1][row];
-      }
-
-      const auto & row_offsets = offsets[offsets.size() - 1];
-      return std::accumulate(std::begin(row_offsets),
-                             std::begin(row_offsets) + row,
-                             result);
     }
   }
 
@@ -548,6 +533,7 @@ public:
   ColumnMaps maps_;
   ColumnRanges ranges_;
   ShapeProvider shape_provider_;
+  std::optional<casacore::IPosition> output_shape_;
 
 public:
   inline const ColumnMap & DimMaps(std::size_t dim) const { return maps_[dim]; }
@@ -555,7 +541,33 @@ public:
   inline std::size_t nDim() const { return shape_provider_.nDim(); }
   inline std::size_t RowDim() const { return nDim() - 1; }
   inline std::size_t FlatOffset(const std::vector<std::size_t> & index) const {
-    return shape_provider_.FlatOffset(index);
+    if(output_shape_) {
+      // Fixed shape output, easy case
+      const auto & shape = output_shape_.value();
+      auto result = std::size_t{0};
+      auto product = std::size_t{1};
+
+      for(auto dim = 0; dim < RowDim(); ++dim) {
+        result += index[dim] * product;
+        product *= shape[dim];
+      }
+
+      return result + product * index[RowDim()];
+    }
+    // Variably shaped output, per-row offsets are needed
+    // There is no offset array for the fast changing dimension
+    auto result = index[0];
+    auto row = index[RowDim()];
+    const auto & offsets = shape_provider_.var_data_->offsets_;
+
+    for(auto dim = 1; dim < RowDim(); ++dim) {
+      result += index[dim] * offsets[dim - 1][row];
+    }
+
+    const auto & row_offsets = offsets[offsets.size() - 1];
+    return std::accumulate(std::begin(row_offsets),
+                            std::begin(row_offsets) + row,
+                            result);
   }
 
   inline RangeIterator RangeBegin() const {
@@ -568,6 +580,13 @@ public:
 
   inline std::size_t RowDimSize(casacore::rownr_t row, std::size_t dim) const {
     return shape_provider_.RowDimSize(row, dim);
+  }
+
+  // Get the output shape, returns Status::Invalid if undefined
+  arrow::Result<casacore::IPosition> GetOutputShape() const {
+    if(output_shape_) return output_shape_.value();
+    return arrow::Status::Invalid("Column ", column_.get().columnDesc().name(),
+                                  " does not have a fixed shape");
   }
 
   inline bool IsFixedShape() const {
@@ -740,6 +759,32 @@ public:
     return MakeVariableRanges(shape_prov, maps);
   }
 
+  static std::optional<casacore::IPosition> MaybeMakeOutputShape(const ColumnRanges & ranges) {
+    auto ndim = ranges.size();
+    assert(ndim > 0);
+    auto row_dim = std::ptrdiff_t(ndim) - 1;
+    auto shape = casacore::IPosition(ndim, 0);
+
+    for(auto [dim, size]=std::tuple{std::size_t{0}, std::size_t{0}}; dim < ndim; ++dim) {
+      for(const auto & range: ranges[dim]) {
+        switch(range.type) {
+          case Range::FREE:
+          case Range::MAP:
+            assert(range.IsValid());
+            size += range.nRows();
+            break;
+          case Range::UNCONSTRAINED:
+            return std::nullopt;
+          default:
+            assert(false && "Unhandled Range::Type enum");
+        }
+      }
+      shape[dim] = size;
+    }
+
+    return shape;
+  }
+
   // Factory method for making a ColumnMapping object
   static arrow::Result<ColumnMapping> Make(
       const casacore::TableColumn & column,
@@ -760,7 +805,10 @@ public:
                                            column.columnDesc().name());
     }
 
-    return ColumnMapping{column, std::move(maps), std::move(ranges), std::move(shape_prov)};
+    auto shape = MaybeMakeOutputShape(ranges);
+
+    return ColumnMapping{column, std::move(maps), std::move(ranges),
+                         std::move(shape_prov), std::move(shape)};
   }
 
   // Number of disjoint ranges in this map
@@ -805,38 +853,6 @@ public:
 
     return true;
   }
-
-  // Get the output shape, if the data selection is fixed
-  arrow::Result<casacore::IPosition> GetOutputShape() const {
-    assert(ranges_.size() > 0);
-    const auto & row_ranges = DimRanges(RowDim());
-    auto shape = casacore::IPosition(nDim(), 0);
-
-    if(!IsFixedShape()) {
-      return arrow::Status::Invalid("Column ", column_.get().columnDesc().name(),
-                                    "does not have a fixed shape");
-    }
-
-    for(auto [dim, size]=std::tuple{std::size_t{0}, std::size_t{0}}; dim < nDim(); ++dim) {
-      for(const auto & range: DimRanges(dim)) {
-        switch(range.type) {
-          case Range::FREE:
-          case Range::MAP:
-            assert(range.IsValid());
-            size += range.nRows();
-            break;
-          case Range::UNCONSTRAINED:
-            assert(false && "Unconstrained range in fixed shape");
-          default:
-            assert(false && "Unhandled Range::Type enum");
-        }
-      }
-      shape[dim] = size;
-    }
-
-    return shape;
-  }
-
 
   // Find the total number of elements formed
   // by the disjoint ranges in this map
