@@ -187,15 +187,19 @@ TEST_F(ColumnConvertTest, SelectionVariable) {
       auto mit = rit.MapBegin();
       ASSERT_EQ(mit.ChunkOffset(), 0);
       ASSERT_EQ(mit.GlobalOffset(), 0);
+      ASSERT_EQ(array.data()[mit.ChunkOffset()], 0);
       ++mit;
       ASSERT_EQ(mit.ChunkOffset(), 1);
       ASSERT_EQ(mit.GlobalOffset(), 1);
+      ASSERT_EQ(array.data()[mit.ChunkOffset()], 1);
       ++mit;
       ASSERT_EQ(mit.ChunkOffset(), 2);
       ASSERT_EQ(mit.GlobalOffset(), 2);
+      ASSERT_EQ(array.data()[mit.ChunkOffset()], 2);
       ++mit;
       ASSERT_EQ(mit.ChunkOffset(), 3);
       ASSERT_EQ(mit.GlobalOffset(), 3);
+      ASSERT_EQ(array.data()[mit.ChunkOffset()], 3);
       ++mit;
       ASSERT_EQ(mit, rit.MapEnd());
       ++rit;
@@ -213,6 +217,7 @@ TEST_F(ColumnConvertTest, SelectionVariable) {
       auto mit = rit.MapBegin();
       ASSERT_EQ(mit.ChunkOffset(), 0);
       ASSERT_EQ(mit.GlobalOffset(), 0);
+      ASSERT_EQ(array.data()[mit.ChunkOffset()], 4);
       ++mit;
       ASSERT_EQ(mit, rit.MapEnd());
       ++rit;
@@ -229,20 +234,23 @@ TEST_F(ColumnConvertTest, SelectionVariable) {
 
       {
         auto array = var_data.getColumnRange(rit.GetRowSlicer(), rit.GetSectionSlicer());
-        ASSERT_EQ(array(IPos(0, 0, 0)), 0);
 
         auto mit = rit.MapBegin();
         ASSERT_EQ(mit.ChunkOffset(), 0);
         ASSERT_EQ(mit.GlobalOffset(), 0);
+        ASSERT_EQ(array.data()[mit.ChunkOffset()], 0);
         ++mit;
         ASSERT_EQ(mit.ChunkOffset(), 1);
         ASSERT_EQ(mit.GlobalOffset(), 1);
+        ASSERT_EQ(array.data()[mit.ChunkOffset()], 1);
         ++mit;
         ASSERT_EQ(mit.ChunkOffset(), 2);
         ASSERT_EQ(mit.GlobalOffset(), 2);
+        ASSERT_EQ(array.data()[mit.ChunkOffset()], 2);
         ++mit;
         ASSERT_EQ(mit.ChunkOffset(), 3);
         ASSERT_EQ(mit.GlobalOffset(), 3);
+        ASSERT_EQ(array.data()[mit.ChunkOffset()], 3);
         ++mit;
         ASSERT_EQ(mit, rit.MapEnd());
       }
@@ -256,6 +264,7 @@ TEST_F(ColumnConvertTest, SelectionVariable) {
         auto mit = rit.MapBegin();
         ASSERT_EQ(mit.ChunkOffset(), 0);
         ASSERT_EQ(mit.GlobalOffset(), 4);
+        ASSERT_EQ(array.data()[mit.ChunkOffset()], 4);
         ++mit;
         ASSERT_EQ(mit, rit.MapEnd());
       }
