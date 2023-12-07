@@ -21,6 +21,21 @@
 
 namespace arcae {
 
+namespace {
+
+// Return a selection dimension given
+//
+// 1. FORTRAN ordered dim
+// 2. Number of selection dimensions
+// 3. Number of column dimensions
+//
+// A return of < 0 indicates a non-existent selection
+std::ptrdiff_t SelectDim(std::size_t dim, std::size_t sdims, std::size_t ndims) {
+  return std::ptrdiff_t(dim) + std::ptrdiff_t(sdims) - std::ptrdiff_t(ndims);
+}
+
+} // namespace
+
 enum InputOrder {C=0, F};
 
 using RowIds = std::vector<casacore::rownr_t>;
@@ -92,8 +107,8 @@ struct VariableShapeData {
     auto clipped = shape;
 
     for(std::size_t dim=0; dim < shape.size(); ++dim) {
-      auto sdim = std::ptrdiff_t(dim + selection.size()) - shape.size() - 1;
-      if(sdim >= 0 && sdim < selection.size() && selection[sdim].size() > 0) {
+      auto sdim = SelectDim(dim, selection.size(), shape.size() + 1);
+      if(sdim >= 0 && selection[sdim].size() > 0) {
         clipped[dim] = selection[sdim].size();
       }
     }
@@ -235,13 +250,10 @@ public:
 
   // Returns the dimension size of this column
   arrow::Result<std::size_t> DimSize(std::size_t dim) const {
-    // Dimension needs to be adjusted for
-    // 1. We may not have selections matching all dimensions
-    // 2. Selections are FORTRAN ordered
-    auto sdim = std::ptrdiff_t(dim + selection_.size()) - std::ptrdiff_t(nDim());
+    auto sdim = SelectDim(dim, selection_.size(), nDim());
     // If we have a selection of row id's,
     // derive the dimension size from these
-    if(sdim > 0 && selection_.size() > 0 && selection_[sdim].size() > 0) {
+    if(sdim >= 0 && selection_.size() > 0 && selection_[sdim].size() > 0) {
       return selection_[sdim].size();
     }
 
