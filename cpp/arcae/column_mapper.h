@@ -591,9 +591,9 @@ public:
         ColumnMap column_map;
         column_map.reserve(dim_ids.size());
 
-        for(auto [it, to] = std::tuple{std::begin(dim_ids), casacore::rownr_t{0}};
-            it != std::end(dim_ids); ++to, ++it) {
-              column_map.push_back({*it, to});
+        for(auto [disk_it, mem] = std::tuple{std::begin(dim_ids), casacore::rownr_t{0}};
+            disk_it != std::end(dim_ids); ++mem, ++disk_it) {
+              column_map.push_back({*disk_it, mem});
         }
 
         std::sort(std::begin(column_map), std::end(column_map),
