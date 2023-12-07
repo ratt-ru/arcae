@@ -1,6 +1,3 @@
-
-#include "gmock/gmock.h"
-
 #include <arrow/result.h>
 #include <arrow/testing/gtest_util.h>
 
@@ -13,7 +10,6 @@
 #include <casacore/tables/Tables.h>
 #include <casacore/tables/Tables/TableColumn.h>
 #include <casacore/ms/MeasurementSets/MeasurementSet.h>
-
 
 #include <arcae/column_mapper.h>
 #include <arcae/safe_table_proxy.h>
