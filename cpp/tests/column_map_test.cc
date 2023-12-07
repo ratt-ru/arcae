@@ -1,7 +1,5 @@
-#include "gmock/gmock.h"
 #include <memory>
 #include <numeric>
-#include <random>
 
 #include <arcae//column_mapper.h>
 #include <arcae/safe_table_proxy.h>
@@ -22,7 +20,6 @@
 #include <arrow/testing/gtest_util.h>
 
 #include "arrow/result.h"
-#include "arrow/status.h"
 
 using arcae::ColumnMapping;
 using casacore::Array;
