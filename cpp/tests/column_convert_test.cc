@@ -1,12 +1,12 @@
 #include <memory>
 
-
 #include <arrow/result.h>
 #include <casacore/casa/Arrays/IPosition.h>
 #include <casacore/ms/MeasurementSets/MeasurementSet.h>
 #include <casacore/tables/Tables.h>
 #include <casacore/tables/Tables/RefRows.h>
 #include <casacore/tables/Tables/TableColumn.h>
+#include <casacore/tables/Tables/TableProxy.h>
 #include <tests/test_utils.h>
 
 #include <gtest/gtest.h>
@@ -17,7 +17,6 @@
 #include "arcae/column_mapper.h"
 
 using arcae::ColumnMapping;
-using arcae::IdMap;
 
 using casacore::Array;
 using casacore::ArrayColumn;
@@ -63,7 +62,7 @@ GetArrayColumn(const MS & ms, const std::string & column) {
 
 class ColumnConvertTest : public ::testing::Test {
   protected:
-    std::shared_ptr<arcae::SafeTableProxy> table_proxy_;
+    casacore::TableProxy table_proxy_;
     std::string table_name_;
 
     void SetUp() override {
@@ -111,23 +110,25 @@ class ColumnConvertTest : public ::testing::Test {
         return std::make_shared<TableProxy>(ms);
       };
 
-      ASSERT_OK_AND_ASSIGN(table_proxy_, arcae::SafeTableProxy::Make(factory));
+      ASSERT_OK_AND_ASSIGN(auto stp, arcae::SafeTableProxy::Make(factory));
+      stp.reset();
+
+      auto lock = casacore::TableLock(casacore::TableLock::LockOption::AutoNoReadLocking);
+      auto lockoptions = casacore::Record();
+      lockoptions.define("option", "auto");
+      lockoptions.define("internal", lock.interval());
+      lockoptions.define("maxwait", casacore::Int(lock.maxWait()));
+      table_proxy_ = casacore::TableProxy(table_name_, lockoptions, casacore::Table::Old);
+
     }
 };
 
 
 TEST_F(ColumnConvertTest, SelectSanityCheck) {
-  table_proxy_.reset();
-
-  auto lock = casacore::TableLock(casacore::TableLock::LockOption::AutoNoReadLocking);
-  auto lockoptions = casacore::Record();
-  lockoptions.define("option", "auto");
-  lockoptions.define("internal", lock.interval());
-  lockoptions.define("maxwait", casacore::Int(lock.maxWait()));
-  auto proxy = casacore::TableProxy(table_name_, lockoptions, casacore::Table::Old);
+  const auto & table = table_proxy_.table();
 
   {
-    auto var_data = GetArrayColumn<casacore::Int>(proxy.table(), "VAR_DATA");
+    auto var_data = GetArrayColumn<casacore::Int>(table, "VAR_DATA");
     auto row1 = var_data.getColumnRange(Slicer(IPos{0}, IPos{0}, Slicer::endIsLast));
     ASSERT_EQ(row1.shape(), IPos({2, 2, 1}));
     ASSERT_EQ(row1(IPos({0, 0, 0})), 0);
@@ -140,7 +141,7 @@ TEST_F(ColumnConvertTest, SelectSanityCheck) {
   }
 
   {
-    auto fixed_data = GetArrayColumn<casacore::Int>(proxy.table(), "FIXED_DATA");
+    auto fixed_data = GetArrayColumn<casacore::Int>(table, "FIXED_DATA");
     auto data = fixed_data.getColumnRange(Slicer(IPos{0}, IPos{1}, Slicer::endIsLast));
     ASSERT_EQ(data.shape(), IPos({2, 2, 2}));
     ASSERT_EQ(data(IPos({0, 0, 0})), 0);
@@ -154,7 +155,7 @@ TEST_F(ColumnConvertTest, SelectSanityCheck) {
   }
 
   {
-    auto fixed_data = GetArrayColumn<casacore::Int>(proxy.table(), "VAR_FIXED_DATA");
+    auto fixed_data = GetArrayColumn<casacore::Int>(table, "VAR_FIXED_DATA");
     auto data = fixed_data.getColumnRange(Slicer(IPos{0}, IPos{1}, Slicer::endIsLast));
     ASSERT_EQ(data.shape(), IPos({2, 2, 2}));
     ASSERT_EQ(data(IPos({0, 0, 0})), 0);
@@ -169,18 +170,11 @@ TEST_F(ColumnConvertTest, SelectSanityCheck) {
 }
 
 TEST_F(ColumnConvertTest, SelectionVariable) {
-  table_proxy_.reset();
-
-  auto lock = casacore::TableLock(casacore::TableLock::LockOption::AutoNoReadLocking);
-  auto lockoptions = casacore::Record();
-  lockoptions.define("option", "auto");
-  lockoptions.define("internal", lock.interval());
-  lockoptions.define("maxwait", casacore::Int(lock.maxWait()));
-  auto proxy = casacore::TableProxy(table_name_, lockoptions, casacore::Table::Old);
+  const auto & table = table_proxy_.table();
 
   {
     // Variable data column
-    auto var_data = GetArrayColumn<casacore::Int>(proxy.table(), "VAR_DATA");
+    auto var_data = GetArrayColumn<casacore::Int>(table, "VAR_DATA");
     {
       // Get row 0
       ASSERT_OK_AND_ASSIGN(auto map, ColumnMapping::Make(var_data, {{0}}));
@@ -254,17 +248,10 @@ TEST_F(ColumnConvertTest, SelectionVariable) {
 
 
 TEST_F(ColumnConvertTest, SelectionFixed) {
-  table_proxy_.reset();
-
-  auto lock = casacore::TableLock(casacore::TableLock::LockOption::AutoNoReadLocking);
-  auto lockoptions = casacore::Record();
-  lockoptions.define("option", "auto");
-  lockoptions.define("internal", lock.interval());
-  lockoptions.define("maxwait", casacore::Int(lock.maxWait()));
-  auto proxy = casacore::TableProxy(table_name_, lockoptions, casacore::Table::Old);
+  const auto& table = table_proxy_.table();
 
   {
-    auto fixed_data = GetArrayColumn<casacore::Int>(proxy.table(), "FIXED_DATA");
+    auto fixed_data = GetArrayColumn<casacore::Int>(table, "FIXED_DATA");
     auto data = fixed_data.getColumnRange(Slicer(IPos{0}, IPos{1}, Slicer::endIsLast));
     ASSERT_EQ(data.shape(), IPos({2, 2, 2}));
     ASSERT_EQ(data(IPos({0, 0, 0})), 0);
@@ -278,7 +265,7 @@ TEST_F(ColumnConvertTest, SelectionFixed) {
   }
 
   {
-    auto fixed_data = GetArrayColumn<casacore::Int>(proxy.table(), "VAR_FIXED_DATA");
+    auto fixed_data = GetArrayColumn<casacore::Int>(table, "VAR_FIXED_DATA");
     auto data = fixed_data.getColumnRange(Slicer(IPos{0}, IPos{1}, Slicer::endIsLast));
     ASSERT_EQ(data.shape(), IPos({2, 2, 2}));
     ASSERT_EQ(data(IPos({0, 0, 0})), 0);
