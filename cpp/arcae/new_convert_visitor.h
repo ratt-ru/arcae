@@ -95,9 +95,8 @@ public:
                         auto chunk = column.getColumnRange(it.GetRowSlicer());
                         auto chunk_ptr = chunk.data();
 
-                        for(auto [i, mit] = std::tuple{int{0}, it.MapBegin()}; mit != it.MapEnd(); ++mit, ++i) {
-                            auto out = mit.ToBufferOffset();
-                            casa_ptr[out] = chunk_ptr[i];
+                        for(auto mit = it.MapBegin(); mit != it.MapEnd(); ++mit) {
+                            casa_ptr[mit.GlobalOffset()] = chunk_ptr[mit.ChunkOffset()];
                         }
                     } catch(std::exception & e) {
                         return arrow::Status::Invalid("ConvertScalarColumn ",
@@ -164,9 +163,8 @@ public:
                         auto chunk = column.getColumnRange(it.GetRowSlicer(), it.GetSectionSlicer());
                         auto chunk_ptr = chunk.data();
 
-                        for(auto [i, mit] = std::tuple{int{0}, it.MapBegin()}; mit != it.MapEnd(); ++mit, ++i) {
-                            auto out = mit.ToBufferOffset();
-                            casa_ptr[out] = chunk_ptr[i];
+                        for(auto mit = it.MapBegin(); mit != it.MapEnd(); ++mit) {
+                            casa_ptr[mit.GlobalOffset()] = chunk_ptr[mit.ChunkOffset()];
                         }
                     } catch(std::exception & e) {
                         return arrow::Status::Invalid("ConvertFixedColumn ",
@@ -225,8 +223,7 @@ private:
     template <typename T>
     arrow::Status ConvertColumn(const std::shared_ptr<arrow::DataType> & arrow_dtype) {
         ARROW_RETURN_NOT_OK(CheckByteWidths<T>(arrow_dtype));
-        auto column_desc = column_.get().columnDesc();
-
+        const auto & column_desc = column_.get().columnDesc();
 
         if(column_desc.isScalar()) {
             return ConvertScalarColumn<T>(arrow_dtype);

@@ -243,7 +243,7 @@ public:
     return var_data_ == nullptr;
   }
 
-  // Return true if the column is defined has having a varying shape
+  // Return true if the column is defined as having a varying shape
   inline bool IsVarying() const {
     return !IsDefinitelyFixed();
   }
@@ -311,23 +311,31 @@ public:
   // Iterates over the current mapping in the RangeIterator
   class MapIterator {
     public:
+      // Reference to RangeIterator
       std::reference_wrapper<const RangeIterator> rit_;
-      std::vector<std::size_t> current_;
+      // ND index in the local buffer holding the values
+      // described by this chunk
+      std::vector<std::size_t> chunk_index_;
+      // ND index in the global buffer
+      std::vector<std::size_t> global_index_;
       std::vector<std::size_t> strides_;
       bool done_;
 
       MapIterator(const RangeIterator & rit,
-                  std::vector<std::size_t> && current,
+                  std::vector<std::size_t> && chunk_index,
+                  std::vector<std::size_t> && global_index,
                   std::vector<std::size_t> && strides,
                   bool done) :
         rit_(std::cref(rit)),
-        current_(std::move(current)),
+        chunk_index_(std::move(chunk_index)),
+        global_index_(std::move(global_index)),
         strides_(std::move(strides)),
         done_(done) {}
     public:
 
       static MapIterator Make(const RangeIterator & rit, bool done) {
-        auto current = decltype(MapIterator::current_)(rit.nDim(), 0);
+        auto chunk_index = decltype(MapIterator::chunk_index_)(rit.nDim(), 0);
+        auto global_index = decltype(MapIterator::global_index_)(rit.mem_start_);
         auto strides = decltype(MapIterator::strides_)(rit.nDim(), 1);
         using ItType = std::tuple<std::size_t, std::size_t>;
 
@@ -336,43 +344,53 @@ public:
           product = strides[dim] = product * diff;
         }
 
-        return MapIterator{rit, std::move(current), std::move(strides), done};
+        return MapIterator{rit, std::move(chunk_index), std::move(global_index), std::move(strides), done};
       }
 
       inline std::size_t nDim() const {
-        return current_.size();
+        return chunk_index_.size();
       }
 
       inline std::size_t RowDim() const {
         return nDim() - 1;
       }
 
-      std::size_t FromBufferOffset() const {
+      std::size_t ChunkOffset() const {
         std::size_t offset = 0;
         for(auto dim = std::size_t{0}; dim < nDim(); ++dim) {
-          offset += current_[dim] * strides_[dim];
+          offset += chunk_index_[dim] * strides_[dim];
         }
         return offset;
       }
 
-      std::size_t ToBufferOffset() const {
-        return rit_.get().base_out_offset_ + FromBufferOffset();
+      inline std::size_t GlobalOffset() const {
+        return rit_.get().map_.get().FlatOffset(global_index_);
       }
 
       inline std::size_t RangeSize(std::size_t dim) const {
         return rit_.get().range_length_[dim];
       }
 
+      inline std::size_t MemStart(std::size_t dim) const {
+        return rit_.get().mem_start_[dim];
+      }
+
+
       MapIterator & operator++() {
         assert(!done_);
 
         // Iterate from fastest to slowest changing dimension
         for(auto dim = std::size_t{0}; dim < nDim();) {
-          current_[dim]++;
+          chunk_index_[dim]++;
+          global_index_[dim]++;
           // We've achieved a successful iteration in this dimension
-          if(current_[dim] < RangeSize(dim)) { break; }
+          if(chunk_index_[dim] < RangeSize(dim)) { break; }
           // Reset to zero and retry in the next dimension
-          else if(dim < RowDim()) { current_[dim] = 0; ++dim; }
+          else if(dim < RowDim()) {
+            chunk_index_[dim] = 0;
+            global_index_[dim] = MemStart(dim);
+            ++dim;
+          }
           // This was the slowest changing dimension so we're done
           else { done_ = true; break; }
         }
@@ -382,7 +400,7 @@ public:
 
       bool operator==(const MapIterator & other) const {
         if(&rit_.get() != &other.rit_.get() || done_ != other.done_) return false;
-        return done_ ? true : current_ == other.current_;
+        return done_ ? true : chunk_index_ == other.chunk_index_;
       }
 
       inline bool operator!=(const MapIterator & other) const {
@@ -399,10 +417,10 @@ public:
       std::vector<std::size_t> index_;
       // Starting position of the disk index
       std::vector<std::size_t> disk_start_;
+      // Start position of the memory index
+      std::vector<std::size_t> mem_start_;
       // Length of the range
       std::vector<std::size_t> range_length_;
-      // Base offset into the output buffer for the current range
-      std::size_t base_out_offset_;
       bool done_;
 
     public:
@@ -410,8 +428,8 @@ public:
         map_(std::cref(column_map)),
         index_(column_map.nDim(), 0),
         disk_start_(column_map.nDim(), 0),
+        mem_start_(column_map.nDim(), 0),
         range_length_(column_map.nDim(), 0),
-        base_out_offset_(0),
         done_(done) {
           UpdateState();
       }
@@ -461,12 +479,13 @@ public:
         // Iterate from fastest to slowest changing dimension: FORTRAN order
         for(auto dim = 0; dim < nDim();) {
           index_[dim]++;
+          mem_start_[dim] += range_length_[dim];
 
           // We've achieved a successful iteration in this dimension
           if(index_[dim] < DimRanges(dim).size()) { break; }
           // We've exceeded the size of the current dimension
           // reset to zero and retry the while loop
-          else if(dim < RowDim()) { index_[dim] = 0; ++dim; }
+          else if(dim < RowDim()) { index_[dim] = 0; mem_start_[dim] = 0; ++dim; }
           // Row is the slowest changing dimension so we're done
           // return without updating the iterator state
           else { done_ = true; return *this; }
@@ -508,8 +527,6 @@ public:
               assert(false && "Unhandled Range::Type enum");
           }
         }
-
-        base_out_offset_ = map_.get().FlatOffset(disk_start_);
       }
 
       // Returns a slicer for the row dimension
@@ -588,8 +605,8 @@ public:
 
     const auto & row_offsets = offsets[offsets.size() - 1];
     return std::accumulate(std::begin(row_offsets),
-                            std::begin(row_offsets) + row,
-                            result);
+                           std::begin(row_offsets) + row,
+                           result);
   }
 
   inline RangeIterator RangeBegin() const {
