@@ -80,10 +80,9 @@ using ColumnRanges = std::vector<ColumnRange>;
 
 // Holds variable shape data for a column
 struct VariableShapeData {
-
+  // Clip supplied shape based on the column selection
   static casacore::IPosition ClipShape(const casacore::IPosition & shape,
                                        const ColumnSelection & selection) {
-
     // There's no selection, or only a row selection
     // so there's no need to clip the shapes
     if(selection.size() <= 1) {
@@ -92,7 +91,6 @@ struct VariableShapeData {
 
     auto clipped = shape;
 
-    // No selection or only a row selection, just return
     for(std::size_t dim=0; dim < shape.size(); ++dim) {
       auto sdim = std::ptrdiff_t(dim + selection.size()) - shape.size() - 1;
       if(sdim >= 0 && sdim < selection.size() && selection[sdim].size() > 0) {
