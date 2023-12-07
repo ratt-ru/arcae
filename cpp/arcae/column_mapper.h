@@ -570,6 +570,10 @@ public:
     return shape_provider_.RowDimSize(row, dim);
   }
 
+  inline bool IsFixedShape() const {
+    return shape_provider_.IsActuallyFixed();
+  }
+
   // Create a Column Map from a selection of row id's in different dimensions
   static ColumnMaps MakeMaps(const ShapeProvider & shape_prov, const ColumnSelection & selection) {
     ColumnMaps column_maps;
@@ -802,13 +806,37 @@ public:
     return true;
   }
 
-  arrow::Result<casacore::IPosition> GetShape() const {
-    if(auto shape = shape_provider_.MaybeGetShape(); shape) {
-      return *shape;
+  // Get the output shape, if the data selection is fixed
+  arrow::Result<casacore::IPosition> GetOutputShape() const {
+    assert(ranges_.size() > 0);
+    const auto & row_ranges = DimRanges(RowDim());
+    auto shape = casacore::IPosition(nDim(), 0);
+
+    if(!IsFixedShape()) {
+      return arrow::Status::Invalid("Column ", column_.columnDesc().name(),
+                                    "does not have a fixed shape");
     }
-    return arrow::Status::Invalid("Column ", column_.columnDesc().name(),
-                                  "does not have a fixed shape");
+
+    for(auto [dim, size]=std::tuple{std::size_t{0}, std::size_t{0}}; dim < nDim(); ++dim) {
+      for(const auto & range: DimRanges(dim)) {
+        switch(range.type) {
+          case Range::FREE:
+          case Range::MAP:
+            assert(range.IsValid());
+            size += range.nRows();
+            break;
+          case Range::UNCONSTRAINED:
+            assert(false && "Unconstrained range in fixed shape");
+          default:
+            assert(false && "Unhandled Range::Type enum");
+        }
+      }
+      shape[dim] = size;
+    }
+
+    return shape;
   }
+
 
   // Find the total number of elements formed
   // by the disjoint ranges in this map

@@ -132,7 +132,7 @@ public:
         } else {
             // Wrap Arrow Buffer in casacore Array
             auto nelements = column_map_.nElements();
-            ARROW_ASSIGN_OR_RAISE(auto shape, column_map_.GetShape());
+            ARROW_ASSIGN_OR_RAISE(auto shape, column_map_.GetOutputShape());
             ARROW_ASSIGN_OR_RAISE(auto allocation, arrow::AllocateBuffer(nelements*sizeof(T), pool_));
             auto buffer = std::shared_ptr<arrow::Buffer>(std::move(allocation));
             auto * buf_ptr = reinterpret_cast<T *>(buffer->mutable_data());
