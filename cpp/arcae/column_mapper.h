@@ -769,6 +769,8 @@ public:
     return MakeVariableRanges(shape_prov, maps);
   }
 
+  // Derive an output shape from the selection ranges
+  // This may not be possible for variably shaped columns
   static std::optional<casacore::IPosition> MaybeMakeOutputShape(const ColumnRanges & ranges) {
     auto ndim = ranges.size();
     assert(ndim > 0);
