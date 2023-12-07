@@ -544,7 +544,7 @@ public:
   };
 
 public:
-  const casacore::TableColumn & column_;
+  std::reference_wrapper<const casacore::TableColumn> column_;
   ColumnMaps maps_;
   ColumnRanges ranges_;
   ShapeProvider shape_provider_;
@@ -813,7 +813,7 @@ public:
     auto shape = casacore::IPosition(nDim(), 0);
 
     if(!IsFixedShape()) {
-      return arrow::Status::Invalid("Column ", column_.columnDesc().name(),
+      return arrow::Status::Invalid("Column ", column_.get().columnDesc().name(),
                                     "does not have a fixed shape");
     }
 
