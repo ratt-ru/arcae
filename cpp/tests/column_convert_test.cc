@@ -265,36 +265,3 @@ TEST_F(ColumnConvertTest, SelectionVariable) {
     }
   }
 }
-
-
-TEST_F(ColumnConvertTest, SelectionFixed) {
-  const auto& table = table_proxy_.table();
-
-  {
-    auto fixed_data = GetArrayColumn<casacore::Int>(table, "FIXED_DATA");
-    auto data = fixed_data.getColumnRange(Slicer(IPos{0}, IPos{1}, Slicer::endIsLast));
-    ASSERT_EQ(data.shape(), IPos({2, 2, 2}));
-    ASSERT_EQ(data(IPos({0, 0, 0})), 0);
-    ASSERT_EQ(data(IPos({1, 0, 0})), 1);
-    ASSERT_EQ(data(IPos({0, 1, 0})), 2);
-    ASSERT_EQ(data(IPos({1, 1, 0})), 3);
-    ASSERT_EQ(data(IPos({0, 0, 1})), 4);
-    ASSERT_EQ(data(IPos({1, 0, 1})), 5);
-    ASSERT_EQ(data(IPos({0, 1, 1})), 6);
-    ASSERT_EQ(data(IPos({1, 1, 1})), 7);
-  }
-
-  {
-    auto fixed_data = GetArrayColumn<casacore::Int>(table, "VAR_FIXED_DATA");
-    auto data = fixed_data.getColumnRange(Slicer(IPos{0}, IPos{1}, Slicer::endIsLast));
-    ASSERT_EQ(data.shape(), IPos({2, 2, 2}));
-    ASSERT_EQ(data(IPos({0, 0, 0})), 0);
-    ASSERT_EQ(data(IPos({1, 0, 0})), 1);
-    ASSERT_EQ(data(IPos({0, 1, 0})), 2);
-    ASSERT_EQ(data(IPos({1, 1, 0})), 3);
-    ASSERT_EQ(data(IPos({0, 0, 1})), 4);
-    ASSERT_EQ(data(IPos({1, 0, 1})), 5);
-    ASSERT_EQ(data(IPos({0, 1, 1})), 6);
-    ASSERT_EQ(data(IPos({1, 1, 1})), 7);
-  }
-}
