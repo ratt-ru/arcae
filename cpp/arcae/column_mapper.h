@@ -96,14 +96,14 @@ struct VariableShapeData {
     if(selection.size() == 0 || selection[row_dim].size() == 0) {
       row_shapes.reserve(column.nrow());
 
-      for(auto [r, first] = ItType{0, true}; r < column.nrow(); ++r, first=false) {
+      for(auto [r, first] = ItType{0, true}; r < column.nrow(); ++r) {
         if(!column.isDefined(r)) {
           return arrow::Status::NotImplemented("Row ", r, " in column ",
                                                column.columnDesc().name(),
                                                " is not defined.");
         }
         row_shapes.push_back(column.shape(r));
-        if(first) continue;
+        if(first) { first = false; continue; }
         fixed_shape = fixed_shape && *std::rbegin(row_shapes) == *std::begin(row_shapes);
         fixed_dims = fixed_dims && std::rbegin(row_shapes)->size() == std::begin(row_shapes)->size();
       }
@@ -112,14 +112,14 @@ struct VariableShapeData {
       const auto & row_ids = selection[row_dim];
       row_shapes.reserve(row_ids.size());
 
-      for(auto [r, first] = ItType{0, true}; r < row_ids.size(); ++r, first=false) {
+      for(auto [r, first] = ItType{0, true}; r < row_ids.size(); ++r) {
         if(!column.isDefined(row_ids[r])) {
           return arrow::Status::NotImplemented("Row ", r, " in column ",
                                                column.columnDesc().name(),
                                                " is not defined.");
         }
         row_shapes.push_back(column.shape(row_ids[r]));
-        if(first) continue;
+        if(first) { first = false; continue; }
         fixed_shape = fixed_shape && *std::rbegin(row_shapes) == *std::begin(row_shapes);
         fixed_dims = fixed_dims && std::rbegin(row_shapes)->size() == std::begin(row_shapes)->size();
       }
