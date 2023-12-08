@@ -5,12 +5,10 @@
 #include <functional>
 #include <memory>
 #include <optional>
-#include <sys/types.h>
 #include <vector>
 
 #include <arrow/result.h>
 #include <arrow/status.h>
-#include <arrow/util/logging.h>
 #include <casacore/casa/aipsxtype.h>
 #include <casacore/casa/Arrays/IPosition.h>
 #include <casacore/casa/Arrays/Slicer.h>
@@ -292,28 +290,6 @@ public:
   inline bool IsFixedShape() const {
     return shape_provider_.IsActuallyFixed();
   }
-
-  // Create a Column Map from a selection of row id's in different dimensions
-  static ColumnMaps MakeMaps(const ShapeProvider & shape_prov, const ColumnSelection & selection);
-
-  // Make ranges for fixed shape columns
-  // In this case, each row has the same shape
-  // so we can make ranges that span multiple rows
-  static arrow::Result<ColumnRanges>
-  MakeFixedRanges(const ShapeProvider & shape_prov, const ColumnMaps & maps);
-  // Make ranges for variably shaped columns
-  // In this case, each row may have a different shape
-  // so we create a separate range for each row and unconstrained
-  // ranges for other dimensions whose size cannot be determined.
-  static arrow::Result<ColumnRanges>
-  MakeVariableRanges(const ShapeProvider & shape_prov, const ColumnMaps & maps);
-  // Make ranges for each dimension
-  static arrow::Result<ColumnRanges>
-  MakeRanges(const ShapeProvider & shape_prov, const ColumnMaps & maps);
-
-  // Derive an output shape from the selection ranges
-  // This may not be possible for variably shaped columns
-  static std::optional<casacore::IPosition> MaybeMakeOutputShape(const ColumnRanges & ranges);
 
   // Factory method for making a ColumnMapping object
   static arrow::Result<ColumnMapping> Make(

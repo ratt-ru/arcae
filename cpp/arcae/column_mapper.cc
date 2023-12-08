@@ -12,7 +12,6 @@
 
 #include <arrow/result.h>
 #include <arrow/status.h>
-#include <arrow/util/logging.h>
 #include <casacore/casa/aipsxtype.h>
 #include <casacore/casa/Arrays/IPosition.h>
 #include <casacore/casa/Arrays/Slicer.h>
@@ -64,6 +63,202 @@ arrow::Result<casacore::IPosition> ClipShape(
   return clipped;
 }
 
+
+
+// Create a Column Map from a selection of row id's in different dimensions
+ColumnMaps MapFactory(const ShapeProvider & shape_prov, const ColumnSelection & selection) {
+  ColumnMaps column_maps;
+  auto ndim = shape_prov.nDim();
+  column_maps.reserve(ndim);
+
+  for(auto dim=std::size_t{0}; dim < ndim; ++dim) {
+      // Dimension needs to be adjusted for
+      // 1. We may not have selections matching all dimensions
+      // 2. Selections are FORTRAN ordered
+      auto sdim = std::ptrdiff_t(dim + selection.size()) - std::ptrdiff_t(ndim);
+
+      if(sdim < 0 || selection.size() == 0 || selection[sdim].size() == 0) {
+        column_maps.emplace_back(ColumnMap{});
+        continue;
+      }
+
+      const auto & dim_ids = selection[sdim];
+      ColumnMap column_map;
+      column_map.reserve(dim_ids.size());
+
+      for(auto [disk_it, mem] = std::tuple{std::begin(dim_ids), casacore::rownr_t{0}};
+          disk_it != std::end(dim_ids); ++mem, ++disk_it) {
+            column_map.push_back({*disk_it, mem});
+      }
+
+      std::sort(std::begin(column_map), std::end(column_map),
+                [](const auto & lhs, const auto & rhs) {
+                  return lhs.disk < rhs.disk; });
+
+      column_maps.emplace_back(std::move(column_map));
+  }
+
+  return column_maps;
+}
+
+// Make ranges for fixed shape columns
+// In this case, each row has the same shape
+// so we can make ranges that span multiple rows
+arrow::Result<ColumnRanges>
+FixedRangeFactory(const ShapeProvider & shape_prov, const ColumnMaps & maps) {
+  assert(shape_prov.IsActuallyFixed());
+  auto ndim = shape_prov.nDim();
+  ColumnRanges column_ranges;
+  column_ranges.reserve(ndim);
+
+  for(std::size_t dim=0; dim < ndim; ++dim) {
+    // If no mapping exists for this dimension, create a range
+    // from the column shape
+    if(dim >= maps.size() || maps[dim].size() == 0) {
+      ARROW_ASSIGN_OR_RAISE(auto dim_size, shape_prov.DimSize(dim));
+      column_ranges.emplace_back(ColumnRange{Range{0, dim_size, Range::FREE}});
+      continue;
+    }
+
+    // A mapping exists for this dimension, create ranges
+    // from contiguous segments
+    const auto & column_map = maps[dim];
+    auto column_range = ColumnRange{};
+    auto current = Range{0, 1, Range::MAP};
+
+    for(auto [i, prev, next] = std::tuple{
+            casacore::rownr_t{1},
+            std::begin(column_map),
+            std::next(std::begin(column_map))};
+        next != std::end(column_map); ++i, ++prev, ++next) {
+
+      if(next->disk - prev->disk == 1) {
+        current.end += 1;
+      } else {
+        column_range.push_back(current);
+        current = Range{i, i + 1, Range::MAP};
+      }
+    }
+
+    column_range.emplace_back(std::move(current));
+    column_ranges.emplace_back(std::move(column_range));
+  }
+
+  assert(ndim == column_ranges.size());
+  return column_ranges;
+}
+
+// Make ranges for variably shaped columns
+// In this case, each row may have a different shape
+// so we create a separate range for each row and unconstrained
+// ranges for other dimensions whose size cannot be determined.
+arrow::Result<ColumnRanges>
+VariableRangeFactory(const ShapeProvider & shape_prov, const ColumnMaps & maps) {
+  assert(!shape_prov.IsActuallyFixed());
+  auto ndim = shape_prov.nDim();
+  auto row_dim = ndim - 1;
+  ColumnRanges column_ranges;
+  column_ranges.reserve(ndim);
+
+
+  // Handle non-row dimensions first
+  for(std::size_t dim=0; dim < row_dim; ++dim) {
+    // If no mapping exists for this dimension
+    // create a single unconstrained range
+    if(dim >= maps.size() || maps[dim].size() == 0) {
+      column_ranges.emplace_back(ColumnRange{Range{0, 0, Range::UNCONSTRAINED}});
+      continue;
+    }
+
+    // A mapping exists for this dimension, create ranges
+    // from contiguous segments
+    const auto & column_map = maps[dim];
+    auto column_range = ColumnRange{};
+    auto current = Range{0, 1, Range::MAP};
+
+    for(auto [i, prev, next] = std::tuple{
+            casacore::rownr_t{1},
+            std::begin(column_map),
+            std::next(std::begin(column_map))};
+        next != std::end(column_map); ++i, ++prev, ++next) {
+
+      if(next->disk - prev->disk == 1) {
+        current.end += 1;
+      } else {
+        column_range.push_back(current);
+        current = Range{i, i + 1, Range::MAP};
+      }
+    }
+
+    column_range.emplace_back(std::move(current));
+    column_ranges.emplace_back(std::move(column_range));
+  }
+
+  // Lastly, the row dimension
+  auto row_range = ColumnRange{};
+
+  // Split the row dimension into ranges of exactly one row
+  if(maps.size() == 0 || maps[row_dim].size() == 0) {
+    // No maps provided, derive from shape
+    ARROW_ASSIGN_OR_RAISE(auto dim_size, shape_prov.DimSize(row_dim));
+    row_range.reserve(dim_size);
+    for(std::size_t r=0; r < dim_size; ++r) {
+      row_range.emplace_back(Range{r, r + 1, Range::FREE});
+    }
+  } else {
+    // Derive from mapping
+    const auto & row_maps = maps[row_dim];
+    row_range.reserve(row_maps.size());
+    for(std::size_t r=0; r < row_maps.size(); ++r) {
+      row_range.emplace_back(Range{r, r + 1, Range::MAP});
+    }
+  }
+
+  column_ranges.emplace_back(std::move(row_range));
+
+
+  assert(ndim == column_ranges.size());
+  return column_ranges;
+}
+
+// Make ranges for each dimension
+arrow::Result<ColumnRanges>
+RangeFactory(const ShapeProvider & shape_prov, const ColumnMaps & maps) {
+  if(shape_prov.IsActuallyFixed()) {
+    return FixedRangeFactory(shape_prov, maps);
+  }
+
+  return VariableRangeFactory(shape_prov, maps);
+}
+
+// Derive an output shape from the selection ranges
+// This may not be possible for variably shaped columns
+std::optional<casacore::IPosition>
+MaybeMakeOutputShape(const ColumnRanges & ranges) {
+  auto ndim = ranges.size();
+  assert(ndim > 0);
+  auto row_dim = std::ptrdiff_t(ndim) - 1;
+  auto shape = casacore::IPosition(ndim, 0);
+
+  for(auto [dim, size]=std::tuple{std::size_t{0}, std::size_t{0}}; dim < ndim; ++dim) {
+    for(const auto & range: ranges[dim]) {
+      switch(range.type) {
+        case Range::FREE:
+        case Range::MAP:
+          assert(range.IsValid());
+          size += range.nRows();
+          break;
+        case Range::UNCONSTRAINED:
+          return std::nullopt;
+        default:
+          assert(false && "Unhandled Range::Type enum");
+      }
+    }
+    shape[dim] = size;
+  }
+
+  return shape;
+}
 
 } // namespace
 
@@ -449,201 +644,6 @@ std::size_t ColumnMapping::FlatOffset(const std::vector<std::size_t> & index) co
                           result);
 }
 
-// Create a Column Map from a selection of row id's in different dimensions
-ColumnMaps
-ColumnMapping::MakeMaps(const ShapeProvider & shape_prov, const ColumnSelection & selection) {
-  ColumnMaps column_maps;
-  auto ndim = shape_prov.nDim();
-  column_maps.reserve(ndim);
-
-  for(auto dim=std::size_t{0}; dim < ndim; ++dim) {
-      // Dimension needs to be adjusted for
-      // 1. We may not have selections matching all dimensions
-      // 2. Selections are FORTRAN ordered
-      auto sdim = std::ptrdiff_t(dim + selection.size()) - std::ptrdiff_t(ndim);
-
-      if(sdim < 0 || selection.size() == 0 || selection[sdim].size() == 0) {
-        column_maps.emplace_back(ColumnMap{});
-        continue;
-      }
-
-      const auto & dim_ids = selection[sdim];
-      ColumnMap column_map;
-      column_map.reserve(dim_ids.size());
-
-      for(auto [disk_it, mem] = std::tuple{std::begin(dim_ids), casacore::rownr_t{0}};
-          disk_it != std::end(dim_ids); ++mem, ++disk_it) {
-            column_map.push_back({*disk_it, mem});
-      }
-
-      std::sort(std::begin(column_map), std::end(column_map),
-                [](const auto & lhs, const auto & rhs) {
-                  return lhs.disk < rhs.disk; });
-
-      column_maps.emplace_back(std::move(column_map));
-  }
-
-  return column_maps;
-}
-
-// Make ranges for fixed shape columns
-// In this case, each row has the same shape
-// so we can make ranges that span multiple rows
-arrow::Result<ColumnRanges>
-ColumnMapping::MakeFixedRanges(const ShapeProvider & shape_prov, const ColumnMaps & maps) {
-  assert(shape_prov.IsActuallyFixed());
-  auto ndim = shape_prov.nDim();
-  ColumnRanges column_ranges;
-  column_ranges.reserve(ndim);
-
-  for(std::size_t dim=0; dim < ndim; ++dim) {
-    // If no mapping exists for this dimension, create a range
-    // from the column shape
-    if(dim >= maps.size() || maps[dim].size() == 0) {
-      ARROW_ASSIGN_OR_RAISE(auto dim_size, shape_prov.DimSize(dim));
-      column_ranges.emplace_back(ColumnRange{Range{0, dim_size, Range::FREE}});
-      continue;
-    }
-
-    // A mapping exists for this dimension, create ranges
-    // from contiguous segments
-    const auto & column_map = maps[dim];
-    auto column_range = ColumnRange{};
-    auto current = Range{0, 1, Range::MAP};
-
-    for(auto [i, prev, next] = std::tuple{
-            casacore::rownr_t{1},
-            std::begin(column_map),
-            std::next(std::begin(column_map))};
-        next != std::end(column_map); ++i, ++prev, ++next) {
-
-      if(next->disk - prev->disk == 1) {
-        current.end += 1;
-      } else {
-        column_range.push_back(current);
-        current = Range{i, i + 1, Range::MAP};
-      }
-    }
-
-    column_range.emplace_back(std::move(current));
-    column_ranges.emplace_back(std::move(column_range));
-  }
-
-  assert(ndim == column_ranges.size());
-  return column_ranges;
-}
-
-// Make ranges for variably shaped columns
-// In this case, each row may have a different shape
-// so we create a separate range for each row and unconstrained
-// ranges for other dimensions whose size cannot be determined.
-arrow::Result<ColumnRanges>
-ColumnMapping::MakeVariableRanges(const ShapeProvider & shape_prov, const ColumnMaps & maps) {
-  assert(!shape_prov.IsActuallyFixed());
-  auto ndim = shape_prov.nDim();
-  auto row_dim = ndim - 1;
-  ColumnRanges column_ranges;
-  column_ranges.reserve(ndim);
-
-
-  // Handle non-row dimensions first
-  for(std::size_t dim=0; dim < row_dim; ++dim) {
-    // If no mapping exists for this dimension
-    // create a single unconstrained range
-    if(dim >= maps.size() || maps[dim].size() == 0) {
-      column_ranges.emplace_back(ColumnRange{Range{0, 0, Range::UNCONSTRAINED}});
-      continue;
-    }
-
-    // A mapping exists for this dimension, create ranges
-    // from contiguous segments
-    const auto & column_map = maps[dim];
-    auto column_range = ColumnRange{};
-    auto current = Range{0, 1, Range::MAP};
-
-    for(auto [i, prev, next] = std::tuple{
-            casacore::rownr_t{1},
-            std::begin(column_map),
-            std::next(std::begin(column_map))};
-        next != std::end(column_map); ++i, ++prev, ++next) {
-
-      if(next->disk - prev->disk == 1) {
-        current.end += 1;
-      } else {
-        column_range.push_back(current);
-        current = Range{i, i + 1, Range::MAP};
-      }
-    }
-
-    column_range.emplace_back(std::move(current));
-    column_ranges.emplace_back(std::move(column_range));
-  }
-
-  // Lastly, the row dimension
-  auto row_range = ColumnRange{};
-
-  // Split the row dimension into ranges of exactly one row
-  if(maps.size() == 0 || maps[row_dim].size() == 0) {
-    // No maps provided, derive from shape
-    ARROW_ASSIGN_OR_RAISE(auto dim_size, shape_prov.DimSize(row_dim));
-    row_range.reserve(dim_size);
-    for(std::size_t r=0; r < dim_size; ++r) {
-      row_range.emplace_back(Range{r, r + 1, Range::FREE});
-    }
-  } else {
-    // Derive from mapping
-    const auto & row_maps = maps[row_dim];
-    row_range.reserve(row_maps.size());
-    for(std::size_t r=0; r < row_maps.size(); ++r) {
-      row_range.emplace_back(Range{r, r + 1, Range::MAP});
-    }
-  }
-
-  column_ranges.emplace_back(std::move(row_range));
-
-
-  assert(ndim == column_ranges.size());
-  return column_ranges;
-}
-
-// Make ranges for each dimension
-arrow::Result<ColumnRanges>
-ColumnMapping::MakeRanges(const ShapeProvider & shape_prov, const ColumnMaps & maps) {
-  if(shape_prov.IsActuallyFixed()) {
-    return MakeFixedRanges(shape_prov, maps);
-  }
-
-  return MakeVariableRanges(shape_prov, maps);
-}
-
-// Derive an output shape from the selection ranges
-// This may not be possible for variably shaped columns
-std::optional<casacore::IPosition>
-ColumnMapping::MaybeMakeOutputShape(const ColumnRanges & ranges) {
-  auto ndim = ranges.size();
-  assert(ndim > 0);
-  auto row_dim = std::ptrdiff_t(ndim) - 1;
-  auto shape = casacore::IPosition(ndim, 0);
-
-  for(auto [dim, size]=std::tuple{std::size_t{0}, std::size_t{0}}; dim < ndim; ++dim) {
-    for(const auto & range: ranges[dim]) {
-      switch(range.type) {
-        case Range::FREE:
-        case Range::MAP:
-          assert(range.IsValid());
-          size += range.nRows();
-          break;
-        case Range::UNCONSTRAINED:
-          return std::nullopt;
-        default:
-          assert(false && "Unhandled Range::Type enum");
-      }
-    }
-    shape[dim] = size;
-  }
-
-  return shape;
-}
 
 // Factory method for making a ColumnMapping object
 arrow::Result<ColumnMapping>
@@ -658,8 +658,8 @@ ColumnMapping::Make(
   }
 
   ARROW_ASSIGN_OR_RAISE(auto shape_prov, ShapeProvider::Make(column, selection));
-  auto maps = MakeMaps(shape_prov, selection);
-  ARROW_ASSIGN_OR_RAISE(auto ranges, MakeRanges(shape_prov, maps));
+  auto maps = MapFactory(shape_prov, selection);
+  ARROW_ASSIGN_OR_RAISE(auto ranges, RangeFactory(shape_prov, maps));
 
   if(ranges.size() == 0) {
     return arrow::Status::ExecutionError("Zero ranges generated for column ",
