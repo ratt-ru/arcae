@@ -150,7 +150,7 @@ FixedRangeFactory(const ShapeProvider & shape_prov, const ColumnMaps & maps) {
 
 // Make ranges for variably shaped columns
 // In this case, each row may have a different shape
-// so we create a separate range for each row and unconstrained
+// so we create a separate range for each row and VARYING
 // ranges for other dimensions whose size cannot be determined.
 arrow::Result<ColumnRanges>
 VariableRangeFactory(const ShapeProvider & shape_prov, const ColumnMaps & maps) {
@@ -164,9 +164,9 @@ VariableRangeFactory(const ShapeProvider & shape_prov, const ColumnMaps & maps) 
   // Handle non-row dimensions first
   for(std::size_t dim=0; dim < row_dim; ++dim) {
     // If no mapping exists for this dimension
-    // create a single unconstrained range
+    // create a single VARYING range
     if(dim >= maps.size() || maps[dim].size() == 0) {
-      column_ranges.emplace_back(ColumnRange{Range{0, 0, Range::UNCONSTRAINED}});
+      column_ranges.emplace_back(ColumnRange{Range{0, 0, Range::VARYING}});
       continue;
     }
 
@@ -248,7 +248,7 @@ MaybeMakeOutputShape(const ColumnRanges & ranges) {
           assert(range.IsValid());
           size += range.nRows();
           break;
-        case Range::UNCONSTRAINED:
+        case Range::VARYING:
           return std::nullopt;
         default:
           assert(false && "Unhandled Range::Type enum");
@@ -560,7 +560,7 @@ void RangeIterator::UpdateState() {
         range_length_[dim] = dim_maps[range.end - 1].disk - start + 1;
         break;
       }
-      case Range::UNCONSTRAINED: {
+      case Range::VARYING: {
         // In case of variably shaped columns,
         // the dimension size will vary by row
         // and there will only be a single row
@@ -698,7 +698,7 @@ ColumnMapping::IsSimple() const {
       switch(range.type) {
         // These are trivially contiguous
         case Range::FREE:
-        case Range::UNCONSTRAINED:
+        case Range::VARYING:
           break;
         case Range::MAP:
           for(std::size_t i = range.start + 1; i < range.end; ++i) {
@@ -732,12 +732,18 @@ ColumnMapping::nElements() const {
       const auto & dim_range = DimRanges(dim);
       auto dim_elements = std::size_t{0};
       for(const auto & range: dim_range) {
-        if(range.IsUnconstrained()) {
-          assert(row_range.IsSingleRow());
-          dim_elements += shape_provider_.RowDimSize(rr_id, dim);
-        } else {
-          assert(range.IsValid());
-          dim_elements += range.nRows();
+        switch(range.type) {
+          case Range::VARYING:
+            assert(row_range.IsSingleRow());
+            dim_elements += shape_provider_.RowDimSize(rr_id, dim);
+            break;
+          case Range::FREE:
+          case Range::MAP:
+            assert(range.IsValid());
+            dim_elements += range.nRows();
+            break;
+          default:
+            assert(false && "Unhandled Range::Type enum");
         }
       }
       row_elements *= dim_elements;

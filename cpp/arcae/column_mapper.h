@@ -41,18 +41,9 @@ struct Range {
     MAP=0,
     // A contiguous range of row ids
     FREE,
-    // Specifies a range whose size we don't know
-    UNCONSTRAINED
+    // Specifies a range whose size varies
+    VARYING
   } type = FREE;
-
-  constexpr inline bool IsMap() const
-    { return type == MAP; }
-
-  constexpr inline bool IsFree() const
-    { return type == FREE; }
-
-  constexpr inline bool IsUnconstrained() const
-    { return type == UNCONSTRAINED; }
 
   constexpr casacore::rownr_t nRows() const
     { return end - start; }
