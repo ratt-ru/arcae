@@ -8,6 +8,7 @@
 #include <optional>
 #include <vector>
 
+#include <arrow/api.h>
 #include <arrow/result.h>
 #include <arrow/status.h>
 #include <casacore/casa/aipsxtype.h>
@@ -74,7 +75,7 @@ struct VariableShapeData {
   std::size_t nDim() const;
 
   std::vector<casacore::IPosition> row_shapes_;
-  std::vector<std::vector<std::size_t>> offsets_;
+  std::vector<std::shared_ptr<arrow::Int64Array>> offsets_;
   std::size_t ndim_;
   std::optional<casacore::IPosition> shape_;
 };

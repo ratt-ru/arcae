@@ -1,9 +1,8 @@
 #include <memory>
 #include <numeric>
+#include <sys/types.h>
 
-#include <arcae//column_mapper.h>
-#include <arcae/safe_table_proxy.h>
-#include <arcae/table_factory.h>
+#include <arrow/api.h>
 #include <casacore/casa/Arrays/IPosition.h>
 #include <casacore/casa/BasicSL/Complexfwd.h>
 #include <casacore/tables/Tables/ArrColDesc.h>
@@ -12,14 +11,16 @@
 #include <casacore/tables/Tables.h>
 #include <casacore/tables/Tables/TableColumn.h>
 #include <casacore/ms/MeasurementSets/MeasurementSet.h>
-#include <sys/types.h>
 #include <tests/test_utils.h>
 
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 #include <arrow/testing/gtest_util.h>
 
-#include "arrow/result.h"
+#include <arcae/column_mapper.h>
+#include <arcae/safe_table_proxy.h>
+#include <arcae/table_factory.h>
+
 
 using arcae::ColumnMapping;
 using casacore::Array;
@@ -166,10 +167,14 @@ TEST_F(ColumnConvertTest, SelectFromRange) {
                                        IPos{3, 2}, IPos{4, 1}, IPos{4, 2}, IPos{2, 2}, IPos{2, 1}));
 
     ASSERT_EQ(map.shape_provider_.var_data_->offsets_.size(), 2);
-    EXPECT_THAT(map.shape_provider_.var_data_->offsets_[0],
-                ::testing::ElementsAre(3, 4, 4, 2, 2, 3, 4, 4, 2, 2));
-    EXPECT_THAT(map.shape_provider_.var_data_->offsets_[1],
-                ::testing::ElementsAre(6, 4, 8, 4, 2, 6, 4, 8, 4, 2));
+    arrow::Int64Builder builder;
+    ASSERT_OK(builder.AppendValues({3, 4, 4, 2, 2, 3, 4, 4, 2, 2}));
+    ASSERT_OK_AND_ASSIGN(auto offsets1, builder.Finish());
+    ASSERT_TRUE(offsets1->Equals(map.shape_provider_.var_data_->offsets_[0]));
+    builder.Reset();
+    ASSERT_OK(builder.AppendValues({6, 4, 8, 4, 2, 6, 4, 8, 4, 2}));
+    ASSERT_OK_AND_ASSIGN(auto offsets2, builder.Finish());
+    ASSERT_TRUE(offsets2->Equals(map.shape_provider_.var_data_->offsets_[1]));
 
     for(auto [r, rit]=std::tuple{0, map.RangeBegin()}; rit != map.RangeEnd(); ++rit, ++r) {
       ASSERT_EQ(rit.GetRowSlicer(), Slicer(IPos({r}), IPos({r}), Slicer::endIsLast));
@@ -197,11 +202,15 @@ TEST_F(ColumnConvertTest, SelectFromRange) {
                 ::testing::ElementsAre(IPos{3, 2}, IPos{4, 1}, IPos{4, 2}, IPos{2, 2},
                                        IPos{4, 1}, IPos{4, 2}, IPos{2, 2}, IPos{2, 1}));
 
-    EXPECT_EQ(map.shape_provider_.var_data_->offsets_.size(), 2);
-    EXPECT_THAT(map.shape_provider_.var_data_->offsets_[0],
-                ::testing::ElementsAre(3, 4, 4, 2, 4, 4, 2, 2));
-    EXPECT_THAT(map.shape_provider_.var_data_->offsets_[1],
-                ::testing::ElementsAre(6, 4, 8, 4, 4, 8, 4, 2));
+    ASSERT_EQ(map.shape_provider_.var_data_->offsets_.size(), 2);
+    arrow::Int64Builder builder;
+    ASSERT_OK(builder.AppendValues({3, 4, 4, 2, 4, 4, 2, 2}));
+    ASSERT_OK_AND_ASSIGN(auto offsets1, builder.Finish());
+    ASSERT_TRUE(offsets1->Equals(map.shape_provider_.var_data_->offsets_[0]));
+    builder.Reset();
+    ASSERT_OK(builder.AppendValues({6, 4, 8, 4, 4, 8, 4, 2}));
+    ASSERT_OK_AND_ASSIGN(auto offsets2, builder.Finish());
+    ASSERT_TRUE(offsets2->Equals(map.shape_provider_.var_data_->offsets_[1]));
 
     for(auto [r, rit]=std::tuple{0, map.RangeBegin()}; rit != map.RangeEnd(); ++rit, ++r) {
       auto rid = static_cast<ssize_t>(row_ids[r]);
@@ -232,11 +241,15 @@ TEST_F(ColumnConvertTest, SelectFromRange) {
                 ::testing::ElementsAre(IPos{3, 1}, IPos{4, 1}, IPos{4, 1}, IPos{2, 1},
                                        IPos{4, 1}, IPos{4, 1}, IPos{2, 1}, IPos{2, 1}));
 
-    EXPECT_EQ(map.shape_provider_.var_data_->offsets_.size(), 2);
-    EXPECT_THAT(map.shape_provider_.var_data_->offsets_[0],
-                ::testing::ElementsAre(3, 4, 4, 2, 4, 4, 2, 2));
-    EXPECT_THAT(map.shape_provider_.var_data_->offsets_[1],
-                ::testing::ElementsAre(3, 4, 4, 2, 4, 4, 2, 2));
+    ASSERT_EQ(map.shape_provider_.var_data_->offsets_.size(), 2);
+    arrow::Int64Builder builder;
+    ASSERT_OK(builder.AppendValues({3, 4, 4, 2, 4, 4, 2, 2}));
+    ASSERT_OK_AND_ASSIGN(auto offsets1, builder.Finish());
+    ASSERT_TRUE(offsets1->Equals(map.shape_provider_.var_data_->offsets_[0]));
+    builder.Reset();
+    ASSERT_OK(builder.AppendValues({3, 4, 4, 2, 4, 4, 2, 2}));
+    ASSERT_OK_AND_ASSIGN(auto offsets2, builder.Finish());
+    ASSERT_TRUE(offsets2->Equals(map.shape_provider_.var_data_->offsets_[1]));
 
     for(auto [r, rit]=std::tuple{0, map.RangeBegin()}; rit != map.RangeEnd(); ++rit, ++r) {
       auto rid = static_cast<ssize_t>(row_ids[r]);
@@ -268,11 +281,15 @@ TEST_F(ColumnConvertTest, SelectFromRange) {
                 ::testing::ElementsAre(IPos{1, 2}, IPos{1, 1}, IPos{1, 2}, IPos{1, 2},
                                        IPos{1, 1}, IPos{1, 2}, IPos{1, 2}, IPos{1, 1}));
 
-    EXPECT_EQ(map.shape_provider_.var_data_->offsets_.size(), 2);
-    EXPECT_THAT(map.shape_provider_.var_data_->offsets_[0],
-                ::testing::ElementsAre(1, 1, 1, 1, 1, 1, 1, 1));
-    EXPECT_THAT(map.shape_provider_.var_data_->offsets_[1],
-                ::testing::ElementsAre(2, 1, 2, 2, 1, 2, 2, 1));
+    ASSERT_EQ(map.shape_provider_.var_data_->offsets_.size(), 2);
+    arrow::Int64Builder builder;
+    ASSERT_OK(builder.AppendValues({1, 1, 1, 1, 1, 1, 1, 1}));
+    ASSERT_OK_AND_ASSIGN(auto offsets1, builder.Finish());
+    ASSERT_TRUE(offsets1->Equals(map.shape_provider_.var_data_->offsets_[0]));
+    builder.Reset();
+    ASSERT_OK(builder.AppendValues({2, 1, 2, 2, 1, 2, 2, 1}));
+    ASSERT_OK_AND_ASSIGN(auto offsets2, builder.Finish());
+    ASSERT_TRUE(offsets2->Equals(map.shape_provider_.var_data_->offsets_[1]));
 
     for(auto [r, rit]=std::tuple{0, map.RangeBegin()}; rit != map.RangeEnd(); ++rit, ++r) {
       auto rid = static_cast<ssize_t>(row_ids[r]);
@@ -303,11 +320,15 @@ TEST_F(ColumnConvertTest, SelectFromRange) {
                 ::testing::ElementsAre(IPos{1, 1}, IPos{1, 1}, IPos{1, 1}, IPos{1, 1},
                                        IPos{1, 1}, IPos{1, 1}, IPos{1, 1}, IPos{1, 1}));
 
-    EXPECT_EQ(map.shape_provider_.var_data_->offsets_.size(), 2);
-    EXPECT_THAT(map.shape_provider_.var_data_->offsets_[0],
-                ::testing::ElementsAre(1, 1, 1, 1, 1, 1, 1, 1));
-    EXPECT_THAT(map.shape_provider_.var_data_->offsets_[1],
-                ::testing::ElementsAre(1, 1, 1, 1, 1, 1, 1, 1));
+    ASSERT_EQ(map.shape_provider_.var_data_->offsets_.size(), 2);
+    arrow::Int64Builder builder;
+    ASSERT_OK(builder.AppendValues({1, 1, 1, 1, 1, 1, 1, 1}));
+    ASSERT_OK_AND_ASSIGN(auto offsets1, builder.Finish());
+    ASSERT_TRUE(offsets1->Equals(map.shape_provider_.var_data_->offsets_[0]));
+    builder.Reset();
+    ASSERT_OK(builder.AppendValues({1, 1, 1, 1, 1, 1, 1, 1}));
+    ASSERT_OK_AND_ASSIGN(auto offsets2, builder.Finish());
+    ASSERT_TRUE(offsets2->Equals(map.shape_provider_.var_data_->offsets_[1]));
 
     auto rit = map.RangeBegin();
     ASSERT_EQ(rit.GetRowSlicer(), Slicer(IPos({0}), IPos({3}), Slicer::endIsLast));

@@ -10,6 +10,7 @@
 #include <sys/types.h>
 #include <vector>
 
+#include <arrow/api.h>
 #include <arrow/result.h>
 #include <arrow/status.h>
 #include <casacore/casa/aipsxtype.h>
@@ -323,15 +324,25 @@ VariableShapeData::Make(const casacore::TableColumn & column, const ColumnSelect
   auto nrow = row_shapes.size();
   // Number of dimensions without row
   auto ndim = std::begin(row_shapes)->size();
-  auto offsets = decltype(VariableShapeData::offsets_)(ndim, std::vector<std::size_t>(nrow, 0));
+  auto builders = std::vector<arrow::Int64Builder>(ndim);
+  auto offsets = std::vector<std::shared_ptr<arrow::Int64Array>>(ndim);
+
+  for(auto dim=0; dim < ndim; ++dim) {
+    ARROW_RETURN_NOT_OK(builders[dim].Reserve(nrow));
+  }
 
   for(auto r=0; r < nrow; ++r) {
     using ItType = std::tuple<std::size_t, std::size_t>;
     for(auto [dim, product]=ItType{0, 1}; dim < ndim; ++dim) {
-      product = offsets[dim][r] = product * row_shapes[r][dim];
+      auto offset = product * row_shapes[r][dim];
+      ARROW_RETURN_NOT_OK(builders[dim].Append(offset));
+      product = offset;
     }
   }
 
+  for(auto dim=0; dim < ndim; ++dim) {
+    ARROW_RETURN_NOT_OK(builders[dim].Finish(&offsets[dim]));
+  }
 
   // We may have a fixed shape in practice
   auto shape = fixed_shape ? std::make_optional(*std::begin(row_shapes))
@@ -636,13 +647,15 @@ std::size_t ColumnMapping::FlatOffset(const std::vector<std::size_t> & index) co
   const auto & offsets = shape_provider_.var_data_->offsets_;
 
   for(auto dim = 1; dim < RowDim(); ++dim) {
-    result += index[dim] * offsets[dim - 1][row];
+    result += index[dim] * offsets[dim - 1]->Value(row);
   }
 
   const auto & row_offsets = offsets[offsets.size() - 1];
-  return std::accumulate(std::begin(row_offsets),
-                          std::begin(row_offsets) + row,
-                          result);
+
+  for(std::size_t i=0; i < row; ++i) {
+    result += row_offsets->Value(i);
+  }
+  return result;
 }
 
 
