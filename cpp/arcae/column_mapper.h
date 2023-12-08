@@ -84,7 +84,6 @@ struct VariableShapeData {
 // This easy in the case of Fixed Shape columns.
 // This may not be possible in the Variable column case.
 struct ShapeProvider {
-public:
   std::reference_wrapper<const casacore::TableColumn> column_;
   std::reference_wrapper<const ColumnSelection> selection_;
   std::unique_ptr<VariableShapeData> var_data_;
@@ -123,125 +122,118 @@ public:
 
 
 
-class RangeIterator;
-class ColumnMapping;
+struct RangeIterator;
+struct ColumnMapping;
 
 // Iterates over the current mapping in the RangeIterator
-class MapIterator {
-  public:
-    // Reference to RangeIterator
-    std::reference_wrapper<const RangeIterator> rit_;
-    // Reference to ColumnMapping
-    std::reference_wrapper<const ColumnMapping> map_;
-    // ND index in the local buffer holding the values
-    // described by this chunk
-    std::vector<std::size_t> chunk_index_;
-    // ND index in the global buffer
-    std::vector<std::size_t> global_index_;
-    std::vector<std::size_t> strides_;
-    bool done_;
+struct MapIterator {
+  // Reference to RangeIterator
+  std::reference_wrapper<const RangeIterator> rit_;
+  // Reference to ColumnMapping
+  std::reference_wrapper<const ColumnMapping> map_;
+  // ND index in the local buffer holding the values
+  // described by this chunk
+  std::vector<std::size_t> chunk_index_;
+  // ND index in the global buffer
+  std::vector<std::size_t> global_index_;
+  std::vector<std::size_t> strides_;
+  bool done_;
 
-    MapIterator(const RangeIterator & rit,
-                const ColumnMapping & map,
-                std::vector<std::size_t> chunk_index,
-                std::vector<std::size_t> global_index,
-                std::vector<std::size_t> strides,
-                bool done);
-  public:
-    static MapIterator Make(const RangeIterator & rit, bool done);
-    inline std::size_t nDim() const {
-      return chunk_index_.size();
-    };
+  MapIterator(const RangeIterator & rit,
+              const ColumnMapping & map,
+              std::vector<std::size_t> chunk_index,
+              std::vector<std::size_t> global_index,
+              std::vector<std::size_t> strides,
+              bool done);
 
-    inline std::size_t RowDim() const {
-      return nDim() - 1;
-    };
+  static MapIterator Make(const RangeIterator & rit, bool done);
+  inline std::size_t nDim() const {
+    return chunk_index_.size();
+  };
 
-    std::size_t ChunkOffset() const;
-    std::size_t GlobalOffset() const;
-    std::size_t RangeSize(std::size_t dim) const;
-    std::size_t MemStart(std::size_t dim) const;
+  inline std::size_t RowDim() const {
+    return nDim() - 1;
+  };
 
-    MapIterator & operator++();
-    bool operator==(const MapIterator & other) const;
-    inline bool operator!=(const MapIterator & other) const {
-      return !(*this == other);
-    }
+  std::size_t ChunkOffset() const;
+  std::size_t GlobalOffset() const;
+  std::size_t RangeSize(std::size_t dim) const;
+  std::size_t MemStart(std::size_t dim) const;
+
+  MapIterator & operator++();
+  bool operator==(const MapIterator & other) const;
+  inline bool operator!=(const MapIterator & other) const {
+    return !(*this == other);
+  }
 };
 
 
 // Iterates over the Disjoint Ranges defined by a ColumnMapping
-class RangeIterator {
-  public:
-    std::reference_wrapper<const ColumnMapping> map_;
-    // Index of the Disjoint Range
-    std::vector<std::size_t> index_;
-    // Starting position of the disk index
-    std::vector<std::size_t> disk_start_;
-    // Start position of the memory index
-    std::vector<std::size_t> mem_start_;
-    // Length of the range
-    std::vector<std::size_t> range_length_;
-    bool done_;
+struct RangeIterator {
+  std::reference_wrapper<const ColumnMapping> map_;
+  // Index of the Disjoint Range
+  std::vector<std::size_t> index_;
+  // Starting position of the disk index
+  std::vector<std::size_t> disk_start_;
+  // Start position of the memory index
+  std::vector<std::size_t> mem_start_;
+  // Length of the range
+  std::vector<std::size_t> range_length_;
+  bool done_;
 
-  public:
-    RangeIterator(ColumnMapping & column_map, bool done=false);
+  RangeIterator(ColumnMapping & column_map, bool done=false);
 
-    // Return the number of dimensions in the index
-    inline std::size_t nDim() const {
-      return index_.size();
-    }
+  // Return the number of dimensions in the index
+  inline std::size_t nDim() const {
+    return index_.size();
+  }
 
-    // Index of he row dimension
-    inline std::size_t RowDim() const {
-      assert(nDim() > 0);
-      return nDim() - 1;
-    }
+  // Index of he row dimension
+  inline std::size_t RowDim() const {
+    assert(nDim() > 0);
+    return nDim() - 1;
+  }
 
-    // Return the Ranges for the given dimension
-    const ColumnRange & DimRanges(std::size_t dim) const;
+  // Return the Ranges for the given dimension
+  const ColumnRange & DimRanges(std::size_t dim) const;
 
-    // Return the Maps for the given dimension
-    inline const ColumnMap & DimMaps(std::size_t dim) const;
+  // Return the Maps for the given dimension
+  inline const ColumnMap & DimMaps(std::size_t dim) const;
 
-    // Return the currently selected Range of the given dimension
-    inline const Range & DimRange(std::size_t dim) const;
+  // Return the currently selected Range of the given dimension
+  inline const Range & DimRange(std::size_t dim) const;
 
-    inline MapIterator MapBegin() const {
-      return MapIterator::Make(*this, false);
-    };
+  inline MapIterator MapBegin() const {
+    return MapIterator::Make(*this, false);
+  };
 
-    MapIterator MapEnd() const {
-      return MapIterator::Make(*this, true);
-    };
+  MapIterator MapEnd() const {
+    return MapIterator::Make(*this, true);
+  };
 
-    inline std::size_t RangeElements() const;
+  inline std::size_t RangeElements() const;
 
-    RangeIterator & operator++();
-    void UpdateState();
+  RangeIterator & operator++();
+  void UpdateState();
 
-    // Returns a slicer for the row dimension
-    casacore::Slicer GetRowSlicer() const;
-    // Returns a slicer for secondary dimensions
-    casacore::Slicer GetSectionSlicer() const;
+  // Returns a slicer for the row dimension
+  casacore::Slicer GetRowSlicer() const;
+  // Returns a slicer for secondary dimensions
+  casacore::Slicer GetSectionSlicer() const;
 
-    bool operator==(const RangeIterator & other) const;
-    bool operator!=(const RangeIterator & other) const;
-
+  bool operator==(const RangeIterator & other) const;
+  bool operator!=(const RangeIterator & other) const;
 };
 
-class ColumnMapping {
-public:
+struct ColumnMapping {
   enum InputOrder {C_ORDER=0, F_ORDER};
 
-public:
   std::reference_wrapper<const casacore::TableColumn> column_;
   ColumnMaps maps_;
   ColumnRanges ranges_;
   ShapeProvider shape_provider_;
   std::optional<casacore::IPosition> output_shape_;
 
-public:
   inline const ColumnMap & DimMaps(std::size_t dim) const {
     assert(dim < nDim());
     return maps_[dim];
