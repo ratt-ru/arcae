@@ -240,7 +240,8 @@ MaybeMakeOutputShape(const ColumnRanges & ranges) {
   auto row_dim = std::ptrdiff_t(ndim) - 1;
   auto shape = casacore::IPosition(ndim, 0);
 
-  for(auto [dim, size]=std::tuple{std::size_t{0}, std::size_t{0}}; dim < ndim; ++dim) {
+  for(auto dim=std::size_t{0}; dim < ndim; ++dim) {
+    auto size = std::size_t{0};
     for(const auto & range: ranges[dim]) {
       switch(range.type) {
         case Range::FREE:
