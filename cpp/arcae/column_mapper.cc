@@ -653,7 +653,7 @@ ColumnMapping::Make(
     InputOrder order) {
 
   // Convert to FORTRAN ordering, which the casacore internals use
-  if(order == InputOrder::C) {
+  if(order == InputOrder::C_ORDER) {
     std::reverse(std::begin(selection), std::end(selection));
   }
 

@@ -18,8 +18,6 @@
 
 namespace arcae {
 
-enum InputOrder {C=0, F};
-
 using RowIds = std::vector<casacore::rownr_t>;
 using ColumnSelection = std::vector<RowIds>;
 
@@ -243,6 +241,9 @@ class RangeIterator {
 
 class ColumnMapping {
 public:
+  enum InputOrder {C_ORDER=0, F_ORDER};
+
+public:
   std::reference_wrapper<const casacore::TableColumn> column_;
   ColumnMaps maps_;
   ColumnRanges ranges_;
@@ -318,7 +319,7 @@ public:
   static arrow::Result<ColumnMapping> Make(
       const casacore::TableColumn & column,
       ColumnSelection selection,
-      InputOrder order=InputOrder::C);
+      InputOrder order=InputOrder::C_ORDER);
 
   // Number of disjoint ranges in this map
   std::size_t nRanges() const;
