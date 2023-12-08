@@ -4,6 +4,7 @@
 
 #include "arcae/new_convert_visitor.h"
 #include "arcae/complex_type.h"
+#include "arcae/service_locator.h"
 
 using ::arrow::DataType;
 using ::arrow::Buffer;

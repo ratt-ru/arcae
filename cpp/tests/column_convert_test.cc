@@ -1,6 +1,7 @@
 #include <memory>
 
 #include <arrow/result.h>
+
 #include <casacore/casa/Arrays/IPosition.h>
 #include <casacore/ms/MeasurementSets/MeasurementSet.h>
 #include <casacore/tables/Tables.h>
@@ -15,8 +16,11 @@
 
 #include "arcae/safe_table_proxy.h"
 #include "arcae/column_mapper.h"
+#include "arcae/new_convert_visitor.h"
+#include "arrow/array/array_nested.h"
 
 using arcae::ColumnMapping;
+using arcae::NewConvertVisitor;
 
 using casacore::Array;
 using casacore::ArrayColumn;
@@ -180,6 +184,7 @@ TEST_F(ColumnConvertTest, SelectionVariable) {
       ASSERT_OK_AND_ASSIGN(auto map, ColumnMapping::Make(var_data, {{0}}));
       ASSERT_EQ(map.nRanges(), 1);
       ASSERT_EQ(map.nElements(), 4);
+      ASSERT_EQ(map.GetOutputShape(), IPos({2, 2, 1}));
       auto rit = map.RangeBegin();
       ASSERT_EQ(rit.GetRowSlicer(), Slicer(IPos({0}), IPos({0}), Slicer::endIsLast));
       ASSERT_EQ(rit.GetSectionSlicer(), Slicer(IPos({0, 0}), IPos({1, 1}), Slicer::endIsLast));
@@ -211,6 +216,7 @@ TEST_F(ColumnConvertTest, SelectionVariable) {
       ASSERT_EQ(map.nRanges(), 1);
       ASSERT_EQ(map.nElements(), 1);
       auto rit = map.RangeBegin();
+      ASSERT_EQ(map.GetOutputShape(), IPos({1, 1, 1}));
       ASSERT_EQ(rit.GetRowSlicer(), Slicer(IPos({1}), IPos({1}), Slicer::endIsLast));
       ASSERT_EQ(rit.GetSectionSlicer(), Slicer(IPos({0, 0}), IPos({0, 0}), Slicer::endIsLast));
       auto array = var_data.getColumnRange(rit.GetRowSlicer(), rit.GetSectionSlicer());
@@ -228,6 +234,7 @@ TEST_F(ColumnConvertTest, SelectionVariable) {
       ASSERT_OK_AND_ASSIGN(auto map, ColumnMapping::Make(var_data, {{0, 1}}));
       ASSERT_EQ(map.nRanges(), 2);
       ASSERT_EQ(map.nElements(), 5);
+      ASSERT_FALSE(map.GetOutputShape().ok());
       auto rit = map.RangeBegin();
       ASSERT_EQ(rit.GetRowSlicer(), Slicer(IPos({0}), IPos({0}), Slicer::endIsLast));
       ASSERT_EQ(rit.GetSectionSlicer(), Slicer(IPos({0, 0}), IPos({1, 1}), Slicer::endIsLast));
@@ -272,5 +279,68 @@ TEST_F(ColumnConvertTest, SelectionVariable) {
       ++rit;
       ASSERT_EQ(map.RangeEnd(), rit);
     }
+  }
+}
+
+TEST_F(ColumnConvertTest, ConvertVIsitorFixed) {
+  const auto & table = table_proxy_.table();
+
+  {
+    // Fixed data column, get entire domain
+    auto var_data = GetArrayColumn<casacore::Int>(table, "FIXED_DATA");
+    ASSERT_OK_AND_ASSIGN(auto column_map, (ColumnMapping::Make(var_data, {})));
+    ASSERT_OK_AND_ASSIGN(auto shape, column_map.GetOutputShape());
+    ASSERT_EQ(shape, IPos({2, 2, 2}));
+    auto visitor = NewConvertVisitor(var_data, column_map);
+    auto visit_status = visitor.Visit(var_data.columnDesc().dataType());
+    ASSERT_OK(visit_status);
+
+    auto builder = arrow::Int32Builder();
+    ASSERT_OK(builder.AppendValues({0, 1, 2, 3, 4, 5, 6, 7}));
+    ASSERT_OK_AND_ASSIGN(auto expected, builder.Finish());
+    for(auto dim_size: shape) {
+      ASSERT_OK_AND_ASSIGN(expected, arrow::FixedSizeListArray::FromArrays(expected, dim_size));
+    }
+    ASSERT_TRUE(visitor.array_->Equals(expected));
+  }
+
+  {
+    // Fixed data column, get all rows, first channel and correlation
+    auto var_data = GetArrayColumn<casacore::Int>(table, "FIXED_DATA");
+    ASSERT_OK_AND_ASSIGN(auto column_map, (ColumnMapping::Make(var_data, {{}, {0}, {0}})));
+    ASSERT_OK_AND_ASSIGN(auto shape, column_map.GetOutputShape());
+    ASSERT_EQ(shape, IPos({1, 1, 2}));
+    auto visitor = NewConvertVisitor(var_data, column_map);
+    auto visit_status = visitor.Visit(var_data.columnDesc().dataType());
+    ASSERT_OK(visit_status);
+
+
+    auto builder = arrow::Int32Builder();
+    ASSERT_OK(builder.AppendValues({0, 4}));
+    ASSERT_OK_AND_ASSIGN(auto expected, builder.Finish());
+    for(auto dim_size: shape) {
+      ASSERT_OK_AND_ASSIGN(expected, arrow::FixedSizeListArray::FromArrays(expected, dim_size));
+    }
+    ASSERT_TRUE(visitor.array_->Equals(expected));
+  }
+
+  {
+    // Fixed data column, get all rows, last channel and correlation
+    auto var_data = GetArrayColumn<casacore::Int>(table, "FIXED_DATA");
+    ASSERT_OK_AND_ASSIGN(auto column_map, (ColumnMapping::Make(var_data, {{}, {1}, {1}})));
+    ASSERT_OK_AND_ASSIGN(auto shape, column_map.GetOutputShape());
+    ASSERT_EQ(shape, IPos({1, 1, 2}));
+    auto visitor = NewConvertVisitor(var_data, column_map);
+    auto visit_status = visitor.Visit(var_data.columnDesc().dataType());
+    ASSERT_OK(visit_status);
+
+
+    auto builder = arrow::Int32Builder();
+    ASSERT_OK(builder.AppendValues({3, 7}));
+    ASSERT_OK_AND_ASSIGN(auto expected, builder.Finish());
+    for(auto dim_size: shape) {
+      ASSERT_OK_AND_ASSIGN(expected, arrow::FixedSizeListArray::FromArrays(expected, dim_size));
+    }
+    ASSERT_TRUE(visitor.array_->Equals(expected));
   }
 }
