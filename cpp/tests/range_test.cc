@@ -111,9 +111,9 @@ TEST_F(RangeTest, CheckMapsAndRangesSingleton) {
   EXPECT_EQ(map.DimMaps(1).size(), 0);
   EXPECT_THAT(map.DimMaps(2), ::testing::ElementsAre(IdMap{0, 0}));
 
-  EXPECT_THAT(map.DimRanges(0), ::testing::ElementsAre(Range{0, 2}));
-  EXPECT_THAT(map.DimRanges(1), ::testing::ElementsAre(Range{0, 4}));
-  EXPECT_THAT(map.DimRanges(2), ::testing::ElementsAre(Range{0, 1}));
+  EXPECT_THAT(map.DimRanges(0), ::testing::ElementsAre(Range{0, 2, Range::FREE}));
+  EXPECT_THAT(map.DimRanges(1), ::testing::ElementsAre(Range{0, 4, Range::FREE}));
+  EXPECT_THAT(map.DimRanges(2), ::testing::ElementsAre(Range{0, 1, Range::MAP}));
 }
 
 TEST_F(RangeTest, CheckMapsAndRangesMultiple) {
@@ -133,14 +133,14 @@ TEST_F(RangeTest, CheckMapsAndRangesMultiple) {
         IdMap{8, 4}));
 
   EXPECT_THAT(map.DimRanges(2), ::testing::ElementsAre(
-        Range{0, 4},
-        Range{4, 6}));
+        Range{0, 4, Range::MAP},
+        Range{4, 6, Range::MAP}));
 
   EXPECT_THAT(map.DimMaps(1), ::testing::ElementsAre(
         IdMap{5, 0}, IdMap{6, 1}));
 
   EXPECT_THAT(map.DimRanges(1), ::testing::ElementsAre(
-        Range{0, 2}));
+        Range{0, 2, Range::MAP}));
 
   EXPECT_THAT(map.DimMaps(0), ::testing::ElementsAre(
         IdMap{7, 0},
@@ -150,8 +150,8 @@ TEST_F(RangeTest, CheckMapsAndRangesMultiple) {
         IdMap{12, 3}));
 
   EXPECT_THAT(map.DimRanges(0), ::testing::ElementsAre(
-        Range{0, 3},
-        Range{3, 5}));
+        Range{0, 3, Range::MAP},
+        Range{3, 5, Range::MAP}));
 
   ASSERT_FALSE(map.IsSimple());
 }

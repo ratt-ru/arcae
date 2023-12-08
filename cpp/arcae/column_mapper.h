@@ -55,7 +55,7 @@ struct Range {
     { return start <= end; }
 
   constexpr inline bool operator==(const Range & lhs) const
-      { return start == lhs.start && end == lhs.end; }
+      { return start == lhs.start && end == lhs.end && type == lhs.type; }
 };
 
 // Vectors of ranges
