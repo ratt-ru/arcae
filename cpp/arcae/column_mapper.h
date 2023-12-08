@@ -81,7 +81,9 @@ struct VariableShapeData {
 };
 
 
-// Provides Shape information for this column
+// Provides Shape information for this column,
+// primarily for determining dimension sizes which
+// are used to establish ranges for dimensions with no selection.
 // This easy in the case of Fixed Shape columns.
 // This may not be possible in the Variable column case.
 struct ShapeProvider {
