@@ -1,13 +1,16 @@
 #include <memory>
+#include <string>
 
 #include <arrow/result.h>
 
 #include <casacore/casa/Arrays/IPosition.h>
 #include <casacore/ms/MeasurementSets/MeasurementSet.h>
 #include <casacore/tables/Tables.h>
-#include <casacore/tables/Tables/RefRows.h>
+#include <casacore/tables/Tables/ArrColDesc.h>
+#include <casacore/tables/Tables/Table.h>
 #include <casacore/tables/Tables/TableColumn.h>
 #include <casacore/tables/Tables/TableProxy.h>
+#include <casacore/tables/Tables/RefRows.h>
 #include <tests/test_utils.h>
 
 #include <gtest/gtest.h>
@@ -18,6 +21,7 @@
 #include "arcae/column_mapper.h"
 #include "arcae/new_convert_visitor.h"
 #include "arrow/array/array_nested.h"
+#include "arrow/array/builder_binary.h"
 
 using arcae::ColumnMapping;
 using arcae::NewConvertVisitor;
@@ -77,15 +81,18 @@ class ColumnConvertTest : public ::testing::Test {
         auto table_desc = TableDesc(MS::requiredTableDesc());
         auto data_shape = IPos({kncorr, knchan});
         auto tile_shape = IPos({kncorr, knchan, 1});
-        auto data_column_desc = ArrayColumnDesc<casacore::Int>(
-            "FIXED_DATA", data_shape, ColumnDesc::FixedShape);
-        table_desc.addColumn(data_column_desc);
 
+        auto fixed_column_desc = ArrayColumnDesc<casacore::Int>(
+            "FIXED_DATA", data_shape, ColumnDesc::FixedShape);
+        table_desc.addColumn(fixed_column_desc);
         auto var_column_desc = ArrayColumnDesc<casacore::Int>("VAR_DATA", 2);
         table_desc.addColumn(var_column_desc);
-
         auto var_fixed_column_desc = ArrayColumnDesc<casacore::Int>("VAR_FIXED_DATA", 2);
         table_desc.addColumn(var_fixed_column_desc);
+
+        auto string_column_desc = ArrayColumnDesc<casacore::String>(
+          "FIXED_STRING", data_shape, ColumnDesc::FixedShape);
+        table_desc.addColumn(string_column_desc);
 
         auto storage_manager = TiledColumnStMan("TiledModelData", tile_shape);
         auto setup_new_table = SetupNewTable(table_name_, table_desc, Table::New);
@@ -96,6 +103,8 @@ class ColumnConvertTest : public ::testing::Test {
         auto var_data = GetArrayColumn<casacore::Int>(ms, "VAR_DATA");
         auto fixed_data = GetArrayColumn<casacore::Int>(ms, "FIXED_DATA");
         auto var_fixed_data = GetArrayColumn<casacore::Int>(ms, "VAR_FIXED_DATA");
+
+        auto string_data = GetArrayColumn<casacore::String>(ms, "FIXED_STRING");
 
         for(auto [r, v] = std::tuple{ssize_t{0}, std::size_t{0}}; r < knrow; ++r) {
           auto var_array = Array<casacore::Int>(IPos({
@@ -109,6 +118,14 @@ class ColumnConvertTest : public ::testing::Test {
           for(auto it = std::begin(fixed_array); it != std::end(fixed_array); ++it, ++v) *it = v;
           fixed_data.putColumnCells(casacore::RefRows(r, r), fixed_array);
           var_fixed_data.putColumnCells(casacore::RefRows(r, r), fixed_array);
+        }
+
+        for(auto [r, v] = std::tuple{ssize_t{0}, std::size_t{0}}; r < knrow; ++r) {
+          auto string_array = Array<casacore::String>(IPos({kncorr, knchan, 1}));
+          for(auto it = std::begin(string_array); it != std::end(string_array); ++it, ++v) {
+            *it = std::to_string(v);
+          }
+          string_data.putColumnCells(casacore::RefRows(r, r), string_array);
         }
 
         return std::make_shared<TableProxy>(ms);
@@ -282,17 +299,17 @@ TEST_F(ColumnConvertTest, SelectionVariable) {
   }
 }
 
-TEST_F(ColumnConvertTest, ConvertVIsitorFixed) {
+TEST_F(ColumnConvertTest, ConvertVIsitorFixedNumeric) {
   const auto & table = table_proxy_.table();
 
   {
     // Fixed data column, get entire domain
-    auto var_data = GetArrayColumn<casacore::Int>(table, "FIXED_DATA");
-    ASSERT_OK_AND_ASSIGN(auto column_map, (ColumnMapping::Make(var_data, {})));
+    auto fixed = GetArrayColumn<casacore::Int>(table, "FIXED_DATA");
+    ASSERT_OK_AND_ASSIGN(auto column_map, (ColumnMapping::Make(fixed, {})));
     ASSERT_OK_AND_ASSIGN(auto shape, column_map.GetOutputShape());
     ASSERT_EQ(shape, IPos({2, 2, 2}));
-    auto visitor = NewConvertVisitor(var_data, column_map);
-    auto visit_status = visitor.Visit(var_data.columnDesc().dataType());
+    auto visitor = NewConvertVisitor(fixed, column_map);
+    auto visit_status = visitor.Visit(fixed.columnDesc().dataType());
     ASSERT_OK(visit_status);
 
     auto builder = arrow::Int32Builder();
@@ -306,12 +323,12 @@ TEST_F(ColumnConvertTest, ConvertVIsitorFixed) {
 
   {
     // Fixed data column, get all rows, first channel and correlation
-    auto var_data = GetArrayColumn<casacore::Int>(table, "FIXED_DATA");
-    ASSERT_OK_AND_ASSIGN(auto column_map, (ColumnMapping::Make(var_data, {{}, {0}, {0}})));
+    auto fixed = GetArrayColumn<casacore::Int>(table, "FIXED_DATA");
+    ASSERT_OK_AND_ASSIGN(auto column_map, (ColumnMapping::Make(fixed, {{}, {0}, {0}})));
     ASSERT_OK_AND_ASSIGN(auto shape, column_map.GetOutputShape());
     ASSERT_EQ(shape, IPos({1, 1, 2}));
-    auto visitor = NewConvertVisitor(var_data, column_map);
-    auto visit_status = visitor.Visit(var_data.columnDesc().dataType());
+    auto visitor = NewConvertVisitor(fixed, column_map);
+    auto visit_status = visitor.Visit(fixed.columnDesc().dataType());
     ASSERT_OK(visit_status);
 
 
@@ -326,17 +343,79 @@ TEST_F(ColumnConvertTest, ConvertVIsitorFixed) {
 
   {
     // Fixed data column, get all rows, last channel and correlation
-    auto var_data = GetArrayColumn<casacore::Int>(table, "FIXED_DATA");
-    ASSERT_OK_AND_ASSIGN(auto column_map, (ColumnMapping::Make(var_data, {{}, {1}, {1}})));
+    auto fixed = GetArrayColumn<casacore::Int>(table, "FIXED_DATA");
+    ASSERT_OK_AND_ASSIGN(auto column_map, (ColumnMapping::Make(fixed, {{}, {1}, {1}})));
     ASSERT_OK_AND_ASSIGN(auto shape, column_map.GetOutputShape());
     ASSERT_EQ(shape, IPos({1, 1, 2}));
-    auto visitor = NewConvertVisitor(var_data, column_map);
-    auto visit_status = visitor.Visit(var_data.columnDesc().dataType());
+    auto visitor = NewConvertVisitor(fixed, column_map);
+    auto visit_status = visitor.Visit(fixed.columnDesc().dataType());
     ASSERT_OK(visit_status);
 
 
     auto builder = arrow::Int32Builder();
     ASSERT_OK(builder.AppendValues({3, 7}));
+    ASSERT_OK_AND_ASSIGN(auto expected, builder.Finish());
+    for(auto dim_size: shape) {
+      ASSERT_OK_AND_ASSIGN(expected, arrow::FixedSizeListArray::FromArrays(expected, dim_size));
+    }
+    ASSERT_TRUE(visitor.array_->Equals(expected));
+  }
+}
+
+TEST_F(ColumnConvertTest, ConvertVIsitorFixedString) {
+  const auto & table = table_proxy_.table();
+
+  {
+    // Fixed data column, get entire domain
+    auto fixed = GetArrayColumn<casacore::String>(table, "FIXED_STRING");
+    ASSERT_OK_AND_ASSIGN(auto column_map, (ColumnMapping::Make(fixed, {})));
+    ASSERT_OK_AND_ASSIGN(auto shape, column_map.GetOutputShape());
+    ASSERT_EQ(shape, IPos({2, 2, 2}));
+    auto visitor = NewConvertVisitor(fixed, column_map);
+    auto visit_status = visitor.Visit(fixed.columnDesc().dataType());
+    ASSERT_OK(visit_status);
+
+    auto builder = arrow::StringBuilder();
+    ASSERT_OK(builder.AppendValues({"0", "1", "2", "3", "4", "5", "6", "7"}));
+    ASSERT_OK_AND_ASSIGN(auto expected, builder.Finish());
+    for(auto dim_size: shape) {
+      ASSERT_OK_AND_ASSIGN(expected, arrow::FixedSizeListArray::FromArrays(expected, dim_size));
+    }
+    ASSERT_TRUE(visitor.array_->Equals(expected));
+  }
+
+  {
+    // Fixed data column, get all rows, first channel and correlation
+    auto fixed = GetArrayColumn<casacore::String>(table, "FIXED_STRING");
+    ASSERT_OK_AND_ASSIGN(auto column_map, (ColumnMapping::Make(fixed, {{}, {0}, {0}})));
+    ASSERT_OK_AND_ASSIGN(auto shape, column_map.GetOutputShape());
+    ASSERT_EQ(shape, IPos({1, 1, 2}));
+    auto visitor = NewConvertVisitor(fixed, column_map);
+    auto visit_status = visitor.Visit(fixed.columnDesc().dataType());
+    ASSERT_OK(visit_status);
+
+    auto builder = arrow::StringBuilder();
+    ASSERT_OK(builder.AppendValues({"0", "4"}));
+    ASSERT_OK_AND_ASSIGN(auto expected, builder.Finish());
+    for(auto dim_size: shape) {
+      ASSERT_OK_AND_ASSIGN(expected, arrow::FixedSizeListArray::FromArrays(expected, dim_size));
+    }
+    ASSERT_TRUE(visitor.array_->Equals(expected));
+  }
+
+  {
+    // Fixed data column, get all rows, last channel and correlation
+    auto fixed = GetArrayColumn<casacore::String>(table, "FIXED_STRING");
+    ASSERT_OK_AND_ASSIGN(auto column_map, (ColumnMapping::Make(fixed, {{}, {1}, {1}})));
+    ASSERT_OK_AND_ASSIGN(auto shape, column_map.GetOutputShape());
+    ASSERT_EQ(shape, IPos({1, 1, 2}));
+    auto visitor = NewConvertVisitor(fixed, column_map);
+    auto visit_status = visitor.Visit(fixed.columnDesc().dataType());
+    ASSERT_OK(visit_status);
+
+
+    auto builder = arrow::StringBuilder();
+    ASSERT_OK(builder.AppendValues({"3", "7"}));
     ASSERT_OK_AND_ASSIGN(auto expected, builder.Finish());
     for(auto dim_size: shape) {
       ASSERT_OK_AND_ASSIGN(expected, arrow::FixedSizeListArray::FromArrays(expected, dim_size));

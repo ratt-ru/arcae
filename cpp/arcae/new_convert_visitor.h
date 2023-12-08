@@ -48,13 +48,12 @@ public:
         if constexpr(std::is_same_v<T, casacore::String>) {
             // Handle string cases with Arrow StringBuilders
             ARROW_RETURN_NOT_OK(FailIfNotUTF8(arrow_dtype));
-            return arrow::Status::NotImplemented("ConvertScalarColumn<casacore::String>");
             arrow::StringBuilder builder;
 
             for(auto it = map_.get().RangeBegin(); it != map_.get().RangeEnd(); ++it) {
                 try {
                     auto strings = column.getColumnRange(it.GetRowSlicer());
-                    for(auto & s: strings) { ARROW_RETURN_NOT_OK(builder.Append(s)); }
+                    for(auto & s: strings) { ARROW_RETURN_NOT_OK(builder.Append(std::move(s))); }
                 } catch(std::exception & e) {
                     return arrow::Status::Invalid("ConvertScalarColumn ",
                                                   column_.get().columnDesc().name(),
@@ -115,13 +114,12 @@ public:
         if constexpr(std::is_same_v<T, casacore::String>) {
             // Handle string cases with Arrow StringBuilders
             ARROW_RETURN_NOT_OK(FailIfNotUTF8(arrow_dtype));
-            return arrow::Status::Invalid("ConvertedFixedColumn<casacore::String>");
             arrow::StringBuilder builder;
 
             for(auto it = map_.get().RangeBegin(); it != map_.get().RangeEnd(); ++it) {
                 try {
                     auto strings = column.getColumnRange(it.GetRowSlicer(), it.GetSectionSlicer());
-                    for(auto & s: strings) { ARROW_RETURN_NOT_OK(builder.Append(s)); }
+                    for(auto & s: strings) { ARROW_RETURN_NOT_OK(builder.Append(std::move(s))); }
                 } catch(std::exception & e) {
                     return arrow::Status::Invalid("ConvertFixedColumn ",
                                                   column_.get().columnDesc().name(),
