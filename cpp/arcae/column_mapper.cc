@@ -216,11 +216,13 @@ std::size_t ShapeProvider::RowDimSize(casacore::rownr_t row, std::size_t dim) co
 
 
 MapIterator::MapIterator(const RangeIterator & rit,
+                  const ColumnMapping & map,
                   std::vector<std::size_t> chunk_index,
                   std::vector<std::size_t> global_index,
                   std::vector<std::size_t> strides,
                   bool done) :
         rit_(std::cref(rit)),
+        map_(std::cref(map)),
         chunk_index_(std::move(chunk_index)),
         global_index_(std::move(global_index)),
         strides_(std::move(strides)),
@@ -237,7 +239,9 @@ MapIterator MapIterator::Make(const RangeIterator & rit, bool done) {
     product = strides[dim] = product * diff;
   }
 
-  return MapIterator{rit, std::move(chunk_index), std::move(global_index), std::move(strides), done};
+  return MapIterator{std::cref(rit), std::cref(rit.map_.get()),
+                     std::move(chunk_index), std::move(global_index),
+                     std::move(strides), done};
 }
 
 std::size_t MapIterator::ChunkOffset() const {
@@ -249,7 +253,7 @@ std::size_t MapIterator::ChunkOffset() const {
 }
 
 std::size_t MapIterator::GlobalOffset() const {
-  return rit_.get().map_.get().FlatOffset(global_index_);
+  return map_.get().FlatOffset(global_index_);
 }
 
 inline std::size_t MapIterator::RangeSize(std::size_t dim) const {

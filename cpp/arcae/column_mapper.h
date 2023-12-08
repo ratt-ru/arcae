@@ -143,6 +143,8 @@ class MapIterator {
   public:
     // Reference to RangeIterator
     std::reference_wrapper<const RangeIterator> rit_;
+    // Reference to ColumnMapping
+    std::reference_wrapper<const ColumnMapping> map_;
     // ND index in the local buffer holding the values
     // described by this chunk
     std::vector<std::size_t> chunk_index_;
@@ -152,6 +154,7 @@ class MapIterator {
     bool done_;
 
     MapIterator(const RangeIterator & rit,
+                const ColumnMapping & map,
                 std::vector<std::size_t> chunk_index,
                 std::vector<std::size_t> global_index,
                 std::vector<std::size_t> strides,
