@@ -1,6 +1,7 @@
 #ifndef ARCAE_COLUMN_MAPPER_H
 #define ARCAE_COLUMN_MAPPER_H
 
+#include <cassert>
 #include <cstddef>
 #include <functional>
 #include <memory>
@@ -193,6 +194,7 @@ class RangeIterator {
 
     // Index of he row dimension
     inline std::size_t RowDim() const {
+      assert(nDim() > 0);
       return nDim() - 1;
     }
 
@@ -241,10 +243,12 @@ public:
 
 public:
   inline const ColumnMap & DimMaps(std::size_t dim) const {
+    assert(dim < nDim());
     return maps_[dim];
   }
 
   inline const ColumnRange & DimRanges(std::size_t dim) const {
+    assert(dim < nDim());
     return ranges_[dim];
   }
 
@@ -253,6 +257,7 @@ public:
   }
 
   inline std::size_t RowDim() const {
+    assert(nDim() > 0);
     return nDim() - 1;
   }
 
