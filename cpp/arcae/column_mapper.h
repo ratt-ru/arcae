@@ -268,6 +268,8 @@ struct ColumnMapping {
     return shape_provider_.RowDimSize(row, dim);
   }
 
+  arrow::Result<std::vector<std::shared_ptr<arrow::Int64Array>>> GetOffsets() const;
+
   // Flattened offset in the output buffer
   std::size_t FlatOffset(const std::vector<std::size_t> & index) const;
 

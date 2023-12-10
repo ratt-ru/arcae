@@ -626,6 +626,16 @@ casacore::Slicer RangeIterator::GetSectionSlicer() const {
   return casacore::Slicer(start, length, casacore::Slicer::endIsLast);
 };
 
+arrow::Result<std::vector<std::shared_ptr<arrow::Int64Array>>>
+ColumnMapping::GetOffsets() const {
+  if(shape_provider_.IsVarying()) {
+    return shape_provider_.var_data_->offsets_;
+  }
+  return arrow::Status::Invalid("Unable to retrieve varying offsets for "
+                                "fixed olumn ", column_.get().columnDesc().name());
+}
+
+
 std::size_t ColumnMapping::FlatOffset(const std::vector<std::size_t> & index) const {
   if(output_shape_) {
     // Fixed shape output, easy case
