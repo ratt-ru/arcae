@@ -227,7 +227,7 @@ private:
             return ConvertScalarColumn<T>(arrow_dtype);
         }
 
-        if(column_desc.isFixedShape()) {
+        if(column_desc.isFixedShape() || map_.get().IsFixedShape()) {
             return ConvertFixedColumn<T>(arrow_dtype);
         }
 
