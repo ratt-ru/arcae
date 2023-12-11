@@ -5,11 +5,11 @@ add_library(arcae SHARED
     arcae/array_util.cc
     arcae/casa_visitors.cc
     arcae/column_convert_visitor.cc
+    arcae/column_read_visitor.cc
     arcae/column_mapper.cc
     arcae/complex_type.cc
     arcae/configuration.cc
     arcae/descriptor.cc
-    arcae/new_convert_visitor.cc
     arcae/service_locator.cc
     arcae/safe_table_proxy.cc
     arcae/table_factory.cc

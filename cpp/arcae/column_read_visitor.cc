@@ -2,7 +2,7 @@
 
 #include <casacore/tables/Tables.h>
 
-#include "arcae/new_convert_visitor.h"
+#include "arcae/column_read_visitor.h"
 #include "arcae/complex_type.h"
 #include "arcae/service_locator.h"
 
@@ -13,7 +13,7 @@ using ::arrow::Status;
 
 namespace arcae {
 
-Status NewConvertVisitor::ValidateArray(const std::shared_ptr<arrow::Array> & array) {
+Status ColumnReadVisitor::ValidateArray(const std::shared_ptr<arrow::Array> & array) {
     auto & config = ServiceLocator::configuration();
     auto validation_level = config.GetDefault("validation-level", "basic");
 
@@ -32,7 +32,7 @@ Status NewConvertVisitor::ValidateArray(const std::shared_ptr<arrow::Array> & ar
 
 
 Result<std::shared_ptr<arrow::Array>>
-NewConvertVisitor::MakeArrowPrimitiveArray(
+ColumnReadVisitor::MakeArrowPrimitiveArray(
         const std::shared_ptr<Buffer> & buffer,
         casacore::uInt nelements,
         const std::shared_ptr<DataType> & arrow_dtype) {
@@ -70,69 +70,69 @@ NewConvertVisitor::MakeArrowPrimitiveArray(
     }
 }
 
-arrow::Status NewConvertVisitor::VisitTpBool() {
+arrow::Status ColumnReadVisitor::VisitTpBool() {
     // TODO(sjperkins)
     // Looks like casacore bool is actually a char, improve this
     return this->ConvertColumn<casacore::Bool>(arrow::uint8());
 }
 
-arrow::Status NewConvertVisitor::VisitTpChar() {
+arrow::Status ColumnReadVisitor::VisitTpChar() {
     return this->ConvertColumn<casacore::Char>(arrow::int8());
 }
 
-arrow::Status NewConvertVisitor::VisitTpUChar() {
+arrow::Status ColumnReadVisitor::VisitTpUChar() {
     return this->ConvertColumn<casacore::uChar>(arrow::uint8());
 }
 
-arrow::Status NewConvertVisitor::VisitTpShort() {
+arrow::Status ColumnReadVisitor::VisitTpShort() {
     return this->ConvertColumn<casacore::Short>(arrow::int16());
 }
 
-arrow::Status NewConvertVisitor::VisitTpUShort() {
+arrow::Status ColumnReadVisitor::VisitTpUShort() {
     return this->ConvertColumn<casacore::uShort>(arrow::uint16());
 }
 
-arrow::Status NewConvertVisitor::VisitTpInt() {
+arrow::Status ColumnReadVisitor::VisitTpInt() {
     return this->ConvertColumn<casacore::Int>(arrow::int32());
 }
 
-arrow::Status NewConvertVisitor::VisitTpUInt() {
+arrow::Status ColumnReadVisitor::VisitTpUInt() {
     return this->ConvertColumn<casacore::uInt>(arrow::uint32());
 }
 
-arrow::Status NewConvertVisitor::VisitTpInt64() {
+arrow::Status ColumnReadVisitor::VisitTpInt64() {
     return this->ConvertColumn<casacore::Int64>(arrow::int64());
 }
 
-arrow::Status NewConvertVisitor::VisitTpFloat() {
+arrow::Status ColumnReadVisitor::VisitTpFloat() {
     return this->ConvertColumn<casacore::Float>(arrow::float32());
 }
 
-arrow::Status NewConvertVisitor::VisitTpDouble() {
+arrow::Status ColumnReadVisitor::VisitTpDouble() {
     return this->ConvertColumn<casacore::Double>(arrow::float64());
 }
 
-arrow::Status NewConvertVisitor::VisitTpComplex() {
+arrow::Status ColumnReadVisitor::VisitTpComplex() {
     return this->ConvertColumn<casacore::Complex>(complex64());
 }
 
-arrow::Status NewConvertVisitor::VisitTpDComplex() {
+arrow::Status ColumnReadVisitor::VisitTpDComplex() {
     return this->ConvertColumn<casacore::DComplex>(complex128());
 }
 
-arrow::Status NewConvertVisitor::VisitTpString() {
+arrow::Status ColumnReadVisitor::VisitTpString() {
     return this->ConvertColumn<casacore::String>(arrow::utf8());
 }
 
-arrow::Status NewConvertVisitor::VisitTpQuantity() {
+arrow::Status ColumnReadVisitor::VisitTpQuantity() {
     return arrow::Status::NotImplemented("TpQuantity");
 }
 
-arrow::Status NewConvertVisitor::VisitTpRecord() {
+arrow::Status ColumnReadVisitor::VisitTpRecord() {
     return arrow::Status::NotImplemented("TpRecord");
 }
 
-arrow::Status NewConvertVisitor::VisitTpTable() {
+arrow::Status ColumnReadVisitor::VisitTpTable() {
     return arrow::Status::NotImplemented("TpTable");
 }
 

@@ -1,5 +1,5 @@
-#ifndef ARCAE_NEW_CONVERT_VISITOR_H
-#define ARCAE_NEW_CONVERT_VISITOR_H
+#ifndef ARCAE_COLUMN_READ_VISITOR_H
+#define ARCAE_COLUMN_READ_VISITOR_H
 
 #include <functional>
 #include <memory>
@@ -16,7 +16,7 @@
 
 namespace arcae {
 
-class NewConvertVisitor : public CasaTypeVisitor {
+class ColumnReadVisitor : public CasaTypeVisitor {
 public:
     using ShapeVectorType = std::vector<casacore::IPosition>;
 
@@ -27,14 +27,14 @@ public:
     std::shared_ptr<arrow::Array> array_;
 
 public:
-    explicit NewConvertVisitor(
+    explicit ColumnReadVisitor(
         const casacore::TableColumn & column,
         const ColumnMapping & column_map,
         arrow::MemoryPool * pool=arrow::default_memory_pool()) :
             column_(std::cref(column)),
             map_(std::cref(column_map)),
             pool_(pool) {};
-    virtual ~NewConvertVisitor() = default;
+    virtual ~ColumnReadVisitor() = default;
 
 #define VISIT(CASA_TYPE) \
     virtual arrow::Status Visit##CASA_TYPE() override;
@@ -302,4 +302,4 @@ private:
 
 } // namespace arcae
 
-#endif // ARCAE_NEW_CONVERT_VISITOR_H
+#endif // ARCAE_COLUMN_READ_VISITOR_H
