@@ -293,10 +293,6 @@ private:
         }
 
         return ConvertVariableColumn<T>(arrow_dtype);
-
-        return arrow::Status::Invalid("Unable to convert column ",
-                                      column_desc.name());
-
     };
 };
 
