@@ -416,3 +416,25 @@ TEST_F(ColumnConvertTest, ConvertVIsitorFixedString) {
   }
 }
 
+
+TEST_F(ColumnConvertTest, ConvertVisitorVariableNumeric) {
+  const auto & table = table_proxy_.table();
+
+  for(auto & column: {"VAR_DATA"}) {
+    {
+      // Fixed data column, get entire domain
+      auto var = GetArrayColumn<casacore::Int>(table, column);
+      ASSERT_OK_AND_ASSIGN(auto column_map, (ColumnMapping::Make(var, {})));
+      auto visitor = NewConvertVisitor(var, column_map);
+      ASSERT_OK_AND_ASSIGN(auto offsets, column_map.GetOffsets());
+      auto visit_status = visitor.Visit(var.columnDesc().dataType());
+      ASSERT_OK(visit_status);
+
+      ASSERT_OK_AND_ASSIGN(auto expected, ArrayFromJSON(visitor.array_->type(), R"(
+        [[[0, 1], [2, 3]], [[4]]]
+      )"));
+
+      ASSERT_TRUE(visitor.array_->Equals(expected));
+    }
+  }
+}
