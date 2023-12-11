@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <cstddef>
+#include <cstdint>
 #include <iterator>
 #include <functional>
 #include <memory>
@@ -328,19 +329,28 @@ VariableShapeData::Make(const casacore::TableColumn & column, const ColumnSelect
   auto offsets = std::vector<std::shared_ptr<arrow::Int64Array>>(ndim);
 
   for(auto dim=0; dim < ndim; ++dim) {
-    ARROW_RETURN_NOT_OK(builders[dim].Reserve(nrow));
+    ARROW_RETURN_NOT_OK(builders[dim].Reserve(nrow + 1));
+    ARROW_RETURN_NOT_OK(builders[dim].Append(0));
   }
 
-  for(auto r=0; r < nrow; ++r) {
-    using ItType = std::tuple<std::size_t, std::size_t>;
-    for(auto [dim, product]=ItType{0, 1}; dim < ndim; ++dim) {
-      auto offset = product * row_shapes[r][dim];
-      ARROW_RETURN_NOT_OK(builders[dim].Append(offset));
-      product = offset;
+  auto running_offsets = std::vector<std::size_t>(ndim, 0);
+
+  // Compute number of elements in each row by making
+  // a product over each dimension
+  for(std::size_t row=0; row < nrow; ++row) {
+    using ItType = std::tuple<std::ptrdiff_t, std::size_t>;
+    for(auto [dim, product]=ItType{ndim - 1, 1}; dim >= 0; --dim) {
+      auto dim_size = row_shapes[row][dim];
+      for(std::size_t p=0; p < product; ++p) {
+        running_offsets[dim] += dim_size;
+        ARROW_RETURN_NOT_OK(builders[dim].Append(running_offsets[dim]));
+      }
+      product *= dim_size;
     }
   }
 
-  for(auto dim=0; dim < ndim; ++dim) {
+  // Build the offset arrays
+  for(std::size_t dim=0; dim < ndim; ++dim) {
     ARROW_RETURN_NOT_OK(builders[dim].Finish(&offsets[dim]));
   }
 
@@ -650,21 +660,24 @@ std::size_t ColumnMapping::FlatOffset(const std::vector<std::size_t> & index) co
 
     return result + product * index[RowDim()];
   }
-  // Variably shaped output, per-row offsets are needed
-  // There is no offset array for the fast changing dimension
-  auto result = index[0];
-  auto row = index[RowDim()];
+  // Variably shaped output
   const auto & offsets = shape_provider_.var_data_->offsets_;
+  const auto & shapes = shape_provider_.var_data_->row_shapes_;
+  // Offset into the output starts at the row offset
+  std::size_t row = index[RowDim()];
+  std::size_t result = 0;
+  std::size_t product = 1;
 
-  for(auto dim = 1; dim < RowDim(); ++dim) {
-    result += index[dim] * offsets[dim - 1]->Value(row);
+  // We then add in the offsets of the secondary dimensions
+  for(std::size_t dim = 0; dim < RowDim(); ++dim) {
+    result += product*index[dim];
+    product *= shapes[row][dim];
   }
 
-  const auto & row_offsets = offsets[offsets.size() - 1];
-
-  for(std::size_t i=0; i < row; ++i) {
-    result += row_offsets->Value(i);
+  for(std::size_t r=0; r < row; ++r) {
+    result += shapes[r].product();
   }
+
   return result;
 }
 

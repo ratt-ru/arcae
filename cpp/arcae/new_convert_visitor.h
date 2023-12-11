@@ -2,15 +2,17 @@
 #define ARCAE_NEW_CONVERT_VISITOR_H
 
 #include <functional>
+#include <memory>
+
+#include <arrow/array/array_nested.h>
+#include <arrow/util/logging.h>  // IWYU pragma: keep
+#include <arrow/result.h>
 
 #include <casacore/tables/Tables.h>
-
-#include <arrow/util/logging.h>  // IWYU pragma: keep
 
 #include "arcae/casa_visitors.h"
 #include "arcae/column_mapper.h"
 #include "arcae/complex_type.h"
-#include "arrow/result.h"
 
 namespace arcae {
 
@@ -180,8 +182,67 @@ public:
 
 
 
-private:
+    template <typename T>
+    arrow::Status ConvertVariableColumn(const std::shared_ptr<arrow::DataType> & arrow_dtype) {
+        auto column = casacore::ArrayColumn<T>(column_);
+        column.setMaximumCacheSize(1);
 
+        if constexpr(std::is_same_v<T, casacore::String>) {
+            // Handle string cases with Arrow StringBuilders
+            ARROW_RETURN_NOT_OK(FailIfNotUTF8(arrow_dtype));
+            arrow::StringBuilder builder;
+
+            for(auto it = map_.get().RangeBegin(); it != map_.get().RangeEnd(); ++it) {
+                try {
+                    auto strings = column.getColumnRange(it.GetRowSlicer(), it.GetSectionSlicer());
+                    for(auto & s: strings) { ARROW_RETURN_NOT_OK(builder.Append(std::move(s))); }
+                } catch(std::exception & e) {
+                    return arrow::Status::Invalid("ConvertVariableColumn ",
+                                                  column_.get().columnDesc().name(),
+                                                  ": ", e.what());
+                }
+            }
+
+            ARROW_ASSIGN_OR_RAISE(array_, builder.Finish());
+        } else {
+            // Wrap Arrow Buffer in casacore Array
+            auto nelements = map_.get().nElements();
+            ARROW_ASSIGN_OR_RAISE(auto allocation, arrow::AllocateBuffer(nelements*sizeof(T), pool_));
+            auto buffer = std::shared_ptr<arrow::Buffer>(std::move(allocation));
+            auto * buf_ptr = reinterpret_cast<T *>(buffer->mutable_data());
+
+            for(auto it = map_.get().RangeBegin(); it != map_.get().RangeEnd(); ++it) {
+                // Copy sections of data into the Arrow Buffer
+                try {
+                    auto chunk = column.getColumnRange(it.GetRowSlicer(), it.GetSectionSlicer());
+                    auto chunk_ptr = chunk.data();
+
+                    for(auto mit = it.MapBegin(); mit != it.MapEnd(); ++mit) {
+                        buf_ptr[mit.GlobalOffset()] = chunk_ptr[mit.ChunkOffset()];
+                    }
+                } catch(std::exception & e) {
+                    return arrow::Status::Invalid("ConvertVariableColumn ",
+                                                    column_.get().columnDesc().name(),
+                                                    ": ", e.what());
+                }
+            }
+
+            ARROW_ASSIGN_OR_RAISE(array_, MakeArrowPrimitiveArray(buffer, nelements, arrow_dtype));
+        }
+
+
+        // Fortran ordering
+        ARROW_ASSIGN_OR_RAISE(const auto & offsets, map_.get().GetOffsets());
+
+        for(auto & offset: offsets) {
+            ARROW_ASSIGN_OR_RAISE(array_, arrow::LargeListArray::FromArrays(*offset, *array_));
+        }
+
+        return ValidateArray(array_);
+    }
+
+
+private:
     static arrow::Status ValidateArray(const std::shared_ptr<arrow::Array> & array);
 
     inline arrow::Status FailIfNotUTF8(const std::shared_ptr<arrow::DataType> & arrow_dtype) {
@@ -230,6 +291,8 @@ private:
         if(column_desc.isFixedShape() || map_.get().IsFixedShape()) {
             return ConvertFixedColumn<T>(arrow_dtype);
         }
+
+        return ConvertVariableColumn<T>(arrow_dtype);
 
         return arrow::Status::Invalid("Unable to convert column ",
                                       column_desc.name());
