@@ -2,6 +2,7 @@
 #include <string>
 
 #include <arrow/result.h>
+#include <arrow/ipc/json_simple.h>
 
 #include <casacore/casa/Arrays/IPosition.h>
 #include <casacore/ms/MeasurementSets/MeasurementSet.h>
@@ -23,8 +24,8 @@
 #include "arrow/array/array_nested.h"
 #include "arrow/array/builder_binary.h"
 
-using arcae::ColumnMapping;
-using arcae::NewConvertVisitor;
+
+using arrow::ipc::internal::json::ArrayFromJSON;
 
 using casacore::Array;
 using casacore::ArrayColumn;
@@ -41,6 +42,9 @@ using casacore::TableColumn;
 using casacore::TableProxy;
 using casacore::TiledColumnStMan;
 using IPos = casacore::IPosition;
+
+using arcae::ColumnMapping;
+using arcae::NewConvertVisitor;
 
 using namespace std::string_literals;
 
@@ -318,12 +322,9 @@ TEST_F(ColumnConvertTest, ConvertVIsitorFixedNumeric) {
       auto visit_status = visitor.Visit(fixed.columnDesc().dataType());
       ASSERT_OK(visit_status);
 
-      auto builder = arrow::Int32Builder();
-      ASSERT_OK(builder.AppendValues({0, 1, 2, 3, 4, 5, 6, 7}));
-      ASSERT_OK_AND_ASSIGN(auto expected, builder.Finish());
-      for(auto dim_size: shape) {
-        ASSERT_OK_AND_ASSIGN(expected, arrow::FixedSizeListArray::FromArrays(expected, dim_size));
-      }
+      ASSERT_OK_AND_ASSIGN(auto expected,
+                           ArrayFromJSON(visitor.array_->type(),
+                           R"([[[[0, 1], [2, 3]], [[4, 5], [6, 7]]]])"));
       ASSERT_TRUE(visitor.array_->Equals(expected));
     }
 
@@ -337,13 +338,9 @@ TEST_F(ColumnConvertTest, ConvertVIsitorFixedNumeric) {
       auto visit_status = visitor.Visit(fixed.columnDesc().dataType());
       ASSERT_OK(visit_status);
 
-
-      auto builder = arrow::Int32Builder();
-      ASSERT_OK(builder.AppendValues({0, 4}));
-      ASSERT_OK_AND_ASSIGN(auto expected, builder.Finish());
-      for(auto dim_size: shape) {
-        ASSERT_OK_AND_ASSIGN(expected, arrow::FixedSizeListArray::FromArrays(expected, dim_size));
-      }
+      ASSERT_OK_AND_ASSIGN(auto expected,
+                           ArrayFromJSON(visitor.array_->type(),
+                           R"([[[[0]], [[4]]]])"));
       ASSERT_TRUE(visitor.array_->Equals(expected));
     }
 
@@ -357,13 +354,9 @@ TEST_F(ColumnConvertTest, ConvertVIsitorFixedNumeric) {
       auto visit_status = visitor.Visit(fixed.columnDesc().dataType());
       ASSERT_OK(visit_status);
 
-
-      auto builder = arrow::Int32Builder();
-      ASSERT_OK(builder.AppendValues({3, 7}));
-      ASSERT_OK_AND_ASSIGN(auto expected, builder.Finish());
-      for(auto dim_size: shape) {
-        ASSERT_OK_AND_ASSIGN(expected, arrow::FixedSizeListArray::FromArrays(expected, dim_size));
-      }
+      ASSERT_OK_AND_ASSIGN(auto expected,
+                           ArrayFromJSON(visitor.array_->type(),
+                           R"([[[[3]], [[7]]]])"));
       ASSERT_TRUE(visitor.array_->Equals(expected));
     }
   }
@@ -383,12 +376,9 @@ TEST_F(ColumnConvertTest, ConvertVIsitorFixedString) {
       auto visit_status = visitor.Visit(fixed.columnDesc().dataType());
       ASSERT_OK(visit_status);
 
-      auto builder = arrow::StringBuilder();
-      ASSERT_OK(builder.AppendValues({"0", "1", "2", "3", "4", "5", "6", "7"}));
-      ASSERT_OK_AND_ASSIGN(auto expected, builder.Finish());
-      for(auto dim_size: shape) {
-        ASSERT_OK_AND_ASSIGN(expected, arrow::FixedSizeListArray::FromArrays(expected, dim_size));
-      }
+      ASSERT_OK_AND_ASSIGN(auto expected,
+                           ArrayFromJSON(visitor.array_->type(),
+                           R"([[[["0", "1"], ["2", "3"]], [["4", "5"], ["6", "7"]]]])"));
       ASSERT_TRUE(visitor.array_->Equals(expected));
     }
 
@@ -402,12 +392,9 @@ TEST_F(ColumnConvertTest, ConvertVIsitorFixedString) {
       auto visit_status = visitor.Visit(fixed.columnDesc().dataType());
       ASSERT_OK(visit_status);
 
-      auto builder = arrow::StringBuilder();
-      ASSERT_OK(builder.AppendValues({"0", "4"}));
-      ASSERT_OK_AND_ASSIGN(auto expected, builder.Finish());
-      for(auto dim_size: shape) {
-        ASSERT_OK_AND_ASSIGN(expected, arrow::FixedSizeListArray::FromArrays(expected, dim_size));
-      }
+      ASSERT_OK_AND_ASSIGN(auto expected,
+                           ArrayFromJSON(visitor.array_->type(),
+                           R"([[[["0"]], [["4"]]]])"));
       ASSERT_TRUE(visitor.array_->Equals(expected));
     }
 
@@ -421,13 +408,9 @@ TEST_F(ColumnConvertTest, ConvertVIsitorFixedString) {
       auto visit_status = visitor.Visit(fixed.columnDesc().dataType());
       ASSERT_OK(visit_status);
 
-
-      auto builder = arrow::StringBuilder();
-      ASSERT_OK(builder.AppendValues({"3", "7"}));
-      ASSERT_OK_AND_ASSIGN(auto expected, builder.Finish());
-      for(auto dim_size: shape) {
-        ASSERT_OK_AND_ASSIGN(expected, arrow::FixedSizeListArray::FromArrays(expected, dim_size));
-      }
+      ASSERT_OK_AND_ASSIGN(auto expected,
+                           ArrayFromJSON(visitor.array_->type(),
+                           R"([[[["3"]], [["7"]]]])"));
       ASSERT_TRUE(visitor.array_->Equals(expected));
     }
   }
