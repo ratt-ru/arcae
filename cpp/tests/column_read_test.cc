@@ -70,7 +70,7 @@ GetArrayColumn(const MS & ms, const std::string & column) {
   return ArrayColumn<T>(TableColumn(ms, column));
 }
 
-class ColumnConvertTest : public ::testing::Test {
+class ColumnReadTest : public ::testing::Test {
   protected:
     casacore::TableProxy table_proxy_;
     std::string table_name_;
@@ -152,7 +152,7 @@ class ColumnConvertTest : public ::testing::Test {
 };
 
 
-TEST_F(ColumnConvertTest, SelectSanityCheck) {
+TEST_F(ColumnReadTest, SelectSanityCheck) {
   const auto & table = table_proxy_.table();
 
   {
@@ -197,7 +197,7 @@ TEST_F(ColumnConvertTest, SelectSanityCheck) {
   }
 }
 
-TEST_F(ColumnConvertTest, SelectionVariable) {
+TEST_F(ColumnReadTest, SelectionVariable) {
   const auto & table = table_proxy_.table();
 
   {
@@ -306,7 +306,7 @@ TEST_F(ColumnConvertTest, SelectionVariable) {
   }
 }
 
-TEST_F(ColumnConvertTest, ConvertVIsitorFixedNumeric) {
+TEST_F(ColumnReadTest, ReadVisitorFixedNumeric) {
   const auto & table = table_proxy_.table();
 
   for(auto & column: {"FIXED_DATA", "VAR_FIXED_DATA"}) {
@@ -360,7 +360,7 @@ TEST_F(ColumnConvertTest, ConvertVIsitorFixedNumeric) {
   }
 }
 
-TEST_F(ColumnConvertTest, ConvertVIsitorFixedString) {
+TEST_F(ColumnReadTest, ReadVisitorFixedString) {
   const auto & table = table_proxy_.table();
 
   for(auto & column: {"FIXED_STRING", "VAR_FIXED_STRING"}) {
@@ -415,7 +415,7 @@ TEST_F(ColumnConvertTest, ConvertVIsitorFixedString) {
 }
 
 
-TEST_F(ColumnConvertTest, ConvertVisitorVariableNumeric) {
+TEST_F(ColumnReadTest, ReadVisitorVariableNumeric) {
   const auto & table = table_proxy_.table();
 
   for(auto & column: {"VAR_DATA"}) {
