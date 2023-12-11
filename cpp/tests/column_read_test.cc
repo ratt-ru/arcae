@@ -316,7 +316,7 @@ TEST_F(ColumnConvertTest, ConvertVIsitorFixedNumeric) {
       ASSERT_OK_AND_ASSIGN(auto column_map, (ColumnMapping::Make(fixed, {})));
       ASSERT_OK_AND_ASSIGN(auto shape, column_map.GetOutputShape());
       ASSERT_EQ(shape, IPos({2, 2, 2}));
-      auto visitor = ColumnReadVisitor(fixed, column_map);
+      auto visitor = ColumnReadVisitor(column_map);
       auto visit_status = visitor.Visit(fixed.columnDesc().dataType());
       ASSERT_OK(visit_status);
 
@@ -332,7 +332,7 @@ TEST_F(ColumnConvertTest, ConvertVIsitorFixedNumeric) {
       ASSERT_OK_AND_ASSIGN(auto column_map, (ColumnMapping::Make(fixed, {{}, {0}, {0}})));
       ASSERT_OK_AND_ASSIGN(auto shape, column_map.GetOutputShape());
       ASSERT_EQ(shape, IPos({1, 1, 2}));
-      auto visitor = ColumnReadVisitor(fixed, column_map);
+      auto visitor = ColumnReadVisitor(column_map);
       auto visit_status = visitor.Visit(fixed.columnDesc().dataType());
       ASSERT_OK(visit_status);
 
@@ -348,7 +348,7 @@ TEST_F(ColumnConvertTest, ConvertVIsitorFixedNumeric) {
       ASSERT_OK_AND_ASSIGN(auto column_map, (ColumnMapping::Make(fixed, {{}, {1}, {1}})));
       ASSERT_OK_AND_ASSIGN(auto shape, column_map.GetOutputShape());
       ASSERT_EQ(shape, IPos({1, 1, 2}));
-      auto visitor = ColumnReadVisitor(fixed, column_map);
+      auto visitor = ColumnReadVisitor(column_map);
       auto visit_status = visitor.Visit(fixed.columnDesc().dataType());
       ASSERT_OK(visit_status);
 
@@ -370,7 +370,7 @@ TEST_F(ColumnConvertTest, ConvertVIsitorFixedString) {
       ASSERT_OK_AND_ASSIGN(auto column_map, (ColumnMapping::Make(fixed, {})));
       ASSERT_OK_AND_ASSIGN(auto shape, column_map.GetOutputShape());
       ASSERT_EQ(shape, IPos({2, 2, 2}));
-      auto visitor = ColumnReadVisitor(fixed, column_map);
+      auto visitor = ColumnReadVisitor(column_map);
       auto visit_status = visitor.Visit(fixed.columnDesc().dataType());
       ASSERT_OK(visit_status);
 
@@ -386,7 +386,7 @@ TEST_F(ColumnConvertTest, ConvertVIsitorFixedString) {
       ASSERT_OK_AND_ASSIGN(auto column_map, (ColumnMapping::Make(fixed, {{}, {0}, {0}})));
       ASSERT_OK_AND_ASSIGN(auto shape, column_map.GetOutputShape());
       ASSERT_EQ(shape, IPos({1, 1, 2}));
-      auto visitor = ColumnReadVisitor(fixed, column_map);
+      auto visitor = ColumnReadVisitor(column_map);
       auto visit_status = visitor.Visit(fixed.columnDesc().dataType());
       ASSERT_OK(visit_status);
 
@@ -402,7 +402,7 @@ TEST_F(ColumnConvertTest, ConvertVIsitorFixedString) {
       ASSERT_OK_AND_ASSIGN(auto column_map, (ColumnMapping::Make(fixed, {{}, {1}, {1}})));
       ASSERT_OK_AND_ASSIGN(auto shape, column_map.GetOutputShape());
       ASSERT_EQ(shape, IPos({1, 1, 2}));
-      auto visitor = ColumnReadVisitor(fixed, column_map);
+      auto visitor = ColumnReadVisitor(column_map);
       auto visit_status = visitor.Visit(fixed.columnDesc().dataType());
       ASSERT_OK(visit_status);
 
@@ -423,7 +423,7 @@ TEST_F(ColumnConvertTest, ConvertVisitorVariableNumeric) {
       // Fixed data column, get entire domain
       auto var = GetArrayColumn<casacore::Int>(table, column);
       ASSERT_OK_AND_ASSIGN(auto column_map, (ColumnMapping::Make(var, {})));
-      auto visitor = ColumnReadVisitor(var, column_map);
+      auto visitor = ColumnReadVisitor(column_map);
       ASSERT_OK_AND_ASSIGN(auto offsets, column_map.GetOffsets());
       auto visit_status = visitor.Visit(var.columnDesc().dataType());
       ASSERT_OK(visit_status);

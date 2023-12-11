@@ -10,6 +10,7 @@
 
 #include <casacore/tables/Tables.h>
 
+#include "arcae/array_util.h"
 #include "arcae/casa_visitors.h"
 #include "arcae/column_mapper.h"
 #include "arcae/complex_type.h"
@@ -21,17 +22,14 @@ public:
     using ShapeVectorType = std::vector<casacore::IPosition>;
 
 public:
-    std::reference_wrapper<const casacore::TableColumn> column_;
     std::reference_wrapper<const ColumnMapping> map_;
     arrow::MemoryPool * pool_;
     std::shared_ptr<arrow::Array> array_;
 
 public:
     explicit ColumnReadVisitor(
-        const casacore::TableColumn & column,
         const ColumnMapping & column_map,
         arrow::MemoryPool * pool=arrow::default_memory_pool()) :
-            column_(std::cref(column)),
             map_(std::cref(column_map)),
             pool_(pool) {};
     virtual ~ColumnReadVisitor() = default;
@@ -42,9 +40,14 @@ public:
     VISIT_CASA_TYPES(VISIT)
 #undef VISIT
 
+    const casacore::TableColumn & GetTableColumn() const {
+        return map_.get().column_.get();
+    }
+
     template <typename T>
     arrow::Status ConvertScalarColumn(const std::shared_ptr<arrow::DataType> & arrow_dtype) {
-        auto column = casacore::ScalarColumn<T>(column_);
+
+        auto column = casacore::ScalarColumn<T>(GetTableColumn());
         column.setMaximumCacheSize(1);
 
         if constexpr(std::is_same_v<T, casacore::String>) {
@@ -58,7 +61,7 @@ public:
                     for(auto & s: strings) { ARROW_RETURN_NOT_OK(builder.Append(std::move(s))); }
                 } catch(std::exception & e) {
                     return arrow::Status::Invalid("ConvertScalarColumn ",
-                                                  column_.get().columnDesc().name(),
+                                                  GetTableColumn().columnDesc().name(),
                                                   ": ", e.what());
                 }
             }
@@ -80,7 +83,7 @@ public:
                     column.getColumnRange(it.GetRowSlicer(), casa_vector);
                 } catch(std::exception & e) {
                     return arrow::Status::Invalid("ConvertScalarColumn ",
-                                                  column_.get().columnDesc().name(),
+                                                  GetTableColumn().columnDesc().name(),
                                                   ": ", e.what());
                 }
             } else {
@@ -95,7 +98,7 @@ public:
                         }
                     } catch(std::exception & e) {
                         return arrow::Status::Invalid("ConvertScalarColumn ",
-                                                      column_.get().columnDesc().name(),
+                                                      GetTableColumn().columnDesc().name(),
                                                       ": ", e.what());
                     }
                 }
@@ -109,7 +112,7 @@ public:
 
     template <typename T>
     arrow::Status ConvertFixedColumn(const std::shared_ptr<arrow::DataType> & arrow_dtype) {
-        auto column = casacore::ArrayColumn<T>(column_);
+        auto column = casacore::ArrayColumn<T>(GetTableColumn());
         column.setMaximumCacheSize(1);
         ARROW_ASSIGN_OR_RAISE(auto shape, map_.get().GetOutputShape());
 
@@ -124,7 +127,7 @@ public:
                     for(auto & s: strings) { ARROW_RETURN_NOT_OK(builder.Append(std::move(s))); }
                 } catch(std::exception & e) {
                     return arrow::Status::Invalid("ConvertFixedColumn ",
-                                                  column_.get().columnDesc().name(),
+                                                  GetTableColumn().columnDesc().name(),
                                                   ": ", e.what());
                 }
             }
@@ -147,7 +150,7 @@ public:
                                           carray);
                 } catch(std::exception & e) {
                     return arrow::Status::Invalid("ConvertFixedColumn ",
-                                                  column_.get().columnDesc().name(),
+                                                  GetTableColumn().columnDesc().name(),
                                                   ": ", e.what());
                 }
             } else {
@@ -162,7 +165,7 @@ public:
                         }
                     } catch(std::exception & e) {
                         return arrow::Status::Invalid("ConvertFixedColumn ",
-                                                      column_.get().columnDesc().name(),
+                                                      GetTableColumn().columnDesc().name(),
                                                       ": ", e.what());
                     }
                 }
@@ -184,7 +187,7 @@ public:
 
     template <typename T>
     arrow::Status ConvertVariableColumn(const std::shared_ptr<arrow::DataType> & arrow_dtype) {
-        auto column = casacore::ArrayColumn<T>(column_);
+        auto column = casacore::ArrayColumn<T>(GetTableColumn());
         column.setMaximumCacheSize(1);
 
         if constexpr(std::is_same_v<T, casacore::String>) {
@@ -198,7 +201,7 @@ public:
                     for(auto & s: strings) { ARROW_RETURN_NOT_OK(builder.Append(std::move(s))); }
                 } catch(std::exception & e) {
                     return arrow::Status::Invalid("ConvertVariableColumn ",
-                                                  column_.get().columnDesc().name(),
+                                                  GetTableColumn().columnDesc().name(),
                                                   ": ", e.what());
                 }
             }
@@ -222,7 +225,7 @@ public:
                     }
                 } catch(std::exception & e) {
                     return arrow::Status::Invalid("ConvertVariableColumn ",
-                                                    column_.get().columnDesc().name(),
+                                                    GetTableColumn().columnDesc().name(),
                                                     ": ", e.what());
                 }
             }
@@ -243,8 +246,6 @@ public:
 
 
 private:
-    static arrow::Status ValidateArray(const std::shared_ptr<arrow::Array> & array);
-
     inline arrow::Status FailIfNotUTF8(const std::shared_ptr<arrow::DataType> & arrow_dtype) {
         if(arrow_dtype == arrow::utf8()) { return arrow::Status::OK(); }
         return arrow::Status::Invalid(arrow_dtype->ToString(), " incompatible with casacore::String");
@@ -282,7 +283,7 @@ private:
     template <typename T>
     arrow::Status ConvertColumn(const std::shared_ptr<arrow::DataType> & arrow_dtype) {
         ARROW_RETURN_NOT_OK(CheckByteWidths<T>(arrow_dtype));
-        const auto & column_desc = column_.get().columnDesc();
+        const auto & column_desc = GetTableColumn().columnDesc();
 
         if(column_desc.isScalar()) {
             return ConvertScalarColumn<T>(arrow_dtype);
