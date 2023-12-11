@@ -45,7 +45,7 @@ public:
     }
 
     template <typename T>
-    arrow::Status ConvertScalarColumn(const std::shared_ptr<arrow::DataType> & arrow_dtype) {
+    arrow::Status ReadScalarColumn(const std::shared_ptr<arrow::DataType> & arrow_dtype) {
 
         auto column = casacore::ScalarColumn<T>(GetTableColumn());
         column.setMaximumCacheSize(1);
@@ -60,7 +60,7 @@ public:
                     auto strings = column.getColumnRange(it.GetRowSlicer());
                     for(auto & s: strings) { ARROW_RETURN_NOT_OK(builder.Append(std::move(s))); }
                 } catch(std::exception & e) {
-                    return arrow::Status::Invalid("ConvertScalarColumn ",
+                    return arrow::Status::Invalid("ReadScalarColumn ",
                                                   GetTableColumn().columnDesc().name(),
                                                   ": ", e.what());
                 }
@@ -82,7 +82,7 @@ public:
                     auto it = map_.get().RangeBegin();
                     column.getColumnRange(it.GetRowSlicer(), casa_vector);
                 } catch(std::exception & e) {
-                    return arrow::Status::Invalid("ConvertScalarColumn ",
+                    return arrow::Status::Invalid("ReadScalarColumn ",
                                                   GetTableColumn().columnDesc().name(),
                                                   ": ", e.what());
                 }
@@ -97,7 +97,7 @@ public:
                             casa_ptr[mit.GlobalOffset()] = chunk_ptr[mit.ChunkOffset()];
                         }
                     } catch(std::exception & e) {
-                        return arrow::Status::Invalid("ConvertScalarColumn ",
+                        return arrow::Status::Invalid("ReadScalarColumn ",
                                                       GetTableColumn().columnDesc().name(),
                                                       ": ", e.what());
                     }
@@ -111,7 +111,7 @@ public:
     }
 
     template <typename T>
-    arrow::Status ConvertFixedColumn(const std::shared_ptr<arrow::DataType> & arrow_dtype) {
+    arrow::Status ReadFixedColumn(const std::shared_ptr<arrow::DataType> & arrow_dtype) {
         auto column = casacore::ArrayColumn<T>(GetTableColumn());
         column.setMaximumCacheSize(1);
         ARROW_ASSIGN_OR_RAISE(auto shape, map_.get().GetOutputShape());
@@ -126,7 +126,7 @@ public:
                     auto strings = column.getColumnRange(it.GetRowSlicer(), it.GetSectionSlicer());
                     for(auto & s: strings) { ARROW_RETURN_NOT_OK(builder.Append(std::move(s))); }
                 } catch(std::exception & e) {
-                    return arrow::Status::Invalid("ConvertFixedColumn ",
+                    return arrow::Status::Invalid("ReadFixedColumn ",
                                                   GetTableColumn().columnDesc().name(),
                                                   ": ", e.what());
                 }
@@ -149,7 +149,7 @@ public:
                                           map_.get().RangeBegin().GetSectionSlicer(),
                                           carray);
                 } catch(std::exception & e) {
-                    return arrow::Status::Invalid("ConvertFixedColumn ",
+                    return arrow::Status::Invalid("ReadFixedColumn ",
                                                   GetTableColumn().columnDesc().name(),
                                                   ": ", e.what());
                 }
@@ -164,7 +164,7 @@ public:
                             casa_ptr[mit.GlobalOffset()] = chunk_ptr[mit.ChunkOffset()];
                         }
                     } catch(std::exception & e) {
-                        return arrow::Status::Invalid("ConvertFixedColumn ",
+                        return arrow::Status::Invalid("ReadFixedColumn ",
                                                       GetTableColumn().columnDesc().name(),
                                                       ": ", e.what());
                     }
@@ -186,7 +186,7 @@ public:
 
 
     template <typename T>
-    arrow::Status ConvertVariableColumn(const std::shared_ptr<arrow::DataType> & arrow_dtype) {
+    arrow::Status ReadVariableColumn(const std::shared_ptr<arrow::DataType> & arrow_dtype) {
         auto column = casacore::ArrayColumn<T>(GetTableColumn());
         column.setMaximumCacheSize(1);
 
@@ -200,7 +200,7 @@ public:
                     auto strings = column.getColumnRange(it.GetRowSlicer(), it.GetSectionSlicer());
                     for(auto & s: strings) { ARROW_RETURN_NOT_OK(builder.Append(std::move(s))); }
                 } catch(std::exception & e) {
-                    return arrow::Status::Invalid("ConvertVariableColumn ",
+                    return arrow::Status::Invalid("ReadVariableColumn ",
                                                   GetTableColumn().columnDesc().name(),
                                                   ": ", e.what());
                 }
@@ -224,7 +224,7 @@ public:
                         buf_ptr[mit.GlobalOffset()] = chunk_ptr[mit.ChunkOffset()];
                     }
                 } catch(std::exception & e) {
-                    return arrow::Status::Invalid("ConvertVariableColumn ",
+                    return arrow::Status::Invalid("ReadVariableColumn ",
                                                     GetTableColumn().columnDesc().name(),
                                                     ": ", e.what());
                 }
@@ -286,14 +286,14 @@ private:
         const auto & column_desc = GetTableColumn().columnDesc();
 
         if(column_desc.isScalar()) {
-            return ConvertScalarColumn<T>(arrow_dtype);
+            return ReadScalarColumn<T>(arrow_dtype);
         }
 
         if(column_desc.isFixedShape() || map_.get().IsFixedShape()) {
-            return ConvertFixedColumn<T>(arrow_dtype);
+            return ReadFixedColumn<T>(arrow_dtype);
         }
 
-        return ConvertVariableColumn<T>(arrow_dtype);
+        return ReadVariableColumn<T>(arrow_dtype);
     };
 };
 
