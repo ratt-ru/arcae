@@ -635,6 +635,16 @@ casacore::Slicer RangeIterator::GetSectionSlicer() const {
   return casacore::Slicer(start, length, casacore::Slicer::endIsLast);
 };
 
+// Returns the shape of this range
+casacore::IPosition RangeIterator::GetShape() const {
+  assert(!done_);
+  auto shape = casacore::IPosition(nDim(), 0);
+  for(std::size_t dim=0; dim < nDim(); ++dim) {
+    shape[dim] = range_length_[dim];
+  }
+  return shape;
+}
+
 arrow::Result<std::vector<std::shared_ptr<arrow::Int64Array>>>
 ColumnMapping::GetOffsets() const {
   if(shape_provider_.IsVarying()) {

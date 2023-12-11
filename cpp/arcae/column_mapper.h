@@ -223,6 +223,8 @@ struct RangeIterator {
   casacore::Slicer GetRowSlicer() const;
   // Returns a slicer for secondary dimensions
   casacore::Slicer GetSectionSlicer() const;
+  // Returns shape of this chunk
+  casacore::IPosition GetShape() const;
 
   bool operator==(const RangeIterator & other) const;
   bool operator!=(const RangeIterator & other) const;
