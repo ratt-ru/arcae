@@ -75,7 +75,7 @@ struct VariableShapeData {
   std::size_t nDim() const;
 
   std::vector<casacore::IPosition> row_shapes_;
-  std::vector<std::shared_ptr<arrow::Int64Array>> offsets_;
+  std::vector<std::shared_ptr<arrow::Int32Array>> offsets_;
   std::size_t ndim_;
   std::optional<casacore::IPosition> shape_;
 };
@@ -270,7 +270,7 @@ struct ColumnMapping {
     return shape_provider_.RowDimSize(row, dim);
   }
 
-  arrow::Result<std::vector<std::shared_ptr<arrow::Int64Array>>> GetOffsets() const;
+  arrow::Result<std::vector<std::shared_ptr<arrow::Int32Array>>> GetOffsets() const;
 
   // Flattened offset in the output buffer
   std::size_t FlatOffset(const std::vector<std::size_t> & index) const;

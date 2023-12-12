@@ -167,7 +167,7 @@ TEST_F(ColumnConvertTest, SelectFromRange) {
                                        IPos{3, 2}, IPos{4, 1}, IPos{4, 2}, IPos{2, 2}, IPos{2, 1}));
 
     ASSERT_EQ(map.shape_provider_.var_data_->offsets_.size(), 2);
-    arrow::Int64Builder builder;
+    arrow::Int32Builder builder;
     ASSERT_OK(builder.AppendValues({0, 3, 6, 10, 14, 18, 20, 22, 24, 27, 30, 34, 38, 42, 44, 46, 48}));
     ASSERT_OK_AND_ASSIGN(auto offsets1, builder.Finish());
     ASSERT_TRUE(offsets1->Equals(map.shape_provider_.var_data_->offsets_[0]));
@@ -203,7 +203,7 @@ TEST_F(ColumnConvertTest, SelectFromRange) {
                                        IPos{4, 1}, IPos{4, 2}, IPos{2, 2}, IPos{2, 1}));
 
     ASSERT_EQ(map.shape_provider_.var_data_->offsets_.size(), 2);
-    arrow::Int64Builder builder;
+    arrow::Int32Builder builder;
     ASSERT_OK(builder.AppendValues({0, 3, 6, 10, 14, 18, 20, 22, 26, 30, 34, 36, 38, 40}));
     ASSERT_OK_AND_ASSIGN(auto offsets1, builder.Finish());
     ASSERT_TRUE(offsets1->Equals(map.shape_provider_.var_data_->offsets_[0]));
@@ -242,7 +242,7 @@ TEST_F(ColumnConvertTest, SelectFromRange) {
                                        IPos{4, 1}, IPos{4, 1}, IPos{2, 1}, IPos{2, 1}));
 
     ASSERT_EQ(map.shape_provider_.var_data_->offsets_.size(), 2);
-    arrow::Int64Builder builder;
+    arrow::Int32Builder builder;
     ASSERT_OK(builder.AppendValues({0, 3, 7, 11, 13, 17, 21, 23, 25}));
     ASSERT_OK_AND_ASSIGN(auto offsets1, builder.Finish());
     ASSERT_TRUE(offsets1->Equals(map.shape_provider_.var_data_->offsets_[0]));
@@ -282,7 +282,7 @@ TEST_F(ColumnConvertTest, SelectFromRange) {
                                        IPos{1, 1}, IPos{1, 2}, IPos{1, 2}, IPos{1, 1}));
 
     ASSERT_EQ(map.shape_provider_.var_data_->offsets_.size(), 2);
-    arrow::Int64Builder builder;
+    arrow::Int32Builder builder;
     ASSERT_OK(builder.AppendValues({0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13}));
     ASSERT_OK_AND_ASSIGN(auto offsets1, builder.Finish());
     ASSERT_TRUE(offsets1->Equals(map.shape_provider_.var_data_->offsets_[0]));
@@ -321,7 +321,7 @@ TEST_F(ColumnConvertTest, SelectFromRange) {
                                        IPos{1, 1}, IPos{1, 1}, IPos{1, 1}, IPos{1, 1}));
 
     ASSERT_EQ(map.shape_provider_.var_data_->offsets_.size(), 2);
-    arrow::Int64Builder builder;
+    arrow::Int32Builder builder;
     ASSERT_OK(builder.AppendValues({0, 1, 2, 3, 4, 5, 6, 7, 8}));
     ASSERT_OK_AND_ASSIGN(auto offsets1, builder.Finish());
     ASSERT_TRUE(offsets1->Equals(map.shape_provider_.var_data_->offsets_[0]));

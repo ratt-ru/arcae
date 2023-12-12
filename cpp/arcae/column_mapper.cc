@@ -324,8 +324,8 @@ VariableShapeData::Make(const casacore::TableColumn & column, const ColumnSelect
   auto nrow = row_shapes.size();
   // Number of dimensions without row
   auto ndim = std::begin(row_shapes)->size();
-  auto builders = std::vector<arrow::Int64Builder>(ndim);
-  auto offsets = std::vector<std::shared_ptr<arrow::Int64Array>>(ndim);
+  auto builders = std::vector<arrow::Int32Builder>(ndim);
+  auto offsets = std::vector<std::shared_ptr<arrow::Int32Array>>(ndim);
 
   for(auto dim=0; dim < ndim; ++dim) {
     ARROW_RETURN_NOT_OK(builders[dim].Reserve(nrow + 1));
@@ -644,7 +644,7 @@ casacore::IPosition RangeIterator::GetShape() const {
   return shape;
 }
 
-arrow::Result<std::vector<std::shared_ptr<arrow::Int64Array>>>
+arrow::Result<std::vector<std::shared_ptr<arrow::Int32Array>>>
 ColumnMapping::GetOffsets() const {
   if(shape_provider_.IsVarying()) {
     return shape_provider_.var_data_->offsets_;

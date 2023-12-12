@@ -238,7 +238,7 @@ public:
         ARROW_ASSIGN_OR_RAISE(const auto & offsets, map_.get().GetOffsets());
 
         for(auto & offset: offsets) {
-            ARROW_ASSIGN_OR_RAISE(array_, arrow::LargeListArray::FromArrays(*offset, *array_));
+            ARROW_ASSIGN_OR_RAISE(array_, arrow::ListArray::FromArrays(*offset, *array_));
         }
 
         return ValidateArray(array_);
