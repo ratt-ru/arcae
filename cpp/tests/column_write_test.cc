@@ -180,8 +180,9 @@ TEST_F(ColumnWriteTest, WriteVisitorFixedNumeric) {
   const auto shape = IPos{kncorr, knchan, knrow};
 
   for(auto & column: {"FIXED_DATA", "VAR_FIXED_DATA"}) {
-    auto fixed = GetArrayColumn<casacore::Int>(table, column);
-    auto zeroes = casacore::Array<casacore::Int>(shape, 0);
+    using CT = casacore::Int;
+    auto fixed = GetArrayColumn<CT>(table, column);
+    auto zeroes = casacore::Array<CT>(shape, 0);
 
     {
       // Fixed data column, get entire domain
@@ -204,6 +205,10 @@ TEST_F(ColumnWriteTest, WriteVisitorFixedNumeric) {
       visit_status = read_visitor.Visit(fixed.columnDesc().dataType());
       ASSERT_OK(visit_status);
       ASSERT_TRUE(data->Equals(read_visitor.array_));
+
+      EXPECT_THAT(fixed.getColumn(),  ::testing::ElementsAre(
+        CT{0}, CT{1}, CT{2}, CT{3},
+        CT{4}, CT{5}, CT{6}, CT{7}));
     }
 
     {
@@ -225,6 +230,11 @@ TEST_F(ColumnWriteTest, WriteVisitorFixedNumeric) {
       visit_status = read_visitor.Visit(fixed.columnDesc().dataType());
       ASSERT_OK(visit_status);
       ASSERT_TRUE(data->Equals(read_visitor.array_));
+
+      EXPECT_THAT(fixed.getColumn(),  ::testing::ElementsAre(
+        CT{0}, CT{0}, CT{0}, CT{0},
+        CT{4}, CT{0}, CT{0}, CT{0}));
+
     }
 
     {
@@ -246,6 +256,9 @@ TEST_F(ColumnWriteTest, WriteVisitorFixedNumeric) {
       ASSERT_OK(visit_status);
       ASSERT_TRUE(data->Equals(read_visitor.array_));
 
+      EXPECT_THAT(fixed.getColumn(),  ::testing::ElementsAre(
+        CT{0}, CT{0}, CT{0}, CT{3},
+        CT{0}, CT{0}, CT{0}, CT{7}));
     }
   }
 }
@@ -281,7 +294,7 @@ TEST_F(ColumnWriteTest, WriteVisitorFixedComplex) {
     ASSERT_OK(visit_status);
     ASSERT_TRUE(data->Equals(read_visitor.array_));
 
-    // Sanity check the complex values via casacore
+    // Sanity check the values via casacore
     using CT = casacore::DComplex;
     EXPECT_THAT(fixed.getColumn(),  ::testing::ElementsAre(
       CT{0, 0}, CT{1, 1}, CT{2, 2}, CT{3, 3},
@@ -294,8 +307,9 @@ TEST_F(ColumnWriteTest, WriteVisitorFixedString) {
   const auto shape = IPos{kncorr, knchan, knrow};
 
   for(auto & column: {"FIXED_STRING", "VAR_FIXED_STRING"}) {
-    auto fixed = GetArrayColumn<casacore::String>(table, column);
-    auto zeroes = casacore::Array<casacore::String>(shape, casacore::String{""});
+    using CT = casacore::String;
+    auto fixed = GetArrayColumn<CT>(table, column);
+    auto zeroes = casacore::Array<CT>(shape, CT{""});
 
     {
       // Fixed data column, get entire domain
@@ -318,6 +332,11 @@ TEST_F(ColumnWriteTest, WriteVisitorFixedString) {
       visit_status = read_visitor.Visit(fixed.columnDesc().dataType());
       ASSERT_OK(visit_status);
       ASSERT_TRUE(data->Equals(read_visitor.array_));
+
+      // Sanity check the values via casacore
+      EXPECT_THAT(fixed.getColumn(),  ::testing::ElementsAre(
+        CT{"0"}, CT{"1"}, CT{"2"}, CT{"3"},
+        CT{"4"}, CT{"5"}, CT{"6"}, CT{"7"}));
     }
 
     {
@@ -339,6 +358,11 @@ TEST_F(ColumnWriteTest, WriteVisitorFixedString) {
       visit_status = read_visitor.Visit(fixed.columnDesc().dataType());
       ASSERT_OK(visit_status);
       ASSERT_TRUE(data->Equals(read_visitor.array_));
+
+      // Sanity check values via casacore
+      EXPECT_THAT(fixed.getColumn(),  ::testing::ElementsAre(
+        CT{"0"}, CT{""}, CT{""}, CT{""},
+        CT{"4"}, CT{""}, CT{""}, CT{""}));
     }
 
     {
@@ -359,6 +383,12 @@ TEST_F(ColumnWriteTest, WriteVisitorFixedString) {
       visit_status = read_visitor.Visit(fixed.columnDesc().dataType());
       ASSERT_OK(visit_status);
       ASSERT_TRUE(data->Equals(read_visitor.array_));
+
+      // Sanity check values via casacore
+      EXPECT_THAT(fixed.getColumn(),  ::testing::ElementsAre(
+        CT{""}, CT{""}, CT{""}, CT{"3"},
+        CT{""}, CT{""}, CT{""}, CT{"7"}));
+
     }
   }
 }
@@ -366,6 +396,7 @@ TEST_F(ColumnWriteTest, WriteVisitorFixedString) {
 
 TEST_F(ColumnWriteTest, WriteVisitorVariableNumeric) {
   const auto & table = table_proxy_.table();
+  using CT = casacore::Int;
 
   for(auto & column: {"VAR_DATA"}) {
     {
@@ -374,8 +405,8 @@ TEST_F(ColumnWriteTest, WriteVisitorVariableNumeric) {
                            ArrayFromJSON(dtype,
                                          R"([[[0, 1], [2, 3]], [[4]]])"));
 
-      // Fixed data column, get entire domain
-      auto var = GetArrayColumn<casacore::Int>(table, column);
+      // Variable data column, get entire domain
+      auto var = GetArrayColumn<CT>(table, column);
       ASSERT_OK_AND_ASSIGN(auto column_map, (ColumnMapping::Make(var, {})));
       auto write_visitor = ColumnWriteVisitor(column_map, data);
       auto visit_status = write_visitor.Visit(var.columnDesc().dataType());
@@ -385,12 +416,20 @@ TEST_F(ColumnWriteTest, WriteVisitorVariableNumeric) {
       visit_status = read_visitor.Visit(var.columnDesc().dataType());
       ASSERT_OK(visit_status);
       ASSERT_TRUE(data->Equals(read_visitor.array_));
+
+      // Sanity check values via casacore
+      EXPECT_THAT(var.getColumnCells(casacore::RefRows(0, 0)),
+                  ::testing::ElementsAre(CT{0}, CT{1}, CT{2}, CT{3}));
+      EXPECT_THAT(var.getColumnCells(casacore::RefRows(1, 1)),
+                  ::testing::ElementsAre(CT{4}));
+
     }
   }
 }
 
 TEST_F(ColumnWriteTest, WriteVisitorVariableString) {
   const auto & table = table_proxy_.table();
+  using CT = casacore::String;
 
   for(auto & column: {"VAR_STRING"}) {
     {
@@ -399,8 +438,8 @@ TEST_F(ColumnWriteTest, WriteVisitorVariableString) {
                            ArrayFromJSON(dtype,
                                          R"([[["0", "1"], ["2", "3"]], [["4"]]])"));
 
-      // Fixed data column, get entire domain
-      auto var = GetArrayColumn<casacore::String>(table, column);
+      // Variable data column, get entire domain
+      auto var = GetArrayColumn<CT>(table, column);
       ASSERT_OK_AND_ASSIGN(auto column_map, (ColumnMapping::Make(var, {})));
       auto write_visitor = ColumnWriteVisitor(column_map, data);
       auto visit_status = write_visitor.Visit(var.columnDesc().dataType());
@@ -410,6 +449,13 @@ TEST_F(ColumnWriteTest, WriteVisitorVariableString) {
       visit_status = read_visitor.Visit(var.columnDesc().dataType());
       ASSERT_OK(visit_status);
       ASSERT_TRUE(data->Equals(read_visitor.array_));
+
+      // Sanity check values via casacore
+      EXPECT_THAT(var.getColumnCells(casacore::RefRows(0, 0)),
+                  ::testing::ElementsAre(CT{"0"}, CT{"1"}, CT{"2"}, CT{"3"}));
+      EXPECT_THAT(var.getColumnCells(casacore::RefRows(1, 1)),
+                  ::testing::ElementsAre(CT{"4"}));
+
     }
   }
 }
