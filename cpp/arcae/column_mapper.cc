@@ -451,8 +451,7 @@ MapIterator MapIterator::Make(const RangeIterator & rit, bool done) {
   using ItType = std::tuple<std::size_t, std::size_t>;
 
   for(auto [dim, product]=ItType{1, 1}; dim < rit.nDim(); ++dim) {
-    auto diff = rit.range_length_[dim] - rit.disk_start_[dim];
-    product = strides[dim] = product * diff;
+    product = strides[dim] = product * rit.range_length_[dim - 1];
   }
 
   return MapIterator{std::cref(rit), std::cref(rit.map_.get()),
