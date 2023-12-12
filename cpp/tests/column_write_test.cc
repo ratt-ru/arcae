@@ -329,8 +329,6 @@ TEST_F(ColumnWriteTest, WriteVisitorVariableString) {
                            ArrayFromJSON(dtype,
                                          R"([[["0", "1"], ["2", "3"]], [["4"]]])"));
 
-      ARROW_LOG(INFO) << data;
-
       // Fixed data column, get entire domain
       auto var = GetArrayColumn<casacore::String>(table, column);
       ASSERT_OK_AND_ASSIGN(auto column_map, (ColumnMapping::Make(var, {})));
