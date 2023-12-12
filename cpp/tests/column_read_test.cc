@@ -424,7 +424,6 @@ TEST_F(ColumnReadTest, ReadVisitorVariableNumeric) {
       auto var = GetArrayColumn<casacore::Int>(table, column);
       ASSERT_OK_AND_ASSIGN(auto column_map, (ColumnMapping::Make(var, {})));
       auto visitor = ColumnReadVisitor(column_map);
-      ASSERT_OK_AND_ASSIGN(auto offsets, column_map.GetOffsets());
       auto visit_status = visitor.Visit(var.columnDesc().dataType());
       ASSERT_OK(visit_status);
 
