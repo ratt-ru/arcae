@@ -9,14 +9,10 @@
 #include <arrow/result.h>
 
 #include <casacore/tables/Tables.h>
-#include <type_traits>
 
-#include "arcae/array_util.h"
+#include "arrow/buffer.h"
 #include "arcae/casa_visitors.h"
 #include "arcae/column_mapper.h"
-#include "arcae/complex_type.h"
-#include "arrow/array/array_primitive.h"
-#include "arrow/buffer.h"
 #include "arrow/status.h"
 #include "arrow/testing/gtest_util.h"
 #include "arrow/type_traits.h"
