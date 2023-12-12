@@ -3,6 +3,7 @@
 
 #include <arrow/result.h>
 #include <arrow/ipc/json_simple.h>
+#include <arrow/testing/gtest_util.h>
 
 #include <casacore/casa/Arrays/IPosition.h>
 #include <casacore/ms/MeasurementSets/MeasurementSet.h>
@@ -16,7 +17,6 @@
 
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
-#include <arrow/testing/gtest_util.h>
 
 #include "arcae/safe_table_proxy.h"
 #include "arcae/column_mapper.h"
@@ -25,10 +25,6 @@
 #include "arrow/type_fwd.h"
 
 
-using arrow::list;
-using arrow::fixed_size_list;
-using arrow::int32;
-using arrow::utf8;
 using arrow::ipc::internal::json::ArrayFromJSON;
 
 using casacore::Array;
@@ -91,12 +87,24 @@ class ColumnWriteTest : public ::testing::Test {
         auto tile_shape = IPos({kncorr, knchan, 1});
 
         auto fixed_column_desc = ArrayColumnDesc<casacore::Int>(
-            "FIXED_DATA", data_shape, ColumnDesc::FixedShape);
+          "FIXED_DATA", data_shape, ColumnDesc::FixedShape);
         table_desc.addColumn(fixed_column_desc);
-        auto var_column_desc = ArrayColumnDesc<casacore::Int>("VAR_DATA", 2);
+        auto var_column_desc = ArrayColumnDesc<casacore::Int>(
+          "VAR_DATA", 2);
         table_desc.addColumn(var_column_desc);
-        auto var_fixed_column_desc = ArrayColumnDesc<casacore::Int>("VAR_FIXED_DATA", 2);
+        auto var_fixed_column_desc = ArrayColumnDesc<casacore::Int>(
+          "VAR_FIXED_DATA", 2);
         table_desc.addColumn(var_fixed_column_desc);
+
+        auto fixed_complex_column_desc = ArrayColumnDesc<casacore::DComplex>(
+          "FIXED_COMPLEX", data_shape, ColumnDesc::FixedShape);
+        table_desc.addColumn(fixed_complex_column_desc);
+        auto var_complex_column_desc = ArrayColumnDesc<casacore::DComplex>(
+          "VAR_COMPLEX", 2);
+        table_desc.addColumn(var_complex_column_desc);
+        auto var_fixed_complex_column_desc = ArrayColumnDesc<casacore::DComplex>(
+          "VAR_FIXED_COMPLEX", 2);
+        table_desc.addColumn(var_fixed_complex_column_desc);
 
         auto string_column_desc = ArrayColumnDesc<casacore::String>(
           "FIXED_STRING", data_shape, ColumnDesc::FixedShape);
@@ -118,6 +126,10 @@ class ColumnWriteTest : public ::testing::Test {
         auto fixed_data = GetArrayColumn<casacore::Int>(ms, "FIXED_DATA");
         auto var_fixed_data = GetArrayColumn<casacore::Int>(ms, "VAR_FIXED_DATA");
 
+        auto var_complex = GetArrayColumn<casacore::DComplex>(ms, "VAR_COMPLEX");
+        auto fixed_complex = GetArrayColumn<casacore::DComplex>(ms, "FIXED_COMPLEX");
+        auto var_fixed_complex = GetArrayColumn<casacore::DComplex>(ms, "VAR_FIXED_COMPLEX");
+
         auto string_data = GetArrayColumn<casacore::String>(ms, "FIXED_STRING");
         auto var_string_data = GetArrayColumn<casacore::String>(ms, "VAR_STRING");
         auto var_fixed_string_data = GetArrayColumn<casacore::String>(ms, "VAR_FIXED_STRING");
@@ -125,9 +137,12 @@ class ColumnWriteTest : public ::testing::Test {
         for(auto [r, v] = std::tuple{ssize_t{0}, std::size_t{0}}; r < knrow; ++r) {
           auto var_array = Array<casacore::Int>(IPos({
             ssize_t{kncorr} - (r % 2), ssize_t{knchan} - (r % 2), 1}), 0);
+          auto var_complex_array = Array<casacore::DComplex>(IPos({
+            ssize_t{kncorr} - (r % 2), ssize_t{knchan} - (r % 2), 1}), 0);
           auto var_string = Array<casacore::String>(IPos({
             ssize_t{kncorr} - (r % 2), ssize_t{knchan} - (r % 2), 1}));
           var_data.putColumnCells(casacore::RefRows(r, r), var_array);
+          var_complex.putColumnCells(casacore::RefRows(r, r), var_complex_array);
           var_string_data.putColumnCells(casacore::RefRows(r, r), var_string);
         }
 
@@ -160,8 +175,6 @@ class ColumnWriteTest : public ::testing::Test {
     }
 };
 
-
-
 TEST_F(ColumnWriteTest, WriteVisitorFixedNumeric) {
   const auto & table = table_proxy_.table();
   const auto shape = IPos{kncorr, knchan, knrow};
@@ -175,7 +188,10 @@ TEST_F(ColumnWriteTest, WriteVisitorFixedNumeric) {
       fixed.putColumn(zeroes);
       ASSERT_OK_AND_ASSIGN(auto column_map, (ColumnMapping::Make(fixed, {})));
 
-      auto dtype = fixed_size_list(fixed_size_list(fixed_size_list(int32(), 2), 2), 2);
+      auto dtype = arrow::fixed_size_list(
+                    arrow::fixed_size_list(
+                      arrow::fixed_size_list(
+                        arrow::int32(), 2), 2), 2);
       ASSERT_OK_AND_ASSIGN(auto data,
                            ArrayFromJSON(dtype,
                                          R"([[[[0, 1], [2, 3]], [[4, 5], [6, 7]]]])"));
@@ -195,7 +211,10 @@ TEST_F(ColumnWriteTest, WriteVisitorFixedNumeric) {
       fixed.putColumn(zeroes);
       ASSERT_OK_AND_ASSIGN(auto column_map, (ColumnMapping::Make(fixed, {{}, {0}, {0}})));
 
-      auto dtype = fixed_size_list(fixed_size_list(fixed_size_list(int32(), 1), 1), 2);
+      auto dtype = arrow::fixed_size_list(
+                    arrow::fixed_size_list(
+                      arrow::fixed_size_list(
+                        arrow::int32(), 1), 1), 2);
       ASSERT_OK_AND_ASSIGN(auto data, ArrayFromJSON(dtype, R"([[[[0]], [[4]]]])"));
 
       auto write_visitor = ColumnWriteVisitor(column_map, data);
@@ -212,7 +231,10 @@ TEST_F(ColumnWriteTest, WriteVisitorFixedNumeric) {
       fixed.putColumn(zeroes);
       // Fixed data column, get all rows, last channel and correlation
       ASSERT_OK_AND_ASSIGN(auto column_map, (ColumnMapping::Make(fixed, {{}, {1}, {1}})));
-      auto dtype = fixed_size_list(fixed_size_list(fixed_size_list(int32(), 1), 1), 2);
+      auto dtype = arrow::fixed_size_list(
+                    arrow::fixed_size_list(
+                      arrow::fixed_size_list(
+                        arrow::int32(), 1), 1), 2);
       ASSERT_OK_AND_ASSIGN(auto data, ArrayFromJSON(dtype, R"([[[[3]], [[7]]]])"));
 
       auto write_visitor = ColumnWriteVisitor(column_map, data);
@@ -225,6 +247,45 @@ TEST_F(ColumnWriteTest, WriteVisitorFixedNumeric) {
       ASSERT_TRUE(data->Equals(read_visitor.array_));
 
     }
+  }
+}
+
+TEST_F(ColumnWriteTest, WriteVisitorFixedComplex) {
+  const auto & table = table_proxy_.table();
+  const auto shape = IPos{kncorr, knchan, knrow};
+
+  auto fixed = GetArrayColumn<casacore::DComplex>(table, "FIXED_COMPLEX");
+  auto zeroes = casacore::Array<casacore::DComplex>(shape, 0);
+
+  {
+    // Fixed data column, get entire domain
+    fixed.putColumn(zeroes);
+    ASSERT_OK_AND_ASSIGN(auto column_map, (ColumnMapping::Make(fixed, {})));
+
+    auto dtype = arrow::fixed_size_list(
+                  arrow::fixed_size_list(
+                    arrow::fixed_size_list(
+                      arrow::fixed_size_list(
+                        arrow::float64(), 2), 2), 2), 2);
+    ASSERT_OK_AND_ASSIGN(auto data,
+                          ArrayFromJSON(dtype,
+                                        R"([[[[[0, 0], [1, 1]], [[2, 2], [3, 3]]],
+                                             [[[4, 4], [5, 5]], [[6, 6], [7, 7]]]]])"));
+
+    auto visitor = ColumnWriteVisitor(column_map, data);
+    auto visit_status = visitor.Visit(fixed.columnDesc().dataType());
+    ASSERT_OK(visit_status);
+
+    auto read_visitor = ColumnReadVisitor(column_map);
+    visit_status = read_visitor.Visit(fixed.columnDesc().dataType());
+    ASSERT_OK(visit_status);
+    ASSERT_TRUE(data->Equals(read_visitor.array_));
+
+    // Sanity check the complex values via casacore
+    using CT = casacore::DComplex;
+    EXPECT_THAT(fixed.getColumn(),  ::testing::ElementsAre(
+      CT{0, 0}, CT{1, 1}, CT{2, 2}, CT{3, 3},
+      CT{4, 4}, CT{5, 5}, CT{6, 6}, CT{7, 7}));
   }
 }
 
@@ -241,7 +302,10 @@ TEST_F(ColumnWriteTest, WriteVisitorFixedString) {
       fixed.putColumn(zeroes);
       ASSERT_OK_AND_ASSIGN(auto column_map, (ColumnMapping::Make(fixed, {})));
 
-      auto dtype = fixed_size_list(fixed_size_list(fixed_size_list(utf8(), 2), 2), 2);
+      auto dtype = arrow::fixed_size_list(
+                    arrow::fixed_size_list(
+                      arrow::fixed_size_list(
+                        arrow::utf8(), 2), 2), 2);
       ASSERT_OK_AND_ASSIGN(auto data, ArrayFromJSON(
                            dtype,
                            R"([[[["0", "1"], ["2", "3"]], [["4", "5"], ["6", "7"]]]])"));
@@ -261,7 +325,10 @@ TEST_F(ColumnWriteTest, WriteVisitorFixedString) {
       fixed.putColumn(zeroes);
       ASSERT_OK_AND_ASSIGN(auto column_map, (ColumnMapping::Make(fixed, {{}, {0}, {0}})));
 
-      auto dtype = fixed_size_list(fixed_size_list(fixed_size_list(utf8(), 1), 1), 2);
+      auto dtype = arrow::fixed_size_list(
+                    arrow::fixed_size_list(
+                      arrow::fixed_size_list(
+                        arrow::utf8(), 1), 1), 2);
       ASSERT_OK_AND_ASSIGN(auto data, ArrayFromJSON(dtype, R"([[[["0"]], [["4"]]]])"));
 
       auto write_visitor = ColumnWriteVisitor(column_map, data);
@@ -278,7 +345,10 @@ TEST_F(ColumnWriteTest, WriteVisitorFixedString) {
       fixed.putColumn(zeroes);
       // Fixed data column, get all rows, last channel and correlation
       ASSERT_OK_AND_ASSIGN(auto column_map, (ColumnMapping::Make(fixed, {{}, {1}, {1}})));
-      auto dtype = fixed_size_list(fixed_size_list(fixed_size_list(utf8(), 1), 1), 2);
+      auto dtype = arrow::fixed_size_list(
+                    arrow::fixed_size_list(
+                      arrow::fixed_size_list(
+                        arrow::utf8(), 1), 1), 2);
       ASSERT_OK_AND_ASSIGN(auto data, ArrayFromJSON(dtype, R"([[[["3"]], [["7"]]]])"));
 
       auto write_visitor = ColumnWriteVisitor(column_map, data);
@@ -299,7 +369,7 @@ TEST_F(ColumnWriteTest, WriteVisitorVariableNumeric) {
 
   for(auto & column: {"VAR_DATA"}) {
     {
-      auto dtype = list(list(int32()));
+      auto dtype = arrow::list(arrow::list(arrow::int32()));
       ASSERT_OK_AND_ASSIGN(auto data,
                            ArrayFromJSON(dtype,
                                          R"([[[0, 1], [2, 3]], [[4]]])"));
@@ -324,7 +394,7 @@ TEST_F(ColumnWriteTest, WriteVisitorVariableString) {
 
   for(auto & column: {"VAR_STRING"}) {
     {
-      auto dtype = list(list(utf8()));
+      auto dtype = arrow::list(arrow::list(arrow::utf8()));
       ASSERT_OK_AND_ASSIGN(auto data,
                            ArrayFromJSON(dtype,
                                          R"([[["0", "1"], ["2", "3"]], [["4"]]])"));
