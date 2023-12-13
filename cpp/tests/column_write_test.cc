@@ -1,7 +1,3 @@
-#include "gmock/gmock.h"
-#include <casacore/casa/BasicSL/Complexfwd.h>
-#include <casacore/tables/Tables/ColumnDesc.h>
-#include <casacore/tables/Tables/ScaColDesc.h>
 #include <memory>
 #include <string>
 
@@ -12,7 +8,9 @@
 #include <casacore/casa/Arrays/IPosition.h>
 #include <casacore/ms/MeasurementSets/MeasurementSet.h>
 #include <casacore/tables/Tables.h>
+#include <casacore/tables/Tables/ColumnDesc.h>
 #include <casacore/tables/Tables/ArrColDesc.h>
+#include <casacore/tables/Tables/ScaColDesc.h>
 #include <casacore/tables/Tables/Table.h>
 #include <casacore/tables/Tables/TableColumn.h>
 #include <casacore/tables/Tables/TableProxy.h>
