@@ -282,6 +282,7 @@ struct ColumnMapping {
                                   " does not have a fixed shape");
   }
 
+  // Is this a Fixed Shape case
   inline bool IsFixedShape() const {
     return shape_provider_.IsActuallyFixed();
   }

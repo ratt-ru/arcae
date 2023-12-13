@@ -1,3 +1,7 @@
+#include "gmock/gmock.h"
+#include <casacore/casa/BasicSL/Complexfwd.h>
+#include <casacore/tables/Tables/ColumnDesc.h>
+#include <casacore/tables/Tables/ScaColDesc.h>
 #include <memory>
 #include <string>
 
@@ -35,6 +39,7 @@ using MS = casacore::MeasurementSet;
 using MSColumns = casacore::MSMainEnums::PredefinedColumns;
 using casacore::SetupNewTable;
 using casacore::ScalarColumn;
+using casacore::ScalarColumnDesc;
 using casacore::Table;
 using casacore::TableDesc;
 using casacore::TableColumn;
@@ -86,6 +91,13 @@ class ColumnWriteTest : public ::testing::Test {
         auto data_shape = IPos({kncorr, knchan});
         auto tile_shape = IPos({kncorr, knchan, 1});
 
+        auto scalar_complex_coldesc = ScalarColumnDesc<casacore::DComplex>(
+          "SCALAR_COMPLEX");
+        table_desc.addColumn(scalar_complex_coldesc);
+        auto scalar_string_coldesc = ScalarColumnDesc<casacore::String>(
+          "SCALAR_STRING");
+        table_desc.addColumn(scalar_string_coldesc);
+
         auto fixed_coldesc = ArrayColumnDesc<casacore::Int>(
           "FIXED_DATA", data_shape, ColumnDesc::FixedShape);
         table_desc.addColumn(fixed_coldesc);
@@ -125,6 +137,9 @@ class ColumnWriteTest : public ::testing::Test {
         setup_new_table.bindColumn("FIXED_DATA", storage_manager);
 
         auto ms = MS(setup_new_table, knrow);
+
+        auto scalar_complex_data = GetScalarColumn<casacore::DComplex>(ms, "SCALAR_COMPLEX");
+        auto scalar_string = GetScalarColumn<casacore::String>(ms, "SCALAR_STRING");
 
         auto var_data = GetArrayColumn<casacore::Int>(ms, "VAR_DATA");
         auto fixed_data = GetArrayColumn<casacore::Int>(ms, "FIXED_DATA");
@@ -187,6 +202,93 @@ class ColumnWriteTest : public ::testing::Test {
 
     }
 };
+
+TEST_F(ColumnWriteTest, WriteVisitorScalarNumeric) {
+  const auto & table = table_proxy_.table();
+
+  {
+    // Write both complex rows
+    using CT = casacore::DComplex;
+    auto complex = GetScalarColumn<CT>(table, "SCALAR_COMPLEX");
+    auto zeroes = casacore::Array<CT>(IPos({knrow}), CT{0, 0});
+    complex.putColumn(zeroes);
+    ASSERT_OK_AND_ASSIGN(auto data,
+                         ArrayFromJSON(arrow::fixed_size_list(arrow::float64(), 2),
+                                       R"([[0, 1], [2, 3]])"));
+
+    ASSERT_OK_AND_ASSIGN(auto column_map, (ColumnMapping::Make(complex, {})));
+    auto write_visitor = ColumnWriteVisitor(column_map, data);
+    ASSERT_OK(write_visitor.Visit(complex.columnDesc().dataType()));
+    auto read_visitor = ColumnReadVisitor(column_map);
+    ASSERT_OK(read_visitor.Visit(complex.columnDesc().dataType()));
+    ASSERT_TRUE(data->Equals(read_visitor.array_));
+    EXPECT_THAT(complex.getColumn(), ::testing::ElementsAre(
+      CT{0, 1}, CT{2, 3}));
+  }
+
+  {
+    // Write a single complex row
+    using CT = casacore::DComplex;
+    auto complex = GetScalarColumn<CT>(table, "SCALAR_COMPLEX");
+    complex.putColumn(casacore::Array<CT>(IPos({knrow}), CT{0, 0}));
+    ASSERT_OK_AND_ASSIGN(auto data,
+                         ArrayFromJSON(arrow::fixed_size_list(arrow::float64(), 2),
+                                       R"([[2, 3]])"));
+
+    ASSERT_OK_AND_ASSIGN(auto column_map, (ColumnMapping::Make(complex, {{1}})));
+    auto write_visitor = ColumnWriteVisitor(column_map, data);
+    ASSERT_OK(write_visitor.Visit(complex.columnDesc().dataType()));
+    auto read_visitor = ColumnReadVisitor(column_map);
+    ASSERT_OK(read_visitor.Visit(complex.columnDesc().dataType()));
+    ASSERT_TRUE(data->Equals(read_visitor.array_));
+    EXPECT_THAT(complex.getColumn(), ::testing::ElementsAre(
+      CT{0, 0}, CT{2, 3}));
+  }
+}
+
+
+TEST_F(ColumnWriteTest, WriteVisitorScalarString) {
+  const auto & table = table_proxy_.table();
+
+  {
+    // Write both string rows
+    using CT = casacore::String;
+    auto complex = GetScalarColumn<CT>(table, "SCALAR_STRING");
+    complex.putColumn(casacore::Array<CT>(IPos({knrow})));
+    ASSERT_OK_AND_ASSIGN(auto data,
+                         ArrayFromJSON(arrow::utf8(),
+                                       R"(["0", "1"])"));
+
+    ASSERT_OK_AND_ASSIGN(auto column_map, (ColumnMapping::Make(complex, {})));
+    auto write_visitor = ColumnWriteVisitor(column_map, data);
+    ASSERT_OK(write_visitor.Visit(complex.columnDesc().dataType()));
+    auto read_visitor = ColumnReadVisitor(column_map);
+    ASSERT_OK(read_visitor.Visit(complex.columnDesc().dataType()));
+    ASSERT_TRUE(data->Equals(read_visitor.array_));
+    EXPECT_THAT(complex.getColumn(), ::testing::ElementsAre(
+      CT{"0"}, CT{"1"}));
+  }
+
+  {
+    // Write both string rows
+    using CT = casacore::String;
+    auto complex = GetScalarColumn<CT>(table, "SCALAR_STRING");
+    complex.putColumn(casacore::Array<CT>(IPos({knrow})));
+    ASSERT_OK_AND_ASSIGN(auto data,
+                         ArrayFromJSON(arrow::utf8(),
+                                       R"(["1"])"));
+
+    ASSERT_OK_AND_ASSIGN(auto column_map, (ColumnMapping::Make(complex, {{1}})));
+    auto write_visitor = ColumnWriteVisitor(column_map, data);
+    ASSERT_OK(write_visitor.Visit(complex.columnDesc().dataType()));
+    auto read_visitor = ColumnReadVisitor(column_map);
+    ASSERT_OK(read_visitor.Visit(complex.columnDesc().dataType()));
+    ASSERT_TRUE(data->Equals(read_visitor.array_));
+    EXPECT_THAT(complex.getColumn(), ::testing::ElementsAre(
+      CT{""}, CT{"1"}));
+  }
+}
+
 
 TEST_F(ColumnWriteTest, WriteVisitorFixedNumeric) {
   const auto & table = table_proxy_.table();
