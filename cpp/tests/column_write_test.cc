@@ -86,35 +86,39 @@ class ColumnWriteTest : public ::testing::Test {
         auto data_shape = IPos({kncorr, knchan});
         auto tile_shape = IPos({kncorr, knchan, 1});
 
-        auto fixed_column_desc = ArrayColumnDesc<casacore::Int>(
+        auto fixed_coldesc = ArrayColumnDesc<casacore::Int>(
           "FIXED_DATA", data_shape, ColumnDesc::FixedShape);
-        table_desc.addColumn(fixed_column_desc);
-        auto var_column_desc = ArrayColumnDesc<casacore::Int>(
+        table_desc.addColumn(fixed_coldesc);
+        auto var_coldesc = ArrayColumnDesc<casacore::Int>(
           "VAR_DATA", 2);
-        table_desc.addColumn(var_column_desc);
-        auto var_fixed_column_desc = ArrayColumnDesc<casacore::Int>(
+        table_desc.addColumn(var_coldesc);
+        auto var_fixed_coldesc = ArrayColumnDesc<casacore::Int>(
           "VAR_FIXED_DATA", 2);
-        table_desc.addColumn(var_fixed_column_desc);
+        table_desc.addColumn(var_fixed_coldesc);
 
-        auto fixed_complex_column_desc = ArrayColumnDesc<casacore::DComplex>(
+        auto var_2x3_coldesc = ArrayColumnDesc<casacore::Int>(
+          "VAR_2X3", 2);
+        table_desc.addColumn(var_2x3_coldesc);
+
+        auto fixed_complex_coldesc = ArrayColumnDesc<casacore::DComplex>(
           "FIXED_COMPLEX", data_shape, ColumnDesc::FixedShape);
-        table_desc.addColumn(fixed_complex_column_desc);
-        auto var_complex_column_desc = ArrayColumnDesc<casacore::DComplex>(
+        table_desc.addColumn(fixed_complex_coldesc);
+        auto var_complex_coldesc = ArrayColumnDesc<casacore::DComplex>(
           "VAR_COMPLEX", 2);
-        table_desc.addColumn(var_complex_column_desc);
-        auto var_fixed_complex_column_desc = ArrayColumnDesc<casacore::DComplex>(
+        table_desc.addColumn(var_complex_coldesc);
+        auto var_fixed_complex_coldesc = ArrayColumnDesc<casacore::DComplex>(
           "VAR_FIXED_COMPLEX", 2);
-        table_desc.addColumn(var_fixed_complex_column_desc);
+        table_desc.addColumn(var_fixed_complex_coldesc);
 
-        auto string_column_desc = ArrayColumnDesc<casacore::String>(
+        auto string_coldesc = ArrayColumnDesc<casacore::String>(
           "FIXED_STRING", data_shape, ColumnDesc::FixedShape);
-        table_desc.addColumn(string_column_desc);
-        auto var_string_column_desc = ArrayColumnDesc<casacore::String>(
+        table_desc.addColumn(string_coldesc);
+        auto var_string_coldesc = ArrayColumnDesc<casacore::String>(
           "VAR_STRING", 2);
-        table_desc.addColumn(var_string_column_desc);
-        auto var_fixed_string_column_desc = ArrayColumnDesc<casacore::String>(
+        table_desc.addColumn(var_string_coldesc);
+        auto var_fixed_string_coldesc = ArrayColumnDesc<casacore::String>(
           "VAR_FIXED_STRING", 2);
-        table_desc.addColumn(var_fixed_string_column_desc);
+        table_desc.addColumn(var_fixed_string_coldesc);
 
         auto storage_manager = TiledColumnStMan("TiledModelData", tile_shape);
         auto setup_new_table = SetupNewTable(table_name_, table_desc, Table::New);
@@ -125,6 +129,7 @@ class ColumnWriteTest : public ::testing::Test {
         auto var_data = GetArrayColumn<casacore::Int>(ms, "VAR_DATA");
         auto fixed_data = GetArrayColumn<casacore::Int>(ms, "FIXED_DATA");
         auto var_fixed_data = GetArrayColumn<casacore::Int>(ms, "VAR_FIXED_DATA");
+        auto var_3x2_data = GetArrayColumn<casacore::Int>(ms, "VAR_2X3");
 
         auto var_complex = GetArrayColumn<casacore::DComplex>(ms, "VAR_COMPLEX");
         auto fixed_complex = GetArrayColumn<casacore::DComplex>(ms, "FIXED_COMPLEX");
@@ -141,21 +146,29 @@ class ColumnWriteTest : public ::testing::Test {
             ssize_t{kncorr} - (r % 2), ssize_t{knchan} - (r % 2), 1}), 0);
           auto var_string = Array<casacore::String>(IPos({
             ssize_t{kncorr} - (r % 2), ssize_t{knchan} - (r % 2), 1}));
-          var_data.putColumnCells(casacore::RefRows(r, r), var_array);
-          var_complex.putColumnCells(casacore::RefRows(r, r), var_complex_array);
-          var_string_data.putColumnCells(casacore::RefRows(r, r), var_string);
+          auto refrows = casacore::RefRows(r, r);
+          var_data.putColumnCells(refrows, var_array);
+          var_complex.putColumnCells(refrows, var_complex_array);
+          var_string_data.putColumnCells(refrows, var_string);
+
+          auto var_3x2_array = Array<casacore::Int>(IPos({
+            ssize_t{kncorr} + (r % 2), ssize_t{knchan} + (r % 2), 1}), 0);
+          var_3x2_data.putColumnCells(refrows, var_3x2_array);
+
         }
 
         for(auto [r, v] = std::tuple{ssize_t{0}, std::size_t{0}}; r < knrow; ++r) {
           auto fixed_array = Array<casacore::Int>(IPos({kncorr, knchan, 1}), 0);
-          fixed_data.putColumnCells(casacore::RefRows(r, r), fixed_array);
-          var_fixed_data.putColumnCells(casacore::RefRows(r, r), fixed_array);
+          auto refrows = casacore::RefRows(r, r);
+          fixed_data.putColumnCells(refrows, fixed_array);
+          var_fixed_data.putColumnCells(refrows, fixed_array);
         }
 
         for(auto [r, v] = std::tuple{ssize_t{0}, std::size_t{0}}; r < knrow; ++r) {
           auto string_array = Array<casacore::String>(IPos({kncorr, knchan, 1}));
-          string_data.putColumnCells(casacore::RefRows(r, r), string_array);
-          var_fixed_string_data.putColumnCells(casacore::RefRows(r, r), string_array);
+          auto refrows = casacore::RefRows(r, r);
+          string_data.putColumnCells(refrows, string_array);
+          var_fixed_string_data.putColumnCells(refrows, string_array);
         }
 
         return std::make_shared<TableProxy>(ms);
@@ -397,34 +410,216 @@ TEST_F(ColumnWriteTest, WriteVisitorFixedString) {
 TEST_F(ColumnWriteTest, WriteVisitorVariableNumeric) {
   const auto & table = table_proxy_.table();
   using CT = casacore::Int;
+  auto dtype = arrow::list(arrow::list(arrow::int32()));
 
-  for(auto & column: {"VAR_DATA"}) {
-    {
-      auto dtype = arrow::list(arrow::list(arrow::int32()));
-      ASSERT_OK_AND_ASSIGN(auto data,
-                           ArrayFromJSON(dtype,
-                                         R"([[[0, 1], [2, 3]], [[4]]])"));
+  {
+    ASSERT_OK_AND_ASSIGN(auto data,
+                          ArrayFromJSON(dtype,
+                                        R"([[[0, 1], [2, 3]], [[4]]])"));
 
-      // Variable data column, get entire domain
-      auto var = GetArrayColumn<CT>(table, column);
-      ASSERT_OK_AND_ASSIGN(auto column_map, (ColumnMapping::Make(var, {})));
-      auto write_visitor = ColumnWriteVisitor(column_map, data);
-      auto visit_status = write_visitor.Visit(var.columnDesc().dataType());
-      ASSERT_OK(visit_status);
+    // Variable data column, get entire domain
+    auto var = GetArrayColumn<CT>(table, "VAR_DATA");
+    ASSERT_OK_AND_ASSIGN(auto column_map, (ColumnMapping::Make(var, {})));
+    auto write_visitor = ColumnWriteVisitor(column_map, data);
+    auto visit_status = write_visitor.Visit(var.columnDesc().dataType());
+    ASSERT_OK(visit_status);
 
-      auto read_visitor = ColumnReadVisitor(column_map);
-      visit_status = read_visitor.Visit(var.columnDesc().dataType());
-      ASSERT_OK(visit_status);
-      ASSERT_TRUE(data->Equals(read_visitor.array_));
+    auto read_visitor = ColumnReadVisitor(column_map);
+    visit_status = read_visitor.Visit(var.columnDesc().dataType());
+    ASSERT_OK(visit_status);
+    ASSERT_TRUE(data->Equals(read_visitor.array_));
 
-      // Sanity check values via casacore
-      EXPECT_THAT(var.getColumnCells(casacore::RefRows(0, 0)),
-                  ::testing::ElementsAre(CT{0}, CT{1}, CT{2}, CT{3}));
-      EXPECT_THAT(var.getColumnCells(casacore::RefRows(1, 1)),
-                  ::testing::ElementsAre(CT{4}));
+    // Sanity check values via casacore
+    EXPECT_THAT(var.getColumnCells(casacore::RefRows(0, 0)),
+                ::testing::ElementsAre(CT{0}, CT{1}, CT{2}, CT{3}));
+    EXPECT_THAT(var.getColumnCells(casacore::RefRows(1, 1)),
+                ::testing::ElementsAre(CT{4}));
 
-    }
   }
+
+  {
+    // Variable data column, entire domain
+    ASSERT_OK_AND_ASSIGN(auto data,
+                          ArrayFromJSON(dtype,
+                                        R"([[[0, 1],
+                                             [2, 3]],
+                                            [[4, 5, 6],
+                                             [7, 8, 9],
+                                             [10, 11, 12]]])"));
+
+    auto var = GetArrayColumn<CT>(table, "VAR_2X3");
+    var.putColumnCells(casacore::RefRows(0, 0),
+                       casacore::Array<casacore::Int>(IPos({2, 2, 1}), 0));
+    var.putColumnCells(casacore::RefRows(1, 1),
+                       casacore::Array<casacore::Int>(IPos({3, 3, 1}), 0));
+    ASSERT_OK_AND_ASSIGN(auto column_map, (ColumnMapping::Make(var, {})));
+    auto write_visitor = ColumnWriteVisitor(column_map, data);
+    auto visit_status = write_visitor.Visit(var.columnDesc().dataType());
+    ASSERT_OK(visit_status);
+
+    auto read_visitor = ColumnReadVisitor(column_map);
+    visit_status = read_visitor.Visit(var.columnDesc().dataType());
+    ASSERT_OK(visit_status);
+    ASSERT_TRUE(data->Equals(read_visitor.array_));
+
+    // Sanity check values via casacore
+    EXPECT_THAT(var.getColumnCells(casacore::RefRows(0, 0)),
+                ::testing::ElementsAre(CT{0}, CT{1},
+                                       CT{2}, CT{3}));
+    EXPECT_THAT(var.getColumnCells(casacore::RefRows(1, 1)),
+                ::testing::ElementsAre(CT{4}, CT{5}, CT{6},
+                                       CT{7}, CT{8}, CT{9},
+                                       CT{10}, CT{11}, CT{12}));
+
+  }
+
+  {
+    // Variable data column, one channel
+    ASSERT_OK_AND_ASSIGN(auto data,
+                          ArrayFromJSON(dtype,
+                                        R"([[[2, 3]],
+                                            [[7, 8, 9]]])"));
+
+    // Variable data column, get entire domain
+    auto var = GetArrayColumn<CT>(table, "VAR_2X3");
+    var.putColumnCells(casacore::RefRows(0, 0),
+                       casacore::Array<casacore::Int>(IPos({2, 2, 1}), 0));
+    var.putColumnCells(casacore::RefRows(1, 1),
+                       casacore::Array<casacore::Int>(IPos({3, 3, 1}), 0));
+    ASSERT_OK_AND_ASSIGN(auto column_map, (ColumnMapping::Make(var, {{}, {1}})));
+    auto write_visitor = ColumnWriteVisitor(column_map, data);
+    auto visit_status = write_visitor.Visit(var.columnDesc().dataType());
+    ASSERT_OK(visit_status);
+
+    auto read_visitor = ColumnReadVisitor(column_map);
+    visit_status = read_visitor.Visit(var.columnDesc().dataType());
+    ASSERT_OK(visit_status);
+    ASSERT_TRUE(data->Equals(read_visitor.array_));
+
+    // Sanity check values via casacore
+    EXPECT_THAT(var.getColumnCells(casacore::RefRows(0, 0)),
+                ::testing::ElementsAre(CT{0}, CT{0},
+                                       CT{2}, CT{3}));
+    EXPECT_THAT(var.getColumnCells(casacore::RefRows(1, 1)),
+                ::testing::ElementsAre(CT{0}, CT{0}, CT{0},
+                                       CT{7}, CT{8}, CT{9},
+                                       CT{0}, CT{0}, CT{0}));
+  }
+
+  {
+    // Variable data column, one correlation
+    ASSERT_OK_AND_ASSIGN(auto data,
+                          ArrayFromJSON(dtype,
+                                        R"([[[1],
+                                             [3]],
+                                            [[5],
+                                             [8],
+                                             [11]]])"));
+
+    auto var = GetArrayColumn<CT>(table, "VAR_2X3");
+    var.putColumnCells(casacore::RefRows(0, 0),
+                       casacore::Array<casacore::Int>(IPos({2, 2, 1}), 0));
+    var.putColumnCells(casacore::RefRows(1, 1),
+                       casacore::Array<casacore::Int>(IPos({3, 3, 1}), 0));
+    ASSERT_OK_AND_ASSIGN(auto column_map, (ColumnMapping::Make(var, {{}, {}, {1}})));
+    auto write_visitor = ColumnWriteVisitor(column_map, data);
+    auto visit_status = write_visitor.Visit(var.columnDesc().dataType());
+    ASSERT_OK(visit_status);
+
+    auto read_visitor = ColumnReadVisitor(column_map);
+    visit_status = read_visitor.Visit(var.columnDesc().dataType());
+    ASSERT_OK(visit_status);
+    ASSERT_TRUE(data->Equals(read_visitor.array_));
+
+    // Sanity check values via casacore
+    EXPECT_THAT(var.getColumnCells(casacore::RefRows(0, 0)),
+                ::testing::ElementsAre(CT{0}, CT{1},
+                                       CT{0}, CT{3}));
+    EXPECT_THAT(var.getColumnCells(casacore::RefRows(1, 1)),
+                ::testing::ElementsAre(CT{0}, CT{5}, CT{0},
+                                       CT{0}, CT{8}, CT{0},
+                                       CT{0}, CT{11}, CT{0}));
+
+  }
+
+  {
+    auto dtype = arrow::fixed_size_list(
+                    arrow::fixed_size_list(
+                      arrow::fixed_size_list(
+                        arrow::int32(), 2), 2), 2);
+
+
+    // Variable data column, two channels, two correlations
+    ASSERT_OK_AND_ASSIGN(auto data,
+                          ArrayFromJSON(dtype,
+                                        R"([[[[0, 1],
+                                             [2, 3]],
+                                            [[4, 5],
+                                             [7, 8]]]])"));
+
+    auto var = GetArrayColumn<CT>(table, "VAR_2X3");
+    var.putColumnCells(casacore::RefRows(0, 0),
+                       casacore::Array<casacore::Int>(IPos({2, 2, 1}), 0));
+    var.putColumnCells(casacore::RefRows(1, 1),
+                       casacore::Array<casacore::Int>(IPos({3, 3, 1}), 0));
+    ASSERT_OK_AND_ASSIGN(auto column_map, (ColumnMapping::Make(var, {{}, {0, 1}, {0, 1}})));
+    auto write_visitor = ColumnWriteVisitor(column_map, data);
+    auto visit_status = write_visitor.Visit(var.columnDesc().dataType());
+    ASSERT_OK(visit_status);
+
+    auto read_visitor = ColumnReadVisitor(column_map);
+    visit_status = read_visitor.Visit(var.columnDesc().dataType());
+    ASSERT_OK(visit_status);
+    ASSERT_TRUE(data->Equals(read_visitor.array_));
+
+    // Sanity check values via casacore
+    EXPECT_THAT(var.getColumnCells(casacore::RefRows(0, 0)),
+                ::testing::ElementsAre(CT{0}, CT{1},
+                                       CT{2}, CT{3}));
+    EXPECT_THAT(var.getColumnCells(casacore::RefRows(1, 1)),
+                ::testing::ElementsAre(CT{4}, CT{5}, CT{0},
+                                       CT{7}, CT{8}, CT{0},
+                                       CT{0}, CT{0}, CT{0}));
+  }
+
+
+  {
+    // Variable data column, 1 row, two channels, two correlations
+     auto dtype = arrow::fixed_size_list(
+                    arrow::fixed_size_list(
+                      arrow::fixed_size_list(
+                        arrow::int32(), 2), 2), 1);
+
+    ASSERT_OK_AND_ASSIGN(auto data,
+                          ArrayFromJSON(dtype,
+                                        R"([[[[4, 5],
+                                              [7, 8]]]])"));
+
+    auto var = GetArrayColumn<CT>(table, "VAR_2X3");
+    var.putColumnCells(casacore::RefRows(0, 0),
+                       casacore::Array<casacore::Int>(IPos({2, 2, 1}), 0));
+    var.putColumnCells(casacore::RefRows(1, 1),
+                       casacore::Array<casacore::Int>(IPos({3, 3, 1}), 0));
+    ASSERT_OK_AND_ASSIGN(auto column_map, (ColumnMapping::Make(var, {{1}, {0, 1}, {0, 1}})));
+    auto write_visitor = ColumnWriteVisitor(column_map, data);
+    auto visit_status = write_visitor.Visit(var.columnDesc().dataType());
+    ASSERT_OK(visit_status);
+
+    auto read_visitor = ColumnReadVisitor(column_map);
+    visit_status = read_visitor.Visit(var.columnDesc().dataType());
+    ASSERT_OK(visit_status);
+    ASSERT_TRUE(data->Equals(read_visitor.array_));
+
+    // Sanity check values via casacore
+    EXPECT_THAT(var.getColumnCells(casacore::RefRows(0, 0)),
+                ::testing::ElementsAre(CT{0}, CT{0},
+                                       CT{0}, CT{0}));
+    EXPECT_THAT(var.getColumnCells(casacore::RefRows(1, 1)),
+                ::testing::ElementsAre(CT{4}, CT{5}, CT{0},
+                                       CT{7}, CT{8}, CT{0},
+                                       CT{0}, CT{0}, CT{0}));
+  }
+
 }
 
 TEST_F(ColumnWriteTest, WriteVisitorVariableString) {
