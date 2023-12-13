@@ -174,9 +174,9 @@ public:
             ARROW_ASSIGN_OR_RAISE(array_, MakeArrowPrimitiveArray(buffer, nelements, arrow_dtype));
         }
 
-        // Fortran ordering
-        for(auto dim_size: shape) {
-            ARROW_ASSIGN_OR_RAISE(array_, arrow::FixedSizeListArray::FromArrays(array_, dim_size));
+        // Fortran ordering, but without the row dimension
+        for(auto dim=0; dim < shape.size() - 1; ++dim) {
+            ARROW_ASSIGN_OR_RAISE(array_, arrow::FixedSizeListArray::FromArrays(array_, shape[dim]));
         }
 
 

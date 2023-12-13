@@ -322,7 +322,7 @@ TEST_F(ColumnReadTest, ReadVisitorFixedNumeric) {
 
       ASSERT_OK_AND_ASSIGN(auto expected,
                            ArrayFromJSON(visitor.array_->type(),
-                           R"([[[[0, 1], [2, 3]], [[4, 5], [6, 7]]]])"));
+                           R"([[[0, 1], [2, 3]], [[4, 5], [6, 7]]])"));
       ASSERT_TRUE(visitor.array_->Equals(expected));
     }
 
@@ -338,7 +338,7 @@ TEST_F(ColumnReadTest, ReadVisitorFixedNumeric) {
 
       ASSERT_OK_AND_ASSIGN(auto expected,
                            ArrayFromJSON(visitor.array_->type(),
-                           R"([[[[0]], [[4]]]])"));
+                           R"([[[0]], [[4]]])"));
       ASSERT_TRUE(visitor.array_->Equals(expected));
     }
 
@@ -354,7 +354,7 @@ TEST_F(ColumnReadTest, ReadVisitorFixedNumeric) {
 
       ASSERT_OK_AND_ASSIGN(auto expected,
                            ArrayFromJSON(visitor.array_->type(),
-                           R"([[[[3]], [[7]]]])"));
+                           R"([[[3]], [[7]]])"));
       ASSERT_TRUE(visitor.array_->Equals(expected));
     }
   }
@@ -376,7 +376,7 @@ TEST_F(ColumnReadTest, ReadVisitorFixedString) {
 
       ASSERT_OK_AND_ASSIGN(auto expected,
                            ArrayFromJSON(visitor.array_->type(),
-                           R"([[[["0", "1"], ["2", "3"]], [["4", "5"], ["6", "7"]]]])"));
+                           R"([[["0", "1"], ["2", "3"]], [["4", "5"], ["6", "7"]]])"));
       ASSERT_TRUE(visitor.array_->Equals(expected));
     }
 
@@ -392,7 +392,7 @@ TEST_F(ColumnReadTest, ReadVisitorFixedString) {
 
       ASSERT_OK_AND_ASSIGN(auto expected,
                            ArrayFromJSON(visitor.array_->type(),
-                           R"([[[["0"]], [["4"]]]])"));
+                           R"([[["0"]], [["4"]]])"));
       ASSERT_TRUE(visitor.array_->Equals(expected));
     }
 
@@ -408,7 +408,7 @@ TEST_F(ColumnReadTest, ReadVisitorFixedString) {
 
       ASSERT_OK_AND_ASSIGN(auto expected,
                            ArrayFromJSON(visitor.array_->type(),
-                           R"([[[["3"]], [["7"]]]])"));
+                           R"([[["3"]], [["7"]]])"));
       ASSERT_TRUE(visitor.array_->Equals(expected));
     }
   }

@@ -203,12 +203,11 @@ TEST_F(ColumnWriteTest, WriteVisitorFixedNumeric) {
       ASSERT_OK_AND_ASSIGN(auto column_map, (ColumnMapping::Make(fixed, {})));
 
       auto dtype = arrow::fixed_size_list(
-                    arrow::fixed_size_list(
                       arrow::fixed_size_list(
-                        arrow::int32(), 2), 2), 2);
+                        arrow::int32(), 2), 2);
       ASSERT_OK_AND_ASSIGN(auto data,
                            ArrayFromJSON(dtype,
-                                         R"([[[[0, 1], [2, 3]], [[4, 5], [6, 7]]]])"));
+                                         R"([[[0, 1], [2, 3]], [[4, 5], [6, 7]]])"));
 
       auto visitor = ColumnWriteVisitor(column_map, data);
       auto visit_status = visitor.Visit(fixed.columnDesc().dataType());
@@ -230,10 +229,9 @@ TEST_F(ColumnWriteTest, WriteVisitorFixedNumeric) {
       ASSERT_OK_AND_ASSIGN(auto column_map, (ColumnMapping::Make(fixed, {{}, {0}, {0}})));
 
       auto dtype = arrow::fixed_size_list(
-                    arrow::fixed_size_list(
                       arrow::fixed_size_list(
-                        arrow::int32(), 1), 1), 2);
-      ASSERT_OK_AND_ASSIGN(auto data, ArrayFromJSON(dtype, R"([[[[0]], [[4]]]])"));
+                        arrow::int32(), 1), 1);
+      ASSERT_OK_AND_ASSIGN(auto data, ArrayFromJSON(dtype, R"([[[0]], [[4]]])"));
 
       auto write_visitor = ColumnWriteVisitor(column_map, data);
       auto visit_status = write_visitor.Visit(fixed.columnDesc().dataType());
@@ -255,10 +253,9 @@ TEST_F(ColumnWriteTest, WriteVisitorFixedNumeric) {
       // Fixed data column, get all rows, last channel and correlation
       ASSERT_OK_AND_ASSIGN(auto column_map, (ColumnMapping::Make(fixed, {{}, {1}, {1}})));
       auto dtype = arrow::fixed_size_list(
-                    arrow::fixed_size_list(
                       arrow::fixed_size_list(
-                        arrow::int32(), 1), 1), 2);
-      ASSERT_OK_AND_ASSIGN(auto data, ArrayFromJSON(dtype, R"([[[[3]], [[7]]]])"));
+                        arrow::int32(), 1), 1);
+      ASSERT_OK_AND_ASSIGN(auto data, ArrayFromJSON(dtype, R"([[[3]], [[7]]])"));
 
       auto write_visitor = ColumnWriteVisitor(column_map, data);
       auto visit_status = write_visitor.Visit(fixed.columnDesc().dataType());
@@ -290,13 +287,12 @@ TEST_F(ColumnWriteTest, WriteVisitorFixedComplex) {
 
     auto dtype = arrow::fixed_size_list(
                   arrow::fixed_size_list(
-                    arrow::fixed_size_list(
                       arrow::fixed_size_list(
-                        arrow::float64(), 2), 2), 2), 2);
+                        arrow::float64(), 2), 2), 2);
     ASSERT_OK_AND_ASSIGN(auto data,
                           ArrayFromJSON(dtype,
-                                        R"([[[[[0, 0], [1, 1]], [[2, 2], [3, 3]]],
-                                             [[[4, 4], [5, 5]], [[6, 6], [7, 7]]]]])"));
+                                        R"([[[[0, 0], [1, 1]], [[2, 2], [3, 3]]],
+                                            [[[4, 4], [5, 5]], [[6, 6], [7, 7]]]])"));
 
     auto visitor = ColumnWriteVisitor(column_map, data);
     auto visit_status = visitor.Visit(fixed.columnDesc().dataType());
@@ -330,12 +326,11 @@ TEST_F(ColumnWriteTest, WriteVisitorFixedString) {
       ASSERT_OK_AND_ASSIGN(auto column_map, (ColumnMapping::Make(fixed, {})));
 
       auto dtype = arrow::fixed_size_list(
-                    arrow::fixed_size_list(
                       arrow::fixed_size_list(
-                        arrow::utf8(), 2), 2), 2);
+                        arrow::utf8(), 2), 2);
       ASSERT_OK_AND_ASSIGN(auto data, ArrayFromJSON(
                            dtype,
-                           R"([[[["0", "1"], ["2", "3"]], [["4", "5"], ["6", "7"]]]])"));
+                           R"([[["0", "1"], ["2", "3"]], [["4", "5"], ["6", "7"]]])"));
 
       auto visitor = ColumnWriteVisitor(column_map, data);
       auto visit_status = visitor.Visit(fixed.columnDesc().dataType());
@@ -358,10 +353,9 @@ TEST_F(ColumnWriteTest, WriteVisitorFixedString) {
       ASSERT_OK_AND_ASSIGN(auto column_map, (ColumnMapping::Make(fixed, {{}, {0}, {0}})));
 
       auto dtype = arrow::fixed_size_list(
-                    arrow::fixed_size_list(
                       arrow::fixed_size_list(
-                        arrow::utf8(), 1), 1), 2);
-      ASSERT_OK_AND_ASSIGN(auto data, ArrayFromJSON(dtype, R"([[[["0"]], [["4"]]]])"));
+                        arrow::utf8(), 1), 1);
+      ASSERT_OK_AND_ASSIGN(auto data, ArrayFromJSON(dtype, R"([[["0"]], [["4"]]])"));
 
       auto write_visitor = ColumnWriteVisitor(column_map, data);
       auto visit_status = write_visitor.Visit(fixed.columnDesc().dataType());
@@ -383,10 +377,9 @@ TEST_F(ColumnWriteTest, WriteVisitorFixedString) {
       // Fixed data column, get all rows, last channel and correlation
       ASSERT_OK_AND_ASSIGN(auto column_map, (ColumnMapping::Make(fixed, {{}, {1}, {1}})));
       auto dtype = arrow::fixed_size_list(
-                    arrow::fixed_size_list(
                       arrow::fixed_size_list(
-                        arrow::utf8(), 1), 1), 2);
-      ASSERT_OK_AND_ASSIGN(auto data, ArrayFromJSON(dtype, R"([[[["3"]], [["7"]]]])"));
+                        arrow::utf8(), 1), 1);
+      ASSERT_OK_AND_ASSIGN(auto data, ArrayFromJSON(dtype, R"([[["3"]], [["7"]]])"));
 
       auto write_visitor = ColumnWriteVisitor(column_map, data);
       auto visit_status = write_visitor.Visit(fixed.columnDesc().dataType());
@@ -544,18 +537,17 @@ TEST_F(ColumnWriteTest, WriteVisitorVariableNumeric) {
 
   {
     auto dtype = arrow::fixed_size_list(
-                    arrow::fixed_size_list(
                       arrow::fixed_size_list(
-                        arrow::int32(), 2), 2), 2);
+                        arrow::int32(), 2), 2);
 
 
     // Variable data column, two channels, two correlations
     ASSERT_OK_AND_ASSIGN(auto data,
                           ArrayFromJSON(dtype,
-                                        R"([[[[0, 1],
+                                        R"([[[0, 1],
                                              [2, 3]],
                                             [[4, 5],
-                                             [7, 8]]]])"));
+                                             [7, 8]]])"));
 
     auto var = GetArrayColumn<CT>(table, "VAR_2X3");
     var.putColumnCells(casacore::RefRows(0, 0),
@@ -586,14 +578,13 @@ TEST_F(ColumnWriteTest, WriteVisitorVariableNumeric) {
   {
     // Variable data column, 1 row, two channels, two correlations
      auto dtype = arrow::fixed_size_list(
-                    arrow::fixed_size_list(
                       arrow::fixed_size_list(
-                        arrow::int32(), 2), 2), 1);
+                        arrow::int32(), 2), 2);
 
     ASSERT_OK_AND_ASSIGN(auto data,
                           ArrayFromJSON(dtype,
-                                        R"([[[[4, 5],
-                                              [7, 8]]]])"));
+                                        R"([[[4, 5],
+                                             [7, 8]]])"));
 
     auto var = GetArrayColumn<CT>(table, "VAR_2X3");
     var.putColumnCells(casacore::RefRows(0, 0),
