@@ -68,7 +68,13 @@ using ColumnRanges = std::vector<ColumnRange>;
 struct VariableShapeData {
   // Factory method for creating Variable Shape Data
   static arrow::Result<std::unique_ptr<VariableShapeData>>
-  Make(const casacore::TableColumn & column, const ColumnSelection & selection);
+  MakeFromData(const casacore::TableColumn & column,
+               const std::shared_ptr<arrow::Array> & data,
+               const ColumnSelection & selection);
+
+  static arrow::Result<std::unique_ptr<VariableShapeData>>
+  MakeFromColumn(const casacore::TableColumn & column,
+       const ColumnSelection & selection);
   // Returns true if the data shapes are fixed in practice
   bool IsActuallyFixed() const;
   // Number of dimensions, excluding row
@@ -92,7 +98,8 @@ struct ShapeProvider {
   std::unique_ptr<VariableShapeData> var_data_;
 
   static arrow::Result<ShapeProvider> Make(const casacore::TableColumn & column,
-                                           const ColumnSelection & selection);
+                                           const ColumnSelection & selection,
+                                           const std::shared_ptr<arrow::Array> & data=nullptr);
 
   // Returns true if the column is defined as having a fixed shape
   inline bool IsDefinitelyFixed() const {
@@ -291,7 +298,8 @@ struct ColumnMapping {
   static arrow::Result<ColumnMapping> Make(
       const casacore::TableColumn & column,
       ColumnSelection selection,
-      InputOrder order=InputOrder::C_ORDER);
+      InputOrder order=InputOrder::C_ORDER,
+      const std::shared_ptr<arrow::Array> & data=nullptr);
 
   // Number of disjoint ranges in this map
   std::size_t nRanges() const;

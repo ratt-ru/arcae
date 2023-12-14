@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <cstddef>
+#include <cstdint>
 #include <iterator>
 #include <functional>
 #include <memory>
@@ -13,9 +14,14 @@
 #include <arrow/api.h>
 #include <arrow/result.h>
 #include <arrow/status.h>
+#include <arrow/array/array_nested.h>
+#include <arrow/scalar.h>
+#include <arrow/type.h>
+
 #include <casacore/casa/aipsxtype.h>
 #include <casacore/casa/Arrays/IPosition.h>
 #include <casacore/casa/Arrays/Slicer.h>
+#include <casacore/tables/Tables/ArrayColumnBase.h>
 #include <casacore/tables/Tables/TableColumn.h>
 
 namespace arcae {
@@ -264,62 +270,114 @@ MaybeMakeOutputShape(const ColumnRanges & ranges) {
 
 } // namespace
 
+arrow::Result<casacore::IPosition> GetColumnRowShape(
+  const casacore::TableColumn & column,
+  casacore::rownr_t row) {
+    if(column.isDefined(row)) return column.shape(row);
+    return arrow::Status::IndexError("Row ", row, " in column ",
+                                    column.columnDesc().name(),
+                                   " is undefined");
+}
 
-// Factory method for creating Variable Shape Data
-arrow::Result<std::unique_ptr<VariableShapeData>>
-VariableShapeData::Make(const casacore::TableColumn & column, const ColumnSelection & selection) {
-  assert(!column.columnDesc().isFixedShape());
-  auto row_shapes = decltype(VariableShapeData::row_shapes_){};
-  bool fixed_shape = true;
-  bool fixed_dims = true;
-  // Row dimension is last in FORTRAN ordering
-  auto row_dim = selection.size() - 1;
-  using ItType = std::tuple<std::size_t, bool>;
 
-  // No selection
-  // Create row shape data from column.nrow()
-  if(selection.size() == 0 || selection[row_dim].size() == 0) {
-    row_shapes.reserve(column.nrow());
+arrow::Result<casacore::IPosition> GetDataRowShape(
+  const std::shared_ptr<arrow::Array> & data,
+  casacore::rownr_t row) {
 
-    for(auto [r, first] = ItType{0, true}; r < column.nrow(); ++r) {
-      if(!column.isDefined(r)) {
-        return arrow::Status::NotImplemented("Row ", r, " in column ",
-                                              column.columnDesc().name(),
-                                              " is not defined.");
-      }
+  if(!data->IsValid(row)) {
+    return arrow::Status::IndexError("Row ", row, " in data ",
+                                     data->ToString(),
+                                     " is undefined");
+  }
 
-      ARROW_ASSIGN_OR_RAISE(auto shape, ClipShape(column.shape(r), selection));
-      row_shapes.emplace_back(std::move(shape));
-      if(first) { first = false; continue; }
-      fixed_shape = fixed_shape && *std::rbegin(row_shapes) == *std::begin(row_shapes);
-      fixed_dims = fixed_dims && std::rbegin(row_shapes)->size() == std::begin(row_shapes)->size();
+  // Select the cell at a particular row
+  ARROW_ASSIGN_OR_RAISE(auto cell, data->GetScalar(row));
+  auto cell_data = std::shared_ptr<arrow::Array>{nullptr};
+  auto shape = std::vector<std::int64_t>{};
+
+
+  switch(cell->type->id()) {
+    case arrow::Type::LARGE_LIST:
+    case arrow::Type::LIST:
+    case arrow::Type::FIXED_SIZE_LIST:
+    {
+      auto list_scalar = std::dynamic_pointer_cast<arrow::BaseListScalar>(cell);
+      cell_data = std::dynamic_pointer_cast<arrow::BaseListArray<arrow::ListType>>(list_scalar->value);
+      shape.emplace_back(cell_data->length());
+      break;
     }
-  } else {
-    // Create row shape data from row id selection
-    const auto & row_ids = selection[row_dim];
-    row_shapes.reserve(row_ids.size());
+    case arrow::Type::BOOL:
+    case arrow::Type::UINT8:
+    case arrow::Type::UINT16:
+    case arrow::Type::UINT32:
+    case arrow::Type::UINT64:
+    case arrow::Type::INT8:
+    case arrow::Type::INT16:
+    case arrow::Type::INT32:
+    case arrow::Type::INT64:
+    case arrow::Type::FLOAT:
+    case arrow::Type::DOUBLE:
+    case arrow::Type::STRING:
+        return casacore::IPosition({1});
+    default:
+        return arrow::Status::TypeError(
+            "Shape derivation of ",
+            cell->type->ToString(),
+            " is not supported");
+  }
 
-    for(auto [r, first] = ItType{0, true}; r < row_ids.size(); ++r) {
-      if(!column.isDefined(row_ids[r])) {
-        return arrow::Status::NotImplemented("Row ", r, " in column ",
-                                              column.columnDesc().name(),
-                                              " is not defined.");
+  for(auto done=false; !done;) {
+    switch(cell_data->type_id()) {
+      case arrow::Type::LARGE_LIST:
+      case arrow::Type::LIST:
+      case arrow::Type::FIXED_SIZE_LIST:
+      {
+        auto base_list = std::dynamic_pointer_cast<arrow::BaseListArray<arrow::ListType>>(cell_data);
+        std::int64_t dim_size = base_list->value_length(0);
+        for(std::int64_t i=1; i < base_list->length(); ++i) {
+          if(dim_size != base_list->value_length(i)) {
+            return arrow::Status::Invalid("Heterogenous dimension size ",
+                                          dim_size, " ", base_list->value_length(i),
+                                          " in row ", row, " of input data");
+          }
+        }
+        shape.emplace_back(dim_size);
+        cell_data = base_list->values();
+        break;
       }
-
-      ARROW_ASSIGN_OR_RAISE(auto shape, ClipShape(column.shape(row_ids[r]), selection));
-      row_shapes.emplace_back(std::move(shape));
-      if(first) { first = false; continue; }
-      fixed_shape = fixed_shape && *std::rbegin(row_shapes) == *std::begin(row_shapes);
-      fixed_dims = fixed_dims && std::rbegin(row_shapes)->size() == std::begin(row_shapes)->size();
+      case arrow::Type::BOOL:
+      case arrow::Type::UINT8:
+      case arrow::Type::UINT16:
+      case arrow::Type::UINT32:
+      case arrow::Type::UINT64:
+      case arrow::Type::INT8:
+      case arrow::Type::INT16:
+      case arrow::Type::INT32:
+      case arrow::Type::INT64:
+      case arrow::Type::FLOAT:
+      case arrow::Type::DOUBLE:
+      case arrow::Type::STRING:
+          done = true;
+          break;
+      default:
+          return arrow::Status::TypeError(
+              "Shape derivation of ",
+              cell_data->type()->ToString(),
+              " is not supported");
     }
   }
 
-  // Arrow can't handle differing dimensions per row, so we quit here.
-  if(!fixed_dims) {
-    return arrow::Status::NotImplemented("Column ", column.columnDesc().name(),
-                                          " dimensions vary per row.");
+  auto result = casacore::IPosition(shape.size(), 0);
+  for(std::size_t dim=0; dim < shape.size(); ++dim) {
+    result[shape.size() - dim - 1] = shape[dim];
   }
 
+  return result;
+
+}
+
+arrow::Result<std::vector<std::shared_ptr<arrow::Int32Array>>>
+MakeOffsets(const decltype(VariableShapeData::row_shapes_) & row_shapes) {
   // Create offset arrays
   auto nrow = row_shapes.size();
   // Number of dimensions without row
@@ -353,15 +411,141 @@ VariableShapeData::Make(const casacore::TableColumn & column, const ColumnSelect
     ARROW_RETURN_NOT_OK(builders[dim].Finish(&offsets[dim]));
   }
 
+  return offsets;
+}
+
+
+void SetRowShape(casacore::ArrayColumnBase & column,
+                 const ColumnSelection & selection,
+                 casacore::rownr_t row,
+                 const casacore::IPosition & shape)
+{
+  auto new_shape = shape;
+
+  for(std::size_t dim=0; dim < shape.size(); ++dim) {
+    casacore::rownr_t dim_size = shape[dim];
+    auto sdim = SelectDim(dim, selection.size(), shape.size() + 1);
+    if(sdim >= 0) {
+      for(auto & index: selection[sdim]) {
+        dim_size = std::max(dim_size, index);
+      }
+    }
+    new_shape[dim] = dim_size;
+  }
+
+  column.setShape(row, new_shape);
+}
+
+arrow::Result<std::unique_ptr<VariableShapeData>>
+VariableShapeData::MakeFromData(const casacore::TableColumn & column,
+                                const std::shared_ptr<arrow::Array> & data,
+                                const ColumnSelection & selection) {
+  auto row_shapes = decltype(VariableShapeData::row_shapes_){};
+  auto fixed_shape = true;
+  auto fixed_dims = true;
+  auto row_dim = selection.size() - 1;
+  using ItType = std::tuple<casacore::rownr_t, bool>;
+  auto array_column = casacore::ArrayColumnBase(column);
+
+  if(selection.size() == 0 || selection[row_dim].size() == 0) {
+    for(auto [r, first] = ItType{0, true}; r < data->length(); ++r) {
+      ARROW_ASSIGN_OR_RAISE(auto shape, GetDataRowShape(data, r));
+      // ARROW_ASSIGN_OR_RAISE(shape, ClipShape(shape, selection));
+      row_shapes.emplace_back(std::move(shape));
+      SetRowShape(array_column, selection, r, shape);
+      if(first) { first = false; continue; }
+      fixed_shape = fixed_shape && *std::rbegin(row_shapes) == *std::begin(row_shapes);
+      fixed_dims = fixed_dims && std::rbegin(row_shapes)->size() == std::begin(row_shapes)->size();
+    }
+  } else {
+    const auto & row_ids = selection[row_dim];
+    row_shapes.reserve(row_ids.size());
+    for(auto [r, first] = ItType{0, true}; r < row_ids.size(); ++r) {
+      ARROW_ASSIGN_OR_RAISE(auto shape, GetDataRowShape(data, r))
+      // ARROW_ASSIGN_OR_RAISE(shape, ClipShape(shape, selection));
+      SetRowShape(array_column, selection, row_ids[r], shape);
+      row_shapes.emplace_back(std::move(shape));
+      if(first) { first = false; continue; }
+      fixed_shape = fixed_shape && *std::rbegin(row_shapes) == *std::begin(row_shapes);
+      fixed_dims = fixed_dims && std::rbegin(row_shapes)->size() == std::begin(row_shapes)->size();
+    }
+  }
+
+  // Arrow can't handle differing dimensions per row, so we quit here.
+  if(!fixed_dims) {
+    return arrow::Status::NotImplemented("Array ", data->ToString(),
+                                         " dimensions vary per row.");
+  }
+
   // We may have a fixed shape in practice
   auto shape = fixed_shape ? std::make_optional(*std::begin(row_shapes))
                             : std::nullopt;
 
+  ARROW_ASSIGN_OR_RAISE(auto offsets, MakeOffsets(row_shapes));
 
   return std::unique_ptr<VariableShapeData>(
     new VariableShapeData{std::move(row_shapes),
                           std::move(offsets),
-                          ndim,
+                          std::begin(row_shapes)->size(),
+                          std::move(shape)});
+}
+
+// Factory method for creating Variable Shape Data
+arrow::Result<std::unique_ptr<VariableShapeData>>
+VariableShapeData::MakeFromColumn(const casacore::TableColumn & column,
+                                  const ColumnSelection & selection) {
+  assert(!column.columnDesc().isFixedShape());
+  auto row_shapes = decltype(VariableShapeData::row_shapes_){};
+  bool fixed_shape = true;
+  bool fixed_dims = true;
+  // Row dimension is last in FORTRAN ordering
+  auto row_dim = selection.size() - 1;
+  using ItType = std::tuple<casacore::rownr_t, bool>;
+
+  // No selection
+  // Create row shape data from column.nrow()
+  if(selection.size() == 0 || selection[row_dim].size() == 0) {
+    row_shapes.reserve(column.nrow());
+
+    for(auto [r, first] = ItType{0, true}; r < column.nrow(); ++r) {
+      ARROW_ASSIGN_OR_RAISE(auto shape, GetColumnRowShape(column, r))
+      ARROW_ASSIGN_OR_RAISE(shape, ClipShape(shape, selection));
+      row_shapes.emplace_back(std::move(shape));
+      if(first) { first = false; continue; }
+      fixed_shape = fixed_shape && *std::rbegin(row_shapes) == *std::begin(row_shapes);
+      fixed_dims = fixed_dims && std::rbegin(row_shapes)->size() == std::begin(row_shapes)->size();
+    }
+  } else {
+    // Create row shape data from row id selection
+    const auto & row_ids = selection[row_dim];
+    row_shapes.reserve(row_ids.size());
+
+    for(auto [r, first] = ItType{0, true}; r < row_ids.size(); ++r) {
+      ARROW_ASSIGN_OR_RAISE(auto shape, GetColumnRowShape(column, row_ids[r]));
+      ARROW_ASSIGN_OR_RAISE(shape, ClipShape(shape, selection));
+      row_shapes.emplace_back(std::move(shape));
+      if(first) { first = false; continue; }
+      fixed_shape = fixed_shape && *std::rbegin(row_shapes) == *std::begin(row_shapes);
+      fixed_dims = fixed_dims && std::rbegin(row_shapes)->size() == std::begin(row_shapes)->size();
+    }
+  }
+
+  // Arrow can't handle differing dimensions per row, so we quit here.
+  if(!fixed_dims) {
+    return arrow::Status::NotImplemented("Column ", column.columnDesc().name(),
+                                          " dimensions vary per row.");
+  }
+
+  // We may have a fixed shape in practice
+  auto shape = fixed_shape ? std::make_optional(*std::begin(row_shapes))
+                            : std::nullopt;
+
+  ARROW_ASSIGN_OR_RAISE(auto offsets, MakeOffsets(row_shapes));
+
+  return std::unique_ptr<VariableShapeData>(
+    new VariableShapeData{std::move(row_shapes),
+                          std::move(offsets),
+                          std::begin(row_shapes)->size(),
                           std::move(shape)});
 }
 
@@ -375,13 +559,21 @@ std::size_t VariableShapeData::nDim() const {
 
 arrow::Result<ShapeProvider>
 ShapeProvider::Make(const casacore::TableColumn & column,
-                    const ColumnSelection & selection) {
+                    const ColumnSelection & selection,
+                    const std::shared_ptr<arrow::Array> & data) {
 
   if(column.columnDesc().isFixedShape()) {
     return ShapeProvider{std::cref(column), selection, nullptr};
   }
 
-  ARROW_ASSIGN_OR_RAISE(auto var_data, VariableShapeData::Make(column, selection));
+  auto var_data = std::unique_ptr<VariableShapeData>{};
+
+  if(data) {
+    ARROW_ASSIGN_OR_RAISE(var_data, VariableShapeData::MakeFromData(column, data, selection));
+  } else {
+    ARROW_ASSIGN_OR_RAISE(var_data, VariableShapeData::MakeFromColumn(column, selection));
+  }
+
   return ShapeProvider{std::cref(column), std::cref(selection), std::move(var_data)};
 }
 
@@ -695,14 +887,15 @@ arrow::Result<ColumnMapping>
 ColumnMapping::Make(
     const casacore::TableColumn & column,
     ColumnSelection selection,
-    InputOrder order) {
+    InputOrder order,
+    const std::shared_ptr<arrow::Array> & data) {
 
   // Convert to FORTRAN ordering, which the casacore internals use
   if(order == InputOrder::C_ORDER) {
     std::reverse(std::begin(selection), std::end(selection));
   }
 
-  ARROW_ASSIGN_OR_RAISE(auto shape_prov, ShapeProvider::Make(column, selection));
+  ARROW_ASSIGN_OR_RAISE(auto shape_prov, ShapeProvider::Make(column, selection, data));
   auto maps = MapFactory(shape_prov, selection);
   ARROW_ASSIGN_OR_RAISE(auto ranges, RangeFactory(shape_prov, maps));
 
