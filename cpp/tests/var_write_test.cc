@@ -1,12 +1,11 @@
-#include "arcae/column_read_visitor.h"
-#include "arcae/column_write_visitor.h"
-#include "gmock/gmock.h"
 #include <arrow/api.h>
 #include <arrow/ipc/json_simple.h>
 #include <arrow/testing/gtest_util.h>
 
 #include <arcae/safe_table_proxy.h>
 #include <arcae/column_mapper.h>
+#include <arcae/column_read_visitor.h>
+#include <arcae/column_write_visitor.h>
 
 #include <casacore/casa/Arrays/IPosition.h>
 #include <casacore/casa/Arrays/Slicer.h>
@@ -20,6 +19,7 @@
 #include <casacore/tables/Tables/TableProxy.h>
 
 #include <gtest/gtest.h>
+#include <gmock/gmock.h>
 
 #include <tests/test_utils.h>
 
@@ -176,5 +176,50 @@ TEST_F(EmptyVariableWriteTest, WriteToEmptyVariableColumn) {
 
     EXPECT_FALSE(var.isDefined(1));
   }
+}
 
+TEST_F(EmptyVariableWriteTest, WritePartialVariableEmptyColumn) {
+  const auto & table = table_proxy_.table();
+  using CT = casacore::Int;
+
+  {
+    // Variable data column, entire domain
+    auto dtype = arrow::fixed_size_list(arrow::fixed_size_list(arrow::int32(), 2), 2);
+    //auto dtype = arrow::list(arrow::list(arrow::int32()));
+    ASSERT_OK_AND_ASSIGN(auto data,
+                          ArrayFromJSON(dtype,
+                                        R"([[[0, 1],
+                                             [2, 3]],
+                                            [[4, 5],
+                                             [7, 8]]])"));
+
+    auto var = GetArrayColumn<casacore::Int>(table, "DATA");
+    auto sel = arcae::ColumnSelection{{0, 3}, {1, 5}, {2, 4}};
+    ASSERT_OK_AND_ASSIGN(auto column_map, ColumnMapping::Make(var, sel, ColumnMapping::C_ORDER, data));
+    auto write_visitor = arcae::ColumnWriteVisitor(column_map, data);
+    ASSERT_OK(write_visitor.Visit(var.columnDesc().dataType()));
+
+    ASSERT_OK_AND_ASSIGN(column_map, ColumnMapping::Make(var, sel));
+    auto read_visitor = arcae::ColumnReadVisitor(column_map);
+    ASSERT_OK(read_visitor.Visit(var.columnDesc().dataType()));
+
+    ASSERT_TRUE(read_visitor.array_->Equals(data));
+
+    EXPECT_TRUE(var.isDefined(0));
+    auto row0 = var.getColumnRange(Slicer({IPos{0}, IPos{0}, Slicer::endIsLast}));
+    EXPECT_EQ(row0.shape(), IPos({5, 6, 1}));
+    EXPECT_EQ(row0.data()[5*1 + 2], 0);
+    EXPECT_EQ(row0.data()[5*1 + 4], 1);
+    EXPECT_EQ(row0.data()[5*5 + 2], 2);
+    EXPECT_EQ(row0.data()[5*5 + 4], 3);
+
+    EXPECT_TRUE(var.isDefined(3));
+    auto row3 = var.getColumnRange(Slicer({IPos{3}, IPos{3}, Slicer::endIsLast}));
+    EXPECT_EQ(row3.data()[5*1 + 2], 4);
+    EXPECT_EQ(row3.data()[5*1 + 4], 5);
+    EXPECT_EQ(row3.data()[5*5 + 2], 7);
+    EXPECT_EQ(row3.data()[5*5 + 4], 8);
+
+    EXPECT_FALSE(var.isDefined(1));
+  }
 }
