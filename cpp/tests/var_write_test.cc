@@ -77,11 +77,13 @@ class EmptyVariableWriteTest : public ::testing::Test {
     }
 };
 
-TEST_F(EmptyVariableWriteTest, WriteTest) {
+
+TEST_F(EmptyVariableWriteTest, EmptyVariableColumnWriteSanity) {
   const auto & table = table_proxy_.table();
+  using CT = casacore::Int;
 
   auto var = GetArrayColumn<casacore::Int>(table, "DATA");
-  auto array = casacore::Array<casacore::Int>(IPos({2, 2, 2}));
+  auto array = casacore::Array<casacore::Int>(IPos({2, 2, 2}), CT{2});
   var.putColumnRange(casacore::Slicer(IPos{2}, IPos{3}, Slicer::endIsLast), array);
 
   for(std::size_t r=0; r < knrow; ++r) {
@@ -92,6 +94,15 @@ TEST_F(EmptyVariableWriteTest, WriteTest) {
       ASSERT_FALSE(var.isDefined(r));
     }
   }
+
+  auto row2 = var.getColumnRange(Slicer(IPos({2}), IPos({2}), Slicer::endIsLast));
+  EXPECT_EQ(row2.shape(), IPos({2, 2, 1}));
+  EXPECT_THAT(row2, ::testing::ElementsAre(CT{2}, CT{2}, CT{2}, CT{2}));
+
+  // This destroys the original data
+  var.setShape(2, IPos({3, 3}));
+  auto row2_2 = var.getColumnRange(Slicer(IPos({2}), IPos({2}), Slicer::endIsLast));
+  EXPECT_EQ(row2_2.shape(), IPos({3, 3, 1}));
 }
 
 TEST_F(EmptyVariableWriteTest, WriteToEmptyVariableColumn) {
@@ -132,4 +143,38 @@ TEST_F(EmptyVariableWriteTest, WriteToEmptyVariableColumn) {
 
     EXPECT_FALSE(var.isDefined(1));
   }
+
+
+  {
+    // Given the write above, can we now write a selection of data?
+    auto dtype = arrow::list(arrow::list(arrow::int32()));
+    ASSERT_OK_AND_ASSIGN(auto data,
+                          ArrayFromJSON(dtype,
+                                        R"([[[22, 33]],
+                                            [[77, 88, 99]]])"));
+
+    auto var = GetArrayColumn<casacore::Int>(table, "DATA");
+    ASSERT_OK_AND_ASSIGN(auto column_map, ColumnMapping::Make(var, {{0, 3}, {1}}, ColumnMapping::C_ORDER, data));
+    auto write_visitor = arcae::ColumnWriteVisitor(column_map, data);
+    ASSERT_OK(write_visitor.Visit(var.columnDesc().dataType()));
+
+    ASSERT_OK_AND_ASSIGN(column_map, ColumnMapping::Make(var, {{0, 3}, {1}}));
+    auto read_visitor = arcae::ColumnReadVisitor(column_map);
+    ASSERT_OK(read_visitor.Visit(var.columnDesc().dataType()));
+    ASSERT_TRUE(read_visitor.array_->Equals(data));
+
+    EXPECT_TRUE(var.isDefined(0));
+    auto row0 = var.getColumnRange(Slicer({IPos{0}, IPos{0}, Slicer::endIsLast}));
+    EXPECT_THAT(row0, ::testing::ElementsAre(CT{0}, CT{1}, CT{22}, CT{33}));
+
+    EXPECT_TRUE(var.isDefined(3));
+    auto row3 = var.getColumnRange(Slicer({IPos{3}, IPos{3}, Slicer::endIsLast}));
+    EXPECT_THAT(row3, ::testing::ElementsAre(
+      CT{4}, CT{5}, CT{6},
+      CT{77}, CT{88}, CT{99},
+      CT{10}, CT{11}, CT{12}));
+
+    EXPECT_FALSE(var.isDefined(1));
+  }
+
 }
