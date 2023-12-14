@@ -183,9 +183,8 @@ TEST_F(EmptyVariableWriteTest, WritePartialVariableEmptyColumn) {
   using CT = casacore::Int;
 
   {
-    // Variable data column, entire domain
+    // Variable data column, partial domain
     auto dtype = arrow::fixed_size_list(arrow::fixed_size_list(arrow::int32(), 2), 2);
-    //auto dtype = arrow::list(arrow::list(arrow::int32()));
     ASSERT_OK_AND_ASSIGN(auto data,
                           ArrayFromJSON(dtype,
                                         R"([[[0, 1],
@@ -208,17 +207,17 @@ TEST_F(EmptyVariableWriteTest, WritePartialVariableEmptyColumn) {
     EXPECT_TRUE(var.isDefined(0));
     auto row0 = var.getColumnRange(Slicer({IPos{0}, IPos{0}, Slicer::endIsLast}));
     EXPECT_EQ(row0.shape(), IPos({5, 6, 1}));
-    EXPECT_EQ(row0.data()[5*1 + 2], 0);
-    EXPECT_EQ(row0.data()[5*1 + 4], 1);
-    EXPECT_EQ(row0.data()[5*5 + 2], 2);
-    EXPECT_EQ(row0.data()[5*5 + 4], 3);
+    EXPECT_EQ(row0(IPos({2, 1, 0})), 0);
+    EXPECT_EQ(row0(IPos({4, 1, 0})), 1);
+    EXPECT_EQ(row0(IPos({2, 5, 0})), 2);
+    EXPECT_EQ(row0(IPos({4, 5, 0})), 3);
 
     EXPECT_TRUE(var.isDefined(3));
     auto row3 = var.getColumnRange(Slicer({IPos{3}, IPos{3}, Slicer::endIsLast}));
-    EXPECT_EQ(row3.data()[5*1 + 2], 4);
-    EXPECT_EQ(row3.data()[5*1 + 4], 5);
-    EXPECT_EQ(row3.data()[5*5 + 2], 7);
-    EXPECT_EQ(row3.data()[5*5 + 4], 8);
+    EXPECT_EQ(row3(IPos({2, 1, 0})), 4);
+    EXPECT_EQ(row3(IPos({4, 1, 0})), 5);
+    EXPECT_EQ(row3(IPos({2, 5, 0})), 7);
+    EXPECT_EQ(row3(IPos({4, 5, 0})), 8);
 
     EXPECT_FALSE(var.isDefined(1));
   }
