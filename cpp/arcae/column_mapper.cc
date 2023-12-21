@@ -919,7 +919,7 @@ ColumnMapping::GetOffsets() const {
     return shape_provider_.var_data_->offsets_;
   }
   return arrow::Status::Invalid("Unable to retrieve varying offsets for "
-                                "fixed olumn ", column_.get().columnDesc().name());
+                                "fixed column ", column_.get().columnDesc().name());
 }
 
 
