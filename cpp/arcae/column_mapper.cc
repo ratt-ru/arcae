@@ -945,14 +945,15 @@ std::size_t ColumnMapping::FlatOffset(const std::vector<std::size_t> & index) co
   std::size_t result = 0;
   std::size_t product = 1;
 
-  // We then add in the offsets of the secondary dimensions
+  // Sum shape products until the row of interest
+  for(std::size_t r=0; r < row; ++r) {
+    result += shapes[r].product();
+  }
+
+  // Then add in the offsets of the secondary dimensions
   for(std::size_t dim = 0; dim < RowDim(); ++dim) {
     result += product*index[dim];
     product *= shapes[row][dim];
-  }
-
-  for(std::size_t r=0; r < row; ++r) {
-    result += shapes[r].product();
   }
 
   return result;
