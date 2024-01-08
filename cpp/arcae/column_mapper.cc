@@ -82,7 +82,7 @@ ColumnMaps MapFactory(const ShapeProvider & shape_prov, const ColumnSelection & 
       // Dimension needs to be adjusted for
       // 1. We may not have selections matching all dimensions
       // 2. Selections are FORTRAN ordered
-      auto sdim = std::ptrdiff_t(dim + selection.size()) - std::ptrdiff_t(ndim);
+      auto sdim = SelectDim(dim, selection.size(), ndim);
 
       if(sdim < 0 || selection.size() == 0 || selection[sdim].size() == 0) {
         column_maps.emplace_back(ColumnMap{});
@@ -488,8 +488,7 @@ arrow::Status SetRowShape(casacore::ArrayColumnBase & column,
 
   for(std::size_t dim=0; dim < shape.size(); ++dim) {
     casacore::rownr_t dim_size = shape[dim];
-    auto sdim = SelectDim(dim, selection.size(), shape.size() + 1);
-    if(sdim >= 0) {
+    if(auto sdim = SelectDim(dim, selection.size(), shape.size() + 1); sdim >= 0) {
       for(auto & index: selection[sdim]) {
         dim_size = std::max(dim_size, index + 1);
       }
