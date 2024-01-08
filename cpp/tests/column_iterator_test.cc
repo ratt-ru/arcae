@@ -19,16 +19,12 @@
 #include <arrow/testing/gtest_util.h>
 
 #include "arcae/safe_table_proxy.h"
-#include "arcae/column_mapper.h"
-#include "arcae/column_read_visitor.h"
+#include "arcae/column_read_map.h"
 
-
-using arrow::ipc::internal::json::ArrayFromJSON;
 
 using casacore::Array;
 using casacore::ArrayColumn;
 using casacore::ArrayColumnDesc;
-using casacore::ColumnDesc;
 using MS = casacore::MeasurementSet;
 using MSColumns = casacore::MSMainEnums::PredefinedColumns;
 using casacore::SetupNewTable;
@@ -38,11 +34,9 @@ using casacore::Table;
 using casacore::TableDesc;
 using casacore::TableColumn;
 using casacore::TableProxy;
-using casacore::TiledColumnStMan;
 using IPos = casacore::IPosition;
 
-using arcae::ColumnMapping;
-using arcae::ColumnReadVisitor;
+using arcae::ColumnReadMap;
 
 using namespace std::string_literals;
 
@@ -123,7 +117,7 @@ TEST_F(ColumnReadTest, SelectionVariable) {
     auto var_data = GetArrayColumn<casacore::Int>(table, "VAR_DATA");
     {
       // Get row 0
-      ASSERT_OK_AND_ASSIGN(auto map, ColumnMapping::Make(var_data, {{0}}));
+      ASSERT_OK_AND_ASSIGN(auto map, ColumnReadMap::Make(var_data, {{0}}));
       ASSERT_EQ(map.nRanges(), 1);
       ASSERT_EQ(map.nElements(), 4);
       ASSERT_EQ(map.GetOutputShape(), IPos({2, 2, 1}));
@@ -154,7 +148,7 @@ TEST_F(ColumnReadTest, SelectionVariable) {
     }
     // Get row 1
     {
-      ASSERT_OK_AND_ASSIGN(auto map, ColumnMapping::Make(var_data, {{1}}));
+      ASSERT_OK_AND_ASSIGN(auto map, ColumnReadMap::Make(var_data, {{1}}));
       ASSERT_EQ(map.nRanges(), 1);
       ASSERT_EQ(map.nElements(), 1);
       auto rit = map.RangeBegin();
@@ -173,7 +167,7 @@ TEST_F(ColumnReadTest, SelectionVariable) {
     }
     {
       // Get row 0 and 1
-      ASSERT_OK_AND_ASSIGN(auto map, ColumnMapping::Make(var_data, {{0, 1}}));
+      ASSERT_OK_AND_ASSIGN(auto map, ColumnReadMap::Make(var_data, {{0, 1}}));
       ASSERT_EQ(map.nRanges(), 2);
       ASSERT_EQ(map.nElements(), 5);
       ASSERT_FALSE(map.GetOutputShape().ok());

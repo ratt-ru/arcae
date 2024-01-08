@@ -1,4 +1,4 @@
-#include "arcae/column_mapper.h"
+#include "arcae/column_read_map.h"
 
 #include <cassert>
 #include <cstddef>
@@ -699,221 +699,8 @@ std::size_t ShapeProvider::RowDimSize(casacore::rownr_t row, std::size_t dim) co
 }
 
 
-MapIterator::MapIterator(const RangeIterator & rit,
-                  const ColumnMapping & map,
-                  std::vector<std::size_t> chunk_index,
-                  std::vector<std::size_t> global_index,
-                  std::vector<std::size_t> strides,
-                  bool done) :
-        rit_(std::cref(rit)),
-        map_(std::cref(map)),
-        chunk_index_(std::move(chunk_index)),
-        global_index_(std::move(global_index)),
-        strides_(std::move(strides)),
-        done_(done) {}
-
-MapIterator MapIterator::Make(const RangeIterator & rit, bool done) {
-  auto chunk_index = decltype(MapIterator::chunk_index_)(rit.nDim(), 0);
-  auto global_index = decltype(MapIterator::global_index_)(rit.mem_start_);
-  auto strides = decltype(MapIterator::strides_)(rit.nDim(), 1);
-  using ItType = std::tuple<std::size_t, std::size_t>;
-
-  for(auto [dim, product]=ItType{1, 1}; dim < rit.nDim(); ++dim) {
-    product = strides[dim] = product * rit.range_length_[dim - 1];
-  }
-
-  return MapIterator{std::cref(rit), std::cref(rit.map_.get()),
-                     std::move(chunk_index), std::move(global_index),
-                     std::move(strides), done};
-}
-
-std::size_t MapIterator::ChunkOffset() const {
-  std::size_t offset = 0;
-  for(auto dim = std::size_t{0}; dim < nDim(); ++dim) {
-    offset += chunk_index_[dim] * strides_[dim];
-  }
-  return offset;
-}
-
-std::size_t MapIterator::GlobalOffset() const {
-  return map_.get().FlatOffset(global_index_);
-}
-
-inline std::size_t MapIterator::RangeSize(std::size_t dim) const {
-  return rit_.get().range_length_[dim];
-}
-
-inline std::size_t MapIterator::MemStart(std::size_t dim) const {
-  return rit_.get().mem_start_[dim];
-}
-
-
-MapIterator & MapIterator::operator++() {
-  assert(!done_);
-
-  // Iterate from fastest to slowest changing dimension
-  for(auto dim = std::size_t{0}; dim < nDim();) {
-    chunk_index_[dim]++;
-    global_index_[dim]++;
-    // We've achieved a successful iteration in this dimension
-    if(chunk_index_[dim] < RangeSize(dim)) { break; }
-    // Reset to zero and retry in the next dimension
-    else if(dim < RowDim()) {
-      chunk_index_[dim] = 0;
-      global_index_[dim] = MemStart(dim);
-      ++dim;
-    }
-    // This was the slowest changing dimension so we're done
-    else { done_ = true; break; }
-  }
-
-  return *this;
-}
-
-bool MapIterator::operator==(const MapIterator & other) const {
-  if(&rit_.get() != &other.rit_.get() || done_ != other.done_) return false;
-  return done_ ? true : chunk_index_ == other.chunk_index_;
-}
-
-
-RangeIterator::RangeIterator(ColumnMapping & column_map, bool done) :
-  map_(std::cref(column_map)),
-  index_(column_map.nDim(), 0),
-  disk_start_(column_map.nDim(), 0),
-  mem_start_(column_map.nDim(), 0),
-  range_length_(column_map.nDim(), 0),
-  done_(done) {
-    UpdateState();
-}
-
-// Return the Ranges for the given dimension
-const ColumnRange & RangeIterator::DimRanges(std::size_t dim) const {
-  assert(dim < nDim());
-  return map_.get().DimRanges(dim);
-}
-
-// Return the Maps for the given dimension
-const ColumnMap & RangeIterator::DimMaps(std::size_t dim) const {
-  assert(dim < nDim());
-  return map_.get().DimMaps(dim);
-}
-
-// Return the currently selected Range of the given dimension
-const Range & RangeIterator::DimRange(std::size_t dim) const {
-  assert(dim < nDim());
-  return DimRanges(dim)[index_[dim]];
-}
-
-std::size_t RangeIterator::RangeElements() const {
-  return std::accumulate(std::begin(index_), std::end(index_), std::size_t{1},
-                          [](const auto i, auto v) { return i*v; });
-}
-
-RangeIterator & RangeIterator::operator++() {
-  assert(!done_);
-  // Iterate from fastest to slowest changing dimension: FORTRAN order
-  for(auto dim = 0; dim < nDim();) {
-    index_[dim]++;
-    mem_start_[dim] += range_length_[dim];
-
-    // We've achieved a successful iteration in this dimension
-    if(index_[dim] < DimRanges(dim).size()) { break; }
-    // We've exceeded the size of the current dimension
-    // reset to zero and retry the while loop
-    else if(dim < RowDim()) { index_[dim] = 0; mem_start_[dim] = 0; ++dim; }
-    // Row is the slowest changing dimension so we're done
-    // return without updating the iterator state
-    else { done_ = true; return *this; }
-  }
-
-  // Increment output memory buffer offset
-  UpdateState();
-  return *this;
-};
-
-void RangeIterator::UpdateState() {
-  for(auto dim=std::size_t{0}; dim < nDim(); ++dim) {
-    const auto & range = DimRange(dim);
-    switch(range.type) {
-      case Range::FREE: {
-        disk_start_[dim] = range.start;
-        range_length_[dim] = range.end - range.start;
-        break;
-      }
-      case Range::MAP: {
-        const auto & dim_maps = DimMaps(dim);
-        assert(range.start < dim_maps.size());
-        assert(range.end - 1 < dim_maps.size());
-        auto start = disk_start_[dim] = dim_maps[range.start].disk;
-        range_length_[dim] = dim_maps[range.end - 1].disk - start + 1;
-        break;
-      }
-      case Range::VARYING: {
-        // In case of variably shaped columns,
-        // the dimension size will vary by row
-        // and there will only be a single row
-        const auto & rr = DimRange(RowDim());
-        assert(rr.IsSingleRow());
-        disk_start_[dim] = 0;
-        range_length_[dim] = map_.get().RowDimSize(rr.start, dim);
-        break;
-      }
-      default:
-        assert(false && "Unhandled Range::Type enum");
-    }
-  }
-}
-
-bool RangeIterator::operator==(const RangeIterator & other) const {
-  if(&map_.get() != &other.map_.get() || done_ != other.done_) return false;
-  return done_ ? true : index_ == other.index_;
-};
-
-bool RangeIterator::operator!=(const RangeIterator & other) const {
-  return !(*this == other);
-}
-
-
-// Returns a slicer for the row dimension
-casacore::Slicer RangeIterator::GetRowSlicer() const {
-  assert(!done_);
-  assert(nDim() > 0);
-  auto start = static_cast<ssize_t>(disk_start_[RowDim()]);
-  auto length = static_cast<ssize_t>(range_length_[RowDim()]);
-
-  return casacore::Slicer(
-    casacore::IPosition({start}),
-    casacore::IPosition({start + length - 1}),
-    casacore::Slicer::endIsLast);
-};
-
-// Returns a slicer for secondary dimensions
-casacore::Slicer RangeIterator::GetSectionSlicer() const {
-  assert(!done_);
-  assert(nDim() > 1);
-  casacore::IPosition start(RowDim(), 0);
-  casacore::IPosition length(RowDim(), 0);
-
-  for(auto dim=std::size_t{0}; dim < RowDim(); ++dim) {
-    start[dim] = static_cast<ssize_t>(disk_start_[dim]);
-    length[dim] = start[dim] + static_cast<ssize_t>(range_length_[dim]) - 1;
-  }
-
-  return casacore::Slicer(start, length, casacore::Slicer::endIsLast);
-};
-
-// Returns the shape of this range
-casacore::IPosition RangeIterator::GetShape() const {
-  assert(!done_);
-  auto shape = casacore::IPosition(nDim(), 0);
-  for(std::size_t dim=0; dim < nDim(); ++dim) {
-    shape[dim] = range_length_[dim];
-  }
-  return shape;
-}
-
 arrow::Result<std::vector<std::shared_ptr<arrow::Int32Array>>>
-ColumnMapping::GetOffsets() const {
+ColumnReadMap::GetOffsets() const {
   if(shape_provider_.IsVarying()) {
     return shape_provider_.var_data_->offsets_;
   }
@@ -922,7 +709,7 @@ ColumnMapping::GetOffsets() const {
 }
 
 
-std::size_t ColumnMapping::FlatOffset(const std::vector<std::size_t> & index) const {
+std::size_t ColumnReadMap::FlatOffset(const std::vector<std::size_t> & index) const {
   if(output_shape_) {
     // Fixed shape output, easy case
     const auto & shape = output_shape_.value();
@@ -959,9 +746,9 @@ std::size_t ColumnMapping::FlatOffset(const std::vector<std::size_t> & index) co
 }
 
 
-// Factory method for making a ColumnMapping object
-arrow::Result<ColumnMapping>
-ColumnMapping::Make(
+// Factory method for making a ColumnReadMap object
+arrow::Result<ColumnReadMap>
+ColumnReadMap::Make(
     const casacore::TableColumn & column,
     ColumnSelection selection,
     InputOrder order,
@@ -983,13 +770,13 @@ ColumnMapping::Make(
 
   auto shape = MaybeMakeOutputShape(ranges);
 
-  return ColumnMapping{column, std::move(maps), std::move(ranges),
+  return ColumnReadMap{column, std::move(maps), std::move(ranges),
                         std::move(shape_prov), std::move(shape)};
 }
 
 // Number of disjoint ranges in this map
 std::size_t
-ColumnMapping::nRanges() const {
+ColumnReadMap::nRanges() const {
   return std::accumulate(std::begin(ranges_), std::end(ranges_), std::size_t{1},
                         [](const auto init, const auto & range)
                           { return init * range.size(); });
@@ -999,7 +786,7 @@ ColumnMapping::nRanges() const {
 // a single range and thereby removes the need to read separate ranges of
 // data and copy those into a final buffer.
 bool
-ColumnMapping::IsSimple() const {
+ColumnReadMap::IsSimple() const {
   for(std::size_t dim=0; dim < nDim(); ++dim) {
     const auto & column_map = DimMaps(dim);
     const auto & column_range = DimRanges(dim);
@@ -1035,7 +822,7 @@ ColumnMapping::IsSimple() const {
 // Find the total number of elements formed
 // by the disjoint ranges in this map
 std::size_t
-ColumnMapping::nElements() const {
+ColumnReadMap::nElements() const {
   assert(ranges_.size() > 0);
   const auto & row_ranges = DimRanges(RowDim());
   auto elements = std::size_t{0};

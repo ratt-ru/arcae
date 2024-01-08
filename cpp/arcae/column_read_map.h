@@ -1,5 +1,5 @@
-#ifndef ARCAE_COLUMN_MAPPER_H
-#define ARCAE_COLUMN_MAPPER_H
+#ifndef ARCAE_COLUMN_READ_MAP_H
+#define ARCAE_COLUMN_READ_MAP_H
 
 #include <cassert>
 #include <cstddef>
@@ -16,53 +16,9 @@
 #include <casacore/casa/Arrays/Slicer.h>
 #include <casacore/tables/Tables/TableColumn.h>
 
+#include "arcae/map_iterator.h"
+
 namespace arcae {
-
-using RowIds = std::vector<casacore::rownr_t>;
-using ColumnSelection = std::vector<RowIds>;
-
-// Describes a mapping between disk and memory
-struct IdMap {
-  casacore::rownr_t disk;
-  casacore::rownr_t mem;
-
-  constexpr inline bool operator==(const IdMap & lhs) const
-      { return disk == lhs.disk && mem == lhs.mem; }
-};
-
-// Vectors of ids
-using ColumnMap = std::vector<IdMap>;
-using ColumnMaps = std::vector<ColumnMap>;
-
-// Describes a range along a dimension (end is exclusive)
-struct Range {
-  casacore::rownr_t start = 0;
-  casacore::rownr_t end = 0;
-  enum Type {
-    // Refers to a series of specific row ids
-    MAP=0,
-    // A contiguous range of row ids
-    FREE,
-    // Specifies a range whose size varies
-    VARYING
-  } type = FREE;
-
-  constexpr casacore::rownr_t nRows() const
-    { return end - start; }
-
-  constexpr inline bool IsSingleRow() const
-    { return nRows() == 1; }
-
-  constexpr inline bool IsValid() const
-    { return start <= end; }
-
-  constexpr inline bool operator==(const Range & lhs) const
-      { return start == lhs.start && end == lhs.end && type == lhs.type; }
-};
-
-// Vectors of ranges
-using ColumnRange = std::vector<Range>;
-using ColumnRanges = std::vector<ColumnRange>;
 
 // Holds variable shape data for a column
 struct VariableShapeData {
@@ -131,113 +87,7 @@ struct ShapeProvider {
 };
 
 
-
-struct RangeIterator;
-struct ColumnMapping;
-
-// Iterates over the current mapping in the RangeIterator
-struct MapIterator {
-  // Reference to RangeIterator
-  std::reference_wrapper<const RangeIterator> rit_;
-  // Reference to ColumnMapping
-  std::reference_wrapper<const ColumnMapping> map_;
-  // ND index in the local buffer holding the values
-  // described by this chunk
-  std::vector<std::size_t> chunk_index_;
-  // ND index in the global buffer
-  std::vector<std::size_t> global_index_;
-  std::vector<std::size_t> strides_;
-  bool done_;
-
-  MapIterator(const RangeIterator & rit,
-              const ColumnMapping & map,
-              std::vector<std::size_t> chunk_index,
-              std::vector<std::size_t> global_index,
-              std::vector<std::size_t> strides,
-              bool done);
-
-  static MapIterator Make(const RangeIterator & rit, bool done);
-  inline std::size_t nDim() const {
-    return chunk_index_.size();
-  };
-
-  inline std::size_t RowDim() const {
-    return nDim() - 1;
-  };
-
-  std::size_t ChunkOffset() const;
-  std::size_t GlobalOffset() const;
-  std::size_t RangeSize(std::size_t dim) const;
-  std::size_t MemStart(std::size_t dim) const;
-
-  MapIterator & operator++();
-  bool operator==(const MapIterator & other) const;
-  inline bool operator!=(const MapIterator & other) const {
-    return !(*this == other);
-  }
-};
-
-
-// Iterates over the Disjoint Ranges defined by a ColumnMapping
-struct RangeIterator {
-  std::reference_wrapper<const ColumnMapping> map_;
-  // Index of the Disjoint Range
-  std::vector<std::size_t> index_;
-  // Starting position of the disk index
-  std::vector<std::size_t> disk_start_;
-  // Start position of the memory index
-  std::vector<std::size_t> mem_start_;
-  // Length of the range
-  std::vector<std::size_t> range_length_;
-  bool done_;
-
-  RangeIterator(ColumnMapping & column_map, bool done=false);
-
-  // Return the number of dimensions in the index
-  inline std::size_t nDim() const {
-    return index_.size();
-  }
-
-  // Index of he row dimension
-  inline std::size_t RowDim() const {
-    assert(nDim() > 0);
-    return nDim() - 1;
-  }
-
-  // Return the Ranges for the given dimension
-  const ColumnRange & DimRanges(std::size_t dim) const;
-
-  // Return the Maps for the given dimension
-  inline const ColumnMap & DimMaps(std::size_t dim) const;
-
-  // Return the currently selected Range of the given dimension
-  inline const Range & DimRange(std::size_t dim) const;
-
-  inline MapIterator MapBegin() const {
-    return MapIterator::Make(*this, false);
-  };
-
-  MapIterator MapEnd() const {
-    return MapIterator::Make(*this, true);
-  };
-
-  inline std::size_t RangeElements() const;
-
-  RangeIterator & operator++();
-  void UpdateState();
-
-  // Returns a slicer for the row dimension
-  casacore::Slicer GetRowSlicer() const;
-  // Returns a slicer for secondary dimensions
-  casacore::Slicer GetSectionSlicer() const;
-  // Returns shape of this chunk
-  casacore::IPosition GetShape() const;
-
-  bool operator==(const RangeIterator & other) const;
-  bool operator!=(const RangeIterator & other) const;
-};
-
-struct ColumnMapping {
+struct ColumnReadMap {
   enum InputOrder {C_ORDER=0, F_ORDER};
 
   std::reference_wrapper<const casacore::TableColumn> column_;
@@ -265,12 +115,12 @@ struct ColumnMapping {
     return nDim() - 1;
   }
 
-  inline RangeIterator RangeBegin() const {
-    return RangeIterator{const_cast<ColumnMapping &>(*this), false};
+  inline RangeIterator<ColumnReadMap> RangeBegin() const {
+    return RangeIterator{const_cast<ColumnReadMap &>(*this), false};
   }
 
-  inline RangeIterator RangeEnd() const {
-    return RangeIterator{const_cast<ColumnMapping &>(*this), true};
+  inline RangeIterator<ColumnReadMap> RangeEnd() const {
+    return RangeIterator{const_cast<ColumnReadMap &>(*this), true};
   }
 
   inline std::size_t RowDimSize(casacore::rownr_t row, std::size_t dim) const {
@@ -294,8 +144,8 @@ struct ColumnMapping {
     return shape_provider_.IsActuallyFixed();
   }
 
-  // Factory method for making a ColumnMapping object
-  static arrow::Result<ColumnMapping> Make(
+  // Factory method for making a ColumnReadMap object
+  static arrow::Result<ColumnReadMap> Make(
       const casacore::TableColumn & column,
       ColumnSelection selection,
       InputOrder order=InputOrder::C_ORDER,
@@ -317,4 +167,4 @@ struct ColumnMapping {
 
 } // namespace arcae
 
-#endif // ARCAE_COLUMN_MAPPER_H
+#endif // ARCAE_COLUMN_READ_MAP_H

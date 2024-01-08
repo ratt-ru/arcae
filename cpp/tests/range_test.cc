@@ -11,7 +11,7 @@
 #include <casacore/tables/Tables/TableColumn.h>
 #include <casacore/ms/MeasurementSets/MeasurementSet.h>
 
-#include <arcae/column_mapper.h>
+#include <arcae/column_read_map.h>
 #include <arcae/safe_table_proxy.h>
 #include <arcae/table_factory.h>
 
@@ -20,7 +20,7 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
-using arcae::ColumnMapping;
+using arcae::ColumnReadMap;
 using arcae::ColumnSelection;
 using arcae::IdMap;
 using arcae::Range;
@@ -105,7 +105,7 @@ class RangeTest : public ::testing::Test {
 
 TEST_F(RangeTest, CheckMapsAndRangesSingleton) {
   auto data = GetArrayColumn<CasaComplex>(proxy_.table(), MS::MODEL_DATA);
-  ASSERT_OK_AND_ASSIGN(auto map, ColumnMapping::Make(data, ColumnSelection{{0}}));
+  ASSERT_OK_AND_ASSIGN(auto map, ColumnReadMap::Make(data, ColumnSelection{{0}}));
 
   EXPECT_EQ(map.DimMaps(0).size(), 0);
   EXPECT_EQ(map.DimMaps(1).size(), 0);
@@ -122,7 +122,7 @@ TEST_F(RangeTest, CheckMapsAndRangesMultiple) {
         {4, 3, 2, 1, 8, 7},    // Two disjoint ranges
         {5, 6},                // One range
         {7, 9, 8, 12, 11}};    // Two disjoint ranges
-  ASSERT_OK_AND_ASSIGN(auto map, ColumnMapping::Make(data, std::move(selection)));
+  ASSERT_OK_AND_ASSIGN(auto map, ColumnReadMap::Make(data, std::move(selection)));
 
   EXPECT_THAT(map.DimMaps(2), ::testing::ElementsAre(
         IdMap{1, 3},
@@ -160,24 +160,24 @@ TEST_F(RangeTest, TestSimplicity) {
   auto data = GetArrayColumn<CasaComplex>(proxy_.table(), MS::MODEL_DATA);
 
   {
-    ASSERT_OK_AND_ASSIGN(auto map, ColumnMapping::Make(data, {{1, 2, 3, 4}}));
+    ASSERT_OK_AND_ASSIGN(auto map, ColumnReadMap::Make(data, {{1, 2, 3, 4}}));
     ASSERT_TRUE(map.IsSimple());
   }
 
   {
-    ASSERT_OK_AND_ASSIGN(auto map, ColumnMapping::Make(data, {{1, 2, 3, 4}, {5, 6}, {6, 7}}));
+    ASSERT_OK_AND_ASSIGN(auto map, ColumnReadMap::Make(data, {{1, 2, 3, 4}, {5, 6}, {6, 7}}));
     ASSERT_TRUE(map.IsSimple());
   }
 
   {
     // Multiple mapping ranges (discontiguous)
-    ASSERT_OK_AND_ASSIGN(auto map, ColumnMapping::Make(data, {{1, 2, 4, 5}}));
+    ASSERT_OK_AND_ASSIGN(auto map, ColumnReadMap::Make(data, {{1, 2, 4, 5}}));
     ASSERT_FALSE(map.IsSimple());
   }
 
   {
     // Not monotically increasing
-    ASSERT_OK_AND_ASSIGN(auto map, ColumnMapping::Make(data, {{4, 3, 2, 1}}));
+    ASSERT_OK_AND_ASSIGN(auto map, ColumnReadMap::Make(data, {{4, 3, 2, 1}}));
     ASSERT_FALSE(map.IsSimple());
   }
 }

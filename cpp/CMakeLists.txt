@@ -1,13 +1,17 @@
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(casacore REQUIRED IMPORTED_TARGET casacore)
 
+add_compile_options("-g")
+add_link_options("-g")
+
+
 add_library(arcae SHARED
     arcae/array_util.cc
     arcae/casa_visitors.cc
     arcae/column_convert_visitor.cc
     arcae/column_read_visitor.cc
     arcae/column_write_visitor.cc
-    arcae/column_mapper.cc
+    arcae/column_read_map.cc
     arcae/complex_type.cc
     arcae/configuration.cc
     arcae/descriptor.cc

@@ -17,12 +17,12 @@
 #include <gmock/gmock.h>
 #include <arrow/testing/gtest_util.h>
 
-#include <arcae/column_mapper.h>
+#include <arcae/column_read_map.h>
 #include <arcae/safe_table_proxy.h>
 #include <arcae/table_factory.h>
 
 
-using arcae::ColumnMapping;
+using arcae::ColumnReadMap;
 using casacore::Array;
 using casacore::ArrayColumn;
 using casacore::ArrayColumnDesc;
@@ -153,7 +153,7 @@ TEST_F(ColumnConvertTest, SelectFromRange) {
   {
     // Select all data from the VAR_DATA column
     auto data_column = GetArrayColumn<CasaComplex>(proxy.table(), "VAR_DATA");
-    ASSERT_OK_AND_ASSIGN(auto map, ColumnMapping::Make(data_column, arcae::ColumnSelection{{}}));
+    ASSERT_OK_AND_ASSIGN(auto map, ColumnReadMap::Make(data_column, arcae::ColumnSelection{{}}));
     ASSERT_TRUE(map.shape_provider_.IsVarying());
     ASSERT_FALSE(map.shape_provider_.IsDefinitelyFixed());
     ASSERT_FALSE(map.shape_provider_.IsActuallyFixed());
@@ -187,7 +187,7 @@ TEST_F(ColumnConvertTest, SelectFromRange) {
     // Select some rows from the VAR_DATA column
     auto data_column = GetArrayColumn<CasaComplex>(proxy.table(), "VAR_DATA");
     auto row_ids = arcae::RowIds{0, 1, 2, 3, 6, 7, 8, 9};
-    ASSERT_OK_AND_ASSIGN(auto map, ColumnMapping::Make(data_column, arcae::ColumnSelection{{row_ids}}));
+    ASSERT_OK_AND_ASSIGN(auto map, ColumnReadMap::Make(data_column, arcae::ColumnSelection{{row_ids}}));
 
     ASSERT_TRUE(map.shape_provider_.IsVarying());
     ASSERT_FALSE(map.shape_provider_.IsDefinitelyFixed());
@@ -226,7 +226,7 @@ TEST_F(ColumnConvertTest, SelectFromRange) {
     auto data_column = GetArrayColumn<CasaComplex>(proxy.table(), "VAR_DATA");
     auto row_ids = arcae::RowIds{0, 1, 2, 3, 6, 7, 8, 9};
     auto chan_ids = arcae::RowIds{0};
-    ASSERT_OK_AND_ASSIGN(auto map, ColumnMapping::Make(data_column, arcae::ColumnSelection{{row_ids, chan_ids}}));
+    ASSERT_OK_AND_ASSIGN(auto map, ColumnReadMap::Make(data_column, arcae::ColumnSelection{{row_ids, chan_ids}}));
 
     ASSERT_TRUE(map.shape_provider_.IsVarying());
     ASSERT_FALSE(map.shape_provider_.IsDefinitelyFixed());
@@ -266,7 +266,7 @@ TEST_F(ColumnConvertTest, SelectFromRange) {
     auto data_column = GetArrayColumn<CasaComplex>(proxy.table(), "VAR_DATA");
     auto row_ids = arcae::RowIds{0, 1, 2, 3, 6, 7, 8, 9};
     auto corr_ids = arcae::RowIds{0};
-    ASSERT_OK_AND_ASSIGN(auto map, ColumnMapping::Make(data_column, arcae::ColumnSelection{{row_ids, {}, corr_ids}}));
+    ASSERT_OK_AND_ASSIGN(auto map, ColumnReadMap::Make(data_column, arcae::ColumnSelection{{row_ids, {}, corr_ids}}));
 
     ASSERT_TRUE(map.shape_provider_.IsVarying());
     ASSERT_FALSE(map.shape_provider_.IsDefinitelyFixed());
@@ -305,7 +305,7 @@ TEST_F(ColumnConvertTest, SelectFromRange) {
     auto data_column = GetArrayColumn<CasaComplex>(proxy.table(), "VAR_DATA");
     auto row_ids = arcae::RowIds{0, 1, 2, 3, 6, 7, 8, 9};
     auto selection = arcae::ColumnSelection{row_ids, {0}, {0}};
-    ASSERT_OK_AND_ASSIGN(auto map, ColumnMapping::Make(data_column, selection));
+    ASSERT_OK_AND_ASSIGN(auto map, ColumnReadMap::Make(data_column, selection));
 
     ASSERT_TRUE(map.shape_provider_.IsVarying());
     ASSERT_FALSE(map.shape_provider_.IsDefinitelyFixed());
@@ -348,7 +348,7 @@ TEST_F(ColumnConvertTest, SelectFromRange) {
     // Even though VAR_FIXED_DATA is defined as variable the data
     // is treated as fixed
     auto data_column = GetArrayColumn<CasaComplex>(proxy.table(), "VAR_FIXED_DATA");
-    ASSERT_OK_AND_ASSIGN(auto map, ColumnMapping::Make(data_column, arcae::ColumnSelection{{}}));
+    ASSERT_OK_AND_ASSIGN(auto map, ColumnReadMap::Make(data_column, arcae::ColumnSelection{{}}));
 
     ASSERT_TRUE(map.shape_provider_.IsVarying());
     ASSERT_FALSE(map.shape_provider_.IsDefinitelyFixed());
@@ -371,7 +371,7 @@ TEST_F(ColumnConvertTest, SelectFromRange) {
   {
     // Select all data in a MODEL_DATA, which is defined as fixed
     auto data_column = GetArrayColumn<CasaComplex>(proxy.table(), MS::MODEL_DATA);
-    ASSERT_OK_AND_ASSIGN(auto map, ColumnMapping::Make(data_column, arcae::ColumnSelection{{}}));
+    ASSERT_OK_AND_ASSIGN(auto map, ColumnReadMap::Make(data_column, arcae::ColumnSelection{{}}));
 
     ASSERT_FALSE(map.shape_provider_.IsVarying());
     ASSERT_TRUE(map.shape_provider_.IsDefinitelyFixed());
