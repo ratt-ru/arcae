@@ -9,9 +9,10 @@ add_library(arcae SHARED
     arcae/array_util.cc
     arcae/casa_visitors.cc
     arcae/column_convert_visitor.cc
-    arcae/column_read_visitor.cc
-    arcae/column_write_visitor.cc
     arcae/column_read_map.cc
+    arcae/column_read_visitor.cc
+    arcae/column_write_map.cc
+    arcae/column_write_visitor.cc
     arcae/complex_type.cc
     arcae/configuration.cc
     arcae/descriptor.cc

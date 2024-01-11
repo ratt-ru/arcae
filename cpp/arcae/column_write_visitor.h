@@ -11,7 +11,7 @@
 #include <casacore/tables/Tables.h>
 
 #include "arcae/casa_visitors.h"
-#include "arcae/column_read_map.h"
+#include "arcae/column_write_map.h"
 #include "arrow/status.h"
 #include "arrow/testing/gtest_util.h"
 
@@ -22,13 +22,13 @@ public:
     using ShapeVectorType = std::vector<casacore::IPosition>;
 
 public:
-    std::reference_wrapper<const ColumnReadMap> map_;
+    std::reference_wrapper<const ColumnWriteMap> map_;
     arrow::MemoryPool * pool_;
     std::shared_ptr<arrow::Array> array_;
 
 public:
     explicit ColumnWriteVisitor(
-        const ColumnReadMap & column_map,
+        const ColumnWriteMap & column_map,
         const std::shared_ptr<arrow::Array> & array,
         arrow::MemoryPool * pool=arrow::default_memory_pool()) :
             map_(std::cref(column_map)),

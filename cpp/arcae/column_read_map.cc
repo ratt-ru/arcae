@@ -513,62 +513,9 @@ arrow::Status SetRowShape(casacore::ArrayColumnBase & column,
   return arrow::Status::OK();
 }
 
-// Factory method for creating Variably Shape Data from input data
-arrow::Result<std::unique_ptr<VariableShapeData>>
-VariableShapeData::MakeFromData(const casacore::TableColumn & column,
-                                const std::shared_ptr<arrow::Array> & data,
-                                const ColumnSelection & selection) {
-  auto row_shapes = decltype(VariableShapeData::row_shapes_){};
-  auto fixed_shape = true;
-  auto fixed_dims = true;
-  auto row_dim = selection.size() - 1;
-  using ItType = std::tuple<casacore::rownr_t, bool>;
-  auto array_column = casacore::ArrayColumnBase(column);
-
-  if(selection.size() == 0 || selection[row_dim].size() == 0) {
-    for(auto [r, first] = ItType{0, true}; r < data->length(); ++r) {
-      ARROW_ASSIGN_OR_RAISE(auto shape, GetDataRowShape(data, selection, r));
-      row_shapes.emplace_back(std::move(shape));
-      ARROW_RETURN_NOT_OK(SetRowShape(array_column, selection, r, shape));
-      if(first) { first = false; continue; }
-      fixed_shape = fixed_shape && *std::rbegin(row_shapes) == *std::begin(row_shapes);
-      fixed_dims = fixed_dims && std::rbegin(row_shapes)->size() == std::begin(row_shapes)->size();
-    }
-  } else {
-    const auto & row_ids = selection[row_dim];
-    row_shapes.reserve(row_ids.size());
-    for(auto [r, first] = ItType{0, true}; r < row_ids.size(); ++r) {
-      ARROW_ASSIGN_OR_RAISE(auto shape, GetDataRowShape(data, selection, r))
-      ARROW_RETURN_NOT_OK(SetRowShape(array_column, selection, row_ids[r], shape));
-      row_shapes.emplace_back(std::move(shape));
-      if(first) { first = false; continue; }
-      fixed_shape = fixed_shape && *std::rbegin(row_shapes) == *std::begin(row_shapes);
-      fixed_dims = fixed_dims && std::rbegin(row_shapes)->size() == std::begin(row_shapes)->size();
-    }
-  }
-
-  // Arrow can't handle differing dimensions per row, so we quit here.
-  if(!fixed_dims) {
-    return arrow::Status::NotImplemented("Array ", data->ToString(),
-                                         " dimensions vary per row.");
-  }
-
-  // We may have a fixed shape in practice
-  auto shape = fixed_shape ? std::make_optional(*std::begin(row_shapes))
-                            : std::nullopt;
-
-  ARROW_ASSIGN_OR_RAISE(auto offsets, MakeOffsets(row_shapes));
-
-  return std::unique_ptr<VariableShapeData>(
-    new VariableShapeData{std::move(row_shapes),
-                          std::move(offsets),
-                          std::begin(row_shapes)->size(),
-                          std::move(shape)});
-}
-
 // Factory method for creating Variably Shape Data from column
 arrow::Result<std::unique_ptr<VariableShapeData>>
-VariableShapeData::MakeFromColumn(const casacore::TableColumn & column,
+VariableShapeData::Make(const casacore::TableColumn & column,
                                   const ColumnSelection & selection) {
   assert(!column.columnDesc().isFixedShape());
   auto row_shapes = decltype(VariableShapeData::row_shapes_){};
@@ -635,21 +582,13 @@ std::size_t VariableShapeData::nDim() const {
 
 arrow::Result<ShapeProvider>
 ShapeProvider::Make(const casacore::TableColumn & column,
-                    const ColumnSelection & selection,
-                    const std::shared_ptr<arrow::Array> & data) {
+                    const ColumnSelection & selection) {
 
   if(column.columnDesc().isFixedShape()) {
-    return ShapeProvider{std::cref(column), selection, nullptr};
+    return ShapeProvider{std::cref(column), selection};
   }
 
-  auto var_data = std::unique_ptr<VariableShapeData>{};
-
-  if(data) {
-    ARROW_ASSIGN_OR_RAISE(var_data, VariableShapeData::MakeFromData(column, data, selection));
-  } else {
-    ARROW_ASSIGN_OR_RAISE(var_data, VariableShapeData::MakeFromColumn(column, selection));
-  }
-
+  ARROW_ASSIGN_OR_RAISE(auto var_data, VariableShapeData::Make(column, selection));
   return ShapeProvider{std::cref(column), std::cref(selection), std::move(var_data)};
 }
 
@@ -724,7 +663,6 @@ std::size_t ColumnReadMap::FlatOffset(const std::vector<std::size_t> & index) co
     return result + product * index[RowDim()];
   }
   // Variably shaped output
-  const auto & offsets = shape_provider_.var_data_->offsets_;
   const auto & shapes = shape_provider_.var_data_->row_shapes_;
   // Offset into the output starts at the row offset
   std::size_t row = index[RowDim()];
@@ -751,15 +689,14 @@ arrow::Result<ColumnReadMap>
 ColumnReadMap::Make(
     const casacore::TableColumn & column,
     ColumnSelection selection,
-    InputOrder order,
-    const std::shared_ptr<arrow::Array> & data) {
+    InputOrder order) {
 
   // Convert to FORTRAN ordering, which the casacore internals use
   if(order == InputOrder::C_ORDER) {
     std::reverse(std::begin(selection), std::end(selection));
   }
 
-  ARROW_ASSIGN_OR_RAISE(auto shape_prov, ShapeProvider::Make(column, selection, data));
+  ARROW_ASSIGN_OR_RAISE(auto shape_prov, ShapeProvider::Make(column, selection));
   auto maps = MapFactory(shape_prov, selection);
   ARROW_ASSIGN_OR_RAISE(auto ranges, RangeFactory(shape_prov, maps));
 

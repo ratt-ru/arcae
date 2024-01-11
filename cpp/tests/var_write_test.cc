@@ -4,6 +4,7 @@
 
 #include <arcae/safe_table_proxy.h>
 #include <arcae/column_read_map.h>
+#include <arcae/column_write_map.h>
 #include <arcae/column_read_visitor.h>
 #include <arcae/column_write_visitor.h>
 
@@ -28,6 +29,7 @@ using namespace std::string_literals;
 using arrow::ipc::internal::json::ArrayFromJSON;
 
 using ::arcae::ColumnReadMap;
+using ::arcae::ColumnWriteMap;
 
 using ::casacore::ArrayColumn;
 using ::casacore::TableColumn;
@@ -121,12 +123,12 @@ TEST_F(EmptyVariableWriteTest, WriteToEmptyVariableColumn) {
                                             [10, 11, 12]]])"));
 
     auto var = GetArrayColumn<casacore::Int>(table, "DATA");
-    ASSERT_OK_AND_ASSIGN(auto column_map, ColumnReadMap::Make(var, {{0, 3}}, ColumnReadMap::C_ORDER, data));
-    auto write_visitor = arcae::ColumnWriteVisitor(column_map, data);
+    ASSERT_OK_AND_ASSIGN(auto write_map, ColumnWriteMap::Make(var, {{0, 3}}, data, ColumnWriteMap::C_ORDER));
+    auto write_visitor = arcae::ColumnWriteVisitor(write_map, data);
     ASSERT_OK(write_visitor.Visit(var.columnDesc().dataType()));
 
-    ASSERT_OK_AND_ASSIGN(column_map, ColumnReadMap::Make(var, {{0, 3}}));
-    auto read_visitor = arcae::ColumnReadVisitor(column_map);
+    ASSERT_OK_AND_ASSIGN(auto read_map, ColumnReadMap::Make(var, {{0, 3}}));
+    auto read_visitor = arcae::ColumnReadVisitor(read_map);
     ASSERT_OK(read_visitor.Visit(var.columnDesc().dataType()));
     ASSERT_TRUE(read_visitor.array_->Equals(data));
 
@@ -154,12 +156,12 @@ TEST_F(EmptyVariableWriteTest, WriteToEmptyVariableColumn) {
                                             [[77, 88, 99]]])"));
 
     auto var = GetArrayColumn<casacore::Int>(table, "DATA");
-    ASSERT_OK_AND_ASSIGN(auto column_map, ColumnReadMap::Make(var, {{0, 3}, {1}}, ColumnReadMap::C_ORDER, data));
-    auto write_visitor = arcae::ColumnWriteVisitor(column_map, data);
+    ASSERT_OK_AND_ASSIGN(auto write_map, ColumnWriteMap::Make(var, {{0, 3}, {1}}, data));
+    auto write_visitor = arcae::ColumnWriteVisitor(write_map, data);
     ASSERT_OK(write_visitor.Visit(var.columnDesc().dataType()));
 
-    ASSERT_OK_AND_ASSIGN(column_map, ColumnReadMap::Make(var, {{0, 3}, {1}}));
-    auto read_visitor = arcae::ColumnReadVisitor(column_map);
+    ASSERT_OK_AND_ASSIGN(auto read_map, ColumnReadMap::Make(var, {{0, 3}, {1}}));
+    auto read_visitor = arcae::ColumnReadVisitor(read_map);
     ASSERT_OK(read_visitor.Visit(var.columnDesc().dataType()));
     ASSERT_TRUE(read_visitor.array_->Equals(data));
 
@@ -194,12 +196,12 @@ TEST_F(EmptyVariableWriteTest, WritePartialVariableEmptyColumn) {
 
     auto var = GetArrayColumn<casacore::Int>(table, "DATA");
     auto sel = arcae::ColumnSelection{{0, 3}, {1, 5}, {2, 4}};
-    ASSERT_OK_AND_ASSIGN(auto column_map, ColumnReadMap::Make(var, sel, ColumnReadMap::C_ORDER, data));
-    auto write_visitor = arcae::ColumnWriteVisitor(column_map, data);
+    ASSERT_OK_AND_ASSIGN(auto write_map, ColumnWriteMap::Make(var, sel, data));
+    auto write_visitor = arcae::ColumnWriteVisitor(write_map, data);
     ASSERT_OK(write_visitor.Visit(var.columnDesc().dataType()));
 
-    ASSERT_OK_AND_ASSIGN(column_map, ColumnReadMap::Make(var, sel));
-    auto read_visitor = arcae::ColumnReadVisitor(column_map);
+    ASSERT_OK_AND_ASSIGN(auto read_map, ColumnReadMap::Make(var, sel));
+    auto read_visitor = arcae::ColumnReadVisitor(read_map);
     ASSERT_OK(read_visitor.Visit(var.columnDesc().dataType()));
 
     ASSERT_TRUE(read_visitor.array_->Equals(data));
