@@ -238,50 +238,6 @@ RangeFactory(const ArrowShapeProvider & shape_prov, const ColumnMaps & maps) {
   return VariableRangeFactory(shape_prov, maps);
 }
 
-arrow::Result<casacore::IPosition> GetColumnRowShape(
-  const casacore::TableColumn & column,
-  casacore::rownr_t row) {
-    if(column.isDefined(row)) return column.shape(row);
-    return arrow::Status::IndexError("Row ", row, " in column ",
-                                    column.columnDesc().name(),
-                                   " is undefined");
-}
-
-// Set the casacore row shape of a variably shaped casacore column row
-arrow::Status SetRowShape(casacore::ArrayColumnBase & column,
-                 const ColumnSelection & selection,
-                 casacore::rownr_t row,
-                 const casacore::IPosition & shape)
-{
-  auto new_shape = shape;
-
-  for(std::size_t dim=0; dim < shape.size(); ++dim) {
-    casacore::rownr_t dim_size = shape[dim];
-    if(auto sdim = SelectDim(dim, selection.size(), shape.size() + 1); sdim >= 0) {
-      for(auto & index: selection[sdim]) {
-        dim_size = std::max(dim_size, index + 1);
-      }
-    }
-    new_shape[dim] = dim_size;
-  }
-
-  // Avoid setting the shape if possible
-  if(column.isDefined(row)) {
-    auto column_shape = column.shape(row);
-    if(column_shape.size() != new_shape.size() || new_shape > column_shape) {
-      return arrow::Status::Invalid("Unable to set row ", row, " to shape ", new_shape,
-                                     "column ", column.columnDesc().name(),
-                                     ". The existing row shape is ", column.shape(row),
-                                     " and changing this would destroy existing data");
-    }
-
-    return arrow::Status::OK();
-  }
-
-  column.setShape(row, new_shape);
-  return arrow::Status::OK();
-}
-
 struct DataProperties {
   std::optional<casacore::IPosition> shape;
   std::size_t ndim;
