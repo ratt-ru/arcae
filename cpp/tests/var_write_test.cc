@@ -60,9 +60,12 @@ class EmptyVariableWriteTest : public ::testing::Test {
         auto varcol_desc = casacore::ArrayColumnDesc<casacore::Int>(
           "DATA", 2);
         table_desc.addColumn(varcol_desc);
-        auto complex_varcold_desc = casacore::ArrayColumnDesc<casacore::Complex>(
+        auto float_varcol_desc = casacore::ArrayColumnDesc<casacore::Float>(
+          "FLOAT_DATA", 2);
+        table_desc.addColumn(float_varcol_desc);
+        auto complex_varcol_desc = casacore::ArrayColumnDesc<casacore::Complex>(
           "VAR_COMPLEX", 2);
-        table_desc.addColumn(complex_varcold_desc);
+        table_desc.addColumn(complex_varcol_desc);
 
         auto setup_new_table = SetupNewTable(table_name_, table_desc, Table::New);
         auto table = casacore::Table(setup_new_table, knrow);
@@ -198,7 +201,52 @@ TEST_F(EmptyVariableWriteTest, WritePartialVariableEmptyColumn) {
                                             [[4, 5],
                                              [7, 8]]])"));
 
-    auto var = GetArrayColumn<casacore::Int>(table, "DATA");
+    auto var = GetArrayColumn<CT>(table, "DATA");
+    auto sel = arcae::ColumnSelection{{0, 3}, {1, 5}, {2, 4}};
+    ASSERT_OK_AND_ASSIGN(auto write_map, ColumnWriteMap::Make(var, sel, data));
+    auto write_visitor = arcae::ColumnWriteVisitor(write_map, data);
+    ASSERT_OK(write_visitor.Visit());
+
+    ASSERT_OK_AND_ASSIGN(auto read_map, ColumnReadMap::Make(var, sel));
+    auto read_visitor = arcae::ColumnReadVisitor(read_map);
+    ASSERT_OK(read_visitor.Visit(var.columnDesc().dataType()));
+
+    ASSERT_TRUE(read_visitor.array_->Equals(data));
+
+    EXPECT_TRUE(var.isDefined(0));
+    auto row0 = var.getColumnRange(Slicer({IPos{0}, IPos{0}, Slicer::endIsLast}));
+    EXPECT_EQ(row0.shape(), IPos({5, 6, 1}));
+    EXPECT_EQ(row0(IPos({2, 1, 0})), 0);
+    EXPECT_EQ(row0(IPos({4, 1, 0})), 1);
+    EXPECT_EQ(row0(IPos({2, 5, 0})), 2);
+    EXPECT_EQ(row0(IPos({4, 5, 0})), 3);
+
+    EXPECT_TRUE(var.isDefined(3));
+    auto row3 = var.getColumnRange(Slicer({IPos{3}, IPos{3}, Slicer::endIsLast}));
+    EXPECT_EQ(row3(IPos({2, 1, 0})), 4);
+    EXPECT_EQ(row3(IPos({4, 1, 0})), 5);
+    EXPECT_EQ(row3(IPos({2, 5, 0})), 7);
+    EXPECT_EQ(row3(IPos({4, 5, 0})), 8);
+
+    EXPECT_FALSE(var.isDefined(1));
+  }
+}
+
+TEST_F(EmptyVariableWriteTest, WritePartialFloatVariableEmptyColumn) {
+  const auto & table = table_proxy_.table();
+  using CT = casacore::Float;
+
+  {
+    // Variable data column, partial domain
+    auto dtype = arrow::fixed_size_list(arrow::fixed_size_list(arrow::float32(), 2), 2);
+    ASSERT_OK_AND_ASSIGN(auto data,
+                          ArrayFromJSON(dtype,
+                                        R"([[[0, 1],
+                                             [2, 3]],
+                                            [[4, 5],
+                                             [7, 8]]])"));
+
+    auto var = GetArrayColumn<CT>(table, "FLOAT_DATA");
     auto sel = arcae::ColumnSelection{{0, 3}, {1, 5}, {2, 4}};
     ASSERT_OK_AND_ASSIGN(auto write_map, ColumnWriteMap::Make(var, sel, data));
     auto write_visitor = arcae::ColumnWriteVisitor(write_map, data);
