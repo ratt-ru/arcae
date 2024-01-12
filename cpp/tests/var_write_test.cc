@@ -117,15 +117,15 @@ TEST_F(EmptyVariableWriteTest, WriteToEmptyVariableColumn) {
     ASSERT_OK_AND_ASSIGN(auto data,
                           ArrayFromJSON(dtype,
                                         R"([[[0, 1],
-                                            [2, 3]],
+                                             [2, 3]],
                                             [[4, 5, 6],
-                                            [7, 8, 9],
-                                            [10, 11, 12]]])"));
+                                             [7, 8, 9],
+                                             [10, 11, 12]]])"));
 
     auto var = GetArrayColumn<casacore::Int>(table, "DATA");
     ASSERT_OK_AND_ASSIGN(auto write_map, ColumnWriteMap::Make(var, {{0, 3}}, data, ColumnWriteMap::C_ORDER));
     auto write_visitor = arcae::ColumnWriteVisitor(write_map, data);
-    ASSERT_OK(write_visitor.Visit(var.columnDesc().dataType()));
+    ASSERT_OK(write_visitor.Visit());
 
     ASSERT_OK_AND_ASSIGN(auto read_map, ColumnReadMap::Make(var, {{0, 3}}));
     auto read_visitor = arcae::ColumnReadVisitor(read_map);
@@ -158,7 +158,7 @@ TEST_F(EmptyVariableWriteTest, WriteToEmptyVariableColumn) {
     auto var = GetArrayColumn<casacore::Int>(table, "DATA");
     ASSERT_OK_AND_ASSIGN(auto write_map, ColumnWriteMap::Make(var, {{0, 3}, {1}}, data));
     auto write_visitor = arcae::ColumnWriteVisitor(write_map, data);
-    ASSERT_OK(write_visitor.Visit(var.columnDesc().dataType()));
+    ASSERT_OK(write_visitor.Visit());
 
     ASSERT_OK_AND_ASSIGN(auto read_map, ColumnReadMap::Make(var, {{0, 3}, {1}}));
     auto read_visitor = arcae::ColumnReadVisitor(read_map);
@@ -198,7 +198,7 @@ TEST_F(EmptyVariableWriteTest, WritePartialVariableEmptyColumn) {
     auto sel = arcae::ColumnSelection{{0, 3}, {1, 5}, {2, 4}};
     ASSERT_OK_AND_ASSIGN(auto write_map, ColumnWriteMap::Make(var, sel, data));
     auto write_visitor = arcae::ColumnWriteVisitor(write_map, data);
-    ASSERT_OK(write_visitor.Visit(var.columnDesc().dataType()));
+    ASSERT_OK(write_visitor.Visit());
 
     ASSERT_OK_AND_ASSIGN(auto read_map, ColumnReadMap::Make(var, sel));
     auto read_visitor = arcae::ColumnReadVisitor(read_map);

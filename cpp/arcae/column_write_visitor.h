@@ -4,23 +4,21 @@
 #include <functional>
 #include <memory>
 
-#include <arrow/array/array_nested.h>
-#include <arrow/util/logging.h>  // IWYU pragma: keep
 #include <arrow/result.h>
+#include <arrow/status.h>
+#include <arrow/type.h>
+#include <arrow/visit_type_inline.h>
 
+#include <casacore/casa/aipstype.h>
+#include <casacore/casa/aipsxtype.h>
+#include <casacore/casa/BasicSL/String.h>
 #include <casacore/tables/Tables.h>
 
-#include "arcae/casa_visitors.h"
 #include "arcae/column_write_map.h"
-#include "arrow/status.h"
-#include "arrow/testing/gtest_util.h"
 
 namespace arcae {
 
-class ColumnWriteVisitor : public CasaTypeVisitor {
-public:
-    using ShapeVectorType = std::vector<casacore::IPosition>;
-
+class ColumnWriteVisitor {
 public:
     std::reference_wrapper<const ColumnWriteMap> map_;
     arrow::MemoryPool * pool_;
@@ -36,13 +34,39 @@ public:
             pool_(pool) {};
     virtual ~ColumnWriteVisitor() = default;
 
-#define VISIT(CASA_TYPE) \
-    virtual arrow::Status Visit##CASA_TYPE() override;
+    arrow::Status Visit() {
+        return arrow::VisitTypeInline(*map_.get().shape_provider_.data_type_,
+                                      this);
+    }
 
-    VISIT_CASA_TYPES(VISIT)
-#undef VISIT
+    arrow::Status Visit(const arrow::Int8Type & dt) { return WriteColumn<casacore::Char>(); }
+    arrow::Status Visit(const arrow::Int16Type & dt) { return WriteColumn<casacore::Short>(); }
+    arrow::Status Visit(const arrow::Int32Type & dt) { return WriteColumn<casacore::Int>(); }
+    arrow::Status Visit(const arrow::Int64Type & dt) { return WriteColumn<casacore::Int64>(); }
 
-    // Convert the
+    arrow::Status Visit(const arrow::UInt8Type & dt) { return WriteColumn<casacore::uChar>(); }
+    arrow::Status Visit(const arrow::UInt16Type & dt) { return WriteColumn<casacore::uShort>(); }
+    arrow::Status Visit(const arrow::UInt32Type & dt) { return WriteColumn<casacore::uInt>(); }
+    //arrow::Status Visit(const arrow::UInt64Type & dt) { return WriteColumn<casacore::uInt64>(); }
+
+    arrow::Status Visit(const arrow::FloatType & dt) {
+        if(map_.get().IsComplex()) return WriteColumn<casacore::Complex>();
+        return WriteColumn<casacore::Float>();
+    }
+
+    arrow::Status Visit(const arrow::DoubleType & dt) {
+        if(map_.get().IsComplex()) return WriteColumn<casacore::DComplex>();
+        return WriteColumn<casacore::Double>();
+    }
+
+    arrow::Status Visit(const arrow::StringType & dt) { return WriteColumn<casacore::String>(); }
+
+    arrow::Status Visit(const arrow::DataType & dt) {
+        return arrow::Status::NotImplemented("Arrow Array to Casa Column "
+                                             "conversion for type ", dt.ToString());
+    }
+
+    // Write arrow array to the CASA column
     template <typename T>
     arrow::Status WriteColumn() {
         if(map_.get().nDim() == 1) {
@@ -52,14 +76,12 @@ public:
         } else {
             return WriteVariableColumn<T>();
         }
-
     };
 
 private:
     const casacore::TableColumn & GetTableColumn() const {
         return map_.get().column_.get();
     }
-
 
     arrow::Result<std::shared_ptr<arrow::Array>> GetFlatArray(bool nulls=false) const;
     arrow::Status CheckElements(std::size_t map_size, std::size_t data_size) const;
@@ -241,7 +263,7 @@ private:
         } else {
             // Get Arrow Array buffer
             auto buffer = flat_array->data()->buffers[1];
-            ARROW_RETURN_NOT_OK(CheckElements(buffer->size() / sizeof(T), nelements));
+            ARROW_RETURN_NOT_OK(CheckElements(flat_array->length(), nelements));
             auto * buf_ptr = reinterpret_cast<T *>(buffer->mutable_data());
 
             for(auto it = map_.get().RangeBegin(); it != map_.get().RangeEnd(); ++it) {

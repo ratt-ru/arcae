@@ -218,7 +218,7 @@ TEST_F(ColumnWriteTest, WriteVisitorScalarNumeric) {
 
     ASSERT_OK_AND_ASSIGN(auto write_map, (ColumnWriteMap::Make(complex, {}, data)));
     auto write_visitor = ColumnWriteVisitor(write_map, data);
-    ASSERT_OK(write_visitor.Visit(complex.columnDesc().dataType()));
+    ASSERT_OK(write_visitor.Visit());
 
     ASSERT_OK_AND_ASSIGN(auto read_map, (ColumnReadMap::Make(complex, {})));
     auto read_visitor = ColumnReadVisitor(read_map);
@@ -239,7 +239,7 @@ TEST_F(ColumnWriteTest, WriteVisitorScalarNumeric) {
 
     ASSERT_OK_AND_ASSIGN(auto write_map, (ColumnWriteMap::Make(complex, {{1}}, data)));
     auto write_visitor = ColumnWriteVisitor(write_map, data);
-    ASSERT_OK(write_visitor.Visit(complex.columnDesc().dataType()));
+    ASSERT_OK(write_visitor.Visit());
 
     ASSERT_OK_AND_ASSIGN(auto read_map, (ColumnReadMap::Make(complex, {{1}})));
     auto read_visitor = ColumnReadVisitor(read_map);
@@ -265,7 +265,7 @@ TEST_F(ColumnWriteTest, WriteVisitorScalarString) {
 
     ASSERT_OK_AND_ASSIGN(auto write_map, (ColumnWriteMap::Make(complex, {}, data)));
     auto write_visitor = ColumnWriteVisitor(write_map, data);
-    ASSERT_OK(write_visitor.Visit(complex.columnDesc().dataType()));
+    ASSERT_OK(write_visitor.Visit());
 
     ASSERT_OK_AND_ASSIGN(auto read_map, (ColumnReadMap::Make(complex, {})));
     auto read_visitor = ColumnReadVisitor(read_map);
@@ -286,7 +286,7 @@ TEST_F(ColumnWriteTest, WriteVisitorScalarString) {
 
     ASSERT_OK_AND_ASSIGN(auto write_map, (ColumnWriteMap::Make(complex, {{1}}, data)));
     auto write_visitor = ColumnWriteVisitor(write_map, data);
-    ASSERT_OK(write_visitor.Visit(complex.columnDesc().dataType()));
+    ASSERT_OK(write_visitor.Visit());
 
     ASSERT_OK_AND_ASSIGN(auto read_map, (ColumnReadMap::Make(complex, {{1}})));
     auto read_visitor = ColumnReadVisitor(read_map);
@@ -319,8 +319,8 @@ TEST_F(ColumnWriteTest, WriteVisitorFixedNumeric) {
                                          R"([[[0, 1], [2, 3]], [[4, 5], [6, 7]]])"));
 
       ASSERT_OK_AND_ASSIGN(auto write_map, (ColumnWriteMap::Make(fixed, {}, data)));
-      auto visitor = ColumnWriteVisitor(write_map, data);
-      auto visit_status = visitor.Visit(fixed.columnDesc().dataType());
+      auto write_visitor = ColumnWriteVisitor(write_map, data);
+      auto visit_status = write_visitor.Visit();
       ASSERT_OK(visit_status);
 
       ASSERT_OK_AND_ASSIGN(auto read_map, (ColumnReadMap::Make(fixed, {})));
@@ -345,7 +345,7 @@ TEST_F(ColumnWriteTest, WriteVisitorFixedNumeric) {
 
       ASSERT_OK_AND_ASSIGN(auto write_map, (ColumnWriteMap::Make(fixed, {{}, {0}, {0}}, data)));
       auto write_visitor = ColumnWriteVisitor(write_map, data);
-      auto visit_status = write_visitor.Visit(fixed.columnDesc().dataType());
+      auto visit_status = write_visitor.Visit();
       ASSERT_OK(visit_status);
 
       ASSERT_OK_AND_ASSIGN(auto read_map, (ColumnReadMap::Make(fixed, {{}, {0}, {0}})));
@@ -370,7 +370,7 @@ TEST_F(ColumnWriteTest, WriteVisitorFixedNumeric) {
 
       ASSERT_OK_AND_ASSIGN(auto write_map, (ColumnWriteMap::Make(fixed, {{}, {1}, {1}}, data)));
       auto write_visitor = ColumnWriteVisitor(write_map, data);
-      auto visit_status = write_visitor.Visit(fixed.columnDesc().dataType());
+      auto visit_status = write_visitor.Visit();
       ASSERT_OK(visit_status);
 
       ASSERT_OK_AND_ASSIGN(auto read_map, (ColumnReadMap::Make(fixed, {{}, {1}, {1}})));
@@ -407,8 +407,8 @@ TEST_F(ColumnWriteTest, WriteVisitorFixedComplex) {
                                             [[[4, 4], [5, 5]], [[6, 6], [7, 7]]]])"));
 
     ASSERT_OK_AND_ASSIGN(auto write_map, (ColumnWriteMap::Make(fixed, {}, data)));
-    auto visitor = ColumnWriteVisitor(write_map, data);
-    auto visit_status = visitor.Visit(fixed.columnDesc().dataType());
+    auto write_visitor = ColumnWriteVisitor(write_map, data);
+    auto visit_status = write_visitor.Visit();
     ASSERT_OK(visit_status);
 
     ASSERT_OK_AND_ASSIGN(auto read_map, (ColumnReadMap::Make(fixed, {})));
@@ -446,8 +446,8 @@ TEST_F(ColumnWriteTest, WriteVisitorFixedString) {
                            R"([[["0", "1"], ["2", "3"]], [["4", "5"], ["6", "7"]]])"));
 
       ASSERT_OK_AND_ASSIGN(auto write_map, (ColumnWriteMap::Make(fixed, {}, data)));
-      auto visitor = ColumnWriteVisitor(write_map, data);
-      auto visit_status = visitor.Visit(fixed.columnDesc().dataType());
+      auto write_visitor = ColumnWriteVisitor(write_map, data);
+      auto visit_status = write_visitor.Visit();
       ASSERT_OK(visit_status);
 
       ASSERT_OK_AND_ASSIGN(auto read_map, (ColumnReadMap::Make(fixed, {})));
@@ -473,7 +473,7 @@ TEST_F(ColumnWriteTest, WriteVisitorFixedString) {
 
       ASSERT_OK_AND_ASSIGN(auto write_map, (ColumnWriteMap::Make(fixed, {{}, {0}, {0}}, data)));
       auto write_visitor = ColumnWriteVisitor(write_map, data);
-      auto visit_status = write_visitor.Visit(fixed.columnDesc().dataType());
+      auto visit_status = write_visitor.Visit();
       ASSERT_OK(visit_status);
 
       ASSERT_OK_AND_ASSIGN(auto read_map, (ColumnReadMap::Make(fixed, {{}, {0}, {0}})));
@@ -498,7 +498,7 @@ TEST_F(ColumnWriteTest, WriteVisitorFixedString) {
 
       ASSERT_OK_AND_ASSIGN(auto write_map, (ColumnWriteMap::Make(fixed, {{}, {1}, {1}}, data)));
       auto write_visitor = ColumnWriteVisitor(write_map, data);
-      auto visit_status = write_visitor.Visit(fixed.columnDesc().dataType());
+      auto visit_status = write_visitor.Visit();
       ASSERT_OK(visit_status);
 
       ASSERT_OK_AND_ASSIGN(auto read_map, (ColumnReadMap::Make(fixed, {{}, {1}, {1}})));
@@ -531,13 +531,11 @@ TEST_F(ColumnWriteTest, WriteVisitorVariableNumeric) {
     auto var = GetArrayColumn<CT>(table, "VAR_DATA");
     ASSERT_OK_AND_ASSIGN(auto write_map, (ColumnWriteMap::Make(var, {}, data)));
     auto write_visitor = ColumnWriteVisitor(write_map, data);
-    auto visit_status = write_visitor.Visit(var.columnDesc().dataType());
-    ASSERT_OK(visit_status);
+    ASSERT_OK(write_visitor.Visit());
 
     ASSERT_OK_AND_ASSIGN(auto read_map, (ColumnReadMap::Make(var, {})));
     auto read_visitor = ColumnReadVisitor(read_map);
-    visit_status = read_visitor.Visit(var.columnDesc().dataType());
-    ASSERT_OK(visit_status);
+    ASSERT_OK(read_visitor.Visit(var.columnDesc().dataType()));
     ASSERT_TRUE(data->Equals(read_visitor.array_));
 
     // Sanity check values via casacore
@@ -565,7 +563,7 @@ TEST_F(ColumnWriteTest, WriteVisitorVariableNumeric) {
                        casacore::Array<casacore::Int>(IPos({3, 3, 1}), 0));
     ASSERT_OK_AND_ASSIGN(auto write_map, (ColumnWriteMap::Make(var, {}, data)));
     auto write_visitor = ColumnWriteVisitor(write_map, data);
-    auto visit_status = write_visitor.Visit(var.columnDesc().dataType());
+    auto visit_status = write_visitor.Visit();;
     ASSERT_OK(visit_status);
 
     ASSERT_OK_AND_ASSIGN(auto read_map, (ColumnReadMap::Make(var, {})));
@@ -600,7 +598,7 @@ TEST_F(ColumnWriteTest, WriteVisitorVariableNumeric) {
                        casacore::Array<casacore::Int>(IPos({3, 3, 1}), 0));
     ASSERT_OK_AND_ASSIGN(auto write_map, (ColumnWriteMap::Make(var, {{}, {1}}, data)));
     auto write_visitor = ColumnWriteVisitor(write_map, data);
-    auto visit_status = write_visitor.Visit(var.columnDesc().dataType());
+    auto visit_status = write_visitor.Visit();;
     ASSERT_OK(visit_status);
 
     ASSERT_OK_AND_ASSIGN(auto read_map, (ColumnReadMap::Make(var, {{}, {1}})))
@@ -636,7 +634,7 @@ TEST_F(ColumnWriteTest, WriteVisitorVariableNumeric) {
                        casacore::Array<casacore::Int>(IPos({3, 3, 1}), 0));
     ASSERT_OK_AND_ASSIGN(auto write_map, (ColumnWriteMap::Make(var, {{}, {}, {1}}, data)));
     auto write_visitor = ColumnWriteVisitor(write_map, data);
-    auto visit_status = write_visitor.Visit(var.columnDesc().dataType());
+    auto visit_status = write_visitor.Visit();;
     ASSERT_OK(visit_status);
 
     ASSERT_OK_AND_ASSIGN(auto read_map, (ColumnReadMap::Make(var, {{}, {}, {1}})));
@@ -677,7 +675,7 @@ TEST_F(ColumnWriteTest, WriteVisitorVariableNumeric) {
                        casacore::Array<casacore::Int>(IPos({3, 3, 1}), 0));
     ASSERT_OK_AND_ASSIGN(auto write_map, (ColumnWriteMap::Make(var, {{}, {0, 1}, {0, 1}}, data)));
     auto write_visitor = ColumnWriteVisitor(write_map, data);
-    auto visit_status = write_visitor.Visit(var.columnDesc().dataType());
+    auto visit_status = write_visitor.Visit();
     ASSERT_OK(visit_status);
 
     ASSERT_OK_AND_ASSIGN(auto read_map, (ColumnReadMap::Make(var, {{}, {0, 1}, {0, 1}})));
@@ -715,7 +713,7 @@ TEST_F(ColumnWriteTest, WriteVisitorVariableNumeric) {
                        casacore::Array<casacore::Int>(IPos({3, 3, 1}), 0));
     ASSERT_OK_AND_ASSIGN(auto write_map, (ColumnWriteMap::Make(var, {{1}, {0, 1}, {0, 1}}, data)));
     auto write_visitor = ColumnWriteVisitor(write_map, data);
-    auto visit_status = write_visitor.Visit(var.columnDesc().dataType());
+    auto visit_status = write_visitor.Visit();;
     ASSERT_OK(visit_status);
 
     ASSERT_OK_AND_ASSIGN(auto read_map, (ColumnReadMap::Make(var, {{1}, {0, 1}, {0, 1}})));
@@ -751,7 +749,7 @@ TEST_F(ColumnWriteTest, WriteVisitorVariableString) {
       auto var = GetArrayColumn<CT>(table, column);
       ASSERT_OK_AND_ASSIGN(auto write_map, (ColumnWriteMap::Make(var, {}, data)));
       auto write_visitor = ColumnWriteVisitor(write_map, data);
-      auto visit_status = write_visitor.Visit(var.columnDesc().dataType());
+      auto visit_status = write_visitor.Visit();;
       ASSERT_OK(visit_status);
 
       ASSERT_OK_AND_ASSIGN(auto read_map, (ColumnReadMap::Make(var, {})));

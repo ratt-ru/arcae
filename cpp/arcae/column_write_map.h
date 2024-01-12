@@ -18,6 +18,7 @@
 
 #include "arcae/map_iterator.h"
 #include "arrow/array/array_base.h"
+#include "arrow/type.h"
 
 namespace arcae {
 
@@ -31,8 +32,10 @@ struct ArrowShapeProvider {
   std::reference_wrapper<const casacore::TableColumn> column_;
   std::reference_wrapper<const ColumnSelection> selection_;
   std::shared_ptr<arrow::Array> data_;
+  std::shared_ptr<arrow::DataType> data_type_;
   std::optional<casacore::IPosition> shape_;
   std::size_t ndim_;
+  bool is_complex_;
 
   static arrow::Result<ArrowShapeProvider> Make(const casacore::TableColumn & column,
                                                 const ColumnSelection & selection,
@@ -81,6 +84,10 @@ struct ColumnWriteMap {
     return ranges_[dim];
   }
 
+  inline bool IsComplex() const {
+    return shape_provider_.is_complex_;
+  }
+
   inline std::size_t nDim() const {
     return shape_provider_.nDim();
   }
@@ -119,7 +126,7 @@ struct ColumnWriteMap {
 
   // Factory method for making a ColumnWriteMap object
   static arrow::Result<ColumnWriteMap> Make(
-      const casacore::TableColumn & column,
+      casacore::TableColumn & column,
       ColumnSelection selection,
       const std::shared_ptr<arrow::Array> & data,
       InputOrder order=InputOrder::C_ORDER);
