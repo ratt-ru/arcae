@@ -20,7 +20,7 @@ env:
   # CIBW_TEST_COMMAND: py.test -s -vvv --pyargs arcae
 
 linux_aarch64_task:
-  name: Build Linux aarch64 wheels.
+  name: Build linux amd64 ${PYTHON_VERSION_NAME} manylinux_2_28 wheel
   compute_engine_instance:
     image_project: cirrus-images
     image: family/docker-builder-arm64
@@ -35,12 +35,16 @@ linux_aarch64_task:
 
   matrix:
     - env:
+        PYTHON_VERSION_NAME: python 3.9
         CIBW_BUILD: cp39-manylinux*
     - env:
+        PYTHON_VERSION_NAME: python 3.10
         CIBW_BUILD: cp310-manylinux*
     - env:
+        PYTHON_VERSION_NAME: python 3.11
         CIBW_BUILD: cp311-manylinux*
     - env:
+        PYTHON_VERSION_NAME: python 3.12
         CIBW_BUILD: cp312-manylinux*
   env:
     # Run the container in host mode so that vcpkg has access to the Cirrus CI cache
