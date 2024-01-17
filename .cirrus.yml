@@ -8,7 +8,7 @@ build_and_store_wheels: &BUILD_AND_STORE_WHEELS
 
 env:
   VCPKG_INSTALLED_DIR: /tmp/vcpkg_installed
-  VCPKG_BINARY_SOURCES: "clear;http,http://$CIRRUS_HTTP_CACHE_HOST/{name}/{version}/{sha},readwrite"
+  VCPKG_BINARY_SOURCES: "clear;http,http://localhost:12321/{name}/{version}/{sha},readwrite"
 
 linux_aarch64_task:
   name: Build Linux aarch64 wheels.
