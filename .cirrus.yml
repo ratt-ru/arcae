@@ -77,7 +77,7 @@ macos_arm64_task:
     #     PYTHON_VERSION_NAME: python 3.12
     #     CIBW_BUILD: cp312-*
 
-  VCPKG_TARGET_TRIPLET: arm64-OS6-dynamic-cxx17-abi1-rel
+  VCPKG_TARGET_TRIPLET: arm64-osx-dynamic-cxx17-abi1-rel
   CIBW_ENVIRONMENT_MACOSX: >
     CMAKE_ARGS=-DBUILD_TESTING=OFF
     VCPKG_BINARY_SOURCES="clear;http,http://127.0.0.1:12321/{name}/{version}/{sha},readwrite"
