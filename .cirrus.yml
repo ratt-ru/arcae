@@ -77,26 +77,27 @@ macos_arm64_task:
     #     PYTHON_VERSION_NAME: python 3.12
     #     CIBW_BUILD: cp312-*
 
-  VCPKG_TARGET_TRIPLET: arm64-osx-dynamic-cxx17-abi1-rel
-  CIBW_ENVIRONMENT_MACOSX: >
-    CMAKE_ARGS=-DBUILD_TESTING=OFF
-    VCPKG_BINARY_SOURCES="clear;http,http://127.0.0.1:12321/{name}/{version}/{sha},readwrite"
-    VCPKG_INSTALLED_DIR=$VCPKG_INSTALLED_DIR
-    VCPKG_TARGET_TRIPLET=$VCPKG_TARGET_TRIPLET
-    LD_LIBRARY_PATH=$VCPKG_INSTALLED_DIR/$VCPKG_TARGET_TRIPLET/lib
-    MACOSX_DEPLOYMENT_TARGET=14.0
+  env:
+    VCPKG_TARGET_TRIPLET: arm64-osx-dynamic-cxx17-abi1-rel
+    CIBW_ENVIRONMENT_MACOSX: >
+      CMAKE_ARGS=-DBUILD_TESTING=OFF
+      VCPKG_BINARY_SOURCES="clear;http,http://127.0.0.1:12321/{name}/{version}/{sha},readwrite"
+      VCPKG_INSTALLED_DIR=$VCPKG_INSTALLED_DIR
+      VCPKG_TARGET_TRIPLET=$VCPKG_TARGET_TRIPLET
+      LD_LIBRARY_PATH=$VCPKG_INSTALLED_DIR/$VCPKG_TARGET_TRIPLET/lib
+      MACOSX_DEPLOYMENT_TARGET=14.0
 
   install_pre_requirements_script: |
     brew install micromamba
     micromamba shell init -s bash -p ~/micromamba
-    source ~/.bash_profile
+    source ~/.bash_profile 2>/dev/null
 
     micromamba create -n arcaedev
     micromamba activate arcaedev
     micromamba install -y -c conda-forge compilers python=3.11 2>/dev/null
     pip install cibuildwheel==2.16.2
   run_cibuildwheel_script: |
-    source ~/.bash_profile
+    source ~/.bash_profile 2>/dev/null
     micromamba activate arcaedev
     cibuildwheel
   wheels_artifacts:
