@@ -8,11 +8,6 @@ build_and_store_wheels: &BUILD_AND_STORE_WHEELS
 
 env:
   VCPKG_INSTALLED_DIR: /tmp/vcpkg_installed
-  BASE_CIBW_ENVIRONMENT: >
-    CMAKE_ARGS=-DBUILD_TESTING=OFF
-    VCPKG_BINARY_SOURCES="clear;http,http://127.0.0.1:12321/{name}/{version}/{sha},readwrite"
-    VCPKG_INSTALLED_DIR=$VCPKG_INSTALLED_DIR
-    VCPKG_FORCE_SYSTEM_BINARIES=1
   CIBW_BUILD_FRONTEND: build
   CIBW_BEFORE_ALL_LINUX: yum install -y zip flex bison gcc-gfortran
   CIBW_MANYLINUX_AARCH64_IMAGE: quay.io/pypa/manylinux_2_28_aarch64
@@ -56,18 +51,40 @@ linux_aarch64_task:
     CIBW_CONTAINER_ENGINE: "docker; create_args: --network=host"
     VCPKG_TARGET_TRIPLET: arm64-linux-dynamic-cxx17-abi1-rel
     CIBW_ENVIRONMENT_LINUX: >
-      $BASE_CIBW_ENVIRONMENT
+      CMAKE_ARGS=-DBUILD_TESTING=OFF
+      VCPKG_BINARY_SOURCES="clear;http,http://127.0.0.1:12321/{name}/{version}/{sha},readwrite"
+      VCPKG_INSTALLED_DIR=$VCPKG_INSTALLED_DIR
+      VCPKG_FORCE_SYSTEM_BINARIES=1
       VCPKG_TARGET_TRIPLET=$VCPKG_TARGET_TRIPLET
       LD_LIBRARY_PATH=$VCPKG_INSTALLED_DIR/$VCPKG_TARGET_TRIPLET/lib
 
-# macos_arm64_task:
-#   name: Build macOS arm64 wheels.
-#   macos_instance:
-#     image: ghcr.io/cirruslabs/macos-monterey-xcode
+macos_arm64_task:
+  name: Build macOS arm64 wheels.
+  macos_instance:
+    image: ghcr.io/cirruslabs/macos-monterey-xcode
 
-#   env:
-#     PATH: /opt/homebrew/opt/python@3.10/bin:$PATH
-#   install_pre_requirements_script:
-#     - brew install python@3.10
-#     - ln -s python3 /opt/homebrew/opt/python@3.10/bin/python
-#   <<: *BUILD_AND_STORE_WHEELS
+  VCPKG_TARGET_TRIPLET: arm64-OS6-dynamic-cxx17-abi1-rel
+  CIBW_ENVIRONMENT_MACOSX: >
+    CMAKE_ARGS=-DBUILD_TESTING=OFF
+    VCPKG_BINARY_SOURCES="clear;http,http://127.0.0.1:12321/{name}/{version}/{sha},readwrite"
+    VCPKG_INSTALLED_DIR=$VCPKG_INSTALLED_DIR
+    VCPKG_FORCE_SYSTEM_BINARIES=1
+    VCPKG_TARGET_TRIPLET=$VCPKG_TARGET_TRIPLET
+    LD_LIBRARY_PATH=$VCPKG_INSTALLED_DIR/$VCPKG_TARGET_TRIPLET/lib
+    MACOSX_DEPLOYMENT_TARGET=14.0
+
+  install_pre_requirements_script: |
+    brew install micromamba
+    micromamba shell init -s bash -p ~/micromamba
+    source ~/.bash_profile
+
+    micromamba create -n arcaedev
+    micromamba activate arcaedev
+    micromamba install -y -c conda-forge compilers python=3.11 2>/dev/null
+    pip install cibuildwheel==2.16.2
+  run_cibuildwheel_script: |
+    source ~/.bash_profile
+    micromamba activate arcaedev
+    cibuildwheel
+  wheels_artifacts:
+    path: "wheelhouse/*"
