@@ -1,44 +1,4 @@
-build_and_store_wheels: &BUILD_AND_STORE_WHEELS
-  install_cibuildwheel_script:
-    - python -m pip install -U cibuildwheel
-  cibuildwheel_script:
-    - cibuildwheel
-  wheels_artifacts:
-    path: "wheelhouse/*"
-
-wheels_linux_aarch64_task:
-  compute_engine_instance:
-    image_project: cirrus-images
-    image: family/docker-build-arm64
-    architecture: arm64
-    platform: linux
-    cpu: 1
-    memory: 4G
-  matrix:
-    - env:
-      CIBW_BUILD: cp38-manylinux*
-    - env:
-      CIBW_BUILD: cp39-manylinux*
-    - env:
-      CIBW_BUILD: cp310-manylinux*
-    - env:
-      CIBW_BUILD: cp311-manylinux*
-  env:
-    CIBW_BUILD_FRONTEND: build
-    CIBW_BEFORE_ALL_LINUX: yum install -y zip flex bison gcc-gfortran
-    CIBW_MANYLINUX_AARCH64_IMAGE: quay.io/pypa/manylinux_2_28_aarch64
-    VCPKG_TARGET_TRIPLET: arm64-linux-dynamic-cxx17-abi1-rel
-    CIBW_ENVIRONMENT_LINUX: >
-      CMAKE_ARGS=-DBUILD_TESTING=OFF
-      VCPKG_TARGET_TRIPLET=$VCPKG_TARGET_TRIPLET
-      VCPKG_INSTALLED_DIR=$VCPKG_INSTALLED_DIR
-      LD_LIBRARY_PATH=$VCPKG_INSTALLED_DIR/$VCPKG_TARGET_TRIPLET/lib
-    CIBW_REPAIR_WHEEL_COMMAND_LINUX: >
-      auditwheel repair -w {dest_dir} {wheel} --exclude libarrow_python.so --exclude libarrow.so.1300
-    CIBW_TEST_EXTRAS: test
-    CIBW_TEST_COMMAND: py.test -s -vvv --pyargs arcae
-
-  build_script: |
-    apt install -y python-is-python3 python3-venv
-    which python
-    echo $CIRRUS_CHANGE_MESSAGE
+basic_task:
+  arm_container:
+    image: alpine/flake8:latest
+  script: ls -lh *
