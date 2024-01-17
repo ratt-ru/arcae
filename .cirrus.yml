@@ -34,6 +34,7 @@ linux_aarch64_task:
     # - env:
     #     CIBW_BUILD: cp311-manylinux*
   env:
+    DOCKER_ARGS: "--network host"
     CIBW_BUILD_FRONTEND: build
     CIBW_BUILD_VERBOSITY: 3
     CIBW_BEFORE_ALL_LINUX: yum install -y zip flex bison gcc-gfortran
