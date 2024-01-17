@@ -87,7 +87,7 @@ macos_arm64_task:
     MACOSX_DEPLOYMENT_TARGET=14.0
 
   install_pre_requirements_script: |
-    brew install micromamba cmake@3.28.1
+    brew install micromamba
     micromamba shell init -s bash -p ~/micromamba
     source ~/.bash_profile
 

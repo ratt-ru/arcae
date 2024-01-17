@@ -52,3 +52,4 @@ find = {}
 
 [tool.scikit-build]
 # build-dir = "/tmp/arcae"
+cmake.version = ">=3.26.1"
