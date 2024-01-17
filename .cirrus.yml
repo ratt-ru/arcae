@@ -8,7 +8,7 @@ build_and_store_wheels: &BUILD_AND_STORE_WHEELS
 
 env:
   VCPKG_INSTALLED_DIR: /tmp/vcpkg_installed
-  VCPKG_BINARY_SOURCES: "clear;http,http://localhost:12321/{name}/{version}/{sha},readwrite"
+  VCPKG_BINARY_SOURCES: "clear;http,http://$CIRRUS_HTTP_CACHE_HOST/{name}/{version}/{sha},readwrite"
 
 linux_aarch64_task:
   name: Build Linux aarch64 wheels.
@@ -22,6 +22,7 @@ linux_aarch64_task:
 
   install_pre_requirements_script:
     - apt install -y python3-venv python-is-python3
+    - echo "CIRRUS_HTTP_CACHE_HOST=$CIRRUS_HTTP_CACHE_HOST"
   <<: *BUILD_AND_STORE_WHEELS
 
   matrix:
@@ -34,10 +35,7 @@ linux_aarch64_task:
   env:
     CIBW_BUILD_FRONTEND: build
     CIBW_BUILD_VERBOSITY: 3
-    CIBW_BEFORE_ALL_LINUX: |
-      yum install -y zip flex bison gcc-gfortran
-      echo "VCPKG_BINARY_SOURCES=$VCPKG_BINARY_SOURCES"
-      echo "VCPKG_INSTALLED_DIR=$VCPKG_INSTALLED_DIR"
+    CIBW_BEFORE_ALL_LINUX: yum install -y zip flex bison gcc-gfortran
     CIBW_MANYLINUX_AARCH64_IMAGE: quay.io/pypa/manylinux_2_28_aarch64
     VCPKG_TARGET_TRIPLET: arm64-linux-dynamic-cxx17-abi1-rel
     CIBW_ENVIRONMENT_LINUX: >
