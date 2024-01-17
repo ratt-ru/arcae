@@ -48,7 +48,7 @@ linux_aarch64_task:
       VCPKG_FORCE_SYSTEM_BINARIES=1
       LD_LIBRARY_PATH=$VCPKG_INSTALLED_DIR/$VCPKG_TARGET_TRIPLET/lib
     CIBW_REPAIR_WHEEL_COMMAND_LINUX: >
-      auditwheel repair -w {dest_dir} {wheel} --exclude libarrow_python.so --exclude libarrow.so.1300
+      auditwheel repair -w {dest_dir} {wheel} --exclude libarrow_python.so --exclude libarrow.so.1400
     CIBW_TEST_EXTRAS: test
     CIBW_TEST_COMMAND: py.test -s -vvv --pyargs arcae
 
