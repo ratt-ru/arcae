@@ -14,6 +14,11 @@ set(CMAKE_JOB_POOL_COMPILE "compile")
 set(CMAKE_JOB_POOL_LINK "link")
 set(CMAKE_JOB_POOLS "compile=${ncores};link=2")
 
+# Export compile_commands.json by default
+if(NOT DEFINED CMAKE_EXPORT_COMPILE_COMMANDS)
+    set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+endif()
+
 find_program(CCACHE_FOUND ccache)
 if(CCACHE_FOUND)
     set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ccache)
