@@ -88,17 +88,9 @@ macos_arm64_task:
       MACOSX_DEPLOYMENT_TARGET=14.0
 
   install_pre_requirements_script: |
-    brew install micromamba
-    micromamba shell init -s bash -p ~/micromamba
-    source ~/.bash_profile 2>/dev/null
-
-    micromamba create -n arcaedev
-    micromamba activate arcaedev
-    micromamba install -y -c conda-forge compilers python=3.11 2>/dev/null
-    pip install cibuildwheel==2.16.2
+    brew install llvm
   run_cibuildwheel_script: |
-    source ~/.bash_profile 2>/dev/null
-    micromamba activate arcaedev
+    export PATH="/usr/local/opt/llvm/bin:$PATH"
     cibuildwheel
   wheels_artifacts:
     path: "wheelhouse/*"
