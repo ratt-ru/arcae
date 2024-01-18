@@ -87,7 +87,7 @@ macos_arm64_task:
 
   env:
     VCPKG_TARGET_TRIPLET: arm64-osx-dynamic-cxx17-abi1-rel
-    CIBW_ENVIRONMENT_MACOSX: >
+    CIBW_ENVIRONMENT_MACOS: >
       CMAKE_ARGS=-DBUILD_TESTING=OFF
       VCPKG_BINARY_SOURCES="clear;http,http://127.0.0.1:12321/{name}/{version}/{sha},readwrite"
       VCPKG_INSTALLED_DIR=$VCPKG_INSTALLED_DIR
