@@ -21,7 +21,7 @@ env:
     -w {dest_dir}
     -v {wheel}
     --exclude libarrow_python.dylib
-    --exclude libarrow.dylib.1400
+    --exclude libarrow.1400.dylib
 
   # There's no python-casacore wheel for amd64-linux
   # CIBW_TEST_EXTRAS: test
