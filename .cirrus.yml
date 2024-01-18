@@ -88,7 +88,7 @@ macos_arm64_task:
       MACOSX_DEPLOYMENT_TARGET=14.0
 
   install_pre_requirements_script: |
-    brew install llvm clang llc python
+    brew install llvm llc python
     pip install cibuildwheel
   run_cibuildwheel_script: |
     export PATH="/opt/homebrew/opt/llvm/bin:$PATH"
