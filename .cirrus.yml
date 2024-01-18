@@ -94,7 +94,7 @@ macos_arm64_task:
       VCPKG_INSTALLED_DIR=$VCPKG_INSTALLED_DIR
       VCPKG_TARGET_TRIPLET=$VCPKG_TARGET_TRIPLET
       REPAIR_LIBRARY_PATH=$REPAIR_LIBRARY_PATH
-      MACOSX_DEPLOYMENT_TARGET=14.0
+      MACOSX_DEPLOYMENT_TARGET=11.0
 
   install_pre_requirements_script: |
     brew install llvm python
