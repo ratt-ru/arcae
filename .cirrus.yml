@@ -88,10 +88,12 @@ macos_arm64_task:
       MACOSX_DEPLOYMENT_TARGET=14.0
 
   install_pre_requirements_script: |
-    brew install llvm
+    brew install llvm clang llc python
     pip install cibuildwheel
   run_cibuildwheel_script: |
-    export PATH="/usr/local/opt/llvm/bin:$PATH"
+    export PATH="/opt/homebrew/opt/llvm/bin:$PATH"
+    export LDFLAGS="-L/opt/homebrew/opt/llvm/lib"
+    export CPPFLAGS="-I/opt/homebrew/opt/llvm/include"
     cibuildwheel
   wheels_artifacts:
     path: "wheelhouse/*"
