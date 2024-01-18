@@ -98,7 +98,7 @@ macos_arm64_task:
   install_pre_requirements_script: |
     brew install llvm python
     python3 -m pip install --upgrade pip
-    python3 -m pip install --upgrade cibuildwheel
+    python3 -m pip install --upgrade pip install git+https://github.com/pypa/cibuildwheel@main
   run_cibuildwheel_script: |
     export PATH="/opt/homebrew/opt/llvm/bin:$PATH"
     export LDFLAGS="-L/opt/homebrew/opt/llvm/lib"
