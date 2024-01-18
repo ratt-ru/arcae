@@ -22,8 +22,7 @@ env:
     -v {wheel}
     --exclude libarrow_python.dylib
     --exclude libarrow.1400.dylib
-
-  # There's no python-casacore wheel for amd64-linux
+  # There's no python-casacore wheel for amd64-linux or macosx
   # CIBW_TEST_EXTRAS: test
   # CIBW_TEST_COMMAND: py.test -s -vvv --pyargs arcae
 
@@ -93,6 +92,7 @@ macos_arm64_task:
       VCPKG_INSTALLED_DIR=$VCPKG_INSTALLED_DIR
       VCPKG_TARGET_TRIPLET=$VCPKG_TARGET_TRIPLET
       DYLD_FALLBACK_LIBRARY_PATH=$VCPKG_INSTALLED_DIR/$VCPKG_TARGET_TRIPLET/lib
+      DYLD_LIBRARY_PATH=$VCPKG_INSTALLED_DIR/$VCPKG_TARGET_TRIPLET/lib
       MACOSX_DEPLOYMENT_TARGET=14.0
 
   install_pre_requirements_script: |
@@ -103,7 +103,7 @@ macos_arm64_task:
     export PATH="/opt/homebrew/opt/llvm/bin:$PATH"
     export LDFLAGS="-L/opt/homebrew/opt/llvm/lib"
     export CPPFLAGS="-I/opt/homebrew/opt/llvm/include"
-    echo "CIBW_ENVIRONMENT_MACOSX=$CIBW_ENVIRONMENT_MACOSX"
+    echo "CIBW_ENVIRONMENT_MACOS=$CIBW_ENVIRONMENT_MACOS"
     cibuildwheel
   wheels_artifacts:
     path: "wheelhouse/*"
