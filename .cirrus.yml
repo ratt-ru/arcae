@@ -15,13 +15,6 @@ env:
     auditwheel repair -w {dest_dir} {wheel}
     --exclude libarrow_python.so
     --exclude libarrow.so.1400
-  CIBW_REPAIR_WHEEL_COMMAND_MACOS:
-    DYLD_LIBRARY_PATH=$REPAIR_LIBRARY_PATH delocate-wheel
-    --require-archs {delocate_archs}
-    -w {dest_dir}
-    -v {wheel}
-    --exclude libarrow_python.dylib
-    --exclude libarrow.1400.dylib
   # There's no python-casacore wheel for amd64-linux or macosx
   # CIBW_TEST_EXTRAS: test
   # CIBW_TEST_COMMAND: py.test -s -vvv --pyargs arcae
@@ -86,12 +79,20 @@ macos_arm64_task:
 
   env:
     VCPKG_TARGET_TRIPLET: arm64-osx-dynamic-cxx17-abi1-rel
+    REPAIR_LIBRARY_DIRS: $VCPKG_INSTALLED_DIR/$VCPKG_TARGET_TRIPLET/lib
+    CIBW_REPAIR_WHEEL_COMMAND_MACOS:
+      DYLD_LIBRARY_PATH=$REPAIR_LIBRARY_PATH delocate-wheel
+      --require-archs {delocate_archs}
+      -w {dest_dir}
+      -v {wheel}
+      --exclude libarrow_python.dylib
+      --exclude libarrow.1400.dylib
     CIBW_ENVIRONMENT_MACOS: >
       CMAKE_ARGS=-DBUILD_TESTING=OFF
       VCPKG_BINARY_SOURCES="clear;http,http://127.0.0.1:12321/{name}/{version}/{sha},readwrite"
       VCPKG_INSTALLED_DIR=$VCPKG_INSTALLED_DIR
       VCPKG_TARGET_TRIPLET=$VCPKG_TARGET_TRIPLET
-      REPAIR_LIBRARY_DIRS=$VCPKG_INSTALLED_DIR/$VCPKG_TARGET_TRIPLET/lib
+      REPAIR_LIBRARY_DIRS=$REPAIR_LIBRARY_DIRS
       MACOSX_DEPLOYMENT_TARGET=14.0
 
   install_pre_requirements_script: |
