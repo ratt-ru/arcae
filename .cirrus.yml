@@ -79,7 +79,7 @@ macos_arm64_task:
 
   env:
     VCPKG_TARGET_TRIPLET: arm64-osx-dynamic-cxx17-abi1-rel
-    REPAIR_LIBRARY_DIRS: $VCPKG_INSTALLED_DIR/$VCPKG_TARGET_TRIPLET/lib
+    REPAIR_LIBRARY_PATH: $VCPKG_INSTALLED_DIR/$VCPKG_TARGET_TRIPLET/lib
     CIBW_REPAIR_WHEEL_COMMAND_MACOS:
       DYLD_LIBRARY_PATH=$REPAIR_LIBRARY_PATH delocate-wheel
       --require-archs {delocate_archs}
@@ -92,7 +92,7 @@ macos_arm64_task:
       VCPKG_BINARY_SOURCES="clear;http,http://127.0.0.1:12321/{name}/{version}/{sha},readwrite"
       VCPKG_INSTALLED_DIR=$VCPKG_INSTALLED_DIR
       VCPKG_TARGET_TRIPLET=$VCPKG_TARGET_TRIPLET
-      REPAIR_LIBRARY_DIRS=$REPAIR_LIBRARY_DIRS
+      REPAIR_LIBRARY_PATH=$REPAIR_LIBRARY_PATH
       MACOSX_DEPLOYMENT_TARGET=14.0
 
   install_pre_requirements_script: |
