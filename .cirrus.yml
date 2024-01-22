@@ -81,7 +81,6 @@ macos_arm64_task:
     VCPKG_TARGET_TRIPLET: arm64-osx-dynamic-cxx17-abi1-rel
     REPAIR_LIBRARY_PATH: $VCPKG_INSTALLED_DIR/$VCPKG_TARGET_TRIPLET/lib
     CIBW_REPAIR_WHEEL_COMMAND_MACOS:
-      tree /tmp/vcpkg_installed/arm64-osx-dynamic-cxx17-abi1-rel &&
       DYLD_LIBRARY_PATH=$REPAIR_LIBRARY_PATH delocate-listdeps {wheel} &&
       DYLD_LIBRARY_PATH=$REPAIR_LIBRARY_PATH delocate-wheel
       --require-archs {delocate_archs}
@@ -98,7 +97,7 @@ macos_arm64_task:
       MACOSX_DEPLOYMENT_TARGET=11.0
 
   install_pre_requirements_script: |
-    brew install llvm python tree
+    brew install llvm python
     python3 -m pip install --upgrade pip
     python3 -m pip install --upgrade pip install git+https://github.com/pypa/cibuildwheel@main
   run_cibuildwheel_script: |
