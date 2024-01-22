@@ -1,4 +1,12 @@
 cmake_minimum_required(VERSION 3.25)
+
+# Compiler id for Apple Clang is now AppleClang
+cmake_policy(SET CMP0025 NEW)
+
+# Enable MACOS_RPATH
+# https://cmake.org/cmake/help/latest/policy/CMP0042.html
+cmake_policy(SET CMP0042 NEW)
+
 cmake_host_system_information(RESULT ncores QUERY NUMBER_OF_PHYSICAL_CORES)
 enable_testing()
 
@@ -11,7 +19,7 @@ if(UNIX)
     set(CMAKE_INSTALL_RPATH "$ORIGIN")
     set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 elseif(APPLE)
-    set(CMAKE_INSTALL_RPATH "@rpath")
+    set(CMAKE_INSTALL_RPATH "@loader_path")
     set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 elseif(WIN32)
     message(FATAL_ERROR "Windows is not supported")
