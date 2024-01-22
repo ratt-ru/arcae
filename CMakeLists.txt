@@ -17,7 +17,7 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake_modules)
 
 if(UNIX)
     if(APPLE)
-        set(CMAKE_INSTALL_RPATH "@loader_path")
+        set(CMAKE_INSTALL_RPATH "@rpath")
         set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
     else()
         set(CMAKE_INSTALL_RPATH "$ORIGIN")
