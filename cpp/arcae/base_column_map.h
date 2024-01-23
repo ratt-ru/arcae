@@ -148,13 +148,22 @@ struct RangeIterator {
   }
 
   // Return the Ranges for the given dimension
-  const ColumnRange & DimRanges(std::size_t dim) const;
+  const ColumnRange & DimRanges(std::size_t dim) const {
+    assert(dim < nDim());
+    return map_.get().DimRanges(dim);
+  };
 
   // Return the Maps for the given dimension
-  const ColumnMap & DimMaps(std::size_t dim) const;
+  const ColumnMap & DimMaps(std::size_t dim) const {
+    assert(dim < nDim());
+    return map_.get().DimMaps(dim);
+  };
 
   // Return the currently selected Range of the given dimension
-  const Range & DimRange(std::size_t dim) const;
+  const Range & DimRange(std::size_t dim) const {
+    assert(dim < nDim());
+    return DimRanges(dim)[index_[dim]];
+  };
 
   MapIterator<ColumnMapping> MapBegin() const {
     return MapIterator<ColumnMapping>::Make(*this, false);
@@ -177,7 +186,9 @@ struct RangeIterator {
   casacore::IPosition GetShape() const;
 
   bool operator==(const RangeIterator & other) const;
-  bool operator!=(const RangeIterator & other) const;
+  bool operator!=(const RangeIterator & other) const {
+    return !(*this == other);
+  };
 };
 
 
@@ -281,27 +292,6 @@ RangeIterator<ColumnMapping>::RangeIterator(ColumnMapping & column_map, bool don
     UpdateState();
 }
 
-// Return the Ranges for the given dimension
-template <typename ColumnMapping>
-const ColumnRange & RangeIterator<ColumnMapping>::DimRanges(std::size_t dim) const {
-  assert(dim < nDim());
-  return map_.get().DimRanges(dim);
-}
-
-// Return the Maps for the given dimension
-template <typename ColumnMapping>
-const ColumnMap & RangeIterator<ColumnMapping>::DimMaps(std::size_t dim) const {
-  assert(dim < nDim());
-  return map_.get().DimMaps(dim);
-}
-
-// Return the currently selected Range of the given dimension
-template <typename ColumnMapping>
-const Range & RangeIterator<ColumnMapping>::DimRange(std::size_t dim) const {
-  assert(dim < nDim());
-  return DimRanges(dim)[index_[dim]];
-}
-
 template <typename ColumnMapping>
 std::size_t RangeIterator<ColumnMapping>::RangeElements() const {
   return std::accumulate(std::begin(index_), std::end(index_), std::size_t{1},
@@ -370,12 +360,6 @@ bool RangeIterator<ColumnMapping>::operator==(const RangeIterator<ColumnMapping>
   if(&map_.get() != &other.map_.get() || done_ != other.done_) return false;
   return done_ ? true : index_ == other.index_;
 };
-
-template <typename ColumnMapping>
-bool RangeIterator<ColumnMapping>::operator!=(const RangeIterator<ColumnMapping> & other) const {
-  return !(*this == other);
-}
-
 
 // Returns a slicer for the row dimension
 template <typename ColumnMapping>
