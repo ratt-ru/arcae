@@ -13,6 +13,7 @@
 #include <vector>
 
 #include <arrow/api.h>
+#include <arrow/util/logging.h>
 #include <arrow/result.h>
 #include <arrow/status.h>
 #include <arrow/array/array_nested.h>
@@ -456,7 +457,7 @@ ArrowShapeProvider::DimSize(std::size_t dim) const {
 // Returns the dimension size of the data for the given row
 std::size_t ArrowShapeProvider::RowDimSize(casacore::rownr_t row, std::size_t dim) const {
   assert(dim < RowDim());
-  auto cdim = nDim() - dim - 1 /* account for row */ - 1;
+  auto cdim = std::ptrdiff_t(nDim()) - std::ptrdiff_t(dim) - 1 /* account for row */ - 1;
 
   auto tmp_data = data_;
   auto start = std::int64_t(row);
@@ -516,7 +517,13 @@ std::size_t ArrowShapeProvider::RowDimSize(casacore::rownr_t row, std::size_t di
     }
   }
 
+  /// TODO(sjperkins)
+  /// If we've reached this point, we've interpreted Arrow's nested arrays
+  /// incorrectly.
+  ARROW_LOG(INFO) << "Logical error in ArrowShapeProvider::RowDimSize";
   assert(false);
+  std::exit(1);
+  return -1;
 }
 
 
