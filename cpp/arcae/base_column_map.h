@@ -1,5 +1,5 @@
-#ifndef ARCAE_MAP_ITERATOR_H
-#define ARCAE_MAP_ITERATOR_H
+#ifndef ARCAE_BASE_COLUMN_MAP_H
+#define ARCAE_BASE_COLUMN_MAP_H
 
 #include <cassert>
 #include <functional>
@@ -737,4 +737,4 @@ RangeFactory(const SP & shape_prov, const ColumnMaps & maps) {
 
 } // namespace arcea
 
-#endif // ARCAE_MAP_ITERATOR_H
+#endif // ARCAE_BASE_COLUMN_MAP_H
