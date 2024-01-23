@@ -9,7 +9,7 @@ namespace arcae {
 
 arrow::Result<std::shared_ptr<arrow::Array>>
 ColumnWriteVisitor::GetFlatArray(bool nulls) const {
-    auto data = array_;
+    auto data = map_.get().data_;
 
     if(!nulls && data->null_count() > 0) {
         return arrow::Status::Invalid("Null values were encountered "

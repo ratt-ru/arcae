@@ -588,7 +588,8 @@ ColumnWriteMap::Make(
                                           column.columnDesc().name());
   }
 
-  return ColumnWriteMap{column, std::move(maps), std::move(ranges),
+  return ColumnWriteMap{column, data,
+                        std::move(maps), std::move(ranges),
                         std::move(shape_prov)};
 }
 

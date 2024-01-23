@@ -70,6 +70,7 @@ struct ColumnWriteMap {
   enum InputOrder {C_ORDER=0, F_ORDER};
 
   std::reference_wrapper<const casacore::TableColumn> column_;
+  std::shared_ptr<arrow::Array> data_;
   ColumnMaps maps_;
   ColumnRanges ranges_;
   ArrowShapeProvider shape_provider_;

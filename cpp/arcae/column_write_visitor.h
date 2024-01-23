@@ -22,15 +22,12 @@ class ColumnWriteVisitor {
 public:
     std::reference_wrapper<const ColumnWriteMap> map_;
     arrow::MemoryPool * pool_;
-    std::shared_ptr<arrow::Array> array_;
 
 public:
     explicit ColumnWriteVisitor(
         const ColumnWriteMap & column_map,
-        const std::shared_ptr<arrow::Array> & array,
         arrow::MemoryPool * pool=arrow::default_memory_pool()) :
             map_(std::cref(column_map)),
-            array_(array),
             pool_(pool) {};
     virtual ~ColumnWriteVisitor() = default;
 

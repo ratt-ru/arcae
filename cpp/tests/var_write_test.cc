@@ -131,7 +131,7 @@ TEST_F(EmptyVariableWriteTest, WriteToEmptyVariableColumn) {
 
     auto var = GetArrayColumn<casacore::Int>(table, "DATA");
     ASSERT_OK_AND_ASSIGN(auto write_map, ColumnWriteMap::Make(var, {{0, 3}}, data, ColumnWriteMap::C_ORDER));
-    auto write_visitor = arcae::ColumnWriteVisitor(write_map, data);
+    auto write_visitor = arcae::ColumnWriteVisitor(write_map);
     ASSERT_OK(write_visitor.Visit());
 
     ASSERT_OK_AND_ASSIGN(auto read_map, ColumnReadMap::Make(var, {{0, 3}}));
@@ -164,7 +164,7 @@ TEST_F(EmptyVariableWriteTest, WriteToEmptyVariableColumn) {
 
     auto var = GetArrayColumn<casacore::Int>(table, "DATA");
     ASSERT_OK_AND_ASSIGN(auto write_map, ColumnWriteMap::Make(var, {{0, 3}, {1}}, data));
-    auto write_visitor = arcae::ColumnWriteVisitor(write_map, data);
+    auto write_visitor = arcae::ColumnWriteVisitor(write_map);
     ASSERT_OK(write_visitor.Visit());
 
     ASSERT_OK_AND_ASSIGN(auto read_map, ColumnReadMap::Make(var, {{0, 3}, {1}}));
@@ -204,7 +204,7 @@ TEST_F(EmptyVariableWriteTest, WritePartialVariableEmptyColumn) {
     auto var = GetArrayColumn<CT>(table, "DATA");
     auto sel = arcae::ColumnSelection{{0, 3}, {1, 5}, {2, 4}};
     ASSERT_OK_AND_ASSIGN(auto write_map, ColumnWriteMap::Make(var, sel, data));
-    auto write_visitor = arcae::ColumnWriteVisitor(write_map, data);
+    auto write_visitor = arcae::ColumnWriteVisitor(write_map);
     ASSERT_OK(write_visitor.Visit());
 
     ASSERT_OK_AND_ASSIGN(auto read_map, ColumnReadMap::Make(var, sel));
@@ -249,7 +249,7 @@ TEST_F(EmptyVariableWriteTest, WritePartialFloatVariableEmptyColumn) {
     auto var = GetArrayColumn<CT>(table, "FLOAT_DATA");
     auto sel = arcae::ColumnSelection{{0, 3}, {1, 5}, {2, 4}};
     ASSERT_OK_AND_ASSIGN(auto write_map, ColumnWriteMap::Make(var, sel, data));
-    auto write_visitor = arcae::ColumnWriteVisitor(write_map, data);
+    auto write_visitor = arcae::ColumnWriteVisitor(write_map);
     ASSERT_OK(write_visitor.Visit());
 
     ASSERT_OK_AND_ASSIGN(auto read_map, ColumnReadMap::Make(var, sel));
@@ -297,7 +297,7 @@ TEST_F(EmptyVariableWriteTest, WritePartialComplexVariableEmptyColumn) {
     auto var = GetArrayColumn<CT>(table, "VAR_COMPLEX");
     auto sel = arcae::ColumnSelection{{0, 3}, {1, 5}, {2, 4}};
     ASSERT_OK_AND_ASSIGN(auto write_map, ColumnWriteMap::Make(var, sel, data));
-    auto write_visitor = arcae::ColumnWriteVisitor(write_map, data);
+    auto write_visitor = arcae::ColumnWriteVisitor(write_map);
     ASSERT_OK(write_visitor.Visit());
 
     ASSERT_OK_AND_ASSIGN(auto read_map, ColumnReadMap::Make(var, sel));
