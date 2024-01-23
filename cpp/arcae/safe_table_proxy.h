@@ -27,7 +27,7 @@ private:
     bool is_closed;
 
 private:
-    inline arrow::Status FailIfClosed() const {
+    arrow::Status FailIfClosed() const {
         return is_closed ? arrow::Status::Invalid("Table is closed")
                          : arrow::Status::OK();
     };

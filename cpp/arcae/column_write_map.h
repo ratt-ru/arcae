@@ -41,21 +41,21 @@ struct ArrowShapeProvider {
                                                 const std::shared_ptr<arrow::Array> & data);
 
   // returns true if the column shape is fixed
-  inline bool IsColumnFixed() const { return column_.get().columnDesc().isFixedShape(); }
+  bool IsColumnFixed() const { return column_.get().columnDesc().isFixedShape(); }
 
   // return true if the column shape varys
-  inline bool IsColumnVarying() const { return !IsColumnFixed(); }
+  bool IsColumnVarying() const { return !IsColumnFixed(); }
 
   // Returns true if the data shape is fixed
-  inline bool IsDataFixed() const { return shape_.has_value(); }
+  bool IsDataFixed() const { return shape_.has_value(); }
 
   // Return true if the data shape varys
-  inline bool IsDataVarying() const { return !IsDataFixed(); }
+  bool IsDataVarying() const { return !IsDataFixed(); }
 
   // Returns the number of dimensions, including row
   std::size_t nDim() const { return ndim_; }
 
-  inline std::size_t RowDim() const { return nDim() - 1; }
+  std::size_t RowDim() const { return nDim() - 1; }
 
   // Returns the dimension size of this column
   arrow::Result<std::size_t> DimSize(std::size_t dim) const;
@@ -70,15 +70,15 @@ struct ColumnWriteMap : public BaseColumnMap<ColumnWriteMap> {
   ArrowShapeProvider shape_provider_;
 
 
-  inline bool IsComplex() const {
+  bool IsComplex() const {
     return shape_provider_.is_complex_;
   }
 
-  inline std::size_t nDim() const {
+  std::size_t nDim() const {
     return shape_provider_.nDim();
   }
 
-  inline std::size_t RowDimSize(casacore::rownr_t row, std::size_t dim) const {
+  std::size_t RowDimSize(casacore::rownr_t row, std::size_t dim) const {
     return shape_provider_.RowDimSize(row, dim);
   }
 
@@ -93,7 +93,7 @@ struct ColumnWriteMap : public BaseColumnMap<ColumnWriteMap> {
   }
 
   // Is this a Fixed Shape case
-  inline bool IsFixedShape() const {
+  bool IsFixedShape() const {
     return shape_provider_.IsDataFixed();
   }
 

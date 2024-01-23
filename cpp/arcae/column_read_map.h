@@ -50,17 +50,17 @@ struct ShapeProvider {
                                            const ColumnSelection & selection);
 
   // Returns true if the column is defined as having a fixed shape
-  inline bool IsDefinitelyFixed() const {
+  bool IsDefinitelyFixed() const {
     return var_data_ == nullptr;
   }
 
   // Return true if the column is defined as having a varying shape
-  inline bool IsVarying() const {
+  bool IsVarying() const {
     return !IsDefinitelyFixed();
   }
 
   // Return true if the column has a fixed shape in practice
-  inline bool IsActuallyFixed() const {
+  bool IsActuallyFixed() const {
     return IsDefinitelyFixed() || var_data_->IsActuallyFixed();
   }
 
@@ -69,7 +69,7 @@ struct ShapeProvider {
     return (IsDefinitelyFixed() ? column_.get().columnDesc().ndim() : var_data_->nDim()) + 1;
   }
 
-  inline std::size_t RowDim() const { return nDim() - 1; }
+  std::size_t RowDim() const { return nDim() - 1; }
 
   // Returns the dimension size of this column
   arrow::Result<std::size_t> DimSize(std::size_t dim) const;
@@ -83,11 +83,11 @@ struct ColumnReadMap : public BaseColumnMap<ColumnReadMap> {
   ShapeProvider shape_provider_;
   std::optional<casacore::IPosition> output_shape_;
 
-  inline std::size_t nDim() const {
+  std::size_t nDim() const {
     return shape_provider_.nDim();
   }
 
-  inline std::size_t RowDimSize(casacore::rownr_t row, std::size_t dim) const {
+  std::size_t RowDimSize(casacore::rownr_t row, std::size_t dim) const {
     return shape_provider_.RowDimSize(row, dim);
   }
 
@@ -104,7 +104,7 @@ struct ColumnReadMap : public BaseColumnMap<ColumnReadMap> {
   }
 
   // Is this a Fixed Shape case
-  inline bool IsFixedShape() const {
+  bool IsFixedShape() const {
     return shape_provider_.IsActuallyFixed();
   }
 

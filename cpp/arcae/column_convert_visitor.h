@@ -44,10 +44,10 @@ public:
 #undef VISIT
 
 private:
-    inline casacore::uInt local_row(casacore::uInt row)
+    casacore::uInt local_row(casacore::uInt row)
         { assert(row >= startrow_); return row - startrow_; }
 
-    inline arrow::Status FailIfNotUTF8(const std::shared_ptr<arrow::DataType> & arrow_dtype) {
+    arrow::Status FailIfNotUTF8(const std::shared_ptr<arrow::DataType> & arrow_dtype) {
         if(arrow_dtype == arrow::utf8()) { return arrow::Status::OK(); }
         return arrow::Status::Invalid(arrow_dtype->ToString(), " incompatible with casacore::String");
     }

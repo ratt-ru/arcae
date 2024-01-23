@@ -34,7 +34,7 @@ struct IdMap {
   casacore::rownr_t disk;
   casacore::rownr_t mem;
 
-  constexpr inline bool operator==(const IdMap & lhs) const
+  constexpr bool operator==(const IdMap & lhs) const
       { return disk == lhs.disk && mem == lhs.mem; }
 };
 
@@ -58,13 +58,13 @@ struct Range {
   constexpr casacore::rownr_t nRows() const
     { return end - start; }
 
-  constexpr inline bool IsSingleRow() const
+  constexpr bool IsSingleRow() const
     { return nRows() == 1; }
 
-  constexpr inline bool IsValid() const
+  constexpr bool IsValid() const
     { return start <= end; }
 
-  constexpr inline bool operator==(const Range & lhs) const
+  constexpr bool operator==(const Range & lhs) const
       { return start == lhs.start && end == lhs.end && type == lhs.type; }
 };
 
@@ -99,11 +99,11 @@ struct MapIterator {
               bool done);
 
   static MapIterator Make(const RangeIterator<ColumnMapping> & rit, bool done);
-  inline std::size_t nDim() const {
+  std::size_t nDim() const {
     return chunk_index_.size();
   };
 
-  inline std::size_t RowDim() const {
+  std::size_t RowDim() const {
     return nDim() - 1;
   };
 
@@ -114,7 +114,7 @@ struct MapIterator {
 
   MapIterator & operator++();
   bool operator==(const MapIterator & other) const;
-  inline bool operator!=(const MapIterator & other) const {
+  bool operator!=(const MapIterator & other) const {
     return !(*this == other);
   }
 };
@@ -137,12 +137,12 @@ struct RangeIterator {
   RangeIterator(ColumnMapping & column_map, bool done=false);
 
   // Return the number of dimensions in the index
-  inline std::size_t nDim() const {
+  std::size_t nDim() const {
     return index_.size();
   }
 
   // Index of he row dimension
-  inline std::size_t RowDim() const {
+  std::size_t RowDim() const {
     assert(nDim() > 0);
     return nDim() - 1;
   }
@@ -151,12 +151,12 @@ struct RangeIterator {
   const ColumnRange & DimRanges(std::size_t dim) const;
 
   // Return the Maps for the given dimension
-  inline const ColumnMap & DimMaps(std::size_t dim) const;
+  const ColumnMap & DimMaps(std::size_t dim) const;
 
   // Return the currently selected Range of the given dimension
-  inline const Range & DimRange(std::size_t dim) const;
+  const Range & DimRange(std::size_t dim) const;
 
-  inline MapIterator<ColumnMapping> MapBegin() const {
+  MapIterator<ColumnMapping> MapBegin() const {
     return MapIterator<ColumnMapping>::Make(*this, false);
   };
 
@@ -164,7 +164,7 @@ struct RangeIterator {
     return MapIterator<ColumnMapping>::Make(*this, true);
   };
 
-  inline std::size_t RangeElements() const;
+  std::size_t RangeElements() const;
 
   RangeIterator & operator++();
   void UpdateState();
@@ -229,13 +229,13 @@ MapIterator<ColumnMapping>::GlobalOffset() const {
 }
 
 template <typename ColumnMapping>
-inline std::size_t
+std::size_t
 MapIterator<ColumnMapping>::RangeSize(std::size_t dim) const {
   return rit_.get().range_length_[dim];
 }
 
 template <typename ColumnMapping>
-inline std::size_t MapIterator<ColumnMapping>::MemStart(std::size_t dim) const {
+std::size_t MapIterator<ColumnMapping>::MemStart(std::size_t dim) const {
   return rit_.get().mem_start_[dim];
 }
 
@@ -439,31 +439,31 @@ struct BaseColumnMap {
   ColumnRanges ranges_;
 
   // Return number of dimensions in the map
-  inline std::size_t nDim() const {
+  std::size_t nDim() const {
     return static_cast<const T*>(this)->nDim();
   }
 
   // Return the dimension size for the specified row and dimension
   // This is appropriate for variably-shaped data.
-  inline std::size_t RowDimSize(casacore::rownr_t row, std::size_t dim) const {
+  std::size_t RowDimSize(casacore::rownr_t row, std::size_t dim) const {
     return static_cast<const T*>(this)->RowDimSize(row, dim);
   }
 
 
   // Return the ColumnRange for the given dimension
-  inline const ColumnMap & DimMaps(std::size_t dim) const {
+  const ColumnMap & DimMaps(std::size_t dim) const {
     assert(dim < nDim());
     return maps_[dim];
   }
 
   // Return the ColumnRange for the given dimension
-  inline const ColumnRange & DimRanges(std::size_t dim) const {
+  const ColumnRange & DimRanges(std::size_t dim) const {
     assert(dim < nDim());
     return ranges_[dim];
   }
 
   // Return the row dimension in FORTRAN order
-  inline std::size_t RowDim() const {
+  std::size_t RowDim() const {
     assert(nDim() > 0);
     return nDim() - 1;
   }
