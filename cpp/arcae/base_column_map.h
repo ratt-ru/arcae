@@ -469,11 +469,11 @@ struct BaseColumnMap {
   }
 
   RangeIterator<T> RangeBegin() const {
-    return RangeIterator{const_cast<T &>(*static_cast<const T*>(this)), false};
+    return RangeIterator{const_cast<T&>(static_cast<const T&>(*this)), false};
   }
 
   RangeIterator<T> RangeEnd() const {
-    return RangeIterator{const_cast<T &>(*static_cast<const T*>(this)), true};
+    return RangeIterator{const_cast<T&>(static_cast<const T&>(*this)), true};
   }
 
   // Number of disjoint ranges in this map
@@ -721,17 +721,6 @@ VariableRangeFactory(const SP & shape_prov, const ColumnMaps & maps) {
 
   assert(ndim == column_ranges.size());
   return column_ranges;
-}
-
-// Make ranges for each dimension
-template <typename SP>
-arrow::Result<ColumnRanges>
-RangeFactory(const SP & shape_prov, const ColumnMaps & maps) {
-  if(shape_prov.IsDataFixed()) {
-    return FixedRangeFactory(shape_prov, maps);
-  }
-
-  return VariableRangeFactory(shape_prov, maps);
 }
 
 
