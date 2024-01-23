@@ -36,16 +36,22 @@ public:
                                       this);
     }
 
+    // Signed Integer types
     arrow::Status Visit(const arrow::Int8Type & dt) { return WriteColumn<casacore::Char>(); }
     arrow::Status Visit(const arrow::Int16Type & dt) { return WriteColumn<casacore::Short>(); }
     arrow::Status Visit(const arrow::Int32Type & dt) { return WriteColumn<casacore::Int>(); }
     arrow::Status Visit(const arrow::Int64Type & dt) { return WriteColumn<casacore::Int64>(); }
 
+    // Unsigned Integer types
     arrow::Status Visit(const arrow::UInt8Type & dt) { return WriteColumn<casacore::uChar>(); }
     arrow::Status Visit(const arrow::UInt16Type & dt) { return WriteColumn<casacore::uShort>(); }
     arrow::Status Visit(const arrow::UInt32Type & dt) { return WriteColumn<casacore::uInt>(); }
     //arrow::Status Visit(const arrow::UInt64Type & dt) { return WriteColumn<casacore::uInt64>(); }
 
+    // Strings
+    arrow::Status Visit(const arrow::StringType & dt) { return WriteColumn<casacore::String>(); }
+
+    // Float point and Complex Numbers
     arrow::Status Visit(const arrow::FloatType & dt) {
         if(map_.get().IsComplex()) return WriteColumn<casacore::Complex>();
         return WriteColumn<casacore::Float>();
@@ -56,8 +62,7 @@ public:
         return WriteColumn<casacore::Double>();
     }
 
-    arrow::Status Visit(const arrow::StringType & dt) { return WriteColumn<casacore::String>(); }
-
+    // Base case
     arrow::Status Visit(const arrow::DataType & dt) {
         return arrow::Status::NotImplemented("Arrow Array to Casa Column "
                                              "conversion for type ", dt.ToString());
