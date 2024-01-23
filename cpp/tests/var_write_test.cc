@@ -130,7 +130,7 @@ TEST_F(EmptyVariableWriteTest, WriteToEmptyVariableColumn) {
                                              [10, 11, 12]]])"));
 
     auto var = GetArrayColumn<casacore::Int>(table, "DATA");
-    ASSERT_OK_AND_ASSIGN(auto write_map, ColumnWriteMap::Make(var, {{0, 3}}, data, ColumnWriteMap::C_ORDER));
+    ASSERT_OK_AND_ASSIGN(auto write_map, ColumnWriteMap::Make(var, {{0, 3}}, data));
     auto write_visitor = arcae::ColumnWriteVisitor(write_map);
     ASSERT_OK(write_visitor.Visit());
 

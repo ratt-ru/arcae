@@ -1,7 +1,6 @@
 #ifndef ARCAE_COLUMN_WRITE_MAP_H
 #define ARCAE_COLUMN_WRITE_MAP_H
 
-#include <cassert>
 #include <cstddef>
 #include <functional>
 #include <memory>
@@ -66,24 +65,10 @@ struct ArrowShapeProvider {
 };
 
 
-struct ColumnWriteMap {
-  enum InputOrder {C_ORDER=0, F_ORDER};
-
-  std::reference_wrapper<const casacore::TableColumn> column_;
+struct ColumnWriteMap : public BaseColumnMap<ColumnWriteMap> {
   std::shared_ptr<arrow::Array> data_;
-  ColumnMaps maps_;
-  ColumnRanges ranges_;
   ArrowShapeProvider shape_provider_;
 
-  inline const ColumnMap & DimMaps(std::size_t dim) const {
-    assert(dim < nDim());
-    return maps_[dim];
-  }
-
-  inline const ColumnRange & DimRanges(std::size_t dim) const {
-    assert(dim < nDim());
-    return ranges_[dim];
-  }
 
   inline bool IsComplex() const {
     return shape_provider_.is_complex_;
@@ -91,19 +76,6 @@ struct ColumnWriteMap {
 
   inline std::size_t nDim() const {
     return shape_provider_.nDim();
-  }
-
-  inline std::size_t RowDim() const {
-    assert(nDim() > 0);
-    return nDim() - 1;
-  }
-
-  inline RangeIterator<ColumnWriteMap> RangeBegin() const {
-    return RangeIterator{const_cast<ColumnWriteMap &>(*this), false};
-  }
-
-  inline RangeIterator<ColumnWriteMap> RangeEnd() const {
-    return RangeIterator{const_cast<ColumnWriteMap &>(*this), true};
   }
 
   inline std::size_t RowDimSize(casacore::rownr_t row, std::size_t dim) const {
@@ -130,19 +102,7 @@ struct ColumnWriteMap {
       casacore::TableColumn & column,
       ColumnSelection selection,
       const std::shared_ptr<arrow::Array> & data,
-      InputOrder order=InputOrder::C_ORDER);
-
-  // Number of disjoint ranges in this map
-  std::size_t nRanges() const;
-
-  // Returns true if this is a simple map or, a map that only contains
-  // a single range and thereby removes the need to read separate ranges of
-  // data and copy those into a final buffer.
-  bool IsSimple() const;
-
-  // Find the total number of elements formed
-  // by the disjoint ranges in this map
-  std::size_t nElements() const;
+      MapOrder order=MapOrder::C_ORDER);
 };
 
 

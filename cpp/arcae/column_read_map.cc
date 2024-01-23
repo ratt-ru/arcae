@@ -6,7 +6,6 @@
 #include <iterator>
 #include <functional>
 #include <memory>
-#include <numeric>
 #include <optional>
 #include <sys/types.h>
 #include <vector>
@@ -689,10 +688,10 @@ arrow::Result<ColumnReadMap>
 ColumnReadMap::Make(
     const casacore::TableColumn & column,
     ColumnSelection selection,
-    InputOrder order) {
+    MapOrder order) {
 
   // Convert to FORTRAN ordering, which the casacore internals use
-  if(order == InputOrder::C_ORDER) {
+  if(order == MapOrder::C_ORDER) {
     std::reverse(std::begin(selection), std::end(selection));
   }
 
@@ -710,88 +709,5 @@ ColumnReadMap::Make(
   return ColumnReadMap{column, std::move(maps), std::move(ranges),
                         std::move(shape_prov), std::move(shape)};
 }
-
-// Number of disjoint ranges in this map
-std::size_t
-ColumnReadMap::nRanges() const {
-  return std::accumulate(std::begin(ranges_), std::end(ranges_), std::size_t{1},
-                        [](const auto init, const auto & range)
-                          { return init * range.size(); });
-}
-
-// Returns true if this is a simple map or, a map that only contains
-// a single range and thereby removes the need to read separate ranges of
-// data and copy those into a final buffer.
-bool
-ColumnReadMap::IsSimple() const {
-  for(std::size_t dim=0; dim < nDim(); ++dim) {
-    const auto & column_map = DimMaps(dim);
-    const auto & column_range = DimRanges(dim);
-
-    // More than one range of row ids in a dimension
-    if(column_range.size() > 1) {
-      return false;
-    }
-
-    for(auto & range: column_range) {
-      switch(range.type) {
-        // These are trivially contiguous
-        case Range::FREE:
-        case Range::VARYING:
-          break;
-        case Range::MAP:
-          for(std::size_t i = range.start + 1; i < range.end; ++i) {
-            if(column_map[i].mem - column_map[i-1].mem != 1) {
-              return false;
-            }
-            if(column_map[i].disk - column_map[i-1].disk != 1) {
-              return false;
-            }
-          }
-          break;
-      }
-    }
-  }
-
-  return true;
-}
-
-// Find the total number of elements formed
-// by the disjoint ranges in this map
-std::size_t
-ColumnReadMap::nElements() const {
-  assert(ranges_.size() > 0);
-  const auto & row_ranges = DimRanges(RowDim());
-  auto elements = std::size_t{0};
-
-  for(std::size_t rr_id=0; rr_id < row_ranges.size(); ++rr_id) {
-    const auto & row_range = row_ranges[rr_id];
-    auto row_elements = std::size_t{row_range.nRows()};
-    for(std::size_t dim = 0; dim < RowDim(); ++dim) {
-      const auto & dim_range = DimRanges(dim);
-      auto dim_elements = std::size_t{0};
-      for(const auto & range: dim_range) {
-        switch(range.type) {
-          case Range::VARYING:
-            assert(row_range.IsSingleRow());
-            dim_elements += shape_provider_.RowDimSize(rr_id, dim);
-            break;
-          case Range::FREE:
-          case Range::MAP:
-            assert(range.IsValid());
-            dim_elements += range.nRows();
-            break;
-          default:
-            assert(false && "Unhandled Range::Type enum");
-        }
-      }
-      row_elements *= dim_elements;
-    }
-    elements += row_elements;
-  }
-
-  return elements;
-}
-
 
 } // namespace arcae

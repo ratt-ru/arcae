@@ -13,6 +13,8 @@
 
 namespace arcae {
 
+enum MapOrder {C_ORDER=0, F_ORDER};
+
 using RowIds = std::vector<casacore::rownr_t>;
 using ColumnSelection = std::vector<RowIds>;
 
@@ -405,6 +407,149 @@ casacore::IPosition RangeIterator<ColumnMapping>::GetShape() const {
   return shape;
 }
 
+
+// CRTP base class for Read/Write Column Mappings
+//
+// Defines a mapping between ranges of a casacore column
+// and an Arrow Array. If there is a single contiguous range
+// then the mapping is regarded as simple -- the data can
+// be read/written in one operation. Otherwise,
+// multiple operations are required to read/write multiple
+// disjoint ranges.
+//
+// BaseColumnMap should be subclassed to handle the different
+// cases for reading and writing. Sub-classes should implement
+// - std::size_t nDim() const
+// - std::size_t RowDimSize(casacore::rownr_t row, std::size_t dim) const
+template <typename T>
+struct BaseColumnMap {
+  std::reference_wrapper<const casacore::TableColumn> column_;
+  ColumnMaps maps_;
+  ColumnRanges ranges_;
+
+  // Return number of dimensions in the map
+  inline std::size_t nDim() const {
+    return static_cast<const T*>(this)->nDim();
+  }
+
+  // Return the dimension size for the specified row and dimension
+  // This is appropriate for variably-shaped data.
+  inline std::size_t RowDimSize(casacore::rownr_t row, std::size_t dim) const {
+    return static_cast<const T*>(this)->RowDimSize(row, dim);
+  }
+
+
+  // Return the ColumnRange for the given dimension
+  inline const ColumnMap & DimMaps(std::size_t dim) const {
+    assert(dim < nDim());
+    return maps_[dim];
+  }
+
+  // Return the ColumnRange for the given dimension
+  inline const ColumnRange & DimRanges(std::size_t dim) const {
+    assert(dim < nDim());
+    return ranges_[dim];
+  }
+
+  // Return the row dimension in FORTRAN order
+  inline std::size_t RowDim() const {
+    assert(nDim() > 0);
+    return nDim() - 1;
+  }
+
+  RangeIterator<T> RangeBegin() const {
+    return RangeIterator{const_cast<T &>(*static_cast<const T*>(this)), false};
+  }
+
+  RangeIterator<T> RangeEnd() const {
+    return RangeIterator{const_cast<T &>(*static_cast<const T*>(this)), true};
+  }
+
+  // Number of disjoint ranges in this map
+  std::size_t nRanges() const {
+    return std::accumulate(std::begin(ranges_), std::end(ranges_), std::size_t{1},
+                            [](const auto init, const auto & range)
+                              { return init * range.size(); });
+  }
+
+  // Returns true if this is a simple map or, a map that only contains
+  // a single range and thereby removes the need to read separate ranges of
+  // data and copy those into a final buffer.
+  bool IsSimple() const;
+
+  // Find the total number of elements formed
+  // by the possibly disjoint ranges in this map
+  std::size_t nElements() const;
+};
+
+template <typename T>
+bool BaseColumnMap<T>::IsSimple() const {
+  for(std::size_t dim=0; dim < nDim(); ++dim) {
+    const auto & column_map = DimMaps(dim);
+    const auto & column_range = DimRanges(dim);
+
+    // More than one range of row ids in a dimension
+    if(column_range.size() > 1) {
+      return false;
+    }
+
+    for(auto & range: column_range) {
+      switch(range.type) {
+        // These are trivially contiguous
+        case Range::FREE:
+        case Range::VARYING:
+          break;
+        case Range::MAP:
+          for(std::size_t i = range.start + 1; i < range.end; ++i) {
+            if(column_map[i].mem - column_map[i-1].mem != 1) {
+              return false;
+            }
+            if(column_map[i].disk - column_map[i-1].disk != 1) {
+              return false;
+            }
+          }
+          break;
+      }
+    }
+  }
+
+  return true;
+}
+
+template <typename T>
+std::size_t BaseColumnMap<T>::nElements() const {
+  assert(ranges_.size() > 0);
+  const auto & row_ranges = DimRanges(RowDim());
+  auto elements = std::size_t{0};
+
+  for(std::size_t rr_id=0; rr_id < row_ranges.size(); ++rr_id) {
+    const auto & row_range = row_ranges[rr_id];
+    auto row_elements = std::size_t{row_range.nRows()};
+    for(std::size_t dim = 0; dim < RowDim(); ++dim) {
+      const auto & dim_range = DimRanges(dim);
+      auto dim_elements = std::size_t{0};
+      for(const auto & range: dim_range) {
+        switch(range.type) {
+          case Range::VARYING:
+            assert(row_range.IsSingleRow());
+            dim_elements += RowDimSize(rr_id, dim);
+            break;
+          case Range::FREE:
+          case Range::MAP:
+            assert(range.IsValid());
+            dim_elements += range.nRows();
+            break;
+          default:
+            assert(false && "Unhandled Range::Type enum");
+        }
+      }
+      row_elements *= dim_elements;
+    }
+    elements += row_elements;
+  }
+
+  return elements;
+}
 
 
 } // namespace arcea
