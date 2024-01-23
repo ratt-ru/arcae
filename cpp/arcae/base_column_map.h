@@ -6,6 +6,8 @@
 #include <numeric>
 #include <vector>
 
+#include <arrow/result.h>
+
 #include <casacore/casa/aipsxtype.h>
 #include <casacore/casa/Arrays/IPosition.h>
 #include <casacore/casa/Arrays/Slicer.h>
@@ -14,6 +16,15 @@
 namespace arcae {
 
 enum MapOrder {C_ORDER=0, F_ORDER};
+
+// Return a selection dimension given
+//
+// 1. FORTRAN ordered dim
+// 2. Number of selection dimensions
+// 3. Number of column dimensions
+//
+// A return of < 0 indicates a non-existent selection
+std::ptrdiff_t SelectDim(std::size_t dim, std::size_t sdims, std::size_t ndims);
 
 using RowIds = std::vector<casacore::rownr_t>;
 using ColumnSelection = std::vector<RowIds>;
@@ -549,6 +560,178 @@ std::size_t BaseColumnMap<T>::nElements() const {
   }
 
   return elements;
+}
+
+
+
+// Create a Column Map from a selection of row id's in different dimensions
+template <typename SP>
+ColumnMaps MapFactory(const SP & shape_prov, const ColumnSelection & selection) {
+  ColumnMaps column_maps;
+  auto ndim = shape_prov.nDim();
+  column_maps.reserve(ndim);
+
+  for(auto dim=std::size_t{0}; dim < ndim; ++dim) {
+      // Dimension needs to be adjusted for
+      // 1. We may not have selections matching all dimensions
+      // 2. Selections are FORTRAN ordered
+      auto sdim = SelectDim(dim, selection.size(), ndim);
+
+      if(sdim < 0 || selection.size() == 0 || selection[sdim].size() == 0) {
+        column_maps.emplace_back(ColumnMap{});
+        continue;
+      }
+
+      const auto & dim_ids = selection[sdim];
+      ColumnMap column_map;
+      column_map.reserve(dim_ids.size());
+
+      for(auto [disk_it, mem] = std::tuple{std::begin(dim_ids), casacore::rownr_t{0}};
+          disk_it != std::end(dim_ids); ++mem, ++disk_it) {
+            column_map.push_back({*disk_it, mem});
+      }
+
+      std::sort(std::begin(column_map), std::end(column_map),
+                [](const auto & lhs, const auto & rhs) {
+                  return lhs.disk < rhs.disk; });
+
+      column_maps.emplace_back(std::move(column_map));
+  }
+
+  return column_maps;
+}
+
+// Make ranges for fixed shape data
+// In this case, each row has the same shape
+// so we can make ranges that span multiple rows
+template <typename SP>
+arrow::Result<ColumnRanges>
+FixedRangeFactory(const SP & shape_prov, const ColumnMaps & maps) {
+  //assert(shape_prov.IsDataFixed());
+  auto ndim = shape_prov.nDim();
+  ColumnRanges column_ranges;
+  column_ranges.reserve(ndim);
+
+  for(std::size_t dim=0; dim < ndim; ++dim) {
+    // If no mapping exists for this dimension, create a range
+    // from the column shape
+    if(dim >= maps.size() || maps[dim].size() == 0) {
+      ARROW_ASSIGN_OR_RAISE(auto dim_size, shape_prov.DimSize(dim));
+      column_ranges.emplace_back(ColumnRange{Range{0, dim_size, Range::FREE}});
+      continue;
+    }
+
+    // A mapping exists for this dimension, create ranges
+    // from contiguous segments
+    const auto & column_map = maps[dim];
+    auto column_range = ColumnRange{};
+    auto current = Range{0, 1, Range::MAP};
+
+    for(auto [i, prev, next] = std::tuple{
+            casacore::rownr_t{1},
+            std::begin(column_map),
+            std::next(std::begin(column_map))};
+        next != std::end(column_map); ++i, ++prev, ++next) {
+
+      if(next->disk - prev->disk == 1) {
+        current.end += 1;
+      } else {
+        column_range.push_back(current);
+        current = Range{i, i + 1, Range::MAP};
+      }
+    }
+
+    column_range.emplace_back(std::move(current));
+    column_ranges.emplace_back(std::move(column_range));
+  }
+
+  assert(ndim == column_ranges.size());
+  return column_ranges;
+}
+
+// Make ranges for variably shaped data
+// In this case, each row may have a different shape
+// so we create a separate range for each row and VARYING
+// ranges for other dimensions whose size cannot be determined.
+template <typename SP>
+arrow::Result<ColumnRanges>
+VariableRangeFactory(const SP & shape_prov, const ColumnMaps & maps) {
+  //assert(shape_prov.IsDataVarying());
+  auto ndim = shape_prov.nDim();
+  auto row_dim = ndim - 1;
+  ColumnRanges column_ranges;
+  column_ranges.reserve(ndim);
+
+
+  // Handle non-row dimensions first
+  for(std::size_t dim=0; dim < row_dim; ++dim) {
+    // If no mapping exists for this dimension
+    // create a single VARYING range
+    if(dim >= maps.size() || maps[dim].size() == 0) {
+      column_ranges.emplace_back(ColumnRange{Range{0, 0, Range::VARYING}});
+      continue;
+    }
+
+    // A mapping exists for this dimension, create ranges
+    // from contiguous segments
+    const auto & column_map = maps[dim];
+    auto column_range = ColumnRange{};
+    auto current = Range{0, 1, Range::MAP};
+
+    for(auto [i, prev, next] = std::tuple{
+            casacore::rownr_t{1},
+            std::begin(column_map),
+            std::next(std::begin(column_map))};
+        next != std::end(column_map); ++i, ++prev, ++next) {
+
+      if(next->disk - prev->disk == 1) {
+        current.end += 1;
+      } else {
+        column_range.push_back(current);
+        current = Range{i, i + 1, Range::MAP};
+      }
+    }
+
+    column_range.emplace_back(std::move(current));
+    column_ranges.emplace_back(std::move(column_range));
+  }
+
+  // Lastly, the row dimension
+  auto row_range = ColumnRange{};
+
+  // Split the row dimension into ranges of exactly one row
+  if(maps.size() == 0 || maps[row_dim].size() == 0) {
+    // No maps provided, derive from shape
+    ARROW_ASSIGN_OR_RAISE(auto dim_size, shape_prov.DimSize(row_dim));
+    row_range.reserve(dim_size);
+    for(std::size_t r=0; r < dim_size; ++r) {
+      row_range.emplace_back(Range{r, r + 1, Range::FREE});
+    }
+  } else {
+    // Derive from mapping
+    const auto & row_maps = maps[row_dim];
+    row_range.reserve(row_maps.size());
+    for(std::size_t r=0; r < row_maps.size(); ++r) {
+      row_range.emplace_back(Range{r, r + 1, Range::MAP});
+    }
+  }
+
+  column_ranges.emplace_back(std::move(row_range));
+
+
+  assert(ndim == column_ranges.size());
+  return column_ranges;
+}
+
+// Make ranges for each dimension
+template <typename SP>
+arrow::Result<ColumnRanges>
+RangeFactory(const SP & shape_prov, const ColumnMaps & maps) {
+  if(shape_prov.IsDataFixed()) {
+    return FixedRangeFactory(shape_prov, maps);
+  }
+
+  return VariableRangeFactory(shape_prov, maps);
 }
 
 

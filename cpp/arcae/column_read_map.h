@@ -1,7 +1,6 @@
 #ifndef ARCAE_COLUMN_READ_MAP_H
 #define ARCAE_COLUMN_READ_MAP_H
 
-#include <cassert>
 #include <cstddef>
 #include <functional>
 #include <memory>
@@ -16,7 +15,7 @@
 #include <casacore/casa/Arrays/Slicer.h>
 #include <casacore/tables/Tables/TableColumn.h>
 
-#include "arcae/map_iterator.h"
+#include "arcae/base_column_map.h"
 
 namespace arcae {
 

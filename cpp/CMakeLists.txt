@@ -12,6 +12,7 @@ add_library(arcae SHARED
     arcae/complex_type.cc
     arcae/configuration.cc
     arcae/descriptor.cc
+    arcae/base_column_map.cc
     arcae/service_locator.cc
     arcae/safe_table_proxy.cc
     arcae/table_factory.cc

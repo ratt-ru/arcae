@@ -15,7 +15,7 @@
 #include <casacore/casa/Arrays/Slicer.h>
 #include <casacore/tables/Tables/TableColumn.h>
 
-#include "arcae/map_iterator.h"
+#include "arcae/base_column_map.h"
 #include "arrow/array/array_base.h"
 #include "arrow/type.h"
 
