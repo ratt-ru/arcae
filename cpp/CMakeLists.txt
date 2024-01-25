@@ -1,4 +1,5 @@
 find_package(PkgConfig REQUIRED)
+find_package(absl CONFIG REQUIRED)
 pkg_check_modules(casacore REQUIRED IMPORTED_TARGET casacore)
 
 add_library(arcae SHARED
@@ -19,8 +20,8 @@ add_library(arcae SHARED
     arcae/utility.cc)
 
 target_link_directories(arcae PUBLIC ${PYARROW_LIBDIRS})
-target_link_libraries(arcae PkgConfig::casacore arrow)
-target_include_directories(arcae PUBLIC PkgConfig::casacore ${PYARROW_INCLUDE} ${CMAKE_INCLUDE_CURRENT_DIR})
+target_link_libraries(arcae PkgConfig::casacore arrow absl::span)
+target_include_directories(arcae PUBLIC PkgConfig::casacore absl::span ${PYARROW_INCLUDE} ${CMAKE_INCLUDE_CURRENT_DIR})
 
 set_target_properties(arcae PROPERTIES
     POSITION_INDEPENDENT_CODE 1)

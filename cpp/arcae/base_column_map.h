@@ -6,6 +6,8 @@
 #include <numeric>
 #include <vector>
 
+#include <absl/types/span.h>
+
 #include <arrow/result.h>
 
 #include <casacore/casa/aipsxtype.h>
