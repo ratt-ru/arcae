@@ -148,6 +148,25 @@ def test_getcol(getcol_table):
     with pytest.raises(pa.lib.ArrowException, match="NONEXISTENT does not exist"):
         T.getcol("NONEXISTENT")
 
+def test_getcol2(getcol_table):
+    T = arcae.table(getcol_table)
+
+    assert_array_equal(T.getcol2("TIME"), [0, 1, 2])
+    assert_array_equal(T.getcol2("TIME", (slice(0, 2),)), [0, 1])
+    assert_array_equal(T.getcol2("TIME", (np.array([0, 1]),)), [0, 1])
+    assert_array_equal(T.getcol2("TIME", (np.array([0, 2]),)), [0, 2])
+    assert_array_equal(T.getcol2("STRING"), ["0", "1", "2"])
+
+    assert_array_equal(T.getcol2("FLOAT_DATA"), [
+        [[0, 0, 0, 0], [0, 0, 0, 0]],
+        [[1, 1, 1, 1], [1, 1, 1, 1]],
+        [[2, 2, 2, 2], [2, 2, 2, 2]]])
+
+    assert_array_equal(T.getcol2("FLOAT_DATA", (slice(0, 2), slice(0, 2))), [
+        [[0, 0, 0, 0], [0, 0, 0, 0]],
+        [[1, 1, 1, 1], [1, 1, 1, 1]]])
+
+
 def test_partial_read(sorting_table):
     """ Tests that partial reads work """
     T = arcae.table(sorting_table)

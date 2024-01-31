@@ -1,4 +1,5 @@
 find_package(Python COMPONENTS Interpreter Development.Module REQUIRED)
+find_package(absl CONFIG REQUIRED)
 find_package(PkgConfig REQUIRED)
 find_program(CYTHON_FOUND "cython" REQUIRED)
 
@@ -17,6 +18,7 @@ target_link_libraries(arrow_tables PUBLIC arcae PkgConfig::casacore)
 target_link_directories(arrow_tables PUBLIC ${PYARROW_LIBDIRS})
 target_include_directories(arrow_tables PUBLIC
                             PkgConfig::casacore
+                            absl::span
                             ${PYARROW_INCLUDE}
                             ${NUMPY_INCLUDE}
                             ${CMAKE_SOURCE_DIR}/cpp)

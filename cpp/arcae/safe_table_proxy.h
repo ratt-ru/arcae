@@ -8,10 +8,10 @@
 #include <casacore/tables/Tables.h>
 #include <casacore/tables/Tables/TableProxy.h>
 
+#include <arrow/util/logging.h>
 #include <arrow/util/thread_pool.h>
 
-#include "arcae/column_convert_visitor.h"
-
+#include "arcae/base_column_map.h"
 
 namespace arcae {
 
@@ -108,6 +108,11 @@ public:
         const std::string & column,
         casacore::uInt startrow,
         casacore::uInt nrow) const;
+
+    arrow::Result<std::shared_ptr<arrow::Array>> GetColumn2(
+        const std::string & column,
+        const ColumnSelection & selection) const;
+
 
     arrow::Result<std::string> GetTableDescriptor() const;
     arrow::Result<std::string> GetColumnDescriptor(const std::string & column) const;

@@ -2,6 +2,7 @@
 # cython: language_level = 3
 
 from collections.abc import Iterable, MutableMapping
+import ctypes
 import cython
 import json
 from typing import Optional
@@ -10,10 +11,14 @@ from libcpp cimport bool
 from libcpp.map cimport map
 from libcpp.memory cimport dynamic_pointer_cast, shared_ptr
 from libcpp.string cimport string
+from libcpp.utility cimport move
 from libcpp.vector cimport vector
 
 import numpy as np
 import pyarrow as pa
+
+cimport numpy as cnp
+
 from pyarrow.includes.common cimport *
 from pyarrow.includes.libarrow cimport *
 
@@ -44,6 +49,10 @@ from arcae.arrow_tables cimport (CCasaTable,
                                  CTaql,
                                  complex64,
                                  complex128,
+                                 ColumnSelection,
+                                 RowIds,
+                                 Span,
+                                 rownr_t,
                                  UINT_MAX)
 
 def ms_descriptor(table: str, complete: bool = False) -> dict:
@@ -90,6 +99,49 @@ cdef class ComplexFloatType(ComplexType):
 
 cdef class ComplexFloatArray(ExtensionArray):
     pass
+
+
+cdef class SelectionObj:
+    cdef vector[vector[rownr_t]] vec_store
+    cdef ColumnSelection selection
+
+    def __init__(self, index: tuple = None):
+        cdef rownr_t[::1] dim_memview
+
+        if index is None:
+            pass
+        elif isinstance(index, (tuple, list)):
+            for d, dim_index in enumerate(index):
+                if dim_index is None:
+                    self.selection.push_back(RowIds())
+                elif isinstance(dim_index, slice):
+                    # Convert a slice object into a vector, and then a span of rownr_t
+                    if dim_index.step is not None and dim_index.step != 1:
+                        raise ValueError(f"slice step {dim_index.step} is not 1")
+
+                    vec_index = vector[rownr_t](dim_index.stop - dim_index.start, 0)
+
+                    for i, r in enumerate(range(dim_index.start, dim_index.stop)):
+                        vec_index[i] = r
+
+                    span = RowIds(&vec_index[0], vec_index.size())
+                    self.vec_store.push_back(move(vec_index))
+                    self.selection.push_back(move(span))
+                elif isinstance(dim_index, np.ndarray):
+                    if dim_index.ndim != 1:
+                        raise ValueError(f"Multi-dimensional ndarray received as index "
+                                            f"in dimension {d}")
+                    # Cast to uint64 if necessary
+                    dim_memview = np.require(dim_index, dtype=np.uint64, requirements=["C"])
+                    span = RowIds(&dim_memview[0], dim_memview.shape[0])
+                    self.selection.push_back(move(span))
+                else:
+                    raise TypeError(f"Invalid index type {type(dim_index)} "
+                                    f"for dimension {d}")
+        else:
+            raise TypeError(f"index must be a tuple of "
+                            f"(None, slices or numpy arrays), or None")
+
 
 # Create a Cython extension type around the CCasaTable C++ instance
 cdef class Table:
@@ -147,7 +199,57 @@ cdef class Table:
 
         return pyarrow_wrap_table(ctable)
 
-    def getcol(self, column: str, unsigned int startrow=0, unsigned int nrow=UINT_MAX):
+    def getcol2(self, column: str, index: tuple = None) -> np.ndarray:
+        cdef string cpp_column = tobytes(column)
+        cdef SelectionObj selobj = SelectionObj(index)
+
+        carray = GetResultValue(self.c_table.get().GetColumn2(cpp_column, selobj.selection))
+        py_column = pyarrow_wrap_array(carray)
+
+        if isinstance(py_column, (pa.ListArray, pa.LargeListArray)):
+            raise TypeError(f"Can't convert variably shaped column {column} to numpy array")
+
+        if isinstance(py_column, pa.NumericArray):
+            return py_column.to_numpy(zero_copy_only=True)
+
+        if isinstance(py_column, pa.StringArray):
+            return py_column.to_numpy(zero_copy_only=False)
+
+        if isinstance(py_column, pa.FixedSizeListArray):
+            shape = [len(py_column)]
+            nested_column = py_column
+            zero_copy_only = True
+
+            while True:
+                if pa.types.is_primitive(nested_column.type):
+                    break
+                elif isinstance(nested_column, pa.StringArray):
+                    zero_copy_only = False
+                    break
+                elif isinstance(nested_column, pa.FixedSizeListArray):
+                    shape.append(nested_column.type.list_size)
+                    nested_column = nested_column.flatten()
+                else:
+                    raise TypeError(f"Encountered invalid type {nested_column.type} "
+                                    f"when converting column {column} from a "
+                                    f"nested FixedSizeListArray to a numpy array. "
+                                    f"Only FixedSizeListArrays or PrimitiveArrays "
+                                    f"are supported")
+
+            nested_column = nested_column.to_numpy(zero_copy_only=zero_copy_only)
+            array = nested_column.reshape(tuple(shape))
+
+            # Convert to complex if necessary
+            if "COMPLEX" in self.getcoldesc(column)["valueType"].upper():
+                complex_dtype = np.result_type(array.dtype, np.complex64)
+                array = array.view(complex_dtype)[..., 0]
+
+            return array
+
+        raise TypeError(f"Unhandled column type {py_column.type}")
+
+
+    def getcol(self, column: str, unsigned int startrow=0, unsigned int nrow=UINT_MAX) -> np.ndarray:
         cdef:
             shared_ptr[CArray] carray
             string cpp_column = tobytes(column)

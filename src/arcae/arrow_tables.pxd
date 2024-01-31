@@ -12,6 +12,20 @@ from pyarrow.includes.libarrow cimport *
 cdef extern from "<climits>" nogil:
     cdef unsigned int UINT_MAX
 
+cdef extern from "<casacore/casa/aipsxtype.h>" namespace "casacore" nogil:
+    ctypedef unsigned long long uInt64
+    ctypedef uInt64 rownr_t
+
+cdef extern from "<absl/types/span.h>" namespace "absl" nogil:
+    cdef cppclass Span[T]:
+        Span() except +
+        Span(T * array, size_t length) except +
+        Span(Span&) except +
+        size()
+
+cdef extern from "arcae/base_column_map.h" namespace "arcae" nogil:
+    ctypedef Span[rownr_t] RowIds
+    ctypedef vector[RowIds] ColumnSelection
 
 cdef extern from "arcae/service_locator.h" namespace "arcae" nogil:
     cdef cppclass CServiceLocator" arcae::ServiceLocator":
@@ -36,6 +50,7 @@ cdef extern from "arcae/safe_table_proxy.h" namespace "arcae" nogil:
 
         CResult[shared_ptr[CTable]] ToArrow " SafeTableProxy::ToArrow"(unsigned int startrow, unsigned int nrow, const vector[string] & columns)
         CResult[shared_ptr[CArray]] GetColumn " SafeTableProxy::GetColumn"(const string & column, unsigned int startrow, unsigned int nrow)
+        CResult[shared_ptr[CArray]] GetColumn2 " SafeTableProxy::GetColumn2"(const string & column, const ColumnSelection & selection)
         CResult[string] GetTableDescriptor " SafeTableProxy::GetTableDescriptor"()
         CResult[string] GetColumnDescriptor "SafeTableProxy::GetColumnDescriptor"(const string & column)
         CResult[unsigned int] nRow " SafeTableProxy::nRow"()

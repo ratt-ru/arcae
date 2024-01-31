@@ -7,19 +7,18 @@
 #include <casacore/tables/Tables/TableIterProxy.h>
 
 #include "arcae/safe_table_proxy.h"
+#include "arcae/column_convert_visitor.h"
+#include "arcae/column_read_map.h"
+#include "arcae/column_read_visitor.h"
+#include "arrow/result.h"
 
 
-using ::arrow::DataType;
-using ::arrow::Buffer;
-using ::arrow::Future;
 using ::arrow::Result;
 using ::arrow::Status;
 
 using ::casacore::Record;
-using ::casacore::Table;
 using ::casacore::TableColumn;
 using ::casacore::TableIterProxy;
-using ::casacore::TableLock;
 using ::casacore::TableProxy;
 
 namespace arcae {
@@ -101,6 +100,27 @@ SafeTableProxy::GetColumn(const std::string & column, casacore::uInt startrow, c
         return std::move(visitor.array_);
     });
 }
+
+arrow::Result<std::shared_ptr<arrow::Array>>
+SafeTableProxy::GetColumn2(const std::string & column, const ColumnSelection & selection) const {
+    ARROW_RETURN_NOT_OK(FailIfClosed());
+
+    return run_isolated([this, &column, &selection]() -> arrow::Result<std::shared_ptr<arrow::Array>> {
+        auto & casa_table = this->table_proxy->table();
+
+        if(!casa_table.tableDesc().isColumn(column)) {
+            return arrow::Status::UnknownError(column, " does not exist");
+        }
+
+        auto table_column = TableColumn(casa_table, column);
+        const auto & column_desc = table_column.columnDesc();
+        ARROW_ASSIGN_OR_RAISE(auto map, ColumnReadMap::Make(table_column, selection));
+        auto visitor = ColumnReadVisitor(map);
+        ARROW_RETURN_NOT_OK(visitor.Visit(column_desc.dataType()));
+        return std::move(visitor.array_);
+    });
+}
+
 
 arrow::Result<std::shared_ptr<arrow::Table>>
 SafeTableProxy::ToArrow(casacore::uInt startrow, casacore::uInt nrow, const std::vector<std::string> & columns) const {
