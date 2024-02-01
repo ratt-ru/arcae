@@ -107,7 +107,7 @@ cdef class SelectionObj:
     Helper object for generating a ColumnSelection
 
     Needed because vectors may need to be stored so
-    that data referenced by span objects stays live
+    that they stay live when referenced by span objects
     """
     cdef vector[vector[rownr_t]] vec_store
     cdef ColumnSelection selection
@@ -238,13 +238,17 @@ cdef class Table:
     def _numpy_to_arrow(self, data: np.ndarray) -> pa.array:
         """ Covert numpy array into a nested FixedSizeListArrays """
         shape = data.shape
-        pa_array = data.ravel()
+        np_array = data.ravel()
 
         # Add an extra dimension of 2 elements and cast to the real dtype
-        if issubclass(pa_array.dtype.type, np.complexfloating):
+        if issubclass(np_array.dtype.type, np.complexfloating):
             shape += (2,)
-            pa_array = pa_array.view(pa_array.real.dtype)
+            np_array = np_array.view(np_array.real.dtype)
 
+        # Convert to pyarrow array
+        pa_array = pa.array(np_array)
+
+        # Nested by secondary dimensions
         for dim in reversed(shape[1:]):
             pa_array = pa.FixedSizeListArray.from_arrays(pa_array, dim)
 
