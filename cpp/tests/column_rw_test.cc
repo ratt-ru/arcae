@@ -207,6 +207,48 @@ TEST_F(ColumnWriteTest, WriteVisitorScalarNumeric) {
   const auto & table = table_proxy_.table();
 
   {
+    using CT = casacore::Double;
+    auto time = GetScalarColumn<CT>(table, "TIME");
+    auto zeroes = casacore::Array<CT>(IPos({knrow}), CT{0});
+    time.putColumn(zeroes);
+    ASSERT_OK_AND_ASSIGN(auto data,
+                         ArrayFromJSON(arrow::float64(), R"([2, 3])"));
+
+    ASSERT_OK_AND_ASSIGN(auto write_map, (ColumnWriteMap::Make(time, {}, data)));
+    auto write_visitor = ColumnWriteVisitor(write_map);
+    ASSERT_OK(write_visitor.Visit());
+
+    ASSERT_OK_AND_ASSIGN(auto read_map, (ColumnReadMap::Make(time, {})));
+    auto read_visitor = ColumnReadVisitor(read_map);
+    ASSERT_OK(read_visitor.Visit(time.columnDesc().dataType()));
+    ASSERT_TRUE(data->Equals(read_visitor.array_));
+    EXPECT_THAT(time.getColumn(), ::testing::ElementsAre(
+      CT{2}, CT{3}));
+
+  }
+
+  {
+    using CT = casacore::Double;
+    auto time = GetScalarColumn<CT>(table, "TIME");
+    auto zeroes = casacore::Array<CT>(IPos({knrow}), CT{0});
+    time.putColumn(zeroes);
+    ASSERT_OK_AND_ASSIGN(auto data,
+                         ArrayFromJSON(arrow::float64(), R"([3])"));
+
+    ASSERT_OK_AND_ASSIGN(auto write_map, (ColumnWriteMap::Make(time, {{1}}, data)));
+    auto write_visitor = ColumnWriteVisitor(write_map);
+    ASSERT_OK(write_visitor.Visit());
+
+    ASSERT_OK_AND_ASSIGN(auto read_map, (ColumnReadMap::Make(time, {{1}})));
+    auto read_visitor = ColumnReadVisitor(read_map);
+    ASSERT_OK(read_visitor.Visit(time.columnDesc().dataType()));
+    ASSERT_TRUE(data->Equals(read_visitor.array_));
+    EXPECT_THAT(time.getColumn(), ::testing::ElementsAre(
+      CT{0}, CT{3}));
+
+  }
+
+  {
     // Write both complex rows
     using CT = casacore::DComplex;
     auto complex = GetScalarColumn<CT>(table, "SCALAR_COMPLEX");
