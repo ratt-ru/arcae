@@ -26,12 +26,6 @@ private:
     std::shared_ptr<arrow::internal::ThreadPool> io_pool;
     bool is_closed;
 
-private:
-    arrow::Status FailIfClosed() const {
-        return is_closed ? arrow::Status::Invalid("Table is closed")
-                         : arrow::Status::OK();
-    };
-
 protected:
     SafeTableProxy() = default;
     SafeTableProxy(const SafeTableProxy & rhs) = delete;
@@ -99,6 +93,8 @@ public:
               casacore::uInt startrow,
               casacore::uInt nrow);
 
+    bool IsClosed() const { return is_closed; }
+
     arrow::Result<std::shared_ptr<arrow::Table>> ToArrow(
         casacore::uInt startrow=0,
         casacore::uInt nrow=UINT_MAX,
@@ -113,6 +109,10 @@ public:
         const std::string & column,
         const ColumnSelection & selection) const;
 
+    arrow::Result<bool> PutColumn(
+        const std::string & column,
+        const ColumnSelection & selection,
+        const std::shared_ptr<arrow::Array> & data) const;
 
     arrow::Result<std::string> GetTableDescriptor() const;
     arrow::Result<std::string> GetColumnDescriptor(const std::string & column) const;

@@ -51,6 +51,7 @@ cdef extern from "arcae/safe_table_proxy.h" namespace "arcae" nogil:
         CResult[shared_ptr[CTable]] ToArrow " SafeTableProxy::ToArrow"(unsigned int startrow, unsigned int nrow, const vector[string] & columns)
         CResult[shared_ptr[CArray]] GetColumn " SafeTableProxy::GetColumn"(const string & column, unsigned int startrow, unsigned int nrow)
         CResult[shared_ptr[CArray]] GetColumn2 " SafeTableProxy::GetColumn2"(const string & column, const ColumnSelection & selection)
+        CResult[bool] PutColumn " SafeTableProxy::PutColumn"(const string & column, const ColumnSelection & selection, const shared_ptr[CArray] & data)
         CResult[string] GetTableDescriptor " SafeTableProxy::GetTableDescriptor"()
         CResult[string] GetColumnDescriptor "SafeTableProxy::GetColumnDescriptor"(const string & column)
         CResult[unsigned int] nRow " SafeTableProxy::nRow"()
@@ -62,7 +63,8 @@ cdef extern from "arcae/safe_table_proxy.h" namespace "arcae" nogil:
 
 cdef extern from "arcae/table_factory.h" namespace "arcae" nogil:
     cdef CResult[shared_ptr[CCasaTable]] COpenTable" arcae::OpenTable"(
-                                                    const string & filename)
+                                                    const string & filename,
+                                                    bool readonly)
     cdef CResult[shared_ptr[CCasaTable]] CDefaultMS" arcae::DefaultMS"(
                                                     const string & name,
                                                     const string & subtable,

@@ -1,6 +1,7 @@
 #ifndef COLUMN_WRITE_VISITOR_H
 #define COLUMN_WRITE_VISITOR_H
 
+#include <casacore/casa/Exceptions/Error.h>
 #include <functional>
 #include <memory>
 
@@ -71,12 +72,18 @@ public:
     // Write arrow array to the CASA column
     template <typename T>
     arrow::Status WriteColumn() {
-        if(map_.get().nDim() == 1) {
-            return WriteScalarColumn<T>();
-        } else if(map_.get().IsFixedShape()) {
-            return WriteFixedColumn<T>();
-        } else {
-            return WriteVariableColumn<T>();
+        try {
+            if(map_.get().nDim() == 1) {
+                return WriteScalarColumn<T>();
+            } else if(map_.get().IsFixedShape()) {
+                return WriteFixedColumn<T>();
+            } else {
+                return WriteVariableColumn<T>();
+            }
+        } catch(casacore::AipsError & e) {
+            return arrow::Status::Invalid("WriteColumn ",
+                                          GetTableColumn().columnDesc().name(),
+                                            ": ", e.what());
         }
     };
 
@@ -112,7 +119,7 @@ private:
                         chunk_ptr[mit.ChunkOffset()] = casacore::String(std::begin(sv), std::end(sv));
                     }
                     column.putColumnRange(it.GetRowSlicer(), carray);
-                } catch(std::exception & e) {
+                } catch(casacore::AipsError & e) {
                     return arrow::Status::Invalid("WriteScalarColumn ",
                                                   GetTableColumn().columnDesc().name(),
                                                   ": ", e.what());
@@ -132,7 +139,7 @@ private:
                     // Dump column data straight from the Arrow Buffer
                     column.putColumnRange(map_.get().RangeBegin().GetRowSlicer(),
                                           carray);
-                } catch(std::exception & e) {
+                } catch(casacore::AipsError & e) {
                     return arrow::Status::Invalid("WriteScalarColumn ",
                                                   GetTableColumn().columnDesc().name(),
                                                   ": ", e.what());
@@ -147,7 +154,7 @@ private:
                             chunk_ptr[mit.ChunkOffset()] = buf_ptr[mit.GlobalOffset()];
                         }
                         column.putColumnRange(it.GetRowSlicer(), carray);
-                    } catch(std::exception & e) {
+                    } catch(casacore::AipsError & e) {
                         return arrow::Status::Invalid("WriteScalarColumn ",
                                                       GetTableColumn().columnDesc().name(),
                                                       ": ", e.what());
@@ -185,7 +192,7 @@ private:
                         chunk_ptr[mit.ChunkOffset()] = casacore::String(std::begin(sv), std::end(sv));
                     }
                     column.putColumnRange(it.GetRowSlicer(), it.GetSectionSlicer(), carray);
-                } catch(std::exception & e) {
+                } catch(casacore::AipsError & e) {
                     return arrow::Status::Invalid("WriteFixedColumn ",
                                                     GetTableColumn().columnDesc().name(),
                                                     ": ", e.what());
@@ -205,7 +212,7 @@ private:
                     column.putColumnRange(map_.get().RangeBegin().GetRowSlicer(),
                                           map_.get().RangeBegin().GetSectionSlicer(),
                                           carray);
-                } catch(std::exception & e) {
+                } catch(casacore::AipsError & e) {
                     return arrow::Status::Invalid("WriteFixedColumn ",
                                                   GetTableColumn().columnDesc().name(),
                                                   ": ", e.what());
@@ -220,7 +227,7 @@ private:
                             chunk_ptr[mit.ChunkOffset()] = buf_ptr[mit.GlobalOffset()];
                         }
                         column.putColumnRange(it.GetRowSlicer(), it.GetSectionSlicer(), carray);
-                    } catch(std::exception & e) {
+                    } catch(casacore::AipsError & e) {
                         return arrow::Status::Invalid("WriteFixedColumn ",
                                                       GetTableColumn().columnDesc().name(),
                                                       ": ", e.what());
@@ -256,7 +263,7 @@ private:
                         chunk_ptr[mit.ChunkOffset()] = casacore::String(std::begin(sv), std::end(sv));
                     }
                     column.putColumnRange(it.GetRowSlicer(), it.GetSectionSlicer(), carray);
-                } catch(std::exception & e) {
+                } catch(casacore::AipsError & e) {
                     return arrow::Status::Invalid("WriteVariableColumn ",
                                                   GetTableColumn().columnDesc().name(),
                                                   ": ", e.what());
@@ -277,7 +284,7 @@ private:
                         chunk_ptr[mit.ChunkOffset()] = buf_ptr[mit.GlobalOffset()];
                     }
                     column.putColumnRange(it.GetRowSlicer(), it.GetSectionSlicer(), carray);
-                } catch(std::exception & e) {
+                } catch(casacore::AipsError & e) {
                     return arrow::Status::Invalid("WriteVariableColumn ",
                                                   GetTableColumn().columnDesc().name(),
                                                   ": ", e.what());
