@@ -82,10 +82,12 @@ arrow::Result<DataProperties> GetDataProperties(
   const ColumnSelection & selection,
   const std::shared_ptr<arrow::Array> & data)
 {
+  // Starting state is a fixed shape array of 1 dimension
+  // whose size is the number of rows in the arrow array
   auto fixed_shape = true;
   auto shape = std::vector<std::int64_t>{data->length()};
+  auto ndim = std::size_t{1};
   auto tmp_data = data;
-  auto ndim = std::size_t{0};
 
   auto MaybeUpdateShapeAndNdim = [&](auto list) -> arrow::Result<std::shared_ptr<arrow::Array>> {
     ++ndim;
@@ -117,6 +119,7 @@ arrow::Result<DataProperties> GetDataProperties(
 
   for(auto done=false; !done;) {
     switch(tmp_data->type_id()) {
+      // Traverse nested list
       case arrow::Type::LARGE_LIST:
       {
         auto base_list = std::dynamic_pointer_cast<arrow::LargeListArray>(tmp_data);
@@ -138,6 +141,8 @@ arrow::Result<DataProperties> GetDataProperties(
         ARROW_ASSIGN_OR_RAISE(tmp_data, MaybeUpdateShapeAndNdim(base_list));
         break;
       }
+      // We've traversed all nested arrays
+      // infer the base type of the array
       case arrow::Type::BOOL:
       case arrow::Type::UINT8:
       case arrow::Type::UINT16:
@@ -150,7 +155,6 @@ arrow::Result<DataProperties> GetDataProperties(
       case arrow::Type::FLOAT:
       case arrow::Type::DOUBLE:
       case arrow::Type::STRING:
-        ++ndim;
         data_type = tmp_data->type();
         done = true;
         break;
@@ -171,7 +175,7 @@ arrow::Result<DataProperties> GetDataProperties(
                            casa_type == casacore::TpDComplex;
 
   if(is_complex) {
-    if(ndim == 0) {
+    if(ndim <= 1) {
       return arrow::Status::Invalid(
         "A list array of paired numbers must be supplied when writing "
         "to complex typed column ", column.columnDesc().name());
@@ -203,7 +207,7 @@ arrow::Result<DataProperties> GetDataProperties(
     casa_shape[fdim] = shape[dim];
 
     // Check that the selection indices don't exceed the data shape
-    if(auto sdim = SelectDim(fdim, selection.size(), ndim); sdim >= 0) {
+    if(auto sdim = SelectDim(fdim, selection.size(), ndim); sdim >= 0 && sdim < selection.size()) {
       if(selection[sdim].size() > shape[dim]) {
         return arrow::Status::IndexError(
           "Number of selections ", selection[sdim].size(),
