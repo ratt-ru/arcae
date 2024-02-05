@@ -1,8 +1,10 @@
 find_package(GTest CONFIG REQUIRED)
 
 add_library(test_utils test_utils.cc)
-add_compile_options("-fsanitize=address")
-add_link_options("-fsanitize=address")
+# add_compile_options("-fsanitize=address")
+# add_link_options("-fsanitize=address")
+add_compile_options("-g")
+add_link_options("-g")
 
 add_executable(basic_test basic_test.cc)
 target_link_libraries(basic_test PRIVATE GTest::gtest_main arcae test_utils)

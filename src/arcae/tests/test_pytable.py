@@ -154,6 +154,7 @@ def test_getcol2(getcol_table):
     assert_array_equal(T.getcol2("TIME"), [0, 1, 2])
     assert_array_equal(T.getcol2("TIME", (slice(0, 2),)), [0, 1])
     assert_array_equal(T.getcol2("TIME", (np.array([0, 1]),)), [0, 1])
+    assert_array_equal(T.getcol2("TIME", (np.array([2, 0]),)), [2, 0])
     assert_array_equal(T.getcol2("TIME", (np.array([0, 2]),)), [0, 2])
     assert_array_equal(T.getcol2("STRING"), ["0", "1", "2"])
 
@@ -162,14 +163,26 @@ def test_getcol2(getcol_table):
         [[1, 1, 1, 1], [1, 1, 1, 1]],
         [[2, 2, 2, 2], [2, 2, 2, 2]]])
 
-    assert_array_equal(T.getcol2("FLOAT_DATA", (slice(0, 2), slice(0, 2))), [
-        [[0, 0, 0, 0], [0, 0, 0, 0]],
-        [[1, 1, 1, 1], [1, 1, 1, 1]]])
+    assert_array_equal(T.getcol2("FLOAT_DATA",
+        (slice(0, 2), slice(0, 2))), [
+            [[0, 0, 0, 0], [0, 0, 0, 0]],
+            [[1, 1, 1, 1], [1, 1, 1, 1]]])
 
-    assert_array_equal(T.getcol2("FLOAT_DATA", (np.array([0, 1]), np.array([0, 1]), np.array([0, 1]))), [
-        [[0, 0], [0, 0]],
-        [[1, 1], [1, 1]]])
+    assert_array_equal(T.getcol2("FLOAT_DATA",
+            (np.array([0, 1]), np.array([0, 1]), np.array([0, 1]))), [
+                [[0, 0], [0, 0]],
+                [[1, 1], [1, 1]]])
 
+    # Test partial round-trip
+    index = (np.array([0, 1]), np.array([0, 1]), np.array([0, 1]))
+    float_data = np.array([
+        [[2, 3], [4, 5]],
+        [[9, 8], [7, 6]]], np.float32)
+
+    T.putcol("FLOAT_DATA", float_data + 1, index)
+    assert_array_equal(T.getcol2("FLOAT_DATA", index), float_data + 1)
+
+    # Test complete round-trips
     float_data = np.array([
         [[3, 2, 1, 0], [3, 2, 1, 0]],
         [[0, 1, 2, 3], [0, 1, 2, 3]],
@@ -183,9 +196,13 @@ def test_getcol2(getcol_table):
     T.putcol("FLOAT_DATA", float_data + 1)
     assert_array_equal(T.getcol2("FLOAT_DATA"), float_data + 1)
 
-    T.putcol("COMPLEX_DATA", complex_data + 1)
-    assert_array_equal(T.getcol2("COMPLEX_DATA"), complex_data + 1)
+    T.putcol("COMPLEX_DATA", complex_data + 1 + 1j)
+    assert_array_equal(T.getcol2("COMPLEX_DATA"), complex_data + 1 + 1j)
 
+    T.putcol("TIME", np.array([5, 6, 7], dtype=np.float64),
+        (np.array([0, 1, 2]),))
+
+    print(T.getcol2("TIME"))
 
 def test_partial_read(sorting_table):
     """ Tests that partial reads work """

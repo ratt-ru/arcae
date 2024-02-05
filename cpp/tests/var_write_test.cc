@@ -1,12 +1,10 @@
+#include <cstdlib>
+
+#include <absl/types/span.h>
+
 #include <arrow/api.h>
 #include <arrow/ipc/json_simple.h>
 #include <arrow/testing/gtest_util.h>
-
-#include <arcae/safe_table_proxy.h>
-#include <arcae/column_read_map.h>
-#include <arcae/column_write_map.h>
-#include <arcae/column_read_visitor.h>
-#include <arcae/column_write_visitor.h>
 
 #include <casacore/casa/Arrays/IPosition.h>
 #include <casacore/casa/Arrays/Slicer.h>
@@ -18,6 +16,13 @@
 #include <casacore/tables/Tables/Table.h>
 #include <casacore/tables/Tables/TableColumn.h>
 #include <casacore/tables/Tables/TableProxy.h>
+
+#include <arcae/base_column_map.h>
+#include <arcae/safe_table_proxy.h>
+#include <arcae/column_read_map.h>
+#include <arcae/column_write_map.h>
+#include <arcae/column_read_visitor.h>
+#include <arcae/column_write_visitor.h>
 
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
@@ -45,6 +50,23 @@ template <typename T> ArrayColumn<T>
 GetArrayColumn(const Table & table, const std::string & column) {
   return ArrayColumn<T>(TableColumn(table, column));
 }
+
+struct Selection {
+  static Selection Make(std::initializer_list<std::initializer_list<casacore::rownr_t>> list) {
+    std::vector<std::vector<casacore::rownr_t>> vecs;
+    arcae::ColumnSelection spans;
+
+    for(const auto & v: list) {
+      vecs.push_back(std::vector<casacore::rownr_t>(v));
+      spans.push_back(arcae::RowIds(vecs.back()));
+    }
+
+    return Selection{std::move(spans), std::move(vecs)};
+  }
+
+  arcae::ColumnSelection spans_;
+  std::vector<std::vector<casacore::rownr_t>> rowids_;
+};
 
 class EmptyVariableWriteTest : public ::testing::Test {
   protected:
@@ -202,12 +224,12 @@ TEST_F(EmptyVariableWriteTest, WritePartialVariableEmptyColumn) {
                                              [7, 8]]])"));
 
     auto var = GetArrayColumn<CT>(table, "DATA");
-    auto sel = arcae::ColumnSelection{{0, 3}, {1, 5}, {2, 4}};
-    ASSERT_OK_AND_ASSIGN(auto write_map, ColumnWriteMap::Make(var, sel, data));
+    auto obj = Selection::Make({{0, 3}, {1, 5}, {2, 4}});
+    ASSERT_OK_AND_ASSIGN(auto write_map, ColumnWriteMap::Make(var, obj.spans_, data));
     auto write_visitor = arcae::ColumnWriteVisitor(write_map);
     ASSERT_OK(write_visitor.Visit());
 
-    ASSERT_OK_AND_ASSIGN(auto read_map, ColumnReadMap::Make(var, sel));
+    ASSERT_OK_AND_ASSIGN(auto read_map, ColumnReadMap::Make(var, obj.spans_));
     auto read_visitor = arcae::ColumnReadVisitor(read_map);
     ASSERT_OK(read_visitor.Visit(var.columnDesc().dataType()));
 
@@ -247,12 +269,12 @@ TEST_F(EmptyVariableWriteTest, WritePartialFloatVariableEmptyColumn) {
                                              [7, 8]]])"));
 
     auto var = GetArrayColumn<CT>(table, "FLOAT_DATA");
-    auto sel = arcae::ColumnSelection{{0, 3}, {1, 5}, {2, 4}};
-    ASSERT_OK_AND_ASSIGN(auto write_map, ColumnWriteMap::Make(var, sel, data));
+    auto obj = Selection::Make({{0, 3}, {1, 5}, {2, 4}});
+    ASSERT_OK_AND_ASSIGN(auto write_map, ColumnWriteMap::Make(var, obj.spans_, data));
     auto write_visitor = arcae::ColumnWriteVisitor(write_map);
     ASSERT_OK(write_visitor.Visit());
 
-    ASSERT_OK_AND_ASSIGN(auto read_map, ColumnReadMap::Make(var, sel));
+    ASSERT_OK_AND_ASSIGN(auto read_map, ColumnReadMap::Make(var, obj.spans_));
     auto read_visitor = arcae::ColumnReadVisitor(read_map);
     ASSERT_OK(read_visitor.Visit(var.columnDesc().dataType()));
 
@@ -295,12 +317,12 @@ TEST_F(EmptyVariableWriteTest, WritePartialComplexVariableEmptyColumn) {
                                [[12, 13], [14, 15]]]])"));
 
     auto var = GetArrayColumn<CT>(table, "VAR_COMPLEX");
-    auto sel = arcae::ColumnSelection{{0, 3}, {1, 5}, {2, 4}};
-    ASSERT_OK_AND_ASSIGN(auto write_map, ColumnWriteMap::Make(var, sel, data));
+    auto obj = Selection::Make({{0, 3}, {1, 5}, {2, 4}});
+    ASSERT_OK_AND_ASSIGN(auto write_map, ColumnWriteMap::Make(var, obj.spans_, data));
     auto write_visitor = arcae::ColumnWriteVisitor(write_map);
     ASSERT_OK(write_visitor.Visit());
 
-    ASSERT_OK_AND_ASSIGN(auto read_map, ColumnReadMap::Make(var, sel));
+    ASSERT_OK_AND_ASSIGN(auto read_map, ColumnReadMap::Make(var, obj.spans_));
     auto read_visitor = arcae::ColumnReadVisitor(read_map);
     ASSERT_OK(read_visitor.Visit(var.columnDesc().dataType()));
 

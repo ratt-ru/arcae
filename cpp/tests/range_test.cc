@@ -107,9 +107,9 @@ TEST_F(RangeTest, CheckMapsAndRangesSingleton) {
   auto data = GetArrayColumn<CasaComplex>(proxy_.table(), MS::MODEL_DATA);
   ASSERT_OK_AND_ASSIGN(auto map, ColumnReadMap::Make(data, ColumnSelection{{0}}));
 
-  EXPECT_EQ(map.DimMaps(0).size(), 0);
-  EXPECT_EQ(map.DimMaps(1).size(), 0);
-  EXPECT_THAT(map.DimMaps(2), ::testing::ElementsAre(IdMap{0, 0}));
+  EXPECT_EQ(map.DimMap(0).size(), 0);
+  EXPECT_EQ(map.DimMap(1).size(), 0);
+  EXPECT_THAT(map.DimMap(2), ::testing::ElementsAre(IdMap{0, 0}));
 
   EXPECT_THAT(map.DimRanges(0), ::testing::ElementsAre(Range{0, 2, Range::FREE}));
   EXPECT_THAT(map.DimRanges(1), ::testing::ElementsAre(Range{0, 4, Range::FREE}));
@@ -124,7 +124,7 @@ TEST_F(RangeTest, CheckMapsAndRangesMultiple) {
         {7, 9, 8, 12, 11}};    // Two disjoint ranges
   ASSERT_OK_AND_ASSIGN(auto map, ColumnReadMap::Make(data, std::move(selection)));
 
-  EXPECT_THAT(map.DimMaps(2), ::testing::ElementsAre(
+  EXPECT_THAT(map.DimMap(2), ::testing::ElementsAre(
         IdMap{1, 3},
         IdMap{2, 2},
         IdMap{3, 1},
@@ -136,13 +136,13 @@ TEST_F(RangeTest, CheckMapsAndRangesMultiple) {
         Range{0, 4, Range::MAP},
         Range{4, 6, Range::MAP}));
 
-  EXPECT_THAT(map.DimMaps(1), ::testing::ElementsAre(
+  EXPECT_THAT(map.DimMap(1), ::testing::ElementsAre(
         IdMap{5, 0}, IdMap{6, 1}));
 
   EXPECT_THAT(map.DimRanges(1), ::testing::ElementsAre(
         Range{0, 2, Range::MAP}));
 
-  EXPECT_THAT(map.DimMaps(0), ::testing::ElementsAre(
+  EXPECT_THAT(map.DimMap(0), ::testing::ElementsAre(
         IdMap{7, 0},
         IdMap{8, 2},
         IdMap{9, 1},

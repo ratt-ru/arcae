@@ -96,23 +96,35 @@ struct MapIterator {
   MapIterator(const RangeIterator<ColumnMapping> & rit,
               const ColumnMapping & map,
               std::vector<std::size_t> chunk_index,
-              std::vector<std::size_t> global_index,
               std::vector<std::size_t> strides,
               bool done);
 
   static MapIterator Make(const RangeIterator<ColumnMapping> & rit, bool done);
-  std::size_t nDim() const {
-    return chunk_index_.size();
-  };
-
-  std::size_t RowDim() const {
-    return nDim() - 1;
-  };
+  std::size_t nDim() const { return chunk_index_.size(); };
+  std::size_t RowDim() const { return nDim() - 1; };
 
   std::size_t ChunkOffset() const;
-  std::size_t GlobalOffset() const;
-  std::size_t RangeSize(std::size_t dim) const;
-  std::size_t MemStart(std::size_t dim) const;
+  std::size_t GlobalOffset() const {
+    return map_.get().FlatOffset(global_index_);
+  };
+
+  std::size_t RangeSize(std::size_t dim) const {
+    return rit_.get().range_length_[dim];
+  }
+
+  const ColumnMap & DimMap(std::size_t dim) const {
+    return rit_.get().DimMap(dim);
+  }
+
+  std::size_t MemStart(std::size_t dim) const {
+    return rit_.get().mem_start_[dim];
+  }
+
+  std::size_t MemOffset(std::size_t dim, std::size_t offset=0) const;
+
+  const Range & DimRange(std::size_t dim) const {
+    return rit_.get().DimRange(dim);
+  }
 
   MapIterator & operator++();
   bool operator==(const MapIterator & other) const;
@@ -121,6 +133,98 @@ struct MapIterator {
   }
 };
 
+
+template <typename ColumnMapping>
+MapIterator<ColumnMapping>::MapIterator(const RangeIterator<ColumnMapping> & rit,
+                  const ColumnMapping & map,
+                  std::vector<std::size_t> chunk_index,
+                  std::vector<std::size_t> strides,
+                  bool done) :
+        rit_(std::cref(rit)),
+        map_(std::cref(map)),
+        chunk_index_(std::move(chunk_index)),
+        global_index_(chunk_index_.size(), 0),
+        strides_(std::move(strides)),
+        done_(done) {
+
+  for(std::size_t dim=0; dim < chunk_index_.size(); ++dim) {
+    global_index_[dim] = MemOffset(dim, chunk_index_[dim]);
+  }
+}
+
+template <typename ColumnMapping>
+MapIterator<ColumnMapping>
+MapIterator<ColumnMapping>::Make(const RangeIterator<ColumnMapping> & rit, bool done) {
+  auto chunk_index = decltype(MapIterator::chunk_index_)(rit.nDim(), 0);
+  auto strides = decltype(MapIterator::strides_)(rit.nDim(), 1);
+  using ItType = std::tuple<std::size_t, std::size_t>;
+
+  for(auto [dim, product]=ItType{1, 1}; dim < rit.nDim(); ++dim) {
+    product = strides[dim] = product * rit.range_length_[dim - 1];
+  }
+
+  return MapIterator{std::cref(rit), std::cref(rit.map_.get()),
+                     std::move(chunk_index),
+                     std::move(strides),
+                     done};
+}
+
+template <typename ColumnMapping>
+std::size_t
+MapIterator<ColumnMapping>::ChunkOffset() const {
+  std::size_t offset = 0;
+  for(auto dim = std::size_t{0}; dim < nDim(); ++dim) {
+    offset += chunk_index_[dim] * strides_[dim];
+  }
+  return offset;
+}
+
+template <typename ColumnMapping>
+std::size_t
+MapIterator<ColumnMapping>::MemOffset(std::size_t dim, std::size_t offset) const {
+  auto base_offset = MemStart(dim);
+
+  if(DimRange(dim).type == Range::MAP) {
+    const auto & dim_map = DimMap(dim);
+    assert(offset < dim_map.size());
+    return base_offset + dim_map[offset].mem;
+  }
+
+  return base_offset + offset;
+}
+
+template <typename ColumnMapping>
+MapIterator<ColumnMapping> & MapIterator<ColumnMapping>::operator++() {
+  assert(!done_);
+
+  // Iterate from fastest to slowest changing dimension
+  for(auto dim = std::size_t{0}; dim < nDim();) {
+    chunk_index_[dim]++;
+
+    // We've achieved a successful iteration in this dimension
+    if(chunk_index_[dim] < RangeSize(dim)) {
+      global_index_[dim] = MemOffset(dim, chunk_index_[dim]);
+      break;
+    // Reset to zero and retry in the next dimension
+    } else if(dim < RowDim()) {
+      chunk_index_[dim] = 0;
+      global_index_[dim] = MemOffset(dim, chunk_index_[dim]);
+      ++dim;
+    // This was the slowest changing dimension so we're done
+    } else {
+      done_ = true;
+      break;
+    }
+  }
+
+  return *this;
+}
+
+template <typename ColumnMapping>
+bool MapIterator<ColumnMapping>::operator==(const MapIterator<ColumnMapping> & other) const {
+  if(&rit_.get() != &other.rit_.get() || done_ != other.done_) return false;
+  return done_ ? true : chunk_index_ == other.chunk_index_;
+}
 
 // Iterates over the Disjoint Ranges defined by a ColumnMapping
 template <typename ColumnMapping>
@@ -156,9 +260,9 @@ struct RangeIterator {
   };
 
   // Return the Maps for the given dimension
-  const ColumnMap & DimMaps(std::size_t dim) const {
+  const ColumnMap & DimMap(std::size_t dim) const {
     assert(dim < nDim());
-    return map_.get().DimMaps(dim);
+    return map_.get().DimMap(dim);
   };
 
   // Return the currently selected Range of the given dimension
@@ -192,95 +296,6 @@ struct RangeIterator {
     return !(*this == other);
   };
 };
-
-
-template <typename ColumnMapping>
-MapIterator<ColumnMapping>::MapIterator(const RangeIterator<ColumnMapping> & rit,
-                  const ColumnMapping & map,
-                  std::vector<std::size_t> chunk_index,
-                  std::vector<std::size_t> global_index,
-                  std::vector<std::size_t> strides,
-                  bool done) :
-        rit_(std::cref(rit)),
-        map_(std::cref(map)),
-        chunk_index_(std::move(chunk_index)),
-        global_index_(std::move(global_index)),
-        strides_(std::move(strides)),
-        done_(done) {}
-
-template <typename ColumnMapping>
-MapIterator<ColumnMapping>
-MapIterator<ColumnMapping>::Make(const RangeIterator<ColumnMapping> & rit, bool done) {
-  auto chunk_index = decltype(MapIterator::chunk_index_)(rit.nDim(), 0);
-  auto global_index = decltype(MapIterator::global_index_)(rit.mem_start_);
-  auto strides = decltype(MapIterator::strides_)(rit.nDim(), 1);
-  using ItType = std::tuple<std::size_t, std::size_t>;
-
-  for(auto [dim, product]=ItType{1, 1}; dim < rit.nDim(); ++dim) {
-    product = strides[dim] = product * rit.range_length_[dim - 1];
-  }
-
-  return MapIterator{std::cref(rit), std::cref(rit.map_.get()),
-                     std::move(chunk_index), std::move(global_index),
-                     std::move(strides), done};
-}
-
-template <typename ColumnMapping>
-std::size_t
-MapIterator<ColumnMapping>::ChunkOffset() const {
-  std::size_t offset = 0;
-  for(auto dim = std::size_t{0}; dim < nDim(); ++dim) {
-    offset += chunk_index_[dim] * strides_[dim];
-  }
-  return offset;
-}
-
-template <typename ColumnMapping>
-std::size_t
-MapIterator<ColumnMapping>::GlobalOffset() const {
-  return map_.get().FlatOffset(global_index_);
-}
-
-template <typename ColumnMapping>
-std::size_t
-MapIterator<ColumnMapping>::RangeSize(std::size_t dim) const {
-  return rit_.get().range_length_[dim];
-}
-
-template <typename ColumnMapping>
-std::size_t MapIterator<ColumnMapping>::MemStart(std::size_t dim) const {
-  return rit_.get().mem_start_[dim];
-}
-
-
-template <typename ColumnMapping>
-MapIterator<ColumnMapping> & MapIterator<ColumnMapping>::operator++() {
-  assert(!done_);
-
-  // Iterate from fastest to slowest changing dimension
-  for(auto dim = std::size_t{0}; dim < nDim();) {
-    chunk_index_[dim]++;
-    global_index_[dim]++;
-    // We've achieved a successful iteration in this dimension
-    if(chunk_index_[dim] < RangeSize(dim)) { break; }
-    // Reset to zero and retry in the next dimension
-    else if(dim < RowDim()) {
-      chunk_index_[dim] = 0;
-      global_index_[dim] = MemStart(dim);
-      ++dim;
-    }
-    // This was the slowest changing dimension so we're done
-    else { done_ = true; break; }
-  }
-
-  return *this;
-}
-
-template <typename ColumnMapping>
-bool MapIterator<ColumnMapping>::operator==(const MapIterator<ColumnMapping> & other) const {
-  if(&rit_.get() != &other.rit_.get() || done_ != other.done_) return false;
-  return done_ ? true : chunk_index_ == other.chunk_index_;
-}
 
 
 template <typename ColumnMapping>
@@ -334,7 +349,7 @@ void RangeIterator<ColumnMapping>::UpdateState() {
         break;
       }
       case Range::MAP: {
-        const auto & dim_maps = DimMaps(dim);
+        const auto & dim_maps = DimMap(dim);
         assert(range.start < dim_maps.size());
         assert(range.end - 1 < dim_maps.size());
         auto start = disk_start_[dim] = dim_maps[range.start].disk;
@@ -436,8 +451,8 @@ struct BaseColumnMap {
   }
 
 
-  // Return the ColumnRange for the given dimension
-  const ColumnMap & DimMaps(std::size_t dim) const {
+  // Return the Dimension Map for the given dimension
+  const ColumnMap & DimMap(std::size_t dim) const {
     assert(dim < nDim());
     return maps_[dim];
   }
@@ -482,7 +497,7 @@ struct BaseColumnMap {
 template <typename T>
 bool BaseColumnMap<T>::IsSimple() const {
   for(std::size_t dim=0; dim < nDim(); ++dim) {
-    const auto & column_map = DimMaps(dim);
+    const auto & column_map = DimMap(dim);
     const auto & column_range = DimRanges(dim);
 
     // More than one range of row ids in a dimension
