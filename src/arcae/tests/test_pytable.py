@@ -148,6 +148,65 @@ def test_getcol(getcol_table):
     with pytest.raises(pa.lib.ArrowException, match="NONEXISTENT does not exist"):
         T.getcol("NONEXISTENT")
 
+
+def test_unordered_select_roundtrip(tmp_path):
+    """ Tests writing and reading using indexing """
+    from arcae.lib.arrow_tables import ms_descriptor
+    from arcae.lib.arrow_tables import Table
+
+    ms = str(tmp_path / "unorded_select.ms")
+    table_desc = ms_descriptor("MAIN", complete=False)
+
+    table_desc["DATA"] = {
+        "comment": "Antenna number",
+        "dataManagerGroup": "StandardStMan",
+        "dataManagerType": "StandardStMan",
+        "keywords": {},
+        "ndim": 2,
+        "shape": [3, 3],
+        "maxlen": 0,
+        "option": 0,
+        "valueType": "float",
+    }
+
+    T = Table.ms_from_descriptor(ms, table_desc=table_desc)
+    T.addrows(3)
+    zeros = np.zeros((3, 3, 3), dtype=np.float32)
+    T.putcol("DATA", np.arange(3*3*3, dtype=np.float32).reshape(3, 3, 3))
+
+    assert_array_equal(T.getcol2("DATA"), [
+        [[0, 1, 2], [3, 4, 5], [6, 7, 8]],
+        [[9, 10, 11], [12, 13, 14], [15, 16, 17]],
+        [[18, 19, 20], [21, 22, 23], [24, 25, 26]],
+    ])
+
+    index = (np.array([2, 0]), np.array([2, 0]), np.array([2, 0]))
+    expected = np.array([
+        [[26, 24], [20, 18]],
+        [[8, 6], [2, 0]]], np.float32)
+    assert_array_equal(T.getcol2("DATA", index=index), expected)
+
+    T.putcol("DATA", zeros)
+    assert_array_equal(T.getcol2("DATA"), 0)
+
+    T.putcol("DATA", expected, index=index)
+    assert_array_equal(T.getcol2("DATA"), [
+        [[0, 0, 2], [0, 0, 0], [6, 0, 8]],
+        [[0, 0, 0], [0, 0, 0], [0, 0, 0]],
+        [[18, 0, 20], [0, 0, 0], [24, 0, 26]],
+    ])
+
+    T.putcol("DATA", zeros)
+    assert_array_equal(T.getcol2("DATA"), 0)
+
+    index = (np.array([0, 2]),)*3
+    T.putcol("DATA", expected, index=index)
+    assert_array_equal(T.getcol2("DATA"), [
+        [[26, 0, 24], [0, 0, 0], [20, 0, 18]],
+        [[0, 0, 0], [0, 0, 0], [0, 0, 0]],
+        [[8, 0, 6], [0, 0, 0], [2, 0, 0]],
+    ])
+
 def test_getcol2(getcol_table):
     T = arcae.table(getcol_table, readonly=False)
 
