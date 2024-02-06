@@ -7,17 +7,16 @@
 #include <optional>
 #include <vector>
 
-#include <arrow/api.h>
+#include <arrow/array.h>
 #include <arrow/result.h>
 #include <arrow/status.h>
+#include <arrow/type.h>
+
 #include <casacore/casa/aipsxtype.h>
 #include <casacore/casa/Arrays/IPosition.h>
-#include <casacore/casa/Arrays/Slicer.h>
 #include <casacore/tables/Tables/TableColumn.h>
 
 #include "arcae/base_column_map.h"
-#include "arrow/array/array_base.h"
-#include "arrow/type.h"
 
 namespace arcae {
 

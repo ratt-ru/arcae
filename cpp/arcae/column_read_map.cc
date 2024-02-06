@@ -9,17 +9,12 @@
 #include <sys/types.h>
 #include <vector>
 
-#include <arrow/api.h>
 #include <arrow/result.h>
 #include <arrow/status.h>
-#include <arrow/array/array_nested.h>
-#include <arrow/scalar.h>
 #include <arrow/type.h>
 
 #include <casacore/casa/aipsxtype.h>
 #include <casacore/casa/Arrays/IPosition.h>
-#include <casacore/casa/Arrays/Slicer.h>
-#include <casacore/tables/Tables/ArrayColumnBase.h>
 #include <casacore/tables/Tables/TableColumn.h>
 
 namespace arcae {

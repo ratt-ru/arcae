@@ -11,23 +11,19 @@
 #include <type_traits>
 #include <vector>
 
-#include <arrow/api.h>
 #include <arrow/util/logging.h>
 #include <arrow/result.h>
 #include <arrow/status.h>
 #include <arrow/array/array_nested.h>
 #include <arrow/scalar.h>
-#include <arrow/testing/gtest_util.h>
 #include <arrow/type.h>
 
 #include <casacore/casa/aipsxtype.h>
 #include <casacore/casa/Utilities/DataType.h>
 #include <casacore/casa/Arrays/IPosition.h>
-#include <casacore/casa/Arrays/Slicer.h>
 #include <casacore/tables/Tables/ArrayColumnBase.h>
 #include <casacore/tables/Tables/TableColumn.h>
 
-#include "arcae/base_column_map.h"
 
 namespace arcae {
 
