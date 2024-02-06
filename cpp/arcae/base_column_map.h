@@ -186,8 +186,8 @@ MapIterator<ColumnMapping>::MemOffset(std::size_t dim, std::size_t offset) const
 
   if(DimRange(dim).type == Range::MAP) {
     const auto & dim_map = DimMap(dim);
-    assert(offset < dim_map.size());
-    return base_offset + dim_map[offset].mem;
+    assert(base_offset + offset < dim_map.size());
+    return dim_map[base_offset + offset].mem;
   }
 
   return base_offset + offset;
