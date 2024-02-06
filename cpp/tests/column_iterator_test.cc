@@ -109,41 +109,6 @@ class ColumnIteratorTest : public ::testing::Test {
     }
 };
 
-
-TEST_F(ColumnIteratorTest, Unordered) {
-  const auto & table = table_proxy_.table();
-
-  auto time = GetScalarColumn<casacore::Double>(table, "TIME");
-
-  ASSERT_OK_AND_ASSIGN(auto map, ColumnReadMap::Make(time, {{2, 0}}));
-  ASSERT_EQ(map.nRanges(), 2);
-  ASSERT_EQ(map.nElements(), 2);
-  ASSERT_EQ(map.GetOutputShape(), IPos({2}));
-  auto rit = map.RangeBegin();
-  ASSERT_EQ(rit.GetRowSlicer(), Slicer(IPos({0}), IPos({0}), Slicer::endIsLast));
-  auto mit = rit.MapBegin();
-  auto array = time.getColumnRange(rit.GetRowSlicer());
-  ASSERT_EQ(mit.ChunkOffset(), 0);
-  ASSERT_EQ(mit.GlobalOffset(), 1);
-  ASSERT_EQ(array.data()[mit.ChunkOffset()], 0);
-  ++mit;
-  ASSERT_EQ(mit, rit.MapEnd());
-
-  ++rit;
-  mit = rit.MapBegin();
-  array = time.getColumnRange(rit.GetRowSlicer());
-  ASSERT_EQ(rit.GetRowSlicer(), Slicer(IPos({2}), IPos({2}), Slicer::endIsLast));
-  ASSERT_EQ(mit.ChunkOffset(), 0);
-  ASSERT_EQ(mit.GlobalOffset(), 0);
-  ASSERT_EQ(array.data()[mit.ChunkOffset()], 2);
-  ++mit;
-  ASSERT_EQ(mit, rit.MapEnd());
-
-  ++rit;
-  ASSERT_EQ(rit, map.RangeEnd());
-}
-
-
 TEST_F(ColumnIteratorTest, SelectionVariable) {
   const auto & table = table_proxy_.table();
 
@@ -251,4 +216,37 @@ TEST_F(ColumnIteratorTest, SelectionVariable) {
       ASSERT_EQ(map.RangeEnd(), rit);
     }
   }
+}
+
+TEST_F(ColumnIteratorTest, OutOfOrderSelection) {
+  const auto & table = table_proxy_.table();
+
+  auto time = GetScalarColumn<casacore::Double>(table, "TIME");
+
+  ASSERT_OK_AND_ASSIGN(auto map, ColumnReadMap::Make(time, {{2, 0}}));
+  ASSERT_EQ(map.nRanges(), 2);
+  ASSERT_EQ(map.nElements(), 2);
+  ASSERT_EQ(map.GetOutputShape(), IPos({2}));
+  auto rit = map.RangeBegin();
+  ASSERT_EQ(rit.GetRowSlicer(), Slicer(IPos({0}), IPos({0}), Slicer::endIsLast));
+  auto mit = rit.MapBegin();
+  auto array = time.getColumnRange(rit.GetRowSlicer());
+  ASSERT_EQ(mit.ChunkOffset(), 0);
+  ASSERT_EQ(mit.GlobalOffset(), 1);
+  ASSERT_EQ(array.data()[mit.ChunkOffset()], 0);
+  ++mit;
+  ASSERT_EQ(mit, rit.MapEnd());
+
+  ++rit;
+  mit = rit.MapBegin();
+  array = time.getColumnRange(rit.GetRowSlicer());
+  ASSERT_EQ(rit.GetRowSlicer(), Slicer(IPos({2}), IPos({2}), Slicer::endIsLast));
+  ASSERT_EQ(mit.ChunkOffset(), 0);
+  ASSERT_EQ(mit.GlobalOffset(), 0);
+  ASSERT_EQ(array.data()[mit.ChunkOffset()], 2);
+  ++mit;
+  ASSERT_EQ(mit, rit.MapEnd());
+
+  ++rit;
+  ASSERT_EQ(rit, map.RangeEnd());
 }
