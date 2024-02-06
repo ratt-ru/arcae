@@ -1,7 +1,6 @@
 #ifndef COLUMN_WRITE_VISITOR_H
 #define COLUMN_WRITE_VISITOR_H
 
-#include <casacore/casa/Exceptions/Error.h>
 #include <functional>
 #include <memory>
 
@@ -14,6 +13,7 @@
 #include <casacore/casa/aipstype.h>
 #include <casacore/casa/aipsxtype.h>
 #include <casacore/casa/BasicSL/String.h>
+#include <casacore/casa/Exceptions/Error.h>
 #include <casacore/tables/Tables.h>
 
 #include "arcae/column_write_map.h"
