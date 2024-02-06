@@ -3,6 +3,7 @@
 
 #include <arrow/result.h>
 #include <arrow/ipc/json_simple.h>
+#include <arrow/testing/gtest_util.h>
 
 #include <casacore/casa/Arrays/IPosition.h>
 #include <casacore/ms/MeasurementSets/MeasurementSet.h>
@@ -16,7 +17,6 @@
 
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
-#include <arrow/testing/gtest_util.h>
 
 #include "arcae/safe_table_proxy.h"
 #include "arcae/column_read_map.h"
@@ -40,7 +40,7 @@ using arcae::ColumnReadMap;
 
 using namespace std::string_literals;
 
-static constexpr std::size_t knrow = 2;
+static constexpr std::size_t knrow = 3;
 static constexpr std::size_t knchan = 2;
 static constexpr std::size_t kncorr = 2;
 
@@ -64,7 +64,7 @@ GetArrayColumn(const MS & ms, const std::string & column) {
   return ArrayColumn<T>(TableColumn(ms, column));
 }
 
-class ColumnReadTest : public ::testing::Test {
+class ColumnIteratorTest : public ::testing::Test {
   protected:
     casacore::TableProxy table_proxy_;
     std::string table_name_;
@@ -83,6 +83,7 @@ class ColumnReadTest : public ::testing::Test {
         auto setup_new_table = SetupNewTable(table_name_, table_desc, Table::New);
         auto ms = MS(setup_new_table, knrow);
 
+        auto time_data = GetScalarColumn<casacore::Double>(ms, "TIME");
         auto var_data = GetArrayColumn<casacore::Int>(ms, "VAR_DATA");
 
         for(auto [r, v] = std::tuple{ssize_t{0}, std::size_t{0}}; r < knrow; ++r) {
@@ -90,6 +91,7 @@ class ColumnReadTest : public ::testing::Test {
             ssize_t{kncorr} - (r % 2), ssize_t{knchan} - (r % 2), 1}));
           for(auto it = std::begin(var_array); it != std::end(var_array); ++it, ++v) *it = v;
           var_data.putColumnCells(casacore::RefRows(r, r), var_array);
+          time_data.put(r, r);
         }
 
         return std::make_shared<TableProxy>(ms);
@@ -104,12 +106,45 @@ class ColumnReadTest : public ::testing::Test {
       lockoptions.define("internal", lock.interval());
       lockoptions.define("maxwait", casacore::Int(lock.maxWait()));
       table_proxy_ = casacore::TableProxy(table_name_, lockoptions, casacore::Table::Old);
-
     }
 };
 
 
-TEST_F(ColumnReadTest, SelectionVariable) {
+TEST_F(ColumnIteratorTest, Unordered) {
+  const auto & table = table_proxy_.table();
+
+  auto time = GetScalarColumn<casacore::Double>(table, "TIME");
+
+  ASSERT_OK_AND_ASSIGN(auto map, ColumnReadMap::Make(time, {{2, 0}}));
+  ASSERT_EQ(map.nRanges(), 2);
+  ASSERT_EQ(map.nElements(), 2);
+  ASSERT_EQ(map.GetOutputShape(), IPos({2}));
+  auto rit = map.RangeBegin();
+  ASSERT_EQ(rit.GetRowSlicer(), Slicer(IPos({0}), IPos({0}), Slicer::endIsLast));
+  auto mit = rit.MapBegin();
+  auto array = time.getColumnRange(rit.GetRowSlicer());
+  ASSERT_EQ(mit.ChunkOffset(), 0);
+  ASSERT_EQ(mit.GlobalOffset(), 1);
+  ASSERT_EQ(array.data()[mit.ChunkOffset()], 0);
+  ++mit;
+  ASSERT_EQ(mit, rit.MapEnd());
+
+  ++rit;
+  mit = rit.MapBegin();
+  array = time.getColumnRange(rit.GetRowSlicer());
+  ASSERT_EQ(rit.GetRowSlicer(), Slicer(IPos({2}), IPos({2}), Slicer::endIsLast));
+  ASSERT_EQ(mit.ChunkOffset(), 0);
+  ASSERT_EQ(mit.GlobalOffset(), 0);
+  ASSERT_EQ(array.data()[mit.ChunkOffset()], 2);
+  ++mit;
+  ASSERT_EQ(mit, rit.MapEnd());
+
+  ++rit;
+  ASSERT_EQ(rit, map.RangeEnd());
+}
+
+
+TEST_F(ColumnIteratorTest, SelectionVariable) {
   const auto & table = table_proxy_.table();
 
   {
