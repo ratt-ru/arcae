@@ -169,43 +169,43 @@ def test_unordered_select_roundtrip(tmp_path):
         "valueType": "float",
     }
 
-    T = Table.ms_from_descriptor(ms, table_desc=table_desc)
-    T.addrows(3)
-    zeros = np.zeros((3, 3, 3), dtype=np.float32)
-    T.putcol("DATA", np.arange(3*3*3, dtype=np.float32).reshape(3, 3, 3))
+    with Table.ms_from_descriptor(ms, table_desc=table_desc) as T:
+        T.addrows(3)
+        zeros = np.zeros((3, 3, 3), dtype=np.float32)
+        T.putcol("DATA", np.arange(3*3*3, dtype=np.float32).reshape(3, 3, 3))
 
-    assert_array_equal(T.getcol2("DATA"), [
-        [[0, 1, 2], [3, 4, 5], [6, 7, 8]],
-        [[9, 10, 11], [12, 13, 14], [15, 16, 17]],
-        [[18, 19, 20], [21, 22, 23], [24, 25, 26]],
-    ])
+        assert_array_equal(T.getcol2("DATA"), [
+            [[0, 1, 2], [3, 4, 5], [6, 7, 8]],
+            [[9, 10, 11], [12, 13, 14], [15, 16, 17]],
+            [[18, 19, 20], [21, 22, 23], [24, 25, 26]],
+        ])
 
-    index = (np.array([2, 0]), np.array([2, 0]), np.array([2, 0]))
-    expected = np.array([
-        [[26, 24], [20, 18]],
-        [[8, 6], [2, 0]]], np.float32)
-    assert_array_equal(T.getcol2("DATA", index=index), expected)
+        index = (np.array([2, 0]), np.array([2, 0]), np.array([2, 0]))
+        expected = np.array([
+            [[26, 24], [20, 18]],
+            [[8, 6], [2, 0]]], np.float32)
+        assert_array_equal(T.getcol2("DATA", index=index), expected)
 
-    T.putcol("DATA", zeros)
-    assert_array_equal(T.getcol2("DATA"), 0)
+        T.putcol("DATA", zeros)
+        assert_array_equal(T.getcol2("DATA"), 0)
 
-    T.putcol("DATA", expected, index=index)
-    assert_array_equal(T.getcol2("DATA"), [
-        [[0, 0, 2], [0, 0, 0], [6, 0, 8]],
-        [[0, 0, 0], [0, 0, 0], [0, 0, 0]],
-        [[18, 0, 20], [0, 0, 0], [24, 0, 26]],
-    ])
+        T.putcol("DATA", expected, index=index)
+        assert_array_equal(T.getcol2("DATA"), [
+            [[0, 0, 2], [0, 0, 0], [6, 0, 8]],
+            [[0, 0, 0], [0, 0, 0], [0, 0, 0]],
+            [[18, 0, 20], [0, 0, 0], [24, 0, 26]],
+        ])
 
-    T.putcol("DATA", zeros)
-    assert_array_equal(T.getcol2("DATA"), 0)
+        T.putcol("DATA", zeros)
+        assert_array_equal(T.getcol2("DATA"), 0)
 
-    index = (np.array([0, 2]),)*3
-    T.putcol("DATA", expected, index=index)
-    assert_array_equal(T.getcol2("DATA"), [
-        [[26, 0, 24], [0, 0, 0], [20, 0, 18]],
-        [[0, 0, 0], [0, 0, 0], [0, 0, 0]],
-        [[8, 0, 6], [0, 0, 0], [2, 0, 0]],
-    ])
+        index = (np.array([0, 2]),)*3
+        T.putcol("DATA", expected, index=index)
+        assert_array_equal(T.getcol2("DATA"), [
+            [[26, 0, 24], [0, 0, 0], [20, 0, 18]],
+            [[0, 0, 0], [0, 0, 0], [0, 0, 0]],
+            [[8, 0, 6], [0, 0, 0], [2, 0, 0]],
+        ])
 
 def test_getcol2(getcol_table):
     T = arcae.table(getcol_table, readonly=False)
