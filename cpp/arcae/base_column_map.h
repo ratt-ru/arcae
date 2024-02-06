@@ -646,7 +646,18 @@ FixedRangeFactory(const SP & shape_prov, const ColumnMaps & maps) {
     column_ranges.emplace_back(std::move(column_range));
   }
 
+  // Post construction checks
   assert(ndim == column_ranges.size());
+
+  for(std::size_t dim=0; dim < ndim; ++dim) {
+    const auto & column_range = column_ranges[dim];
+    for(std::size_t r=1; r < column_range.size(); ++r) {
+      if(column_range[r].type != column_range[r - 1].type) {
+        return arrow::Status::NotImplemented("Heterogenous Column Ranges in a dimension");
+      }
+    }
+  }
+
   return column_ranges;
 }
 
