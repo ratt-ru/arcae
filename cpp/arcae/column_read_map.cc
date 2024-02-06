@@ -27,6 +27,7 @@ namespace arcae {
 namespace {
 
 // Clip supplied shape based on the column selection
+// The shape should not include the row dimension
 arrow::Result<casacore::IPosition> ClipShape(
                                     const casacore::IPosition & shape,
                                     const ColumnSelection & selection) {
@@ -149,7 +150,7 @@ MakeOffsets(const decltype(VariableShapeData::row_shapes_) & row_shapes) {
 // Factory method for creating Variably Shape Data from column
 arrow::Result<std::unique_ptr<VariableShapeData>>
 VariableShapeData::Make(const casacore::TableColumn & column,
-                                  const ColumnSelection & selection) {
+                        const ColumnSelection & selection) {
   assert(!column.columnDesc().isFixedShape());
   auto row_shapes = decltype(VariableShapeData::row_shapes_){};
   bool fixed_shape = true;
@@ -218,6 +219,9 @@ ShapeProvider::Make(const casacore::TableColumn & column,
                     const ColumnSelection & selection) {
 
   if(column.columnDesc().isFixedShape()) {
+    auto shape = column.columnDesc().shape();
+    shape.append(casacore::IPosition({ssize_t(column.nrow())}));
+    ARROW_RETURN_NOT_OK(CheckSelectionAgainstShape(shape, selection));
     return ShapeProvider{std::cref(column), selection};
   }
 

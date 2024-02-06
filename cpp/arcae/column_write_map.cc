@@ -264,7 +264,6 @@ arrow::Result<ArrowShapeProvider>
 ArrowShapeProvider::Make(const casacore::TableColumn & column,
                          const ColumnSelection & selection,
                          const std::shared_ptr<arrow::Array> & data) {
-
   ARROW_ASSIGN_OR_RAISE(auto properties, GetDataProperties(column, selection, data));
   auto &[shape, ndim, dtype, is_complex] = properties;
   return ArrowShapeProvider{std::cref(column),
@@ -404,17 +403,27 @@ ColumnWriteMap::Make(
     const std::shared_ptr<arrow::Array> & data,
     MapOrder order) {
 
-  // Convert to FORTRAN ordering, which the casacore internals use
+  // Convert to FORTRAN ordering, used by casacore internals
   if(order == MapOrder::C_ORDER) {
     std::reverse(std::begin(selection), std::end(selection));
   }
 
   ARROW_ASSIGN_OR_RAISE(auto shape_prov, ArrowShapeProvider::Make(column, selection, data));
   auto maps = MapFactory(shape_prov, selection);
-  if(shape_prov.IsColumnVarying()) {
+
+  if(shape_prov.IsColumnFixed()) {
+    // If the column has a fixed shape, check up front that
+    // the selection indices that we're writing to exist
+    auto colshape = column.columnDesc().shape();
+    colshape.append(casacore::IPosition({ssize_t(column.nrow())}));
+    ARROW_RETURN_NOT_OK(CheckSelectionAgainstShape(colshape, selection));
+  } else {
+    // Otherwise we may be able to set the shape in the case
+    // of variably shaped columns
     auto array_base = casacore::ArrayColumnBase(column);
     ARROW_RETURN_NOT_OK(SetVariableRowShapes(array_base, selection, data, shape_prov));
   }
+
   ARROW_ASSIGN_OR_RAISE(auto ranges, RangeFactory(shape_prov, maps));
 
   if(ranges.size() == 0) {

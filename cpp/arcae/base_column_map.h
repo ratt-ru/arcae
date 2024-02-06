@@ -19,6 +19,9 @@ namespace arcae {
 
 enum MapOrder {C_ORDER=0, F_ORDER};
 
+using RowIds = absl::Span<const casacore::rownr_t>;
+using ColumnSelection = std::vector<RowIds>;
+
 // Return a selection dimension given
 //
 // 1. FORTRAN ordered dim
@@ -27,9 +30,9 @@ enum MapOrder {C_ORDER=0, F_ORDER};
 //
 // A return of < 0 indicates a non-existent selection
 std::ptrdiff_t SelectDim(std::size_t dim, std::size_t sdims, std::size_t ndims);
+arrow::Status CheckSelectionAgainstShape(const casacore::IPosition & shape,
+                                         const ColumnSelection & selection);
 
-using RowIds = absl::Span<const casacore::rownr_t>;
-using ColumnSelection = std::vector<RowIds>;
 
 // Describes a mapping between disk and memory
 struct IdMap {

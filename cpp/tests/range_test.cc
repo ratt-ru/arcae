@@ -41,9 +41,9 @@ using IPos = casacore::IPosition;
 
 using namespace std::string_literals;
 
-static constexpr std::size_t knrow = 10;
-static constexpr std::size_t knchan = 4;
-static constexpr std::size_t kncorr = 2;
+static constexpr std::size_t knrow = 20;
+static constexpr std::size_t knchan = 20;
+static constexpr std::size_t kncorr = 20;
 
 template <typename T> ScalarColumn<T>
 GetScalarColumn(const MS & ms, MSColumns column) {
@@ -111,8 +111,8 @@ TEST_F(RangeTest, CheckMapsAndRangesSingleton) {
   EXPECT_EQ(map.DimMap(1).size(), 0);
   EXPECT_THAT(map.DimMap(2), ::testing::ElementsAre(IdMap{0, 0}));
 
-  EXPECT_THAT(map.DimRanges(0), ::testing::ElementsAre(Range{0, 2, Range::FREE}));
-  EXPECT_THAT(map.DimRanges(1), ::testing::ElementsAre(Range{0, 4, Range::FREE}));
+  EXPECT_THAT(map.DimRanges(0), ::testing::ElementsAre(Range{0, 20, Range::FREE}));
+  EXPECT_THAT(map.DimRanges(1), ::testing::ElementsAre(Range{0, 20, Range::FREE}));
   EXPECT_THAT(map.DimRanges(2), ::testing::ElementsAre(Range{0, 1, Range::MAP}));
 }
 
@@ -165,7 +165,7 @@ TEST_F(RangeTest, TestSimplicity) {
   }
 
   {
-    ASSERT_OK_AND_ASSIGN(auto map, ColumnReadMap::Make(data, {{1, 2, 3, 4}, {5, 6}, {6, 7}}));
+    ASSERT_OK_AND_ASSIGN(auto map, ColumnReadMap::Make(data, {{1, 2, 3, 4}, {0, 1}, {0, 1}}));
     ASSERT_TRUE(map.IsSimple());
   }
 
