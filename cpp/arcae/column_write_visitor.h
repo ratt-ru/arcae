@@ -48,7 +48,11 @@ public:
     arrow::Status Visit(const arrow::UInt8Type & dt) { return WriteColumn<casacore::uChar>(); }
     arrow::Status Visit(const arrow::UInt16Type & dt) { return WriteColumn<casacore::uShort>(); }
     arrow::Status Visit(const arrow::UInt32Type & dt) { return WriteColumn<casacore::uInt>(); }
-    //arrow::Status Visit(const arrow::UInt64Type & dt) { return WriteColumn<casacore::uInt64>(); }
+    arrow::Status Visit(const arrow::UInt64Type & dt) {
+        // TODO(sjperkins)
+        // Patch uInt64 support into casacore/casa/Utilities/ValTypeId.h
+        return arrow::Status::NotImplemented("Conversion to casacore::uInt64");
+    }
 
     // Strings
     arrow::Status Visit(const arrow::StringType & dt) { return WriteColumn<casacore::String>(); }
