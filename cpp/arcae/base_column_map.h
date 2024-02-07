@@ -22,6 +22,9 @@ enum MapOrder {C_ORDER=0, F_ORDER};
 using RowIds = absl::Span<const casacore::rownr_t>;
 using ColumnSelection = std::vector<RowIds>;
 
+// Type indicating the ending of an iteration
+struct EndSentinel {};
+
 // Return a selection dimension given
 //
 // 1. FORTRAN ordered dim
@@ -145,6 +148,12 @@ struct MapIterator {
   }
 
   MapIterator & operator++();
+  bool operator==(const EndSentinel & other) const {
+    return done_;
+  }
+  bool operator!=(const EndSentinel & other) const {
+    return !(*this == other);
+  }
   bool operator==(const MapIterator & other) const;
   bool operator!=(const MapIterator & other) const {
     return !(*this == other);
@@ -202,7 +211,7 @@ std::size_t
 MapIterator<ColumnMapping>::MemOffset(std::size_t dim, std::size_t offset) const {
   auto base_offset = MemStart(dim);
 
-  if(DimRange(dim).type == Range::MAP) {
+  if(DimRange(dim).IsMap()) {
     const auto & dim_map = DimMap(dim);
     assert(base_offset + offset < dim_map.size());
     return dim_map[base_offset + offset].mem;
@@ -293,8 +302,8 @@ struct RangeIterator {
     return MapIterator<ColumnMapping>::Make(*this, false);
   };
 
-  MapIterator<ColumnMapping> MapEnd() const {
-    return MapIterator<ColumnMapping>::Make(*this, true);
+  EndSentinel MapEnd() const {
+    return EndSentinel{};
   };
 
   std::size_t RangeElements() const;
@@ -309,6 +318,12 @@ struct RangeIterator {
   // Returns shape of this chunk
   casacore::IPosition GetShape() const;
 
+  bool operator==(const EndSentinel & other) const {
+    return done_;
+  }
+  bool operator!=(const EndSentinel & other) const {
+    return !(*this == other);
+  }
   bool operator==(const RangeIterator & other) const;
   bool operator!=(const RangeIterator & other) const {
     return !(*this == other);
@@ -491,8 +506,8 @@ struct BaseColumnMap {
     return RangeIterator{const_cast<T&>(static_cast<const T&>(*this)), false};
   }
 
-  RangeIterator<T> RangeEnd() const {
-    return RangeIterator{const_cast<T&>(static_cast<const T&>(*this)), true};
+  EndSentinel RangeEnd() const {
+    return EndSentinel{};
   }
 
   // Number of disjoint ranges in this map

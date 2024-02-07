@@ -144,7 +144,7 @@ TEST_F(ColumnIteratorTest, SelectionVariable) {
       ++mit;
       ASSERT_EQ(mit, rit.MapEnd());
       ++rit;
-      ASSERT_EQ(map.RangeEnd(), rit);
+      ASSERT_EQ(rit, map.RangeEnd());
     }
     // Get row 1
     {
@@ -163,7 +163,7 @@ TEST_F(ColumnIteratorTest, SelectionVariable) {
       ++mit;
       ASSERT_EQ(mit, rit.MapEnd());
       ++rit;
-      ASSERT_EQ(map.RangeEnd(), rit);
+      ASSERT_EQ(rit, map.RangeEnd());
     }
     {
       // Get row 0 and 1
@@ -213,7 +213,7 @@ TEST_F(ColumnIteratorTest, SelectionVariable) {
       }
 
       ++rit;
-      ASSERT_EQ(map.RangeEnd(), rit);
+      ASSERT_EQ(rit, map.RangeEnd());
     }
   }
 }
