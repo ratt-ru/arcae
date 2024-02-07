@@ -92,9 +92,6 @@ RangeFactory(const ShapeProvider & shape_prov, const ColumnMaps & maps) {
   return VariableRangeFactory(shape_prov, maps);
 }
 
-
-} // namespace
-
 arrow::Result<casacore::IPosition> GetColumnRowShape(
   const casacore::TableColumn & column,
   casacore::rownr_t row) {
@@ -141,6 +138,8 @@ MakeOffsets(const decltype(VariableShapeData::row_shapes_) & row_shapes) {
 
   return offsets;
 }
+
+} // namespace
 
 // Factory method for creating Variably Shape Data from column
 arrow::Result<std::unique_ptr<VariableShapeData>>
