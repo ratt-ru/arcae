@@ -60,17 +60,32 @@ struct Range {
     VARYING
   } type = FREE;
 
-  constexpr casacore::rownr_t nRows() const
+  // The size of the range
+  constexpr casacore::rownr_t Size() const
     { return end - start; }
 
-  constexpr bool IsSingleRow() const
-    { return nRows() == 1; }
+  // Does this range describe a single value
+  constexpr bool IsSingleton() const
+    { return Size() == 1; }
 
+  // Is the range increasing
   constexpr bool IsValid() const
     { return start <= end; }
 
   constexpr bool operator==(const Range & lhs) const
-      { return start == lhs.start && end == lhs.end && type == lhs.type; }
+    { return start == lhs.start && end == lhs.end && type == lhs.type; }
+
+  // Is this a mapping range
+  constexpr bool IsMap() const
+    { return type == MAP; }
+
+  // Is this a free range
+  constexpr bool IsFree() const
+    { return type == FREE; }
+
+  // Is this a varying range
+  constexpr bool IsVarying() const
+    { return type == VARYING; }
 };
 
 // Vectors of ranges
@@ -364,7 +379,7 @@ void RangeIterator<ColumnMapping>::UpdateState() {
         // the dimension size will vary by row
         // and there will only be a single row
         const auto & rr = DimRange(RowDim());
-        assert(rr.IsSingleRow());
+        assert(rr.IsSingleton());
         disk_start_[dim] = 0;
         range_length_[dim] = map_.get().RowDimSize(rr.start, dim);
         break;
@@ -539,20 +554,20 @@ std::size_t BaseColumnMap<T>::nElements() const {
 
   for(std::size_t rr_id=0; rr_id < row_ranges.size(); ++rr_id) {
     const auto & row_range = row_ranges[rr_id];
-    auto row_elements = std::size_t{row_range.nRows()};
+    auto row_elements = std::size_t{row_range.Size()};
     for(std::size_t dim = 0; dim < RowDim(); ++dim) {
       const auto & dim_range = DimRanges(dim);
       auto dim_elements = std::size_t{0};
       for(const auto & range: dim_range) {
         switch(range.type) {
           case Range::VARYING:
-            assert(row_range.IsSingleRow());
+            assert(row_range.IsSingleton());
             dim_elements += RowDimSize(rr_id, dim);
             break;
           case Range::FREE:
           case Range::MAP:
             assert(range.IsValid());
-            dim_elements += range.nRows();
+            dim_elements += range.Size();
             break;
           default:
             assert(false && "Unhandled Range::Type enum");

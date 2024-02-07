@@ -68,7 +68,7 @@ MaybeMakeOutputShape(const ColumnRanges & ranges) {
         case Range::FREE:
         case Range::MAP:
           assert(range.IsValid());
-          size += range.nRows();
+          size += range.Size();
           break;
         case Range::VARYING:
           return std::nullopt;
