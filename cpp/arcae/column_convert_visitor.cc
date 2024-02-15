@@ -8,7 +8,6 @@
 using ::arrow::DataType;
 using ::arrow::Buffer;
 using ::arrow::Result;
-using ::arrow::Status;
 
 namespace arcae {
 
