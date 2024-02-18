@@ -105,10 +105,10 @@ jobs:
         # https://peps.python.org/pep-0425
         python:
         # python version, cpython tag
-        - ["3.8", "cp38"]
         - ["3.9", "cp39"]
         - ["3.10", "cp310"]
         - ["3.11", "cp311"]
+        - ["3.12", "cp312"]
 
     steps:
       - name: Set up Python ${{ matrix.python[0] }}
