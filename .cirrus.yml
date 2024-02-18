@@ -81,7 +81,9 @@ macos_arm64_task:
     VCPKG_TARGET_TRIPLET: arm64-osx-dynamic-cxx17-abi1-rel
     REPAIR_LIBRARY_PATH: $VCPKG_INSTALLED_DIR/$VCPKG_TARGET_TRIPLET/lib
     CIBW_REPAIR_WHEEL_COMMAND_MACOS:
-      export PYARROW_LIDIRS=$(python -c "import pyarrow; print(':'.join(pyarrow.get_library_dirs()))")
+      python3 -m pip install --upgrade pip
+      python3 -m pip install --upgrade pyarrow
+      export PYARROW_LIBDIRS=$(python -c "import pyarrow; print(':'.join(pyarrow.get_library_dirs()))")
       export REPAIR_LIBRARY_PATH=$PYARROW_LIBDIRS:$REPAIR_LIBRARY_PATH
       DYLD_LIBRARY_PATH=$REPAIR_LIBRARY_PATH delocate-listdeps {wheel} &&
       DYLD_LIBRARY_PATH=$REPAIR_LIBRARY_PATH delocate-wheel
