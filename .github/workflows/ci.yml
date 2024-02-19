@@ -13,9 +13,10 @@ on:
 env:
   CIBW_BUILD_FRONTEND: build
   CIBW_BEFORE_ALL_LINUX: yum install -y zip flex bison gcc-gfortran
+  # Need to reinstall gcc in order to get gfortran
   CIBW_BEFORE_ALL_MACOS: |
-    brew uninstall python
-    brew install python gcc llvm --overwrite
+    brew install python llvm
+    brew reinstall gcc
   # CIBW_BEFORE_BUILD_MACOS: |
   #   export PATH="/opt/homebrew/opt/llvm/bin:$PATH"
   #   export LDFLAGS="-L/opt/homebrew/opt/llvm/lib"
