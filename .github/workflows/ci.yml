@@ -108,7 +108,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ["ubuntu-22.04", "macos-14"]
+        os: ["ubuntu-22.04", "macos-13", "macos-14"]
         # https://peps.python.org/pep-0425
         #cpython: ["cp39", "cp310", "cp311", "cp312"]
         cpython: ["cp310", "cp311"]
@@ -117,14 +117,14 @@ jobs:
             arch: "x86_64"
             triplet: "x64-linux-dynamic-cxx17-abi1-rel"
             extra_build: "manylinux_x86_64"
+          - os: macos-13
+            arch: "x86_64"
+            triplet: "x64-osx-dynamic-cxx17-abi1-rel"
+            extra_build: "macosx_x86_64"
           - os: macos-14
             arch: "arm64"
             triplet: "arm64-osx-dynamic-cxx17-abi1-rel"
             extra_build: "macosx_arm64"
-          # - os: macos-14
-          #   arch: "x86_64"
-          #   triplet: "x64-osx-dynamic-cxx17-abi1-rel"
-          #   extra_build: "macosx_x86_64"
 
     steps:
       - name: Set up Python ${{ env.HOST_PYTHON_VERSION }}
@@ -178,9 +178,9 @@ jobs:
           name: ${{ env.ARTIFACT_NAME }}
           path: ./wheelhouse/*.whl
 
-      - name: Debug with tmate on failure
-        if: ${{ failure() }}
-        uses: mxschmitt/action-tmate@v3
+      # - name: Debug with tmate on failure
+      #   if: ${{ failure() }}
+      #   uses: mxschmitt/action-tmate@v3
 
   upload-to-test-pypi:
     name: Upload release to Test PyPI
