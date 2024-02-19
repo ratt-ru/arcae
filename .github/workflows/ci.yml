@@ -48,7 +48,7 @@ jobs:
         run: python -m build --sdist
 
       - name: Upload wheel artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ env.ARTIFACT_NAME }}
           path: ./dist/*.tar.gz
@@ -172,7 +172,7 @@ jobs:
           CIBW_TEST_COMMAND_LINUX: py.test -s -vvv --pyargs arcae
 
       - name: Upload wheel artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ env.ARTIFACT_NAME }}
           path: ./wheelhouse/*.whl
