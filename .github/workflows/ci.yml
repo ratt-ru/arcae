@@ -13,7 +13,11 @@ on:
 env:
   CIBW_BUILD_FRONTEND: build
   CIBW_BEFORE_ALL_LINUX: yum install -y zip flex bison gcc-gfortran
-  CIBW_BEFORE_ALL_MACOS: brew install python llvm
+  CIBW_BEFORE_ALL_MACOS: |
+    brew install python llvm
+    export PATH="/opt/homebrew/opt/llvm/bin:$PATH"
+    export LDFLAGS="-L/opt/homebrew/opt/llvm/lib"
+    export CPPFLAGS="-I/opt/homebrew/opt/llvm/include"
   CIBW_MANYLINUX_X86_64_IMAGE: quay.io/pypa/manylinux_2_28_x86_64
   CIBW_TEST_EXTRAS: applications,test
   HOST_PYTHON_VERSION: "3.10"
