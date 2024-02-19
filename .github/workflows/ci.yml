@@ -168,10 +168,19 @@ jobs:
             ${{ env.CIBW_ENVIRONMENT_COMMON }}
             MACOSX_DEPLOYMENT_TARGET=11.0
           CIBW_REPAIR_WHEEL_COMMAND_LINUX: >
-            auditwheel repair -w {dest_dir} {wheel} --exclude libarrow_python.so --exclude libarrow.so.1500
+            auditwheel repair
+              -w {dest_dir} {wheel}
+              --exclude libarrow_python.so
+              --exclude libarrow.so.1500
           CIBW_REPAIR_WHEEL_COMMAND_MACOS: |
             DYLD_LIBRARY_PATH=$LD_LIBRARY_PATH delocate-listdeps {wheel}
-            DYLD_LIBRARY_PATH=$LD_LIBRARY_PATH delocate-wheel --require-archs {delocate_archs} -w {dest_dir} -v {wheel} --exclude libarrow_python.dylib --exclude libarrow.1500.dylib --ignore-missing-dependencies
+            DYLD_LIBRARY_PATH=$LD_LIBRARY_PATH delocate-wheel \
+              --require-archs {delocate_archs} \
+              -w {dest_dir} \
+              -v {wheel} \
+              --exclude libarrow_python.dylib \
+              --exclude libarrow.1500.dylib \
+              --ignore-missing-dependencies
           CIBW_TEST_COMMAND_LINUX: py.test -s -vvv --pyargs arcae
 
       - name: Upload wheel artifacts
