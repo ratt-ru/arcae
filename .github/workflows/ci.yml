@@ -174,12 +174,12 @@ jobs:
             --exclude libarrow.so.1500
           CIBW_REPAIR_WHEEL_COMMAND_MACOS: |
             DYLD_LIBRARY_PATH=$LD_LIBRARY_PATH delocate-listdeps {wheel}
-            DYLD_LIBRARY_PATH=$LD_LIBRARY_PATH delocate-wheel
-              --require-archs {delocate_archs}
-              -w {dest_dir}
-              -v {wheel}
-              --exclude libarrow_python.dylib
-              --exclude libarrow.1500.dylib
+            DYLD_LIBRARY_PATH=$LD_LIBRARY_PATH delocate-wheel \
+              --require-archs {delocate_archs} \
+              -w {dest_dir} \
+              -v {wheel} \
+              --exclude libarrow_python.dylib \
+              --exclude libarrow.1500.dylib \
               --ignore-missing-dependencies
           CIBW_TEST_COMMAND_LINUX: py.test -s -vvv --pyargs arcae
 
