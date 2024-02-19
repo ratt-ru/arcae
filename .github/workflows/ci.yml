@@ -157,6 +157,7 @@ jobs:
         uses: pypa/cibuildwheel@v2.16.5
         env:
           CIBW_BUILD: ${{ matrix.cpython }}-${{ matrix.extra_build }}*
+          CIBW_ARCHS: ${{ matrix.arch }}
           CIBW_ENVIRONMENT_LINUX: ${{ env.CIBW_ENVIRONMENT_COMMON }}
           CIBW_ENVIRONMENT_MACOS: >
             ${{ env.CIBW_ENVIRONMENT_COMMON }}
