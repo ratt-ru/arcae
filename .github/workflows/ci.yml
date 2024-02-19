@@ -117,19 +117,23 @@ jobs:
             triplet: "x64-linux-dynamic-cxx17-abi1-rel"
             extra_build: "manylinux_x86_64"
           - os: macos-14
-            arch: "arm64 universal2 x86_64"
-            triplet: "universal2-osx-dynamic-cxx17-abi1-rel"
-            extra_build: ""
+            arch: "arm64"
+            triplet: "arm64-osx-dynamic-cxx17-abi1-rel"
+            extra_build: "macosx_arm64"
+          - os: macos-14
+            arch: "x86_64"
+            triplet: "x64-osx-dynamic-cxx17-abi1-rel"
+            extra_build: "macosx_x86_64"
 
           # Setup Python versions
-          - cpython: cp39
-            python: "3.9"
+          # - cpython: cp39
+          #   python: "3.9"
           - cpython: cp310
             python: "3.10"
-          - cpython: cp311
-            python: "3.11"
-          - cpython: cp312
-            python: "3.12"
+          # - cpython: cp311
+          #   python: "3.11"
+          # - cpython: cp312
+          #   python: "3.12"
 
     steps:
       - name: Set up Python ${{ env.HOST_PYTHON_VERSION }}
