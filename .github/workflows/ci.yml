@@ -174,7 +174,7 @@ jobs:
       - name: Upload wheel artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.ARTIFACT_NAME }}
+          name: ${{ env.ARTIFACT_NAME }}-${{ matrix.os }}-${{ matrix.cpython }}
           path: ./wheelhouse/*.whl
 
       # - name: Debug with tmate on failure
@@ -193,7 +193,8 @@ jobs:
       - name: Download distribution artifacts
         uses: actions/download-artifact@v3
         with:
-          name: ${{ env.ARTIFACT_NAME }}
+          pattern: ${{ env.ARTIFACT_NAME }}-*
+          merge-multiple: true
           path: dist
 
       - name: List artifacts
