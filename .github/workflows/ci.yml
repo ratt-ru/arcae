@@ -182,6 +182,10 @@ jobs:
           name: ${{ env.ARTIFACT_NAME }}
           path: ./wheelhouse/*.whl
 
+      - name: Debug with tmate on failure
+        if: ${{ failure() }}
+        uses: mxschmitt/action-tmate@v3
+
   upload-to-test-pypi:
     name: Upload release to Test PyPI
     needs: [build-sdist, build-wheels]
