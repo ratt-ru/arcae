@@ -169,9 +169,9 @@ jobs:
             MACOSX_DEPLOYMENT_TARGET=11.0
           CIBW_REPAIR_WHEEL_COMMAND_LINUX: >
             auditwheel repair
-              -w {dest_dir} {wheel}
-              --exclude libarrow_python.so
-              --exclude libarrow.so.1500
+            -w {dest_dir} {wheel}
+            --exclude libarrow_python.so
+            --exclude libarrow.so.1500
           CIBW_REPAIR_WHEEL_COMMAND_MACOS: |
             DYLD_LIBRARY_PATH=$LD_LIBRARY_PATH delocate-listdeps {wheel}
             DYLD_LIBRARY_PATH=$LD_LIBRARY_PATH delocate-wheel \
