@@ -17,10 +17,10 @@ env:
   CIBW_BEFORE_ALL_MACOS: |
     brew install python llvm
     brew reinstall gcc
-  # CIBW_BEFORE_BUILD_MACOS: |
-  #   export PATH="/opt/homebrew/opt/llvm/bin:$PATH"
-  #   export LDFLAGS="-L/opt/homebrew/opt/llvm/lib"
-  #   export CPPFLAGS="-I/opt/homebrew/opt/llvm/include"
+  CIBW_BEFORE_BUILD_MACOS: |
+    export PATH="/opt/homebrew/opt/llvm/bin:$PATH"
+    export LDFLAGS="-L/opt/homebrew/opt/llvm/lib"
+    export CPPFLAGS="-I/opt/homebrew/opt/llvm/include"
   CIBW_MANYLINUX_X86_64_IMAGE: quay.io/pypa/manylinux_2_28_x86_64
   CIBW_TEST_EXTRAS: applications,test
   HOST_PYTHON_VERSION: "3.10"
@@ -163,9 +163,6 @@ jobs:
           CIBW_ENVIRONMENT_LINUX: ${{ env.CIBW_ENVIRONMENT_COMMON }}
           CIBW_ENVIRONMENT_MACOS: >
             ${{ env.CIBW_ENVIRONMENT_COMMON }}
-            PATH="/opt/homebrew/opt/llvm/bin:$PATH"
-            LDFLAGS="-L/opt/homebrew/opt/llvm/lib"
-            CPPFLAGS="-I/opt/homebrew/opt/llvm/include"
             MACOSX_DEPLOYMENT_TARGET=11.0
           CIBW_REPAIR_WHEEL_COMMAND_LINUX: >
             auditwheel repair -w {dest_dir} {wheel} --exclude libarrow_python.so --exclude libarrow.so.1500
