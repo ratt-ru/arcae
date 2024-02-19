@@ -106,7 +106,7 @@ jobs:
           - os: ubuntu-22.04
             arch: "x86_64"
             triplet: "x64-linux-dynamic-cxx17-abi1-rel"
-            extra_build: "manylinux"
+            extra_build: "manylinux_x86_64"
           # - os: macos-14
           #   arch: "arm64 universal2 x86_64"
           #   triplet: "universal2-osx-dynamic-cxx17-abi1-rel"
