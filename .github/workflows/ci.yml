@@ -50,6 +50,9 @@ jobs:
     strategy:
       fail-fast: false
 
+    env:
+      VCPKG_TARGET_TRIPLET: "x64-linux-dynamic-cxx17-abi1-rel"
+
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
