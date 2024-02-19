@@ -121,10 +121,10 @@ jobs:
             arch: "arm64"
             triplet: "arm64-osx-dynamic-cxx17-abi1-rel"
             extra_build: "macosx_arm64"
-          - os: macos-14
-            arch: "x86_64"
-            triplet: "x64-osx-dynamic-cxx17-abi1-rel"
-            extra_build: "macosx_x86_64"
+          # - os: macos-14
+          #   arch: "x86_64"
+          #   triplet: "x64-osx-dynamic-cxx17-abi1-rel"
+          #   extra_build: "macosx_x86_64"
 
     steps:
       - name: Set up Python ${{ env.HOST_PYTHON_VERSION }}
