@@ -137,11 +137,9 @@ jobs:
       - name: Expose GitHub Runtime
         uses: crazy-max/ghaction-github-runtime@v3
 
-      - name: Run cibuildwheel
-        uses: pypa/cibuildwheel@v2.16.5
+      - name: Set Common Build Environment Variable
         env:
-          CIBW_BUILD: ${{ matrix.cpython }}-${{ matrix.extra_build }}*
-          CIBW_ENVIRONMENT_LINUX: >
+          COMMON_ENV: >
             CMAKE_ARGS=-DBUILD_TESTING=OFF
             ACTIONS_CACHE_URL=${{ env.ACTIONS_CACHE_URL }}
             ACTIONS_RUNTIME_TOKEN=${{ env.ACTIONS_RUNTIME_TOKEN }}
@@ -149,10 +147,18 @@ jobs:
             VCPKG_TARGET_TRIPLET=${{ matrix.triplet }}
             VCPKG_INSTALLED_DIR=${{ env.VCPKG_INSTALLED_DIR }}
             LD_LIBRARY_PATH=${{ env.VCPKG_INSTALLED_DIR }}/${{ matrix.triplet }}/lib
+        run: echo "CIBW_ENVIRONMENT_COMMON=$COMMON_ENV" >> $GITHUB_ENV
+
+      - name: Run cibuildwheel
+        uses: pypa/cibuildwheel@v2.16.5
+        env:
+          CIBW_BUILD: ${{ matrix.cpython }}-${{ matrix.extra_build }}*
+          CIBW_ENVIRONMENT_LINUX: >
+            ${{ env.CIBW_ENVIRONMENT_COMMON }}
           CIBW_REPAIR_WHEEL_COMMAND_LINUX: >
             auditwheel repair -w {dest_dir} {wheel} --exclude libarrow_python.so --exclude libarrow.so.1500
           CIBW_TEST_EXTRAS: applications,test
-          CIBW_TEST_COMMAND: py.test -s -vvv --pyargs arcae
+          CIBW_TEST_COMMAND_LINUX: py.test -s -vvv --pyargs arcae
 
       - name: Upload wheel artifacts
         uses: actions/upload-artifact@v3
