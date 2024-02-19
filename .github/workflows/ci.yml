@@ -25,7 +25,7 @@ env:
   CIBW_TEST_EXTRAS: applications,test
   HOST_PYTHON_VERSION: "3.10"
   VCPKG_INSTALLED_DIR: /tmp/vcpkg_installed
-  ARTIFACT_NAME: distribution
+  ARTIFACT_NAME: wheel
 
 jobs:
   build-sdist:
@@ -50,7 +50,7 @@ jobs:
       - name: Upload wheel artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.ARTIFACT_NAME }}
+          name: ${{ env.ARTIFACT_NAME }}-source
           path: ./dist/*.tar.gz
 
   cpp-tests:
@@ -116,14 +116,17 @@ jobs:
         cpython: ["cp310", "cp311"]
         include:
           - os: ubuntu-22.04
+            os_short: linux
             arch: "x86_64"
             triplet: "x64-linux-dynamic-cxx17-abi1-rel"
             extra_build: "manylinux_x86_64"
           - os: macos-13
+            os_short: macos
             arch: "x86_64"
             triplet: "x64-osx-dynamic-cxx17-abi1-rel"
             extra_build: "macosx_x86_64"
           - os: macos-14
+            os_short: macos
             arch: "arm64"
             triplet: "arm64-osx-dynamic-cxx17-abi1-rel"
             extra_build: "macosx_arm64"
@@ -174,7 +177,7 @@ jobs:
       - name: Upload wheel artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.ARTIFACT_NAME }}-${{ matrix.os }}-${{ matrix.cpython }}
+          name: ${{ env.ARTIFACT_NAME }}-${{ matrix.os_short }}-${{ matrix.arch }}
           path: ./wheelhouse/*.whl
 
       # - name: Debug with tmate on failure
@@ -191,7 +194,7 @@ jobs:
       id-token: write
     steps:
       - name: Download distribution artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           pattern: ${{ env.ARTIFACT_NAME }}-*
           merge-multiple: true
@@ -220,7 +223,8 @@ jobs:
       - name: Download distribution artifacts
         uses: actions/download-artifact@v4
         with:
-          name: ${{ env.ARTIFACT_NAME }}
+          pattern: ${{ env.ARTIFACT_NAME }}-*
+          merge-multiple: true
           path: dist
 
       - name: List artifacts
