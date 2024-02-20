@@ -1,13 +1,13 @@
-name: upload
-
-env:
-  ARTIFACT_NAME: wheel
+name: deploy
 
 on:
   workflow_run:
     workflows: [wheels]
     types:
       - completed
+
+env:
+  ARTIFACT_NAME: wheel
 
 jobs:
   upload-to-test-pypi:
