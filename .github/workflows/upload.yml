@@ -6,7 +6,8 @@ env:
 on:
   workflow_run:
     workflows: ["wheels"]
-    types: ["completed"]
+    types:
+      - completed
 
 jobs:
   upload-to-test-pypi:
