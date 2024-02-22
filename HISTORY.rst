@@ -4,6 +4,8 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Upgrade to pyarrow 15.0.0 (:pr:`76`)
+* Build linux arm64 and macos arm64/x86_64 wheels (:pr:`76`)
 * Upgrade vcpkg version to include wcslib 8.2.1 (:pr:`82`)
 * Export compile_commands.json by default (:pr:`81`)
 * Make export application dependencies optional (:pr:`80`)

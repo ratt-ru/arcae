@@ -11,22 +11,32 @@ on:
     - cron: '30 2 * * 1,4' # Every Monday and Thursday @ 2h30am UTC
 
 env:
+  CIBW_BUILD_FRONTEND: build
+  CIBW_BEFORE_ALL_LINUX: yum install -y zip flex bison gcc-gfortran
+  # Need to reinstall gcc in order to get gfortran
+  CIBW_BEFORE_ALL_MACOS: |
+    brew install python llvm
+    brew reinstall gcc
+  CIBW_BEFORE_BUILD_MACOS: |
+    export PATH="/opt/homebrew/opt/llvm/bin:$PATH"
+    export LDFLAGS="-L/opt/homebrew/opt/llvm/lib"
+    export CPPFLAGS="-I/opt/homebrew/opt/llvm/include"
+  CIBW_MANYLINUX_X86_64_IMAGE: quay.io/pypa/manylinux_2_28_x86_64
+  CIBW_TEST_EXTRAS: applications,test
+  HOST_PYTHON_VERSION: "3.10"
   VCPKG_INSTALLED_DIR: /tmp/vcpkg_installed
-  ARTIFACT_NAME: distribution
+  ARTIFACT_NAME: wheel
 
 jobs:
   build-sdist:
     name: Build Source Distribution
     runs-on: ubuntu-latest
     if: "!contains(github.event.head_commit.message, '[skip ci]')"
-    strategy:
-      matrix:
-        python: ["3.8"]
     steps:
-      - name: Set up Python ${{ matrix.python }}
-        uses: actions/setup-python@v4
+      - name: Set up Python ${{ env.HOST_PYTHON_VERSION }}
+        uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python }}
+          python-version: ${{ env.HOST_PYTHON_VERSION }}
 
       - name: Upgrade pip and install build
         run: python -m pip install -U pip build
@@ -38,9 +48,9 @@ jobs:
         run: python -m build --sdist
 
       - name: Upload wheel artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.ARTIFACT_NAME }}
+          name: ${{ env.ARTIFACT_NAME }}-source
           path: ./dist/*.tar.gz
 
   cpp-tests:
@@ -49,18 +59,21 @@ jobs:
     if: "!contains(github.event.head_commit.message, '[skip ci]')"
     strategy:
       fail-fast: false
-      matrix:
-        triplet:
-          - x64-linux-dynamic-cxx17-abi1-rel
+
+    env:
+      VCPKG_TARGET_TRIPLET: "x64-linux-dynamic-cxx17-abi1-rel"
 
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Set up Python ${{ matrix.python }}
-        uses: actions/setup-python@v4
+      - name: Set up Python ${{ env.HOST_PYTHON_VERSION }}
+        uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python }}
+          python-version: ${{ env.HOST_PYTHON_VERSION }}
+
+      - name: Expose GitHub Runtime
+        uses: crazy-max/ghaction-github-runtime@v3
 
       - name: List directory structure
         run: tree
@@ -72,17 +85,10 @@ jobs:
           python -m pip install -U pip
           python -m pip install pyarrow
 
-      - name: Get Github Action Cache Variables
-        uses: actions/github-script@v6
-        with:
-          script: |
-            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
-            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
-
       - name: Build C++ libraries and tests
         env:
           VCPKG_BINARY_SOURCES: clear;x-gha,readwrite
-          VCPKG_TARGET_TRIPLET: ${{ matrix.triplet }}
+          VCPKG_TARGET_TRIPLET: ${{ env.VCPKG_TARGET_TRIPLET }}
         run: |
           cmake -S . -B build
           cmake --build build
@@ -99,27 +105,46 @@ jobs:
 
   build-wheels:
     name: Build and Test Binary Wheels
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     if: "!contains(github.event.head_commit.message, '[skip ci]')"
     strategy:
       fail-fast: false
       matrix:
+        os: ["ubuntu-22.04", "macos-13", "macos-14"]
         # https://peps.python.org/pep-0425
-        python:
-          # python version, cpython tag
-          - ["3.8", "cp38"]
-          - ["3.9", "cp39"]
-          - ["3.10", "cp310"]
-          - ["3.11", "cp311"]
-        platform:
-          # platform tag, manylinux tag, vcpkg triplet
-          - [manylinux_x86_64, manylinux_2_28, x64-linux-dynamic-cxx17-abi1-rel]
-
+        cpython: ["cp39", "cp310", "cp311", "cp312"]
+        is_main:
+          - ${{ contains(github.ref, 'main') }}
+        # Avoid building all wheels in a PR
+        exclude:
+          - is_main: false
+            cpython: cp39
+          - is_main: false
+            cpython: cp310
+          - is_main: false
+            cpython: cp311
+        include:
+          - os: ubuntu-22.04
+            os_short: linux
+            arch: "x86_64"
+            triplet: "x64-linux-dynamic-cxx17-abi1-rel"
+            extra_build: "manylinux_x86_64"
+          - os: macos-13
+            os_short: macos
+            arch: "x86_64"
+            triplet: "x64-osx-dynamic-cxx17-abi1-rel"
+            extra_build: "macosx_x86_64"
+          - os: macos-14
+            os_short: macos
+            arch: "arm64"
+            triplet: "arm64-osx-dynamic-cxx17-abi1-rel"
+            extra_build: "macosx_arm64"
+          - cpython: cp312
     steps:
-      - name: Set up Python ${{ matrix.python[0] }}
-        uses: actions/setup-python@v4
+      - name: Set up Python ${{ env.HOST_PYTHON_VERSION }}
+        uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python[0] }}
+          python-version: ${{ env.HOST_PYTHON_VERSION }}
 
       - name: Upgrade pip and install virtualenv
         run: python -m pip install -U pip virtualenv
@@ -127,38 +152,55 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Get Github Action Cache Variables
-        uses: actions/github-script@v6
-        with:
-          script: |
-            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
-            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+      - name: Expose GitHub Runtime
+        uses: crazy-max/ghaction-github-runtime@v3
 
-      - name: Run cibuildwheel
-        uses: pypa/cibuildwheel@v2.13.1
+      - name: Set Common Build Environment Variable
         env:
-          CIBW_BUILD: ${{ matrix.python[1] }}-${{ matrix.platform[0] }}
-          CIBW_BUILD_FRONTEND: build
-          CIBW_BEFORE_ALL_LINUX: yum install -y zip flex bison gcc-gfortran
-          CIBW_MANYLINUX_X86_64_IMAGE: quay.io/pypa/${{ matrix.platform[1] }}_x86_64
-          CIBW_ENVIRONMENT_LINUX: >
+          COMMON_ENV: >
             CMAKE_ARGS=-DBUILD_TESTING=OFF
             ACTIONS_CACHE_URL=${{ env.ACTIONS_CACHE_URL }}
             ACTIONS_RUNTIME_TOKEN=${{ env.ACTIONS_RUNTIME_TOKEN }}
             VCPKG_BINARY_SOURCES="clear;x-gha,readwrite"
-            VCPKG_TARGET_TRIPLET=${{ matrix.platform[2] }}
+            VCPKG_TARGET_TRIPLET=${{ matrix.triplet }}
             VCPKG_INSTALLED_DIR=${{ env.VCPKG_INSTALLED_DIR }}
-            LD_LIBRARY_PATH=${{ env.VCPKG_INSTALLED_DIR }}/${{ matrix.platform[2] }}/lib
+            LD_LIBRARY_PATH=${{ env.VCPKG_INSTALLED_DIR }}/${{ matrix.triplet }}/lib
+        run: echo "CIBW_ENVIRONMENT_COMMON=$COMMON_ENV" >> $GITHUB_ENV
+
+      - name: Run cibuildwheel
+        uses: pypa/cibuildwheel@v2.16.5
+        env:
+          CIBW_BUILD: ${{ matrix.cpython }}-${{ matrix.extra_build }}*
+          CIBW_ARCHS: ${{ matrix.arch }}
+          CIBW_ENVIRONMENT_LINUX: ${{ env.CIBW_ENVIRONMENT_COMMON }}
+          CIBW_ENVIRONMENT_MACOS: >
+            ${{ env.CIBW_ENVIRONMENT_COMMON }}
+            MACOSX_DEPLOYMENT_TARGET=11.0
           CIBW_REPAIR_WHEEL_COMMAND_LINUX: >
-            auditwheel repair -w {dest_dir} {wheel} --exclude libarrow_python.so --exclude libarrow.so.1400
-          CIBW_TEST_EXTRAS: applications,test
-          CIBW_TEST_COMMAND: py.test -s -vvv --pyargs arcae
+            auditwheel repair
+            -w {dest_dir} {wheel}
+            --exclude libarrow_python.so
+            --exclude libarrow.so.1500
+          CIBW_REPAIR_WHEEL_COMMAND_MACOS: |
+            DYLD_LIBRARY_PATH=$LD_LIBRARY_PATH delocate-listdeps {wheel}
+            DYLD_LIBRARY_PATH=$LD_LIBRARY_PATH delocate-wheel \
+              --require-archs {delocate_archs} \
+              -w {dest_dir} \
+              -v {wheel} \
+              --exclude libarrow_python.dylib \
+              --exclude libarrow.1500.dylib \
+              --ignore-missing-dependencies
+          CIBW_TEST_COMMAND_LINUX: py.test -s -vvv --pyargs arcae
 
       - name: Upload wheel artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.ARTIFACT_NAME }}
+          name: ${{ env.ARTIFACT_NAME }}-${{ matrix.os_short }}-${{ matrix.cpython }}-${{ matrix.arch }}
           path: ./wheelhouse/*.whl
+
+      # - name: Debug with tmate on failure
+      #   if: ${{ failure() }}
+      #   uses: mxschmitt/action-tmate@v3
 
   upload-to-test-pypi:
     name: Upload release to Test PyPI
@@ -170,9 +212,10 @@ jobs:
       id-token: write
     steps:
       - name: Download distribution artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
-          name: ${{ env.ARTIFACT_NAME }}
+          pattern: ${{ env.ARTIFACT_NAME }}-*
+          merge-multiple: true
           path: dist
 
       - name: List artifacts
@@ -196,9 +239,10 @@ jobs:
       id-token: write
     steps:
       - name: Download distribution artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
-          name: ${{ env.ARTIFACT_NAME }}
+          pattern: ${{ env.ARTIFACT_NAME }}-*
+          merge-multiple: true
           path: dist
 
       - name: List artifacts
