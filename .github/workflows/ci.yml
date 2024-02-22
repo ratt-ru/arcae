@@ -110,6 +110,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        is_main: ${{ contains(github.ref, 'main') }}
         os: ["ubuntu-22.04", "macos-13", "macos-14"]
         # https://peps.python.org/pep-0425
         cpython: ["cp39", "cp310", "cp311", "cp312"]
@@ -129,6 +130,14 @@ jobs:
             arch: "arm64"
             triplet: "arm64-osx-dynamic-cxx17-abi1-rel"
             extra_build: "macosx_arm64"
+        # Avoid building all wheels in a PR
+        exclude:
+          - is_main: false
+            cpython: "cp39"
+          - is_main: false
+            cpython: "cp10"
+          - is_main: false
+            cpython: "cp11"
 
     steps:
       - name: Set up Python ${{ env.HOST_PYTHON_VERSION }}
