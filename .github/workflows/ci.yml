@@ -135,9 +135,9 @@ jobs:
           - is_main: false
             cpython: "cp39"
           - is_main: false
-            cpython: "cp10"
+            cpython: "cp310"
           - is_main: false
-            cpython: "cp11"
+            cpython: "cp311"
 
     steps:
       - name: Set up Python ${{ env.HOST_PYTHON_VERSION }}
