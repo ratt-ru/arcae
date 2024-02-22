@@ -138,6 +138,7 @@ jobs:
             arch: "arm64"
             triplet: "arm64-osx-dynamic-cxx17-abi1-rel"
             extra_build: "macosx_arm64"
+          - cpython: cp312
     steps:
       - name: Set up Python ${{ env.HOST_PYTHON_VERSION }}
         uses: actions/setup-python@v5
