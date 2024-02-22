@@ -133,11 +133,11 @@ jobs:
         # Avoid building all wheels in a PR
         exclude:
           - is_main: false
-            cpython: "cp39"
+            cpython: cp39
           - is_main: false
-            cpython: "cp310"
+            cpython: cp310
           - is_main: false
-            cpython: "cp311"
+            cpython: cp311
 
     steps:
       - name: Set up Python ${{ env.HOST_PYTHON_VERSION }}
