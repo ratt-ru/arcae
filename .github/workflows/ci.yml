@@ -120,8 +120,6 @@ jobs:
             cpython: cp39
           - is_main: false
             cpython: cp310
-          - is_main: false
-            cpython: cp311
         include:
           - os: ubuntu-22.04
             os_short: linux
@@ -138,7 +136,6 @@ jobs:
             arch: "arm64"
             triplet: "arm64-osx-dynamic-cxx17-abi1-rel"
             extra_build: "macosx_arm64"
-          - cpython: cp312
     steps:
       - name: Set up Python ${{ env.HOST_PYTHON_VERSION }}
         uses: actions/setup-python@v5
