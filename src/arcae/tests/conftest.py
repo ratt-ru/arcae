@@ -285,7 +285,10 @@ def generate_column_cases_table(path):
 
 def casa_table_at_path(factory, *args):
     with mp.get_context("spawn").Pool(1) as pool:
-        return pool.apply(factory, args)
+        try:
+            return pool.apply_async(factory, args).get()
+        except ImportError as e:
+            pytest.importorskip(e.name)
 
 
 @pytest.fixture
