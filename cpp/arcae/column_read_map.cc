@@ -36,7 +36,7 @@ arrow::Result<casacore::IPosition> ClipShape(
 
   for(std::size_t dim=0; dim < shape.size(); ++dim) {
     auto sdim = SelectDim(dim, selection.size(), shape.size() + 1);
-    if(sdim >= 0 && selection[sdim].size() > 0) {
+    if(sdim >= 0 && sdim < selection.size() && selection[sdim].size() > 0) {
       for(auto i: selection[sdim]) {
         if(i >= clipped[dim]) {
           return arrow::Status::Invalid("Selection index ", i,
@@ -172,6 +172,10 @@ VariableShapeData::Make(const casacore::TableColumn & column,
     row_shapes.reserve(row_ids.size());
 
     for(auto [r, first] = ItType{0, true}; r < row_ids.size(); ++r) {
+      if(row_ids[r] >= column.nrow()) {
+        return arrow::Status::IndexError("Row ", row_ids[r], " in selection does not exist");
+      }
+
       ARROW_ASSIGN_OR_RAISE(auto shape, GetColumnRowShape(column, row_ids[r]));
       ARROW_ASSIGN_OR_RAISE(shape, ClipShape(shape, selection));
       row_shapes.emplace_back(std::move(shape));
