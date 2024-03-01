@@ -45,10 +45,10 @@ linux_aarch64_task:
     - env:
         PYTHON_VERSION_NAME: python 3.11
         CIBW_BUILD: cp311-manylinux*
-      only_if: $CIRRUS_BRANCH == 'main'
     - env:
         PYTHON_VERSION_NAME: python 3.12
         CIBW_BUILD: cp312-manylinux*
+      only_if: $CIRRUS_BRANCH == 'main'
   env:
     # Run the container in host mode so that vcpkg has access to the Cirrus CI cache
     CIBW_CONTAINER_ENGINE: "docker; create_args: --network=host"

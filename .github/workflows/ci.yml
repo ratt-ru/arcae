@@ -122,7 +122,7 @@ jobs:
           - is_main: false
             cpython: cp310
           - is_main: false
-            cpython: cp311
+            cpython: cp312
         include:
           - os: ubuntu-22.04
             os_short: linux
