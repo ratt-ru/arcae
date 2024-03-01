@@ -258,10 +258,7 @@ def test_getcol2(getcol_table):
     T.putcol("COMPLEX_DATA", complex_data + 1 + 1j)
     assert_array_equal(T.getcol2("COMPLEX_DATA"), complex_data + 1 + 1j)
 
-    T.putcol("TIME", np.array([5, 6, 7], dtype=np.float64),
-        (np.array([0, 1, 2]),))
-
-    print(T.getcol2("TIME"))
+    print(T.getcol2("VARDATA", index=(slice(1, 2),)))
 
 def test_partial_read(sorting_table):
     """ Tests that partial reads work """
