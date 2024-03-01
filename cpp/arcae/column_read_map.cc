@@ -95,6 +95,11 @@ RangeFactory(const ShapeProvider & shape_prov, const ColumnMaps & maps) {
 arrow::Result<casacore::IPosition> GetColumnRowShape(
   const casacore::TableColumn & column,
   casacore::rownr_t row) {
+    if(row >= column.nrow()) {
+      return arrow::Status::IndexError("Row ", row, " in column ",
+                                       column.columnDesc().name(),
+                                       " is out of bounds");
+    }
     if(column.isDefined(row)) return column.shape(row);
     return arrow::Status::IndexError("Row ", row, " in column ",
                                     column.columnDesc().name(),
@@ -172,10 +177,6 @@ VariableShapeData::Make(const casacore::TableColumn & column,
     row_shapes.reserve(row_ids.size());
 
     for(auto [r, first] = ItType{0, true}; r < row_ids.size(); ++r) {
-      if(row_ids[r] >= column.nrow()) {
-        return arrow::Status::IndexError("Row ", row_ids[r], " in selection does not exist");
-      }
-
       ARROW_ASSIGN_OR_RAISE(auto shape, GetColumnRowShape(column, row_ids[r]));
       ARROW_ASSIGN_OR_RAISE(shape, ClipShape(shape, selection));
       row_shapes.emplace_back(std::move(shape));
