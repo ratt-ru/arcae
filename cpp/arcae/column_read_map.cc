@@ -342,8 +342,8 @@ ColumnReadMap::Make(
   ARROW_ASSIGN_OR_RAISE(auto ranges, RangeFactory(shape_prov, maps));
 
   if(ranges.size() == 0) {
-    return arrow::Status::ExecutionError("Zero ranges generated for column ",
-                                          column.columnDesc().name());
+    return arrow::Status::IndexError("Zero ranges generated for column ",
+                                     column.columnDesc().name());
   }
 
   auto shape = MaybeMakeOutputShape(ranges);
