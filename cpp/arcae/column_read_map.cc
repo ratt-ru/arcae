@@ -166,7 +166,7 @@ VariableShapeData::Make(const casacore::TableColumn & column,
     for(auto [r, first] = ItType{0, true}; r < column.nrow(); ++r) {
       ARROW_ASSIGN_OR_RAISE(auto shape, GetColumnRowShape(column, r))
       ARROW_ASSIGN_OR_RAISE(shape, ClipShape(shape, selection));
-      row_shapes.emplace_back(std::move(shape));
+      row_shapes.push_back(std::move(shape));
       if(first) { first = false; continue; }
       fixed_shape = fixed_shape && *std::rbegin(row_shapes) == *std::begin(row_shapes);
       fixed_dims = fixed_dims && std::rbegin(row_shapes)->size() == std::begin(row_shapes)->size();
@@ -179,7 +179,7 @@ VariableShapeData::Make(const casacore::TableColumn & column,
     for(auto [r, first] = ItType{0, true}; r < row_ids.size(); ++r) {
       ARROW_ASSIGN_OR_RAISE(auto shape, GetColumnRowShape(column, row_ids[r]));
       ARROW_ASSIGN_OR_RAISE(shape, ClipShape(shape, selection));
-      row_shapes.emplace_back(std::move(shape));
+      row_shapes.push_back(std::move(shape));
       if(first) { first = false; continue; }
       fixed_shape = fixed_shape && *std::rbegin(row_shapes) == *std::begin(row_shapes);
       fixed_dims = fixed_dims && std::rbegin(row_shapes)->size() == std::begin(row_shapes)->size();
