@@ -20,7 +20,6 @@
 namespace arcae {
 
 namespace {
-} // namespace
 
 // Clip supplied shape based on the column selection
 // The shape should not include the row dimension
@@ -145,6 +144,7 @@ MakeOffsets(const decltype(VariableShapeData::row_shapes_) & row_shapes) {
   return offsets;
 }
 
+} // namespace
 
 // Factory method for creating Variably Shape Data from column
 arrow::Result<std::unique_ptr<VariableShapeData>>
@@ -152,44 +152,43 @@ VariableShapeData::Make(const casacore::TableColumn & column,
                         const ColumnSelection & selection) {
   assert(!column.columnDesc().isFixedShape());
   auto row_shapes = decltype(VariableShapeData::row_shapes_){};
-  bool fixed_shape = true;
-  bool fixed_dims = true;
+  bool shapes_equal = true;
   // Row dimension is last in FORTRAN ordering
   auto row_dim = selection.size() - 1;
   using ItType = std::tuple<casacore::rownr_t, bool>;
+
+  // Helper lambda for keeping track of whether row shapes are equal
+  auto AreShapesEqual = [&](bool first) -> arrow::Result<bool> {
+    if(first) return shapes_equal;
+    if(row_shapes.front().size() != row_shapes.back().size()) {
+      return arrow::Status::NotImplemented("Column ", column.columnDesc().name(),
+                                           " dimensions vary per row.");
+    }
+    return shapes_equal && (row_shapes.back() == row_shapes.front());
+  };
 
   // No selection
   // Create row shape data from column.nrow()
   if(selection.size() == 0 || selection[row_dim].size() == 0) {
     row_shapes.reserve(column.nrow());
 
-    for(auto [r, first] = ItType{0, true}; r < column.nrow(); ++r) {
+    for(auto [r, first] = ItType{0, true}; r < column.nrow(); ++r, first=false) {
       ARROW_ASSIGN_OR_RAISE(auto shape, GetColumnRowShape(column, r))
       ARROW_ASSIGN_OR_RAISE(shape, ClipShape(shape, selection));
       row_shapes.emplace_back(std::move(shape));
-      if(first) { first = false; continue; }
-      fixed_shape = fixed_shape && (row_shapes.back() == row_shapes.front());
-      fixed_dims = fixed_dims && (row_shapes.back().size() == row_shapes.front().size());
+      ARROW_ASSIGN_OR_RAISE(shapes_equal, AreShapesEqual(first));
     }
   } else {
     // Create row shape data from row id selection
     const auto & row_ids = selection[row_dim];
     row_shapes.reserve(row_ids.size());
 
-    for(auto [r, first] = ItType{0, true}; r < row_ids.size(); ++r) {
+    for(auto [r, first] = ItType{0, true}; r < row_ids.size(); ++r, first=false) {
       ARROW_ASSIGN_OR_RAISE(auto shape, GetColumnRowShape(column, row_ids[r]));
       ARROW_ASSIGN_OR_RAISE(shape, ClipShape(shape, selection));
       row_shapes.emplace_back(std::move(shape));
-      if(first) { first = false; continue; }
-      fixed_shape = fixed_shape && (row_shapes.back() == row_shapes.front());
-      fixed_dims = fixed_dims && (row_shapes.back().size() == row_shapes.front().size());
+      ARROW_ASSIGN_OR_RAISE(shapes_equal, AreShapesEqual(first));
     }
-  }
-
-  // Arrow can't handle differing dimensions per row, so we quit here.
-  if(!fixed_dims) {
-    return arrow::Status::NotImplemented("Column ", column.columnDesc().name(),
-                                          " dimensions vary per row.");
   }
 
   if(row_shapes.size() == 0) {
@@ -197,7 +196,7 @@ VariableShapeData::Make(const casacore::TableColumn & column,
   }
 
   // We may have a fixed shape in practice
-  auto shape = fixed_shape ? std::make_optional(*std::begin(row_shapes))
+  auto shape = shapes_equal ? std::make_optional(row_shapes.front())
                             : std::nullopt;
 
   ARROW_ASSIGN_OR_RAISE(auto offsets, MakeOffsets(row_shapes));
@@ -333,7 +332,7 @@ ColumnReadMap::Make(
     ColumnSelection selection,
     MapOrder order) {
 
-  // Convert to FORTRAN ordering, which the casacore internals use
+  // Convert to FORTRAN ordering used by casacore internals
   if(order == MapOrder::C_ORDER) {
     std::reverse(std::begin(selection), std::end(selection));
   }
