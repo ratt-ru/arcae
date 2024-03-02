@@ -409,7 +409,7 @@ def generate_getcol_table(path):
         for i in range(nrow):
             T.putcell("COMPLEX_DATA", i, np.full((2, 4), i + i*1j))
             T.putcell("FLOAT_DATA", i, np.full((2, 4), i))
-            T.putcell("VARDATA", i, np.full((2, i + 1), i))
+            T.putcell("VARDATA", i, np.full((i + 1, i + 1), i))
             T.putcell("TIME", i, i)
             T.putcell("STRING", i, str(i))
             T.putcell("NESTED_STRING", i, {"shape": (2, 4), "array": [str(i)] * 2 * 4})

@@ -258,7 +258,10 @@ def test_getcol2(getcol_table):
     T.putcol("COMPLEX_DATA", complex_data + 1 + 1j)
     assert_array_equal(T.getcol2("COMPLEX_DATA"), complex_data + 1 + 1j)
 
-    print(T.getcol2("VARDATA", index=(slice(1, 2),)))
+    for r in range(T.nrow()):
+        row_data = T.getcol2("VARDATA", index=(slice(r, r + 1),))
+        assert_array_equal(row_data, np.full((1, r + 1, r + 1), r))
+
 
 def test_partial_read(sorting_table):
     """ Tests that partial reads work """
