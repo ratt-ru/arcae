@@ -20,6 +20,7 @@
 namespace arcae {
 
 namespace {
+} // namespace
 
 // Clip supplied shape based on the column selection
 // The shape should not include the row dimension
@@ -144,7 +145,6 @@ MakeOffsets(const decltype(VariableShapeData::row_shapes_) & row_shapes) {
   return offsets;
 }
 
-} // namespace
 
 // Factory method for creating Variably Shape Data from column
 arrow::Result<std::unique_ptr<VariableShapeData>>
@@ -166,10 +166,10 @@ VariableShapeData::Make(const casacore::TableColumn & column,
     for(auto [r, first] = ItType{0, true}; r < column.nrow(); ++r) {
       ARROW_ASSIGN_OR_RAISE(auto shape, GetColumnRowShape(column, r))
       ARROW_ASSIGN_OR_RAISE(shape, ClipShape(shape, selection));
-      row_shapes.push_back(std::move(shape));
+      row_shapes.emplace_back(std::move(shape));
       if(first) { first = false; continue; }
-      fixed_shape = fixed_shape && *std::rbegin(row_shapes) == *std::begin(row_shapes);
-      fixed_dims = fixed_dims && std::rbegin(row_shapes)->size() == std::begin(row_shapes)->size();
+      fixed_shape = fixed_shape && (row_shapes.back() == row_shapes.front());
+      fixed_dims = fixed_dims && (row_shapes.back().size() == row_shapes.front().size());
     }
   } else {
     // Create row shape data from row id selection
@@ -179,10 +179,10 @@ VariableShapeData::Make(const casacore::TableColumn & column,
     for(auto [r, first] = ItType{0, true}; r < row_ids.size(); ++r) {
       ARROW_ASSIGN_OR_RAISE(auto shape, GetColumnRowShape(column, row_ids[r]));
       ARROW_ASSIGN_OR_RAISE(shape, ClipShape(shape, selection));
-      row_shapes.push_back(std::move(shape));
+      row_shapes.emplace_back(std::move(shape));
       if(first) { first = false; continue; }
-      fixed_shape = fixed_shape && *std::rbegin(row_shapes) == *std::begin(row_shapes);
-      fixed_dims = fixed_dims && std::rbegin(row_shapes)->size() == std::begin(row_shapes)->size();
+      fixed_shape = fixed_shape && (row_shapes.back() == row_shapes.front());
+      fixed_dims = fixed_dims && (row_shapes.back().size() == row_shapes.front().size());
     }
   }
 
@@ -192,16 +192,22 @@ VariableShapeData::Make(const casacore::TableColumn & column,
                                           " dimensions vary per row.");
   }
 
+  if(row_shapes.size() == 0) {
+    return arrow::Status::Invalid("No row shapes were found!");
+  }
+
   // We may have a fixed shape in practice
   auto shape = fixed_shape ? std::make_optional(*std::begin(row_shapes))
                             : std::nullopt;
 
   ARROW_ASSIGN_OR_RAISE(auto offsets, MakeOffsets(row_shapes));
 
+  auto ndim = row_shapes.front().size();
+
   return std::unique_ptr<VariableShapeData>(
     new VariableShapeData{std::move(row_shapes),
                           std::move(offsets),
-                          std::begin(row_shapes)->size(),
+                          ndim,
                           std::move(shape)});
 }
 
