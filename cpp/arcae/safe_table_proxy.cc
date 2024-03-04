@@ -3,6 +3,8 @@
 #include <sstream>
 
 #include <arrow/util/logging.h>  // IWYU pragma: keep
+#include <arrow/result.h>
+#include <arrow/status.h>
 
 #include <casacore/casa/Json.h>
 #include <casacore/tables/Tables/TableIterProxy.h>
@@ -14,8 +16,6 @@
 #include "arcae/column_read_visitor.h"
 #include "arcae/column_write_map.h"
 #include "arcae/column_write_visitor.h"
-#include "arrow/result.h"
-#include "arrow/status.h"
 
 
 using ::arrow::Result;
