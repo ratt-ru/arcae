@@ -349,7 +349,7 @@ std::size_t ArrowShapeProvider::RowDimSize(casacore::rownr_t row, std::size_t di
   /// TODO(sjperkins)
   /// If we've reached this point, we've interpreted Arrow's nested arrays
   /// incorrectly.
-  ARROW_LOG(INFO) << "Logical error in ArrowShapeProvider::RowDimSize";
+  ARROW_LOG(ERROR) << "Logical error in ArrowShapeProvider::RowDimSize";
   assert(false);
   std::exit(1);
   return -1;
