@@ -2,25 +2,31 @@
 #define COLUMN_WRITE_VISITOR_H
 
 #include <functional>
+#include <map>
 #include <memory>
 
 #include <arrow/array.h>
 #include <arrow/result.h>
 #include <arrow/status.h>
 #include <arrow/type.h>
-#include <arrow/visit_type_inline.h>
 
 #include <casacore/casa/aipstype.h>
 #include <casacore/casa/aipsxtype.h>
 #include <casacore/casa/BasicSL/String.h>
 #include <casacore/casa/Exceptions/Error.h>
+#include <casacore/casa/Utilities/DataType.h>
 #include <casacore/tables/Tables.h>
 
+#include "arcae/casa_visitors.h"
 #include "arcae/column_write_map.h"
 
 namespace arcae {
 
-class ColumnWriteVisitor {
+class ColumnWriteVisitor : public CasaTypeVisitor {
+private:
+    // Map of casacore datatypes to arrow datatypes
+    static const std::map<casacore::DataType, std::shared_ptr<arrow::DataType>> arrow_type_map_;
+
 public:
     std::reference_wrapper<const ColumnWriteMap> map_;
     arrow::MemoryPool * pool_;
@@ -33,46 +39,16 @@ public:
             pool_(pool) {};
     virtual ~ColumnWriteVisitor() = default;
 
-    arrow::Status Visit() {
-        return arrow::VisitTypeInline(*map_.get().shape_provider_.data_type_,
-                                      this);
-    }
 
-    // Signed Integer types
-    arrow::Status Visit(const arrow::Int8Type & dt) { return WriteColumn<casacore::Char>(); }
-    arrow::Status Visit(const arrow::Int16Type & dt) { return WriteColumn<casacore::Short>(); }
-    arrow::Status Visit(const arrow::Int32Type & dt) { return WriteColumn<casacore::Int>(); }
-    arrow::Status Visit(const arrow::Int64Type & dt) { return WriteColumn<casacore::Int64>(); }
+#define VISIT(CASA_TYPE) \
+    virtual arrow::Status Visit##CASA_TYPE() override;
 
-    // Unsigned Integer types
-    arrow::Status Visit(const arrow::UInt8Type & dt) { return WriteColumn<casacore::uChar>(); }
-    arrow::Status Visit(const arrow::UInt16Type & dt) { return WriteColumn<casacore::uShort>(); }
-    arrow::Status Visit(const arrow::UInt32Type & dt) { return WriteColumn<casacore::uInt>(); }
-    arrow::Status Visit(const arrow::UInt64Type & dt) {
-        // TODO(sjperkins)
-        // Patch uInt64 support into casacore/casa/Utilities/ValTypeId.h
-        return arrow::Status::NotImplemented("Conversion to casacore::uInt64");
-    }
+    VISIT_CASA_TYPES(VISIT)
+#undef VISIT
 
-    // Strings
-    arrow::Status Visit(const arrow::StringType & dt) { return WriteColumn<casacore::String>(); }
+    arrow::Status Visit();
+    arrow::Result<std::shared_ptr<arrow::Array>> MaybeCastFlatArray(const std::shared_ptr<arrow::Array> & data);
 
-    // Float point and Complex Numbers
-    arrow::Status Visit(const arrow::FloatType & dt) {
-        if(map_.get().IsComplex()) return WriteColumn<casacore::Complex>();
-        return WriteColumn<casacore::Float>();
-    }
-
-    arrow::Status Visit(const arrow::DoubleType & dt) {
-        if(map_.get().IsComplex()) return WriteColumn<casacore::DComplex>();
-        return WriteColumn<casacore::Double>();
-    }
-
-    // Base case
-    arrow::Status Visit(const arrow::DataType & dt) {
-        return arrow::Status::NotImplemented("Arrow Array to Casa Column "
-                                             "conversion for type ", dt.ToString());
-    }
 
     // Write arrow array to the CASA column
     template <typename T>
@@ -106,6 +82,7 @@ private:
         auto column = casacore::ScalarColumn<T>(GetTableColumn());
         column.setMaximumCacheSize(1);
         ARROW_ASSIGN_OR_RAISE(auto flat_array, GetFlatArray());
+        ARROW_ASSIGN_OR_RAISE(flat_array, MaybeCastFlatArray(flat_array));
         auto nelements = map_.get().nElements();
 
         if constexpr(std::is_same_v<T, casacore::String>) {
@@ -178,6 +155,7 @@ private:
         column.setMaximumCacheSize(1);
         ARROW_ASSIGN_OR_RAISE(auto shape, map_.get().GetOutputShape());
         ARROW_ASSIGN_OR_RAISE(auto flat_array, GetFlatArray());
+        ARROW_ASSIGN_OR_RAISE(flat_array, MaybeCastFlatArray(flat_array));
         auto nelements = map_.get().nElements();
 
         if constexpr(std::is_same_v<T, casacore::String>) {
@@ -250,6 +228,7 @@ private:
         auto column = casacore::ArrayColumn<T>(GetTableColumn());
         column.setMaximumCacheSize(1);
         ARROW_ASSIGN_OR_RAISE(auto flat_array, GetFlatArray());
+        ARROW_ASSIGN_OR_RAISE(flat_array, MaybeCastFlatArray(flat_array));
         auto nelements = map_.get().nElements();
 
         if constexpr(std::is_same_v<T, casacore::String>) {
