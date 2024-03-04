@@ -158,7 +158,7 @@ TEST_F(EmptyVariableWriteTest, WriteToEmptyVariableColumn) {
 
     ASSERT_OK_AND_ASSIGN(auto read_map, ColumnReadMap::Make(var, {{0, 3}}));
     auto read_visitor = arcae::ColumnReadVisitor(read_map);
-    ASSERT_OK(read_visitor.Visit(var.columnDesc().dataType()));
+    ASSERT_OK(read_visitor.Visit());
     ASSERT_TRUE(read_visitor.array_->Equals(data));
 
     EXPECT_TRUE(var.isDefined(0));
@@ -191,7 +191,7 @@ TEST_F(EmptyVariableWriteTest, WriteToEmptyVariableColumn) {
 
     ASSERT_OK_AND_ASSIGN(auto read_map, ColumnReadMap::Make(var, {{0, 3}, {1}}));
     auto read_visitor = arcae::ColumnReadVisitor(read_map);
-    ASSERT_OK(read_visitor.Visit(var.columnDesc().dataType()));
+    ASSERT_OK(read_visitor.Visit());
     ASSERT_TRUE(read_visitor.array_->Equals(data));
 
     EXPECT_TRUE(var.isDefined(0));
@@ -231,7 +231,7 @@ TEST_F(EmptyVariableWriteTest, WritePartialVariableEmptyColumn) {
 
     ASSERT_OK_AND_ASSIGN(auto read_map, ColumnReadMap::Make(var, obj.spans_));
     auto read_visitor = arcae::ColumnReadVisitor(read_map);
-    ASSERT_OK(read_visitor.Visit(var.columnDesc().dataType()));
+    ASSERT_OK(read_visitor.Visit());
 
     ASSERT_TRUE(read_visitor.array_->Equals(data));
 
@@ -276,7 +276,7 @@ TEST_F(EmptyVariableWriteTest, WritePartialFloatVariableEmptyColumn) {
 
     ASSERT_OK_AND_ASSIGN(auto read_map, ColumnReadMap::Make(var, obj.spans_));
     auto read_visitor = arcae::ColumnReadVisitor(read_map);
-    ASSERT_OK(read_visitor.Visit(var.columnDesc().dataType()));
+    ASSERT_OK(read_visitor.Visit());
 
     ASSERT_TRUE(read_visitor.array_->Equals(data));
 
@@ -324,7 +324,7 @@ TEST_F(EmptyVariableWriteTest, WritePartialComplexVariableEmptyColumn) {
 
     ASSERT_OK_AND_ASSIGN(auto read_map, ColumnReadMap::Make(var, obj.spans_));
     auto read_visitor = arcae::ColumnReadVisitor(read_map);
-    ASSERT_OK(read_visitor.Visit(var.columnDesc().dataType()));
+    ASSERT_OK(read_visitor.Visit());
 
     ASSERT_TRUE(read_visitor.array_->Equals(data));
 

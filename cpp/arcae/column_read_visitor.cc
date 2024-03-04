@@ -52,6 +52,12 @@ ColumnReadVisitor::MakeArrowPrimitiveArray(
     }
 }
 
+
+arrow::Status ColumnReadVisitor::Visit() {
+    return CasaTypeVisitor::Visit(map_.get().column_.get().columnDesc().dataType());
+}
+
+
 arrow::Status ColumnReadVisitor::VisitTpBool() {
     // TODO(sjperkins)
     // Looks like casacore bool is actually a char, improve this

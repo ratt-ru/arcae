@@ -124,7 +124,7 @@ SafeTableProxy::GetColumn2(const std::string & column, const ColumnSelection & s
         const auto & column_desc = table_column.columnDesc();
         ARROW_ASSIGN_OR_RAISE(auto map, ColumnReadMap::Make(table_column, selection));
         auto visitor = ColumnReadVisitor(map);
-        ARROW_RETURN_NOT_OK(visitor.Visit(column_desc.dataType()));
+        ARROW_RETURN_NOT_OK(visitor.Visit());
         return std::move(visitor.array_);
     });
 }

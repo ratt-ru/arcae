@@ -40,6 +40,9 @@ public:
     VISIT_CASA_TYPES(VISIT)
 #undef VISIT
 
+    arrow::Status Visit();
+
+
     const casacore::TableColumn & GetTableColumn() const {
         return map_.get().column_.get();
     }
