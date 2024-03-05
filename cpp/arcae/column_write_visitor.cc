@@ -1,5 +1,7 @@
 #include "arcae/column_write_visitor.h"
 
+#include <memory>
+
 #include <arrow/api.h>
 #include <arrow/compute/cast.h>
 #include <arrow/result.h>
@@ -8,6 +10,8 @@
 
 #include <casacore/casa/Utilities/DataType.h>
 #include <casacore/tables/Tables.h>
+
+#include "arcae/complex_type.h"
 
 namespace arcae {
 
@@ -23,8 +27,8 @@ ColumnWriteVisitor::arrow_type_map_ = {
     {casacore::TpInt64, arrow::int64()},
     {casacore::TpFloat, arrow::float32()},
     {casacore::TpDouble, arrow::float64()},
-    {casacore::TpComplex, arrow::float32()},
-    {casacore::TpDComplex, arrow::float64()},
+    {casacore::TpComplex, complex64()},
+    {casacore::TpDComplex, complex128()},
     {casacore::TpString, arrow::utf8()}
 };
 
@@ -89,13 +93,21 @@ arrow::Result<std::shared_ptr<arrow::Array>>
 ColumnWriteVisitor::MaybeCastFlatArray(const std::shared_ptr<arrow::Array> & data) {
     auto casa_dtype = map_.get().column_.get().columnDesc().dataType();
 
-    if(auto arrow_dtype = arrow_type_map_.find(casa_dtype); arrow_dtype != arrow_type_map_.end()) {
+    if(auto kv = arrow_type_map_.find(casa_dtype); kv != arrow_type_map_.end()) {
+        auto arrow_dtype = kv->second;
+
+        if(auto ct = std::dynamic_pointer_cast<ComplexFloatType>(arrow_dtype); ct) {
+            arrow_dtype = arrow::float32();
+        } else if (auto ct = std::dynamic_pointer_cast<ComplexDoubleType>(arrow_dtype); ct) {
+            arrow_dtype = arrow::float64();
+        }
+
         // Types match, don't cast
-        if(data->type() == arrow_dtype->second) {
+        if(data->type() == arrow_dtype) {
             return data;
         }
 
-        ARROW_ASSIGN_OR_RAISE(auto datum, arrow::compute::Cast(data, arrow_dtype->second));
+        ARROW_ASSIGN_OR_RAISE(auto datum, arrow::compute::Cast(data, arrow_dtype));
         return datum.make_array();
     }
 
