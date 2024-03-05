@@ -261,12 +261,13 @@ ArrowShapeProvider::Make(const casacore::TableColumn & column,
                          const ColumnSelection & selection,
                          const std::shared_ptr<arrow::Array> & data) {
   ARROW_ASSIGN_OR_RAISE(auto properties, GetDataProperties(column, selection, data));
-  auto &[shape, ndim, dtype, is_complex] = properties;
   return ArrowShapeProvider{std::cref(column),
-                            selection, data,
-                            std::move(dtype),
-                            std::move(shape),
-                            ndim, is_complex};
+                            std::cref(selection),
+                            data,
+                            std::move(properties.data_type),
+                            std::move(properties.shape),
+                            properties.ndim,
+                            properties.is_complex};
 }
 
 // Returns the dimension size of the data
