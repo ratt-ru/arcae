@@ -4,6 +4,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <type_traits>
 
 #include <arrow/array.h>
 #include <arrow/result.h>
@@ -112,10 +113,10 @@ private:
             auto buffer = flat_array->data()->buffers[1];
             ARROW_ASSIGN_OR_RAISE(auto shape, map_.get().GetOutputShape());
             ARROW_RETURN_NOT_OK(CheckElements(buffer->size() / sizeof(T), nelements));
-            auto * buf_ptr = reinterpret_cast<T *>(buffer->mutable_data());
+            auto span = buffer->span_as<T>();
 
             if(map_.get().IsSimple()) {
-                auto carray = casacore::Array<T>(shape, buf_ptr, casacore::SHARE);
+                auto carray = casacore::Array<T>(shape, std::remove_const_t<T *>(span.data()), casacore::SHARE);
 
                 try {
                     // Dump column data straight from the Arrow Buffer
@@ -133,7 +134,7 @@ private:
                         auto carray = casacore::Array<T>(it.GetShape());
                         auto chunk_ptr = carray.data();
                         for(auto mit = it.MapBegin(); mit != it.MapEnd(); ++mit) {
-                            chunk_ptr[mit.ChunkOffset()] = buf_ptr[mit.GlobalOffset()];
+                            chunk_ptr[mit.ChunkOffset()] = span[mit.GlobalOffset()];
                         }
                         column.putColumnRange(it.GetRowSlicer(), carray);
                     } catch(casacore::AipsError & e) {
@@ -157,6 +158,12 @@ private:
         ARROW_ASSIGN_OR_RAISE(auto flat_array, GetFlatArray());
         ARROW_ASSIGN_OR_RAISE(flat_array, MaybeCastFlatArray(flat_array));
         auto nelements = map_.get().nElements();
+
+        if(shape.product() != nelements) {
+            return arrow::Status::Invalid("Shape ", shape, " elements ", shape.nelements(),
+                                            " doesn't match map elements ", nelements);
+        }
+
 
         if constexpr(std::is_same_v<T, casacore::String>) {
             auto flat_strings = std::dynamic_pointer_cast<arrow::StringArray>(flat_array);
@@ -183,12 +190,13 @@ private:
             }
         } else {
             // Get Arrow Array buffer
-            auto buffer = flat_array->data()->buffers[1];
+            std::shared_ptr<arrow::Buffer> buffer = flat_array->data()->buffers[1];
+            auto span = buffer->span_as<T>();
             ARROW_RETURN_NOT_OK(CheckElements(buffer->size() / sizeof(T), nelements));
-            auto * buf_ptr = reinterpret_cast<T *>(buffer->mutable_data());
+            ARROW_RETURN_NOT_OK(CheckElements(span.size(), nelements));
 
             if(map_.get().IsSimple()) {
-                auto carray = casacore::Array<T>(shape, buf_ptr, casacore::SHARE);
+                auto carray = casacore::Array<T>(shape, std::remove_const_t<T *>(span.data()), casacore::SHARE);
 
                 try {
                     // Dump column data straight into the Arrow Buffer
@@ -207,7 +215,7 @@ private:
                         auto carray = casacore::Array<T>(it.GetShape());
                         auto chunk_ptr = carray.data();
                         for(auto mit = it.MapBegin(); mit != it.MapEnd(); ++mit) {
-                            chunk_ptr[mit.ChunkOffset()] = buf_ptr[mit.GlobalOffset()];
+                            chunk_ptr[mit.ChunkOffset()] = span[mit.GlobalOffset()];
                         }
                         column.putColumnRange(it.GetRowSlicer(), it.GetSectionSlicer(), carray);
                     } catch(casacore::AipsError & e) {
@@ -257,7 +265,7 @@ private:
             // Get Arrow Array buffer
             auto buffer = flat_array->data()->buffers[1];
             ARROW_RETURN_NOT_OK(CheckElements(flat_array->length(), nelements));
-            auto * buf_ptr = reinterpret_cast<T *>(buffer->mutable_data());
+            auto span = buffer->span_as<T>();
 
             for(auto it = map_.get().RangeBegin(); it != map_.get().RangeEnd(); ++it) {
                 // Copy sections of data from the Arrow Buffer and write
@@ -265,7 +273,7 @@ private:
                     auto carray = casacore::Array<T>(it.GetShape());
                     auto chunk_ptr = carray.data();
                     for(auto mit = it.MapBegin(); mit != it.MapEnd(); ++mit) {
-                        chunk_ptr[mit.ChunkOffset()] = buf_ptr[mit.GlobalOffset()];
+                        chunk_ptr[mit.ChunkOffset()] = span[mit.GlobalOffset()];
                     }
                     column.putColumnRange(it.GetRowSlicer(), it.GetSectionSlicer(), carray);
                 } catch(casacore::AipsError & e) {
