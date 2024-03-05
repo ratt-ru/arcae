@@ -137,8 +137,8 @@ SafeTableProxy::PutColumn(const std::string & column,
 
     return run_isolated([this, &column, &selection, &data]() -> Result<bool> {
         auto & casa_table = this->table_proxy->table();
-        auto table_column = TableColumn(casa_table, column);
         ARROW_RETURN_NOT_OK(FailIfColumnDoesntExist(casa_table, column));
+        auto table_column = TableColumn(casa_table, column);
         ARROW_ASSIGN_OR_RAISE(auto map, ColumnWriteMap::Make(table_column, selection, data))
         auto visitor = ColumnWriteVisitor(map);
         ARROW_RETURN_NOT_OK(visitor.Visit());
