@@ -75,9 +75,8 @@ public:
             auto nelements = map_.get().nElements();
             ARROW_ASSIGN_OR_RAISE(auto allocation, arrow::AllocateBuffer(nelements*sizeof(T), pool_));
             auto buffer = std::shared_ptr<arrow::Buffer>(std::move(allocation));
-            auto span = buffer->span_as<T>();
             auto casa_vector = casacore::Vector<T>(casacore::IPosition(1, nelements),
-                                                    std::remove_const_t<T *>(span.data()),
+                                                    buffer->mutable_data_as<T>(),
                                                     casacore::SHARE);
             auto casa_ptr = casa_vector.data();
 
@@ -143,9 +142,8 @@ public:
             auto nelements = map_.get().nElements();
             ARROW_ASSIGN_OR_RAISE(auto allocation, arrow::AllocateBuffer(nelements*sizeof(T), pool_));
             auto buffer = std::shared_ptr<arrow::Buffer>(std::move(allocation));
-            auto span = buffer->span_as<T>();
             auto carray = casacore::Array<T>(shape,
-                                             std::remove_const_t<T *>(span.data()),
+                                             buffer->mutable_data_as<T>(),
                                              casacore::SHARE);
             auto casa_ptr = carray.data();
 
@@ -219,7 +217,7 @@ public:
             auto nelements = map_.get().nElements();
             ARROW_ASSIGN_OR_RAISE(auto allocation, arrow::AllocateBuffer(nelements*sizeof(T), pool_));
             auto buffer = std::shared_ptr<arrow::Buffer>(std::move(allocation));
-            auto * buf_ptr = reinterpret_cast<T *>(buffer->mutable_data());
+            auto * buf_ptr = buffer->mutable_data_as<T>();
 
             for(auto it = map_.get().RangeBegin(); it != map_.get().RangeEnd(); ++it) {
                 // Copy sections of data into the Arrow Buffer
