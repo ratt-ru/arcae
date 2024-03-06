@@ -82,9 +82,9 @@ private:
     arrow::Status WriteScalarColumn() {
         auto column = casacore::ScalarColumn<T>(GetTableColumn());
         column.setMaximumCacheSize(1);
+        auto nelements = map_.get().nElements();
         ARROW_ASSIGN_OR_RAISE(auto flat_array, GetFlatArray());
         ARROW_ASSIGN_OR_RAISE(flat_array, MaybeCastFlatArray(flat_array));
-        auto nelements = map_.get().nElements();
 
         if constexpr(std::is_same_v<T, casacore::String>) {
             auto flat_strings = std::dynamic_pointer_cast<arrow::StringArray>(flat_array);
@@ -110,10 +110,9 @@ private:
             }
         } else {
             // Get Arrow Array buffer
-            auto buffer = flat_array->data()->buffers[1];
             ARROW_ASSIGN_OR_RAISE(auto shape, map_.get().GetOutputShape());
-            ARROW_RETURN_NOT_OK(CheckElements(buffer->size() / sizeof(T), nelements));
-            auto span = buffer->span_as<T>();
+            auto span = flat_array->data()->buffers[1]->span_as<T>();
+            ARROW_RETURN_NOT_OK(CheckElements(span.size(), nelements));
 
             if(map_.get().IsSimple()) {
                 auto carray = casacore::Array<T>(shape, std::remove_const_t<T *>(span.data()), casacore::SHARE);
@@ -192,7 +191,6 @@ private:
             // Get Arrow Array buffer
             std::shared_ptr<arrow::Buffer> buffer = flat_array->data()->buffers[1];
             auto span = buffer->span_as<T>();
-            ARROW_RETURN_NOT_OK(CheckElements(buffer->size() / sizeof(T), nelements));
             ARROW_RETURN_NOT_OK(CheckElements(span.size(), nelements));
 
             if(map_.get().IsSimple()) {
@@ -263,9 +261,8 @@ private:
             }
         } else {
             // Get Arrow Array buffer
-            auto buffer = flat_array->data()->buffers[1];
-            ARROW_RETURN_NOT_OK(CheckElements(flat_array->length(), nelements));
-            auto span = buffer->span_as<T>();
+            auto span = flat_array->data()->buffers[1]->span_as<T>();
+            ARROW_RETURN_NOT_OK(CheckElements(span.size(), nelements));
 
             for(auto it = map_.get().RangeBegin(); it != map_.get().RangeEnd(); ++it) {
                 // Copy sections of data from the Arrow Buffer and write
