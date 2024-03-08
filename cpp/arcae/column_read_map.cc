@@ -144,6 +144,44 @@ MakeOffsets(const decltype(VariableShapeData::row_shapes_) & row_shapes) {
   return offsets;
 }
 
+
+arrow::Result<std::vector<std::shared_ptr<arrow::Int32Array>>>
+MakeFixedOffsets(const casacore::rownr_t nrow, const casacore::IPosition & shape) {
+  auto ndim = shape.size();
+
+  auto builders = std::vector<arrow::Int32Builder>(ndim);
+  auto offsets = std::vector<std::shared_ptr<arrow::Int32Array>>(ndim);
+
+  for(auto dim=0; dim < ndim; ++dim) {
+    ARROW_RETURN_NOT_OK(builders[dim].Reserve(nrow + 1));
+    ARROW_RETURN_NOT_OK(builders[dim].Append(0));
+  }
+
+  auto running_offsets = std::vector<std::size_t>(ndim, 0);
+
+  // Compute number of elements in each row by making
+  // a product over each dimension
+  for(std::size_t row=0; row < nrow; ++row) {
+    using ItType = std::tuple<std::ptrdiff_t, std::size_t>;
+    for(auto [dim, product]=ItType{ndim - 1, 1}; dim >= 0; --dim) {
+      auto dim_size = shape[dim];
+      for(std::size_t p=0; p < product; ++p) {
+        running_offsets[dim] += dim_size;
+        ARROW_RETURN_NOT_OK(builders[dim].Append(running_offsets[dim]));
+      }
+      product *= dim_size;
+    }
+  }
+
+  // Build the offset arrays
+  for(std::size_t dim=0; dim < ndim; ++dim) {
+    ARROW_RETURN_NOT_OK(builders[dim].Finish(&offsets[dim]));
+  }
+
+  return offsets;
+
+}
+
 } // namespace
 
 // Factory method for creating Variably Shape Data from column
@@ -284,8 +322,9 @@ ColumnReadMap::GetOffsets() const {
   if(shape_provider_.IsVarying()) {
     return shape_provider_.var_data_->offsets_;
   }
-  return arrow::Status::Invalid("Unable to retrieve varying offsets for "
-                                "fixed column ", column_.get().columnDesc().name());
+
+  auto column_desc = column_.get().columnDesc();
+  return MakeFixedOffsets(column_.get().nrow(), column_desc.shape());
 }
 
 

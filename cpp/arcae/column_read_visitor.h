@@ -14,7 +14,8 @@
 #include "arcae/casa_visitors.h"
 #include "arcae/column_read_map.h"
 #include "arcae/complex_type.h"
-
+#include "arcae/configuration.h"
+#include "arcae/service_locator.h"
 namespace arcae {
 
 class ColumnReadVisitor : public CasaTypeVisitor {
@@ -294,7 +295,11 @@ private:
             return ReadScalarColumn<T>(arrow_dtype);
         }
 
-        if(column_desc.isFixedShape() || map_.get().IsFixedShape()) {
+        auto & config = ServiceLocator::configuration();
+        auto convert_method = config.GetDefault("casa.convert.strategy", "fixed");
+        auto list_convert = convert_method.find("list") == 0;
+
+        if(!list_convert && (column_desc.isFixedShape() || map_.get().IsFixedShape())) {
             return ReadFixedColumn<T>(arrow_dtype);
         }
 
