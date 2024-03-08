@@ -39,23 +39,21 @@ def test_column_selection(column_case_table):
         ]
 
     with arcae.table(column_case_table) as T:
-        assert sorted(T.to_arrow(0, 1).column_names) == [
+        assert sorted(T.to_arrow([[0, 1]]).column_names) == [
             "FIXED",
             "FIXED_STRING",
             "SCALAR",
             "SCALAR_STRING",
-            # When retrieving a single row, we can get values from an unconstrained column
-            "UNCONSTRAINED",
             "UNCONSTRAINED_SAME_NDIM",
             "VARIABLE",
             "VARIABLE_STRING"
         ]
 
     with arcae.table(column_case_table) as T:
-        assert sorted(T.to_arrow(0, 1, "VARIABLE").column_names) == ["VARIABLE"]
+        assert sorted(T.to_arrow([[0, 1]], "VARIABLE").column_names) == ["VARIABLE"]
 
     with arcae.table(column_case_table) as T:
-        assert sorted(T.to_arrow(0, 1, ["VARIABLE", "FIXED"]).column_names) == ["FIXED", "VARIABLE"]
+        assert sorted(T.to_arrow([[0, 1]], ["VARIABLE", "FIXED"]).column_names) == ["FIXED", "VARIABLE"]
 
 
 def test_column_cases(column_case_table, capfd):
@@ -273,7 +271,7 @@ def test_partial_read(sorting_table):
     start = 0
 
     for nrow in nrows:
-        assert full.take(list(range(start, start + nrow))) == T.to_arrow(start, nrow)
+        assert full.take(list(range(start, start + nrow))) == T.to_arrow([], [slice(start, start+nrow)])
         start += nrow
 
 def test_table_taql(sorting_table):
