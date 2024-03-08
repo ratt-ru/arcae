@@ -8,6 +8,7 @@ pkg_check_modules(casacore REQUIRED IMPORTED_TARGET casacore)
 add_custom_command(
     OUTPUT arrow_tables.cc
     VERBATIM
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/arrow_tables.pyx
     COMMAND cython ${CMAKE_CURRENT_SOURCE_DIR}/arrow_tables.pyx
             --output-file ${CMAKE_CURRENT_BINARY_DIR}/arrow_tables.cc
             --cplus -vvv)
