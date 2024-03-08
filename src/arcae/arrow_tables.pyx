@@ -5,7 +5,7 @@ from collections.abc import Iterable, MutableMapping
 import ctypes
 import cython
 import json
-from typing import Optional
+from typing import Optional, Union
 
 from libcpp cimport bool
 from libcpp.map cimport map
@@ -55,6 +55,10 @@ from arcae.arrow_tables cimport (CCasaTable,
                                  Span,
                                  rownr_t,
                                  UINT_MAX)
+
+
+DimIndex = Union[slice, list, np.ndarray]
+FullIndex = Union[list[DimIndex], tuple[DimIndex]]
 
 def ms_descriptor(table: str, complete: bool = False) -> dict:
     table_desc = GetResultValue(CMSDescriptor(tobytes(table), complete))
@@ -112,7 +116,7 @@ cdef class SelectionObj:
     cdef vector[vector[rownr_t]] vec_store
     cdef ColumnSelection selection
 
-    def __init__(self, index: tuple = None):
+    def __init__(self, index: FullIndex = None):
         cdef rownr_t[::1] dim_memview
         cdef rownr_t i
 
@@ -139,6 +143,10 @@ cdef class SelectionObj:
                         span = RowIds(&vec_index[0], vec_index.size())
                         self.vec_store.push_back(move(vec_index))
                         self.selection.push_back(move(span))
+                elif isinstance(dim_index, list):
+                    dim_memview = np.asarray(dim_index, np.uint64)
+                    span = RowIds(&dim_memview[0], dim_memview.shape[0])
+                    self.selection.push_back(move(span))
                 elif isinstance(dim_index, np.ndarray):
                     if dim_index.ndim != 1:
                         raise ValueError(f"Multi-dimensional ndarray received as index "
