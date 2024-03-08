@@ -13,14 +13,14 @@
 #include <casacore/tables/Tables/TableColumn.h>
 #include <casacore/tables/Tables/TableProxy.h>
 #include <casacore/tables/Tables/RefRows.h>
-#include <tests/test_utils.h>
 
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
-#include "arcae/safe_table_proxy.h"
-#include "arcae/column_read_map.h"
+#include <arcae/safe_table_proxy.h>
+#include <arcae/column_read_map.h>
 
+#include <tests/test_utils.h>
 
 using casacore::Array;
 using casacore::ArrayColumn;

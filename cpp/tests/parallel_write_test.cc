@@ -1,11 +1,15 @@
 #include <arcae/safe_table_proxy.h>
 #include <arcae/table_factory.h>
-#include <tests/test_utils.h>
+
 #include <arrow/util/thread_pool.h>
 #include <arrow/testing/gtest_util.h>
+
 #include <casacore/tables/Tables.h>
 #include <casacore/ms/MeasurementSets/MeasurementSet.h>
+
 #include <gtest/gtest.h>
+
+#include <tests/test_utils.h>
 
 using casacore::Array;
 using casacore::ArrayColumn;

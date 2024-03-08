@@ -3,6 +3,7 @@
 #include <sys/types.h>
 
 #include <arrow/api.h>
+#include <arrow/testing/gtest_util.h>
 
 #include <casacore/casa/aipsxtype.h>
 #include <casacore/casa/Arrays/IPosition.h>
@@ -17,7 +18,6 @@
 
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
-#include <arrow/testing/gtest_util.h>
 
 #include <arcae/column_read_map.h>
 #include <arcae/safe_table_proxy.h>

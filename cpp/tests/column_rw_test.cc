@@ -15,18 +15,17 @@
 #include <casacore/tables/Tables/TableColumn.h>
 #include <casacore/tables/Tables/TableProxy.h>
 #include <casacore/tables/Tables/RefRows.h>
-#include <tests/test_utils.h>
 
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
-#include "arcae/safe_table_proxy.h"
-#include "arcae/column_read_map.h"
-#include "arcae/column_write_map.h"
-#include "arcae/column_read_visitor.h"
-#include "arcae/column_write_visitor.h"
-#include "arrow/type_fwd.h"
+#include <arcae/safe_table_proxy.h>
+#include <arcae/column_read_map.h>
+#include <arcae/column_write_map.h>
+#include <arcae/column_read_visitor.h>
+#include <arcae/column_write_visitor.h>
 
+#include <tests/test_utils.h>
 
 using arrow::ipc::internal::json::ArrayFromJSON;
 
