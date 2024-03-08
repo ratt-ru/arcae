@@ -48,7 +48,7 @@ cdef extern from "arcae/safe_table_proxy.h" namespace "arcae" nogil:
         @staticmethod
         CResult[bool] Close" SafeTableProxy::Close"()
 
-        CResult[shared_ptr[CTable]] ToArrow " SafeTableProxy::ToArrow"(unsigned int startrow, unsigned int nrow, const vector[string] & columns)
+        CResult[shared_ptr[CTable]] ToArrow " SafeTableProxy::ToArrow"( const ColumnSelection & selection, const vector[string] & columns)
         CResult[shared_ptr[CArray]] GetColumn " SafeTableProxy::GetColumn"(const string & column, unsigned int startrow, unsigned int nrow)
         CResult[shared_ptr[CArray]] GetColumn2 " SafeTableProxy::GetColumn2"(const string & column, const ColumnSelection & selection)
         CResult[bool] PutColumn " SafeTableProxy::PutColumn"(const string & column, const ColumnSelection & selection, const shared_ptr[CArray] & data)

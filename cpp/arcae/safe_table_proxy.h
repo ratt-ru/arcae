@@ -96,8 +96,7 @@ public:
     bool IsClosed() const { return is_closed; }
 
     arrow::Result<std::shared_ptr<arrow::Table>> ToArrow(
-        casacore::uInt startrow=0,
-        casacore::uInt nrow=UINT_MAX,
+        const ColumnSelection & selection={},
         const std::vector<std::string> & columns = {}) const;
 
     arrow::Result<std::shared_ptr<arrow::Array>> GetColumn(

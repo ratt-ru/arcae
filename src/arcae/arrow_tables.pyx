@@ -205,10 +205,11 @@ cdef class Table:
                                                    tobytes(json_dminfo)))
         return table
 
-    def to_arrow(self, unsigned int startrow=0, unsigned int nrow=UINT_MAX, columns: list[str] | str = None):
+    def to_arrow(self, columns: list[str] | str = None, index: FullIndex = None):
         cdef:
             vector[string] cpp_columns
             shared_ptr[CArray] carray
+            SelectionObj selobj = SelectionObj(index)
 
         if isinstance(columns, str):
             columns = [columns]
@@ -216,7 +217,7 @@ cdef class Table:
         if columns:
             cpp_columns = [tobytes(c) for c in columns]
 
-        ctable = GetResultValue(self.c_table.get().ToArrow(startrow, nrow, cpp_columns))
+        ctable = GetResultValue(self.c_table.get().ToArrow(selobj.selection, cpp_columns))
 
         return pyarrow_wrap_table(ctable)
 
