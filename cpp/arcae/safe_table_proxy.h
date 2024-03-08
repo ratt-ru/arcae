@@ -101,11 +101,6 @@ public:
 
     arrow::Result<std::shared_ptr<arrow::Array>> GetColumn(
         const std::string & column,
-        casacore::uInt startrow,
-        casacore::uInt nrow) const;
-
-    arrow::Result<std::shared_ptr<arrow::Array>> GetColumn2(
-        const std::string & column,
         const ColumnSelection & selection) const;
 
     arrow::Result<bool> PutColumn(

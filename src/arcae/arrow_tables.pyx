@@ -221,24 +221,16 @@ cdef class Table:
 
         return pyarrow_wrap_table(ctable)
 
-    def getcol2(self, column: str, index: tuple = None) -> np.ndarray:
+    def getcol(self, column: str, index: FullIndex = None) -> np.ndarray:
         cdef string cpp_column = tobytes(column)
         cdef SelectionObj selobj = SelectionObj(index)
 
-        carray = GetResultValue(self.c_table.get().GetColumn2(cpp_column, selobj.selection))
+        carray = GetResultValue(self.c_table.get().GetColumn(cpp_column, selobj.selection))
         py_column = pyarrow_wrap_array(carray)
         return self._arrow_to_numpy(column, py_column)
 
-    def getcol(self, column: str, unsigned int startrow=0, unsigned int nrow=UINT_MAX) -> np.ndarray:
-        cdef:
-            shared_ptr[CArray] carray
-            string cpp_column = tobytes(column)
 
-        carray = GetResultValue(self.c_table.get().GetColumn(cpp_column, startrow, nrow))
-        py_column = pyarrow_wrap_array(carray)
-        return self._arrow_to_numpy(column, py_column)
-
-    def putcol(self, column: str, data: np.ndarray, index: tuple = None):
+    def putcol(self, column: str, data: np.ndarray, index: FullIndex = None):
         cdef string cpp_column = tobytes(column)
         cdef SelectionObj selobj = SelectionObj(index)
         cdef shared_ptr[CArray] carray = pyarrow_unwrap_array(self._numpy_to_arrow(data))
