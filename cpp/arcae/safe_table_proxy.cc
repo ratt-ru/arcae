@@ -11,7 +11,6 @@
 
 #include "arcae/safe_table_proxy.h"
 #include "arcae/base_column_map.h"
-#include "arcae/column_convert_visitor.h"
 #include "arcae/column_read_map.h"
 #include "arcae/column_read_visitor.h"
 #include "arcae/column_write_map.h"
