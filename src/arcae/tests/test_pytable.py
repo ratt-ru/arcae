@@ -243,7 +243,7 @@ def test_partial_read(sorting_table):
     start = 0
 
     for nrow in nrows:
-        assert full.take(list(range(start, start + nrow))) == T.to_arrow([], [slice(start, start+nrow)])
+        assert full.take(list(range(start, start + nrow))) == T.to_arrow([slice(start, start+nrow)])
         start += nrow
 
 def test_table_taql(sorting_table):
