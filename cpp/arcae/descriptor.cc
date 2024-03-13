@@ -173,10 +173,6 @@ std::string RecordToJson(const Record & record) {
     return json_oss.str();
 }
 
-Record JsonToRecord(const std::string & json_record) {
-    return JsonParser::parse(json_record).toRecord();
-}
-
 
 // Get the required table descriptions for the given table.
 // If "" or "MAIN", the table descriptions for a Measurement Set
