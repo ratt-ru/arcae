@@ -18,6 +18,9 @@ add_library(arcae SHARED
     arcae/table_factory.cc
     arcae/utility.cc)
 
+target_compile_options(arcae PRIVATE
+    $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:
+        -Wall -Werror>)
 target_link_directories(arcae PUBLIC ${PYARROW_LIBDIRS})
 target_link_libraries(arcae PkgConfig::casacore arrow absl::span)
 target_include_directories(arcae PUBLIC PkgConfig::casacore absl::span ${PYARROW_INCLUDE} ${CMAKE_INCLUDE_CURRENT_DIR})
