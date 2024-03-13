@@ -58,7 +58,6 @@ std::optional<casacore::IPosition>
 MaybeMakeOutputShape(const ColumnRanges & ranges) {
   auto ndim = ranges.size();
   assert(ndim > 0);
-  auto row_dim = std::ptrdiff_t(ndim) - 1;
   auto shape = casacore::IPosition(ndim, 0);
 
   for(auto dim=std::size_t{0}; dim < ndim; ++dim) {
