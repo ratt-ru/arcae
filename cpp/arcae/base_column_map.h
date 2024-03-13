@@ -148,7 +148,7 @@ struct MapIterator {
   }
 
   MapIterator & operator++();
-  bool operator==(const EndSentinel & other) const {
+  bool operator==(const EndSentinel &) const {
     return done_;
   }
   bool operator!=(const EndSentinel & other) const {
@@ -318,7 +318,7 @@ struct RangeIterator {
   // Returns shape of this chunk
   casacore::IPosition GetShape() const;
 
-  bool operator==(const EndSentinel & other) const {
+  bool operator==(const EndSentinel &) const {
     return done_;
   }
   bool operator!=(const EndSentinel & other) const {
