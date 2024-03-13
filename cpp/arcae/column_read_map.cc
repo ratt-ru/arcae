@@ -33,10 +33,11 @@ arrow::Result<casacore::IPosition> ClipShape(
   }
 
   auto clipped = shape;
+  auto selection_size = std::ptrdiff_t(selection.size());
 
   for(std::size_t dim=0; dim < shape.size(); ++dim) {
     auto sdim = SelectDim(dim, selection.size(), shape.size() + 1);
-    if(sdim >= 0 && sdim < selection.size() && selection[sdim].size() > 0) {
+    if(sdim >= 0 && sdim < selection_size && selection[sdim].size() > 0) {
       for(auto i: selection[sdim]) {
         if(i >= clipped[dim]) {
           return arrow::Status::Invalid("Selection index ", i,
@@ -114,7 +115,7 @@ MakeOffsets(const decltype(VariableShapeData::row_shapes_) & row_shapes) {
   auto builders = std::vector<arrow::Int32Builder>(ndim);
   auto offsets = std::vector<std::shared_ptr<arrow::Int32Array>>(ndim);
 
-  for(auto dim=0; dim < ndim; ++dim) {
+  for(std::size_t dim=0; dim < ndim; ++dim) {
     ARROW_RETURN_NOT_OK(builders[dim].Reserve(nrow + 1));
     ARROW_RETURN_NOT_OK(builders[dim].Append(0));
   }
@@ -151,7 +152,7 @@ MakeFixedOffsets(const casacore::rownr_t nrow, const casacore::IPosition & shape
   auto builders = std::vector<arrow::Int32Builder>(ndim);
   auto offsets = std::vector<std::shared_ptr<arrow::Int32Array>>(ndim);
 
-  for(auto dim=0; dim < ndim; ++dim) {
+  for(std::size_t dim=0; dim < ndim; ++dim) {
     ARROW_RETURN_NOT_OK(builders[dim].Reserve(nrow + 1));
     ARROW_RETURN_NOT_OK(builders[dim].Append(0));
   }
@@ -160,7 +161,7 @@ MakeFixedOffsets(const casacore::rownr_t nrow, const casacore::IPosition & shape
 
   // Compute number of elements in each row by making
   // a product over each dimension
-  for(std::size_t row=0; row < nrow; ++row) {
+  for(casacore::rownr_t row=0; row < nrow; ++row) {
     using ItType = std::tuple<std::ptrdiff_t, std::size_t>;
     for(auto [dim, product]=ItType{ndim - 1, 1}; dim >= 0; --dim) {
       auto dim_size = shape[dim];
@@ -334,7 +335,7 @@ std::size_t ColumnReadMap::FlatOffset(const std::vector<std::size_t> & index) co
     auto result = std::size_t{0};
     auto product = std::size_t{1};
 
-    for(auto dim = 0; dim < RowDim(); ++dim) {
+    for(std::size_t dim = 0; dim < RowDim(); ++dim) {
       result += index[dim] * product;
       product *= shape[dim];
     }
@@ -386,7 +387,7 @@ ColumnReadMap::Make(
 
   auto shape = MaybeMakeOutputShape(ranges);
 
-  return ColumnReadMap{column, std::move(maps), std::move(ranges),
+  return ColumnReadMap{std::cref(column), std::move(maps), std::move(ranges),
                         std::move(shape_prov), std::move(shape)};
 }
 

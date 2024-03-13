@@ -181,7 +181,7 @@ public:
         }
 
         // Fortran ordering, but without the row dimension
-        for(auto dim=0; dim < shape.size() - 1; ++dim) {
+        for(std::size_t dim=0; dim < shape.size() - 1; ++dim) {
             ARROW_ASSIGN_OR_RAISE(array_, arrow::FixedSizeListArray::FromArrays(array_, shape[dim]));
         }
 

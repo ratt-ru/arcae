@@ -200,11 +200,12 @@ arrow::Result<DataProperties> GetDataProperties(
   auto casa_shape = casacore::IPosition(ndim, 0);
   for(std::size_t dim=0; dim < ndim; ++dim) {
     auto fdim = ndim - dim - 1;
+    auto selection_size = std::ptrdiff_t(selection.size());
     casa_shape[fdim] = shape[dim];
 
     // Check that the selection indices don't exceed the data shape
-    if(auto sdim = SelectDim(fdim, selection.size(), ndim); sdim >= 0 && sdim < selection.size()) {
-      if(selection[sdim].size() > shape[dim]) {
+    if(auto sdim = SelectDim(fdim, selection.size(), ndim); sdim >= 0 && sdim < selection_size) {
+      if(selection[sdim].size() > std::size_t(shape[dim])) {
         return arrow::Status::IndexError(
           "Number of selections ", selection[sdim].size(),
           " is greater than the dimension ", shape[dim],
@@ -233,18 +234,18 @@ SetVariableRowShapes(casacore::ArrayColumnBase & column,
     for(auto r = 0; r < data->length(); ++r) {
       if(!column.isDefined(r)) {
         auto shape = casacore::IPosition(shape_prov.nDim() - 1, 0);
-        for(auto d=0; d < shape.size(); ++d) shape[d] = shape_prov.RowDimSize(r, d);
+        for(std::size_t d=0; d < shape.size(); ++d) shape[d] = shape_prov.RowDimSize(r, d);
         column.setShape(r, shape);
       }
     }
   } else {
     const auto & row_ids = selection[select_row_dim];
 
-    for(auto rid = 0; rid < row_ids.size(); ++rid) {
+    for(std::size_t rid = 0; rid < row_ids.size(); ++rid) {
       auto r = row_ids[rid];
       if(!column.isDefined(r)) {
         auto shape = casacore::IPosition(shape_prov.nDim() - 1, 0);
-        for(auto d=0; d < shape.size(); ++d) shape[d] = shape_prov.RowDimSize(rid, d);
+        for(std::size_t d=0; d < shape.size(); ++d) shape[d] = shape_prov.RowDimSize(rid, d);
         ReconcileDataAndSelectionShape(selection, shape);
         column.setShape(r, shape);
       }
@@ -313,7 +314,7 @@ std::size_t ArrowShapeProvider::RowDimSize(casacore::rownr_t row, std::size_t di
     return dim_size;
   };
 
-  using ItType = std::tuple<bool, std::size_t>;
+  using ItType = std::tuple<bool, std::ptrdiff_t>;
 
   for(auto [done, current_dim]=ItType{false, 0}; !done; ++current_dim) {
     switch(tmp_data->type_id()) {
@@ -362,7 +363,7 @@ std::size_t ColumnWriteMap::FlatOffset(const std::vector<std::size_t> & index) c
     auto result = std::size_t{0};
     auto product = std::size_t{1};
 
-    for(auto dim = 0; dim < RowDim(); ++dim) {
+    for(std::size_t dim = 0; dim < RowDim(); ++dim) {
       result += index[dim] * product;
       product *= shape[dim];
     }

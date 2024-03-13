@@ -158,7 +158,7 @@ private:
         ARROW_ASSIGN_OR_RAISE(flat_array, MaybeCastFlatArray(flat_array));
         auto nelements = map_.get().nElements();
 
-        if(shape.product() != nelements) {
+        if(std::size_t(shape.product()) != nelements) {
             return arrow::Status::Invalid("Shape ", shape, " elements ", shape.nelements(),
                                             " doesn't match map elements ", nelements);
         }

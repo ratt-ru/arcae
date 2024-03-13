@@ -352,7 +352,7 @@ template <typename ColumnMapping>
 RangeIterator<ColumnMapping> & RangeIterator<ColumnMapping>::operator++() {
   assert(!done_);
   // Iterate from fastest to slowest changing dimension: FORTRAN order
-  for(auto dim = 0; dim < nDim();) {
+  for(std::size_t dim = 0; dim < nDim();) {
     index_[dim]++;
     mem_start_[dim] += range_length_[dim];
 
