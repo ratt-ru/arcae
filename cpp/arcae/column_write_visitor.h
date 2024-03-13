@@ -67,7 +67,7 @@ public:
                                           GetTableColumn().columnDesc().name(),
                                             ": ", e.what());
         }
-    };
+    }
 
 private:
     const casacore::TableColumn & GetTableColumn() const {

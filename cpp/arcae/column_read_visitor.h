@@ -304,7 +304,7 @@ private:
         }
 
         return ReadVariableColumn<T>(arrow_dtype);
-    };
+    }
 };
 
 } // namespace arcae
