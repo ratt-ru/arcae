@@ -387,7 +387,7 @@ ColumnReadMap::Make(
 
   auto shape = MaybeMakeOutputShape(ranges);
 
-  return ColumnReadMap{std::cref(column), std::move(maps), std::move(ranges),
+  return ColumnReadMap{{std::cref(column), std::move(maps), std::move(ranges)},
                         std::move(shape_prov), std::move(shape)};
 }
 

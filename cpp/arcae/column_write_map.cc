@@ -427,7 +427,7 @@ ColumnWriteMap::Make(
                                           column.columnDesc().name());
   }
 
-  return ColumnWriteMap{column, std::move(maps), std::move(ranges),
+  return ColumnWriteMap{{std::cref(column), std::move(maps), std::move(ranges)},
                         data, std::move(shape_prov)};
 }
 
