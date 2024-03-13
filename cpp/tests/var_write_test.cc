@@ -35,6 +35,7 @@ using arrow::ipc::internal::json::ArrayFromJSON;
 
 using ::arcae::ColumnReadMap;
 using ::arcae::ColumnWriteMap;
+using ::arcae::RowId;
 
 using ::casacore::ArrayColumn;
 using ::casacore::TableColumn;
@@ -52,12 +53,12 @@ GetArrayColumn(const Table & table, const std::string & column) {
 }
 
 struct Selection {
-  static Selection Make(std::initializer_list<std::initializer_list<casacore::rownr_t>> list) {
-    std::vector<std::vector<casacore::rownr_t>> vecs;
+  static Selection Make(std::initializer_list<std::initializer_list<RowId>> list) {
+    std::vector<std::vector<RowId>> vecs;
     arcae::ColumnSelection spans;
 
     for(const auto & v: list) {
-      vecs.push_back(std::vector<casacore::rownr_t>(v));
+      vecs.push_back(std::vector<RowId>(v));
       spans.push_back(arcae::RowIds(vecs.back()));
     }
 
@@ -65,7 +66,7 @@ struct Selection {
   }
 
   arcae::ColumnSelection spans_;
-  std::vector<std::vector<casacore::rownr_t>> rowids_;
+  std::vector<std::vector<RowId>> rowids_;
 };
 
 class EmptyVariableWriteTest : public ::testing::Test {

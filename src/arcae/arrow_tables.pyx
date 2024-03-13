@@ -51,9 +51,9 @@ from arcae.arrow_tables cimport (CCasaTable,
                                  complex64,
                                  complex128,
                                  ColumnSelection,
+                                 RowId,
                                  RowIds,
                                  Span,
-                                 rownr_t,
                                  UINT_MAX)
 
 
@@ -113,12 +113,12 @@ cdef class SelectionObj:
     Needed because vectors may need to be stored so
     that they stay live when referenced by span objects
     """
-    cdef vector[vector[rownr_t]] vec_store
+    cdef vector[vector[RowId]] vec_store
     cdef ColumnSelection selection
 
     def __init__(self, index: FullIndex = None):
-        cdef rownr_t[::1] dim_memview
-        cdef rownr_t i
+        cdef RowId[::1] dim_memview
+        cdef RowId i
 
         if index is None:
             pass
@@ -127,15 +127,15 @@ cdef class SelectionObj:
                 if dim_index is None:
                     self.selection.push_back(RowIds())
                 elif isinstance(dim_index, slice):
-                    # Convert a slice object into a vector, and then a span of rownr_t
+                    # Convert a slice object into a vector, and then a span of RowId
                     if dim_index.step is not None and dim_index.step != 1:
                         raise ValueError(f"slice step {dim_index.step} is not 1")
 
-                    start: rownr_t = dim_index.start
-                    stop: rownr_t = dim_index.stop
+                    start: RowId = dim_index.start
+                    stop: RowId = dim_index.stop
 
                     with nogil:
-                        vec_index = vector[rownr_t](stop - start, 0)
+                        vec_index = vector[RowId](stop - start, 0)
 
                         for i in range(stop - start):
                             vec_index[i] = start + i
@@ -144,7 +144,7 @@ cdef class SelectionObj:
                         self.vec_store.push_back(move(vec_index))
                         self.selection.push_back(move(span))
                 elif isinstance(dim_index, list):
-                    dim_memview = np.asarray(dim_index, np.uint64)
+                    dim_memview = np.asarray(dim_index, np.int64)
                     span = RowIds(&dim_memview[0], dim_memview.shape[0])
                     self.selection.push_back(move(span))
                 elif isinstance(dim_index, np.ndarray):
@@ -152,7 +152,7 @@ cdef class SelectionObj:
                         raise ValueError(f"Multi-dimensional ndarray received as index "
                                             f"in dimension {d}")
                     # Cast to uint64 if necessary
-                    dim_memview = np.require(dim_index, dtype=np.uint64, requirements=["C"])
+                    dim_memview = np.require(dim_index, dtype=np.int64, requirements=["C"])
                     span = RowIds(&dim_memview[0], dim_memview.shape[0])
                     self.selection.push_back(move(span))
                 else:

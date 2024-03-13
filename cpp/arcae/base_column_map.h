@@ -2,6 +2,7 @@
 #define ARCAE_BASE_COLUMN_MAP_H
 
 #include <cassert>
+#include <cstdint>
 #include <functional>
 #include <numeric>
 #include <vector>
@@ -19,7 +20,8 @@ namespace arcae {
 
 enum MapOrder {C_ORDER=0, F_ORDER};
 
-using RowIds = absl::Span<const casacore::rownr_t>;
+using RowId = std::int64_t;
+using RowIds = absl::Span<const RowId>;
 using ColumnSelection = std::vector<RowIds>;
 
 // Type indicating the ending of an iteration
@@ -621,8 +623,10 @@ ColumnMaps MapFactory(const SP & shape_prov, const ColumnSelection & selection) 
       column_map.reserve(dim_ids.size());
 
       for(auto [disk_it, mem] = std::tuple{std::begin(dim_ids), casacore::rownr_t{0}};
-          disk_it != std::end(dim_ids); ++mem, ++disk_it) {
-            column_map.push_back({*disk_it, mem});
+          disk_it != std::end(dim_ids); ++disk_it) {
+            if(*disk_it >= 0) {
+              column_map.push_back({casacore::rownr_t(*disk_it), mem++});
+            }
       }
 
       std::sort(std::begin(column_map), std::end(column_map),

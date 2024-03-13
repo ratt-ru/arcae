@@ -156,6 +156,17 @@ TEST_F(RangeTest, CheckMapsAndRangesMultiple) {
   ASSERT_FALSE(map.IsSimple());
 }
 
+
+TEST_F(RangeTest, TestNegativeRows) {
+  auto data = GetArrayColumn<CasaComplex>(proxy_.table(), MS::MODEL_DATA);
+    ASSERT_OK_AND_ASSIGN(auto map, ColumnReadMap::Make(data, {{1, -1, -3, 4}, {-1, 1}, {-1, 1}}));
+    EXPECT_THAT(map.DimMap(0), ::testing::ElementsAre(IdMap{1, 0}));
+    EXPECT_THAT(map.DimMap(1), ::testing::ElementsAre(IdMap{1, 0}));
+    EXPECT_THAT(map.DimMap(2), ::testing::ElementsAre(IdMap{1, 0}, IdMap{4, 1}));
+
+}
+
+
 TEST_F(RangeTest, TestSimplicity) {
   auto data = GetArrayColumn<CasaComplex>(proxy_.table(), MS::MODEL_DATA);
 

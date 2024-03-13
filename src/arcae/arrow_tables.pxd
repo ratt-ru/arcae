@@ -24,7 +24,8 @@ cdef extern from "<absl/types/span.h>" namespace "absl" nogil:
         size()
 
 cdef extern from "arcae/base_column_map.h" namespace "arcae" nogil:
-    ctypedef Span[rownr_t] RowIds
+    ctypedef int64_t RowId
+    ctypedef Span[RowId] RowIds
     ctypedef vector[RowIds] ColumnSelection
 
 cdef extern from "arcae/service_locator.h" namespace "arcae" nogil:

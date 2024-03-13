@@ -19,12 +19,15 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
+#include <arcae/base_column_map.h>
 #include <arcae/column_read_map.h>
 #include <arcae/safe_table_proxy.h>
 #include <arcae/table_factory.h>
 
 
 using arcae::ColumnReadMap;
+using arcae::RowId;
+
 using casacore::Array;
 using casacore::ArrayColumn;
 using casacore::ArrayColumnDesc;
@@ -188,7 +191,7 @@ TEST_F(ColumnConvertTest, SelectFromRange) {
   {
     // Select some rows from the VAR_DATA column
     auto data_column = GetArrayColumn<CasaComplex>(proxy.table(), "VAR_DATA");
-    auto row_ids = std::vector<casacore::rownr_t>{0, 1, 2, 3, 6, 7, 8, 9};
+    auto row_ids = std::vector<RowId>{0, 1, 2, 3, 6, 7, 8, 9};
     ASSERT_OK_AND_ASSIGN(auto map, ColumnReadMap::Make(data_column, arcae::ColumnSelection{{row_ids}}));
 
     ASSERT_TRUE(map.shape_provider_.IsVarying());
@@ -226,8 +229,8 @@ TEST_F(ColumnConvertTest, SelectFromRange) {
   {
     // Select some rows and a channel from the VAR_DATA column
     auto data_column = GetArrayColumn<CasaComplex>(proxy.table(), "VAR_DATA");
-    auto row_ids = std::vector<casacore::rownr_t>{0, 1, 2, 3, 6, 7, 8, 9};
-    auto chan_ids = std::vector<casacore::rownr_t>{0};
+    auto row_ids = std::vector<RowId>{0, 1, 2, 3, 6, 7, 8, 9};
+    auto chan_ids = std::vector<RowId>{0};
     ASSERT_OK_AND_ASSIGN(auto map, ColumnReadMap::Make(data_column, arcae::ColumnSelection{{row_ids, chan_ids}}));
 
     ASSERT_TRUE(map.shape_provider_.IsVarying());
@@ -266,8 +269,8 @@ TEST_F(ColumnConvertTest, SelectFromRange) {
   {
     // Select some rows and a corr from the VAR_DATA column
     auto data_column = GetArrayColumn<CasaComplex>(proxy.table(), "VAR_DATA");
-    auto row_ids = std::vector<casacore::rownr_t>{0, 1, 2, 3, 6, 7, 8, 9};
-    auto corr_ids = std::vector<casacore::rownr_t>{0};
+    auto row_ids = std::vector<RowId>{0, 1, 2, 3, 6, 7, 8, 9};
+    auto corr_ids = std::vector<RowId>{0};
     ASSERT_OK_AND_ASSIGN(auto map, ColumnReadMap::Make(data_column, arcae::ColumnSelection{{row_ids, {}, corr_ids}}));
 
     ASSERT_TRUE(map.shape_provider_.IsVarying());
@@ -305,7 +308,7 @@ TEST_F(ColumnConvertTest, SelectFromRange) {
   {
     // Select some rows a channel and a correlation in the VAR_DATA column
     auto data_column = GetArrayColumn<CasaComplex>(proxy.table(), "VAR_DATA");
-    auto row_ids = std::vector<casacore::rownr_t>{0, 1, 2, 3, 6, 7, 8, 9};
+    auto row_ids = std::vector<RowId>{0, 1, 2, 3, 6, 7, 8, 9};
     auto selection = arcae::ColumnSelection{row_ids, {0}, {0}};
     ASSERT_OK_AND_ASSIGN(auto map, ColumnReadMap::Make(data_column, selection));
 
