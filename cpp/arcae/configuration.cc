@@ -18,7 +18,7 @@ std::string Configuration::GetDefault(const std::string & key, std::string defau
     auto it = kvmap_.find(key);
 
     if(it == kvmap_.end()) {
-        return std::move(default_value);
+        return default_value;
     } else {
         return it->second;
     }
