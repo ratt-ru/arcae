@@ -30,8 +30,9 @@ env:
     import numpy as np
     T = Table.ms_from_descriptor("test.ms")
     T.addrows(10)
-    T.putcol("TIME", np.arange(10))
-    np.testing.assert_array_equal(T.getcol("TIME"), np.arange(10))
+    T.putcol("ANTENNA1", np.arange(10))
+    np.testing.assert_equal(T.nrow(), 10)
+    np.testing.assert_array_equal(T.getcol("ANTENNA1"), np.arange(10))
     EOF
 
   HOST_PYTHON_VERSION: "3.10"
