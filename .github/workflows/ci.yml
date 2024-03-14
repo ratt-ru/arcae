@@ -26,12 +26,12 @@ env:
   CIBW_TEST_COMMAND_LINUX: py.test -s -vvv --pyargs arcae
   CIBW_TEST_COMMAND_MACOS: |
     python - <<-EOF
-      from arcae.lib.arrow_tables import Table
-      import numpy as np
-      T = Table.ms_from_descriptor("test.ms")
-      T.addrows(10)
-      T.putcol("TIME", np.arange(10))
-      np.testing.assert_array_equal(T.getcol("TIME", np.arange(10)))
+    from arcae.lib.arrow_tables import Table
+    import numpy as np
+    T = Table.ms_from_descriptor("test.ms")
+    T.addrows(10)
+    T.putcol("TIME", np.arange(10))
+    np.testing.assert_array_equal(T.getcol("TIME", np.arange(10)))
     EOF
 
   HOST_PYTHON_VERSION: "3.10"
