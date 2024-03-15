@@ -16,8 +16,7 @@ env:
     --exclude libarrow_python.so
     --exclude libarrow.so.1500
   # There's no python-casacore wheel for amd64-linux or macosx
-  # CIBW_TEST_EXTRAS: test
-  # CIBW_TEST_COMMAND: py.test -s -vvv --pyargs arcae
+  CIBW_TEST_COMMAND_LINUX: python -c "from arcae.testing import sanity; sanity()"
 
 linux_aarch64_task:
   name: Build linux amd64 ${PYTHON_VERSION_NAME} manylinux_2_28 wheel
@@ -45,10 +44,10 @@ linux_aarch64_task:
     - env:
         PYTHON_VERSION_NAME: python 3.11
         CIBW_BUILD: cp311-manylinux*
-      only_if: $CIRRUS_BRANCH == 'main'
     - env:
         PYTHON_VERSION_NAME: python 3.12
         CIBW_BUILD: cp312-manylinux*
+      only_if: $CIRRUS_BRANCH == 'main'
   env:
     # Run the container in host mode so that vcpkg has access to the Cirrus CI cache
     CIBW_CONTAINER_ENGINE: "docker; create_args: --network=host"

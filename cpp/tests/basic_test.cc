@@ -1,11 +1,13 @@
-#include <iostream>
-
 #include <arcae/safe_table_proxy.h>
-#include <tests/test_utils.h>
+
 #include <arrow/testing/gtest_util.h>
+
 #include <casacore/tables/Tables.h>
 #include <casacore/ms/MeasurementSets/MeasurementSet.h>
+
 #include <gtest/gtest.h>
+
+#include <tests/test_utils.h>
 
 using namespace std::string_literals;
 
@@ -31,4 +33,13 @@ class BasicTableTests : public ::testing::Test {
 TEST_F(BasicTableTests, CasaTable) {
   ASSERT_TRUE(table_proxy_);
   ASSERT_EQ(table_proxy_->nRow(), 100);
+}
+
+
+TEST_F(BasicTableTests, RunFunctor) {
+  auto nrows = table_proxy_->run([](casacore::TableProxy & proxy) {
+    return arrow::Result(proxy.table().nrow());
+  });
+
+  EXPECT_EQ(nrows, 100);
 }

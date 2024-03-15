@@ -2,57 +2,24 @@
 
 #include <casacore/tables/Tables.h>
 
-#include "arcae/column_convert_visitor.h"
+#include "arcae/column_read_visitor.h"
 #include "arcae/complex_type.h"
+#include "arcae/service_locator.h"
 
 using ::arrow::DataType;
 using ::arrow::Buffer;
 using ::arrow::Result;
-using ::arrow::Status;
 
 namespace arcae {
 
-ColumnConvertVisitor::ColumnConvertVisitor(
-    const casacore::TableColumn & column,
-    casacore::uInt startrow,
-    casacore::uInt nrow,
-    arrow::MemoryPool * pool)
-    : column_(column),
-      startrow_(startrow),
-      nrow_(nrow),
-      endrow_(startrow + nrow),
-      column_desc_(column.columnDesc()),
-      pool_(pool) {
-
-    assert(endrow_ <= column.nrow());
-}
-
-
-Status ColumnConvertVisitor::ValidateArray(const std::shared_ptr<arrow::Array> & array) {
-    auto & config = ServiceLocator::configuration();
-    auto validation_level = config.GetDefault("validation-level", "basic");
-
-    if(validation_level == "basic") {
-        return array->Validate();
-    } else if(validation_level == "full") {
-        return array->ValidateFull();
-    } else if(validation_level == "none") {
-        return Status::OK();
-    } else {
-        ARROW_LOG(WARNING) << "Invalid validation-level=" << validation_level
-                            << ". No array construction validation will be performed";
-        return Status::OK();
-    }
-}
-
 
 Result<std::shared_ptr<arrow::Array>>
-ColumnConvertVisitor::MakeArrowPrimitiveArray(
+ColumnReadVisitor::MakeArrowPrimitiveArray(
         const std::shared_ptr<Buffer> & buffer,
         casacore::uInt nelements,
         const std::shared_ptr<DataType> & arrow_dtype) {
 
-    if(auto complex_dtype = std::dynamic_pointer_cast<ComplexType>(arrow_dtype)) {
+    if(auto complex_dtype = std::dynamic_pointer_cast<ComplexType>(arrow_dtype); complex_dtype) {
         auto child_array = std::make_shared<arrow::PrimitiveArray>(
             complex_dtype->value_type(), 2*nelements, buffer);
 
@@ -85,69 +52,75 @@ ColumnConvertVisitor::MakeArrowPrimitiveArray(
     }
 }
 
-arrow::Status ColumnConvertVisitor::VisitTpBool() {
+
+arrow::Status ColumnReadVisitor::Visit() {
+    return CasaTypeVisitor::Visit(map_.get().column_.get().columnDesc().dataType());
+}
+
+
+arrow::Status ColumnReadVisitor::VisitTpBool() {
     // TODO(sjperkins)
     // Looks like casacore bool is actually a char, improve this
     return this->ConvertColumn<casacore::Bool>(arrow::uint8());
 }
 
-arrow::Status ColumnConvertVisitor::VisitTpChar() {
+arrow::Status ColumnReadVisitor::VisitTpChar() {
     return this->ConvertColumn<casacore::Char>(arrow::int8());
 }
 
-arrow::Status ColumnConvertVisitor::VisitTpUChar() {
+arrow::Status ColumnReadVisitor::VisitTpUChar() {
     return this->ConvertColumn<casacore::uChar>(arrow::uint8());
 }
 
-arrow::Status ColumnConvertVisitor::VisitTpShort() {
+arrow::Status ColumnReadVisitor::VisitTpShort() {
     return this->ConvertColumn<casacore::Short>(arrow::int16());
 }
 
-arrow::Status ColumnConvertVisitor::VisitTpUShort() {
+arrow::Status ColumnReadVisitor::VisitTpUShort() {
     return this->ConvertColumn<casacore::uShort>(arrow::uint16());
 }
 
-arrow::Status ColumnConvertVisitor::VisitTpInt() {
+arrow::Status ColumnReadVisitor::VisitTpInt() {
     return this->ConvertColumn<casacore::Int>(arrow::int32());
 }
 
-arrow::Status ColumnConvertVisitor::VisitTpUInt() {
+arrow::Status ColumnReadVisitor::VisitTpUInt() {
     return this->ConvertColumn<casacore::uInt>(arrow::uint32());
 }
 
-arrow::Status ColumnConvertVisitor::VisitTpInt64() {
+arrow::Status ColumnReadVisitor::VisitTpInt64() {
     return this->ConvertColumn<casacore::Int64>(arrow::int64());
 }
 
-arrow::Status ColumnConvertVisitor::VisitTpFloat() {
+arrow::Status ColumnReadVisitor::VisitTpFloat() {
     return this->ConvertColumn<casacore::Float>(arrow::float32());
 }
 
-arrow::Status ColumnConvertVisitor::VisitTpDouble() {
+arrow::Status ColumnReadVisitor::VisitTpDouble() {
     return this->ConvertColumn<casacore::Double>(arrow::float64());
 }
 
-arrow::Status ColumnConvertVisitor::VisitTpComplex() {
+arrow::Status ColumnReadVisitor::VisitTpComplex() {
     return this->ConvertColumn<casacore::Complex>(complex64());
 }
 
-arrow::Status ColumnConvertVisitor::VisitTpDComplex() {
+arrow::Status ColumnReadVisitor::VisitTpDComplex() {
     return this->ConvertColumn<casacore::DComplex>(complex128());
 }
 
-arrow::Status ColumnConvertVisitor::VisitTpString() {
+arrow::Status ColumnReadVisitor::VisitTpString() {
     return this->ConvertColumn<casacore::String>(arrow::utf8());
 }
 
-arrow::Status ColumnConvertVisitor::VisitTpQuantity() {
+arrow::Status ColumnReadVisitor::VisitTpQuantity() {
     return arrow::Status::NotImplemented("TpQuantity");
 }
 
-arrow::Status ColumnConvertVisitor::VisitTpRecord() {
+arrow::Status ColumnReadVisitor::VisitTpRecord() {
     return arrow::Status::NotImplemented("TpRecord");
 }
 
-arrow::Status ColumnConvertVisitor::VisitTpTable() {
+arrow::Status ColumnReadVisitor::VisitTpTable() {
     return arrow::Status::NotImplemented("TpTable");
 }
 

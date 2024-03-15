@@ -39,23 +39,21 @@ def test_column_selection(column_case_table):
         ]
 
     with arcae.table(column_case_table) as T:
-        assert sorted(T.to_arrow(0, 1).column_names) == [
+        assert sorted(T.to_arrow([[0, 1]]).column_names) == [
             "FIXED",
             "FIXED_STRING",
             "SCALAR",
             "SCALAR_STRING",
-            # When retrieving a single row, we can get values from an unconstrained column
-            "UNCONSTRAINED",
             "UNCONSTRAINED_SAME_NDIM",
             "VARIABLE",
             "VARIABLE_STRING"
         ]
 
     with arcae.table(column_case_table) as T:
-        assert sorted(T.to_arrow(0, 1, "VARIABLE").column_names) == ["VARIABLE"]
+        assert sorted(T.to_arrow([[0, 1]], "VARIABLE").column_names) == ["VARIABLE"]
 
     with arcae.table(column_case_table) as T:
-        assert sorted(T.to_arrow(0, 1, ["VARIABLE", "FIXED"]).column_names) == ["FIXED", "VARIABLE"]
+        assert sorted(T.to_arrow([[0, 1]], ["VARIABLE", "FIXED"]).column_names) == ["FIXED", "VARIABLE"]
 
 
 def test_column_cases(column_case_table, capfd):
@@ -115,10 +113,72 @@ def test_complex_cases(complex_case_table):
         assert T.column("COMPLEX").type == pa.list_(pa.list_(pa.list_(pa.float64())))
 
 
+def test_unordered_select_roundtrip(tmp_path):
+    """ Tests writing and reading using indexing """
+    from arcae.lib.arrow_tables import ms_descriptor
+    from arcae.lib.arrow_tables import Table
+
+    ms = str(tmp_path / "unorded_select.ms")
+    table_desc = ms_descriptor("MAIN", complete=False)
+
+    table_desc["DATA"] = {
+        "comment": "Antenna number",
+        "dataManagerGroup": "StandardStMan",
+        "dataManagerType": "StandardStMan",
+        "keywords": {},
+        "ndim": 2,
+        "shape": [3, 3],
+        "maxlen": 0,
+        "option": 0,
+        "valueType": "float",
+    }
+
+    with Table.ms_from_descriptor(ms, table_desc=table_desc) as T:
+        T.addrows(3)
+        zeros = np.zeros((3, 3, 3), dtype=np.float32)
+        T.putcol("DATA", np.arange(3*3*3, dtype=np.float32).reshape(3, 3, 3))
+
+        assert_array_equal(T.getcol("DATA"), [
+            [[0, 1, 2], [3, 4, 5], [6, 7, 8]],
+            [[9, 10, 11], [12, 13, 14], [15, 16, 17]],
+            [[18, 19, 20], [21, 22, 23], [24, 25, 26]],
+        ])
+
+        index = (np.array([2, 0]), np.array([2, 0]), np.array([2, 0]))
+        expected = np.array([
+            [[26, 24], [20, 18]],
+            [[8, 6], [2, 0]]], np.float32)
+        assert_array_equal(T.getcol("DATA", index=index), expected)
+
+        T.putcol("DATA", zeros)
+        assert_array_equal(T.getcol("DATA"), 0)
+
+        T.putcol("DATA", expected, index=index)
+        assert_array_equal(T.getcol("DATA"), [
+            [[0, 0, 2], [0, 0, 0], [6, 0, 8]],
+            [[0, 0, 0], [0, 0, 0], [0, 0, 0]],
+            [[18, 0, 20], [0, 0, 0], [24, 0, 26]],
+        ])
+
+        T.putcol("DATA", zeros)
+        assert_array_equal(T.getcol("DATA"), 0)
+
+        index = (np.array([0, 2]),)*3
+        T.putcol("DATA", expected, index=index)
+        assert_array_equal(T.getcol("DATA"), [
+            [[26, 0, 24], [0, 0, 0], [20, 0, 18]],
+            [[0, 0, 0], [0, 0, 0], [0, 0, 0]],
+            [[8, 0, 6], [0, 0, 0], [2, 0, 0]],
+        ])
+
 def test_getcol(getcol_table):
-    T = arcae.table(getcol_table)
+    T = arcae.table(getcol_table, readonly=False)
 
     assert_array_equal(T.getcol("TIME"), [0, 1, 2])
+    assert_array_equal(T.getcol("TIME", (slice(0, 2),)), [0, 1])
+    assert_array_equal(T.getcol("TIME", (np.array([0, 1]),)), [0, 1])
+    assert_array_equal(T.getcol("TIME", (np.array([2, 0]),)), [2, 0])
+    assert_array_equal(T.getcol("TIME", (np.array([0, 2]),)), [0, 2])
     assert_array_equal(T.getcol("STRING"), ["0", "1", "2"])
 
     assert_array_equal(T.getcol("FLOAT_DATA"), [
@@ -126,27 +186,52 @@ def test_getcol(getcol_table):
         [[1, 1, 1, 1], [1, 1, 1, 1]],
         [[2, 2, 2, 2], [2, 2, 2, 2]]])
 
-    assert_array_equal(T.getcol("NESTED_STRING"), [
-        [["0", "0", "0", "0"], ["0", "0", "0", "0"]],
-        [["1", "1", "1", "1"], ["1", "1", "1", "1"]],
-        [["2", "2", "2", "2"], ["2", "2", "2", "2"]]])
+    assert_array_equal(T.getcol("FLOAT_DATA",
+        (slice(0, 2), slice(0, 2))), [
+            [[0, 0, 0, 0], [0, 0, 0, 0]],
+            [[1, 1, 1, 1], [1, 1, 1, 1]]])
 
-    assert_array_equal(T.getcol("COMPLEX_DATA"), [
-        [[0 + 0j, 0 + 0j, 0 + 0j, 0 + 0j], [0 + 0j, 0 + 0j, 0 + 0j, 0 + 0j]],
-        [[1 + 1j, 1 + 1j, 1 + 1j, 1 + 1j], [1 + 1j, 1 + 1j, 1 + 1j, 1 + 1j]],
-        [[2 + 2j, 2 + 2j, 2 + 2j, 2 + 2j], [2 + 2j, 2 + 2j, 2 + 2j, 2 + 2j]]])
+    assert_array_equal(T.getcol("FLOAT_DATA",
+            (np.array([0, 1]), np.array([0, 1]), np.array([0, 1]))), [
+                [[0, 0], [0, 0]],
+                [[1, 1], [1, 1]]])
 
+    # Test partial round-trip
+    index = (np.array([0, 1]), np.array([0, 1]), np.array([0, 1]))
+    float_data = np.array([
+        [[2, 3], [4, 5]],
+        [[9, 8], [7, 6]]], np.float32)
 
-    for r in range(0, T.nrow(), 2):
-        assert_array_equal(
-            T.getcol("COMPLEX_DATA", startrow=r, nrow=1),
-            [[[r + r*1j]*4]*2])
+    T.putcol("FLOAT_DATA", float_data + 1, index)
+    assert_array_equal(T.getcol("FLOAT_DATA", index), float_data + 1)
+
+    # Test complete round-trips
+    float_data = np.array([
+        [[3, 2, 1, 0], [3, 2, 1, 0]],
+        [[0, 1, 2, 3], [0, 1, 2, 3]],
+        [[2, 2, 2, 2], [2, 2, 2, 2]]], np.float32)
+
+    complex_data = np.array([
+        [[3 + 3j, 2 + 2j, 1 + 1j, 0 + 0j], [3 + 3j, 2 + 2j, 1 + 1j, 0 + 0j]],
+        [[0 + 0j, 1 + 1j, 2 + 2j, 3 + 3j], [0 + 0j, 1 + 1j, 2 + 2j, 3 + 3j]],
+        [[2 + 2j, 2 + 2j, 2 + 2j, 2 + 2j], [2 + 2j, 2 + 2j, 2 + 2j, 2 + 2j]]], np.complex128)
+
+    T.putcol("FLOAT_DATA", float_data + 1)
+    assert_array_equal(T.getcol("FLOAT_DATA"), float_data + 1)
+
+    T.putcol("COMPLEX_DATA", complex_data + 1 + 1j)
+    assert_array_equal(T.getcol("COMPLEX_DATA"), complex_data + 1 + 1j)
+
+    for r in range(T.nrow()):
+        row_data = T.getcol("VARDATA", index=(slice(r, r + 1),))
+        assert_array_equal(row_data, np.full((1, r + 1, r + 1), r))
 
     with pytest.raises(TypeError, match="variably shaped column VARDATA"):
         T.getcol("VARDATA")
 
     with pytest.raises(pa.lib.ArrowException, match="NONEXISTENT does not exist"):
         T.getcol("NONEXISTENT")
+
 
 def test_partial_read(sorting_table):
     """ Tests that partial reads work """
@@ -158,7 +243,7 @@ def test_partial_read(sorting_table):
     start = 0
 
     for nrow in nrows:
-        assert full.take(list(range(start, start + nrow))) == T.to_arrow(start, nrow)
+        assert full.take(list(range(start, start + nrow))) == T.to_arrow([slice(start, start+nrow)])
         start += nrow
 
 def test_table_taql(sorting_table):
