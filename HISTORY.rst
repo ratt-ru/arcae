@@ -4,7 +4,8 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
-* Enable dependabot versoin updates (:pr:`84`)
+* Configure dependabot (:pr:`85`)
+* Enable dependabot version updates (:pr:`84`)
 * Upgrade to cibuildwheel 2.17 (:pr:`83`)
 * Upgrade to pyarrow 15.0.0 (:pr:`76`)
 * Build linux arm64 and macos arm64/x86_64 wheels (:pr:`76`)
