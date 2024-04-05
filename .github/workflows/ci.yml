@@ -22,7 +22,10 @@ env:
     export LDFLAGS="-L/opt/homebrew/opt/llvm/lib"
     export CPPFLAGS="-I/opt/homebrew/opt/llvm/include"
   CIBW_MANYLINUX_X86_64_IMAGE: quay.io/pypa/manylinux_2_28_x86_64
-  CIBW_TEST_EXTRAS: applications,test
+  CIBW_TEST_EXTRAS_LINUX: applications,test
+  CIBW_TEST_COMMAND_LINUX: py.test -s -vvv --pyargs arcae
+  CIBW_TEST_COMMAND_MACOS: python -c "from arcae.testing import sanity; sanity()"
+
   HOST_PYTHON_VERSION: "3.10"
   VCPKG_INSTALLED_DIR: /tmp/vcpkg_installed
   ARTIFACT_NAME: wheel
@@ -122,7 +125,7 @@ jobs:
           - is_main: false
             cpython: cp310
           - is_main: false
-            cpython: cp311
+            cpython: cp312
         include:
           - os: ubuntu-22.04
             os_short: linux
@@ -139,7 +142,6 @@ jobs:
             arch: "arm64"
             triplet: "arm64-osx-dynamic-cxx17-abi1-rel"
             extra_build: "macosx_arm64"
-          - cpython: cp312
     steps:
       - name: Set up Python ${{ env.HOST_PYTHON_VERSION }}
         uses: actions/setup-python@v5
@@ -190,7 +192,6 @@ jobs:
               --exclude libarrow_python.dylib \
               --exclude libarrow.1500.dylib \
               --ignore-missing-dependencies
-          CIBW_TEST_COMMAND_LINUX: py.test -s -vvv --pyargs arcae
 
       - name: Upload wheel artifacts
         uses: actions/upload-artifact@v4

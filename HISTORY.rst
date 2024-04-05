@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Support complex indexing (:pr:`65`)
 * Configure dependabot (:pr:`85`)
 * Enable dependabot version updates (:pr:`84`)
 * Upgrade to cibuildwheel 2.17 (:pr:`83`)

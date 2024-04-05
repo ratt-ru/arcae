@@ -12,6 +12,21 @@ from pyarrow.includes.libarrow cimport *
 cdef extern from "<climits>" nogil:
     cdef unsigned int UINT_MAX
 
+cdef extern from "<casacore/casa/aipsxtype.h>" namespace "casacore" nogil:
+    ctypedef unsigned long long uInt64
+    ctypedef uInt64 rownr_t
+
+cdef extern from "<absl/types/span.h>" namespace "absl" nogil:
+    cdef cppclass Span[T]:
+        Span() except +
+        Span(T * array, size_t length) except +
+        Span(Span&) except +
+        size()
+
+cdef extern from "arcae/base_column_map.h" namespace "arcae" nogil:
+    ctypedef int64_t RowId
+    ctypedef Span[RowId] RowIds
+    ctypedef vector[RowIds] ColumnSelection
 
 cdef extern from "arcae/service_locator.h" namespace "arcae" nogil:
     cdef cppclass CServiceLocator" arcae::ServiceLocator":
@@ -34,8 +49,9 @@ cdef extern from "arcae/safe_table_proxy.h" namespace "arcae" nogil:
         @staticmethod
         CResult[bool] Close" SafeTableProxy::Close"()
 
-        CResult[shared_ptr[CTable]] ToArrow " SafeTableProxy::ToArrow"(unsigned int startrow, unsigned int nrow, const vector[string] & columns)
-        CResult[shared_ptr[CArray]] GetColumn " SafeTableProxy::GetColumn"(const string & column, unsigned int startrow, unsigned int nrow)
+        CResult[shared_ptr[CTable]] ToArrow " SafeTableProxy::ToArrow"( const ColumnSelection & selection, const vector[string] & columns)
+        CResult[shared_ptr[CArray]] GetColumn " SafeTableProxy::GetColumn"(const string & column, const ColumnSelection & selection)
+        CResult[bool] PutColumn " SafeTableProxy::PutColumn"(const string & column, const ColumnSelection & selection, const shared_ptr[CArray] & data)
         CResult[string] GetTableDescriptor " SafeTableProxy::GetTableDescriptor"()
         CResult[string] GetColumnDescriptor "SafeTableProxy::GetColumnDescriptor"(const string & column)
         CResult[unsigned int] nRow " SafeTableProxy::nRow"()
@@ -47,7 +63,8 @@ cdef extern from "arcae/safe_table_proxy.h" namespace "arcae" nogil:
 
 cdef extern from "arcae/table_factory.h" namespace "arcae" nogil:
     cdef CResult[shared_ptr[CCasaTable]] COpenTable" arcae::OpenTable"(
-                                                    const string & filename)
+                                                    const string & filename,
+                                                    bool readonly)
     cdef CResult[shared_ptr[CCasaTable]] CDefaultMS" arcae::DefaultMS"(
                                                     const string & name,
                                                     const string & subtable,

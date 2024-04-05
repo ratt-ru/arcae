@@ -17,9 +17,9 @@
 
 #include <casacore/casa/Json.h>
 #include <casacore/casa/Json/JsonKVMap.h>
+#include <casacore/casa/Json/JsonParser.h>
 #include <casacore/casa/Containers/RecordInterface.h>
 #include <casacore/ms/MeasurementSets/MeasurementSet.h>
-#include <casacore/tables/Tables/TableError.h>
 #include <casacore/tables/Tables/TableRecord.h>
 #include <casacore/tables/Tables/TableDesc.h>
 #include <casacore/tables/Tables/TableProxy.h>
@@ -29,9 +29,7 @@
 
 
 using ::arrow::Result;
-using ::arrow::Status;
 
-using ::casacore::JsonKVMap;
 using ::casacore::JsonParser;
 using ::casacore::JsonOut;
 using ::casacore::String;
@@ -42,7 +40,6 @@ using ::casacore::SetupNewTable;
 using ::casacore::Record;
 using ::casacore::RecordInterface;
 using ::casacore::TableProxy;
-using ::casacore::TableError;
 using ::casacore::Table;
 
 using ::casacore::MeasurementSet;
@@ -174,10 +171,6 @@ std::string RecordToJson(const Record & record) {
 
     record_json.end();
     return json_oss.str();
-}
-
-Record JsonToRecord(const std::string & json_record) {
-    return JsonParser::parse(json_record).toRecord();
 }
 
 

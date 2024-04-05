@@ -373,6 +373,16 @@ def generate_getcol_table(path):
         {
             "desc": {
                 "_c_order": True,
+                "comment": "FLAG column",
+                "ndim": 2,
+                "option": 0,
+                "valueType": "boolean",
+            },
+            "name": "FLAG",
+        },
+        {
+            "desc": {
+                "_c_order": True,
                 "comment": "TIME column",
                 "option": 0,
                 "valueType": "double",
@@ -409,10 +419,11 @@ def generate_getcol_table(path):
         for i in range(nrow):
             T.putcell("COMPLEX_DATA", i, np.full((2, 4), i + i*1j))
             T.putcell("FLOAT_DATA", i, np.full((2, 4), i))
-            T.putcell("VARDATA", i, np.full((2, i + 1), i))
+            T.putcell("VARDATA", i, np.full((i + 1, i + 1), i))
             T.putcell("TIME", i, i)
             T.putcell("STRING", i, str(i))
             T.putcell("NESTED_STRING", i, {"shape": (2, 4), "array": [str(i)] * 2 * 4})
+            T.putcell("FLAG", i, np.full((2, 4), (i % 2) != 1))
 
     return table_name
 

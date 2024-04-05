@@ -52,8 +52,8 @@ project(arcae CXX)
 include(FindPyArrow)
 include(CTest)
 
-
 include_directories(cpp)
+add_compile_options("-D_GLIBCXX_USE_CXX11_ABI=1")
 add_subdirectory(cpp)
 
 if(SKBUILD)

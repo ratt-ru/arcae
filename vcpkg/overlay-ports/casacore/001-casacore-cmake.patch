@@ -563,3 +563,16 @@ index 452e33cd3..bb46a0dba 100644
  };
  
  
+diff --git a/tables/Tables/TableProxy.cc b/tables/Tables/TableProxy.cc
+index 66865e52d..1fda76d1c 100644
+--- a/tables/Tables/TableProxy.cc
++++ b/tables/Tables/TableProxy.cc
+@@ -3405,6 +3405,8 @@ TableLock TableProxy::makeLockOptions (const Record& options)
+     opt = TableLock::PermanentLocking;
+   } else if (str == "permanentwait") {
+     opt = TableLock::PermanentLockingWait;
++  } else if (str == "nolock") {
++    opt = TableLock::NoLocking;
+   } else {
+     throw TableError ("'" + str + "' is an unknown lock option; valid are "
+ 		      "default,auto,autonoread,user,usernoread,permanent,"

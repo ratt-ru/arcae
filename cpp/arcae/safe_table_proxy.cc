@@ -2,30 +2,47 @@
 #include <sstream>
 
 #include <arrow/util/logging.h>  // IWYU pragma: keep
+#include <arrow/result.h>
+#include <arrow/status.h>
 
 #include <casacore/casa/Json.h>
+#include <casacore/tables/Tables/TableColumn.h>
 #include <casacore/tables/Tables/TableIterProxy.h>
 
 #include "arcae/safe_table_proxy.h"
+#include "arcae/base_column_map.h"
+#include "arcae/column_read_map.h"
+#include "arcae/column_read_visitor.h"
+#include "arcae/column_write_map.h"
+#include "arcae/column_write_visitor.h"
 
 
-using ::arrow::DataType;
-using ::arrow::Buffer;
-using ::arrow::Future;
 using ::arrow::Result;
 using ::arrow::Status;
 
 using ::casacore::Record;
-using ::casacore::Table;
 using ::casacore::TableColumn;
 using ::casacore::TableIterProxy;
-using ::casacore::TableLock;
 using ::casacore::TableProxy;
 
 namespace arcae {
 namespace {
 // https://stackoverflow.com/a/25069711
 struct enable_make_shared_stp : public SafeTableProxy {};
+
+Status FailIfClosed(const SafeTableProxy & proxy) {
+    if(!proxy.IsClosed()) return Status::OK();
+    return Status::Invalid("Table is closed");
+};
+
+
+Status FailIfColumnDoesntExist(const casacore::Table & table, const std::string & column) {
+    if(!table.tableDesc().isColumn(column)) {
+        return Status::Invalid("Column ", column, " does not exist");
+    }
+    return Status::OK();
+}
+
 } // namespace
 
 
@@ -42,11 +59,11 @@ SafeTableProxy::ClampRows(const casacore::Table & table, casacore::uInt startrow
     return {startrow, nrow};
 }
 
-arrow::Result<std::string>
+Result<std::string>
 SafeTableProxy::GetTableDescriptor() const {
-    ARROW_RETURN_NOT_OK(FailIfClosed());
+    ARROW_RETURN_NOT_OK(FailIfClosed(*this));
 
-    return run_isolated([this]() -> arrow::Result<std::string> {
+    return run_isolated([this]() -> Result<std::string> {
         std::ostringstream json_oss;
         casacore::JsonOut table_json(json_oss);
 
@@ -58,17 +75,12 @@ SafeTableProxy::GetTableDescriptor() const {
     });
 }
 
-arrow::Result<std::string>
+Result<std::string>
 SafeTableProxy::GetColumnDescriptor(const std::string & column) const {
-    ARROW_RETURN_NOT_OK(FailIfClosed());
+    ARROW_RETURN_NOT_OK(FailIfClosed(*this));
 
-    return run_isolated([this, &column]() -> arrow::Result<std::string> {
-        const auto & table_desc = this->table_proxy->table().tableDesc();
-
-        if(!table_desc.isColumn(column)) {
-            return arrow::Status::UnknownError(column, " does not exist");
-        }
-
+    return run_isolated([this, &column]() -> Result<std::string> {
+        ARROW_RETURN_NOT_OK(FailIfColumnDoesntExist(this->table_proxy->table(), column));
         std::ostringstream json_oss;
         casacore::JsonOut column_json(json_oss);
 
@@ -81,36 +93,47 @@ SafeTableProxy::GetColumnDescriptor(const std::string & column) const {
 }
 
 
-arrow::Result<std::shared_ptr<arrow::Array>>
-SafeTableProxy::GetColumn(const std::string & column, casacore::uInt startrow, casacore::uInt nrow) const {
-    ARROW_RETURN_NOT_OK(FailIfClosed());
+Result<std::shared_ptr<arrow::Array>>
+SafeTableProxy::GetColumn(const std::string & column, const ColumnSelection & selection) const {
+    ARROW_RETURN_NOT_OK(FailIfClosed(*this));
 
-    return run_isolated([this, &column, startrow, nrow]() -> arrow::Result<std::shared_ptr<arrow::Array>> {
+    return run_isolated([this, &column, &selection]() -> Result<std::shared_ptr<arrow::Array>> {
         auto & casa_table = this->table_proxy->table();
-
-        if(!casa_table.tableDesc().isColumn(column)) {
-            return arrow::Status::UnknownError(column, " does not exist");
-        }
+        ARROW_RETURN_NOT_OK(FailIfColumnDoesntExist(casa_table, column));
 
         auto table_column = TableColumn(casa_table, column);
-        const auto & column_desc = table_column.columnDesc();
-        auto [start_row, n_row] = ClampRows(casa_table, startrow, nrow);
-        auto visitor = ColumnConvertVisitor(table_column, start_row, n_row);
-        auto visit_status = visitor.Visit(column_desc.dataType());
-        ARROW_RETURN_NOT_OK(visit_status);
+        ARROW_ASSIGN_OR_RAISE(auto map, ColumnReadMap::Make(table_column, selection));
+        auto visitor = ColumnReadVisitor(map);
+        ARROW_RETURN_NOT_OK(visitor.Visit());
         return std::move(visitor.array_);
     });
 }
 
-arrow::Result<std::shared_ptr<arrow::Table>>
-SafeTableProxy::ToArrow(casacore::uInt startrow, casacore::uInt nrow, const std::vector<std::string> & columns) const {
-    ARROW_RETURN_NOT_OK(FailIfClosed());
+Result<bool>
+SafeTableProxy::PutColumn(const std::string & column,
+                          const ColumnSelection & selection,
+                          const std::shared_ptr<arrow::Array> & data) const {
+    ARROW_RETURN_NOT_OK(FailIfClosed(*this));
 
-    return run_isolated([this, startrow, nrow, &columns]() -> arrow::Result<std::shared_ptr<arrow::Table>> {
+    return run_isolated([this, &column, &selection, &data]() -> Result<bool> {
+        auto & casa_table = this->table_proxy->table();
+        ARROW_RETURN_NOT_OK(FailIfColumnDoesntExist(casa_table, column));
+        auto table_column = TableColumn(casa_table, column);
+        ARROW_ASSIGN_OR_RAISE(auto map, ColumnWriteMap::Make(table_column, selection, data))
+        auto visitor = ColumnWriteVisitor(map);
+        ARROW_RETURN_NOT_OK(visitor.Visit());
+        return true;
+    });
+}
+
+Result<std::shared_ptr<arrow::Table>>
+SafeTableProxy::ToArrow(const ColumnSelection & selection, const std::vector<std::string> & columns) const {
+    ARROW_RETURN_NOT_OK(FailIfClosed(*this));
+
+    return run_isolated([this, &selection, &columns]() -> Result<std::shared_ptr<arrow::Table>> {
         const auto & casa_table = this->table_proxy->table();
         const auto & table_desc = casa_table.tableDesc();
         auto column_names = columns.size() == 0 ? table_desc.columnNames() : casacore::Vector<casacore::String>(columns);
-        auto [start_row, n_row] = ClampRows(casa_table, startrow, nrow);
         auto fields = arrow::FieldVector();
         auto arrays = arrow::ArrayVector();
 
@@ -124,8 +147,16 @@ SafeTableProxy::ToArrow(casacore::uInt startrow, casacore::uInt nrow, const std:
 
             auto table_column = TableColumn(casa_table, column_name);
             auto column_desc = table_column.columnDesc();
-            auto visitor = ColumnConvertVisitor(table_column, start_row, n_row);
-            auto visit_status = visitor.Visit(column_desc.dataType());
+            auto map_result = ColumnReadMap::Make(table_column, selection);
+
+            if(!map_result.ok()) {
+                ARROW_LOG(WARNING)
+                    << "Ignoring " << column_name << " " << map_result.status();
+                    continue;
+            }
+
+            auto visitor = ColumnReadVisitor(map_result.ValueOrDie());
+            auto visit_status = visitor.Visit();
 
             if(!visit_status.ok()) {
                 ARROW_LOG(WARNING)
@@ -168,7 +199,7 @@ SafeTableProxy::ToArrow(casacore::uInt startrow, casacore::uInt nrow, const std:
             {ARCAE_METADATA}, {json_oss.str()});
 
         auto schema = arrow::schema(fields, std::move(table_metadata));
-        auto table = arrow::Table::Make(std::move(schema), arrays, n_row);
+        auto table = arrow::Table::Make(std::move(schema), std::move(arrays));
         auto status = table->Validate();
 
         if(!status.ok()) {
@@ -182,7 +213,7 @@ SafeTableProxy::ToArrow(casacore::uInt startrow, casacore::uInt nrow, const std:
 
 Result<std::vector<std::string>>
 SafeTableProxy::Columns() const {
-    ARROW_RETURN_NOT_OK(FailIfClosed());
+    ARROW_RETURN_NOT_OK(FailIfClosed(*this));
 
     return run_isolated([this]() -> Result<std::vector<std::string>> {
         const auto& column_names = this->table_proxy->table().tableDesc().columnNames();
@@ -193,7 +224,7 @@ SafeTableProxy::Columns() const {
 
 Result<casacore::uInt>
 SafeTableProxy::nColumns() const {
-    ARROW_RETURN_NOT_OK(FailIfClosed());
+    ARROW_RETURN_NOT_OK(FailIfClosed(*this));
 
     return run_isolated([this]() -> Result<casacore::uInt> {
         return this->table_proxy->table().tableDesc().ncolumn();
@@ -202,7 +233,7 @@ SafeTableProxy::nColumns() const {
 
 Result<casacore::uInt>
 SafeTableProxy::nRow() const {
-    ARROW_RETURN_NOT_OK(FailIfClosed());
+    ARROW_RETURN_NOT_OK(FailIfClosed(*this));
 
     return run_isolated([this]() -> Result<casacore::uInt> {
         return this->table_proxy->table().nrow();
@@ -218,7 +249,7 @@ SafeTableProxy::Partition(
         return Status::Invalid("No partitioning columns provided");
     }
 
-    ARROW_RETURN_NOT_OK(FailIfClosed());
+    ARROW_RETURN_NOT_OK(FailIfClosed(*this));
 
     return run_isolated([this, &partition_columns, &sort_columns]() -> Result<std::vector<std::shared_ptr<SafeTableProxy>>> {
         casacore::Block<casacore::String> casa_sort_cols(sort_columns.size());
@@ -250,7 +281,7 @@ SafeTableProxy::Partition(
 
 Result<bool>
 SafeTableProxy::AddRows(casacore::uInt nrows) {
-    ARROW_RETURN_NOT_OK(FailIfClosed());
+    ARROW_RETURN_NOT_OK(FailIfClosed(*this));
 
     return run_isolated([this, nrows]() -> Result<bool> {
         this->table_proxy->addRow(nrows);

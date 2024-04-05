@@ -3,14 +3,15 @@
 
 #include <climits>
 #include <functional>
+#include <type_traits>
 
 #include <casacore/tables/Tables.h>
 #include <casacore/tables/Tables/TableProxy.h>
 
+#include <arrow/util/logging.h>
 #include <arrow/util/thread_pool.h>
 
-#include "arcae/column_convert_visitor.h"
-
+#include "arcae/base_column_map.h"
 
 namespace arcae {
 
@@ -25,12 +26,6 @@ private:
     std::shared_ptr<arrow::internal::ThreadPool> io_pool;
     bool is_closed;
 
-private:
-    inline arrow::Status FailIfClosed() const {
-        return is_closed ? arrow::Status::Invalid("Table is closed")
-                         : arrow::Status::OK();
-    };
-
 protected:
     SafeTableProxy() = default;
     SafeTableProxy(const SafeTableProxy & rhs) = delete;
@@ -41,13 +36,13 @@ protected:
     /// Run the given functor in the isolated Threadpool
     template <typename Fn>
     std::invoke_result_t<Fn> run_isolated(Fn && functor) {
-        return arrow::DeferNotOk(this->io_pool->Submit(std::move(functor))).result();
+        return arrow::DeferNotOk(this->io_pool->Submit(std::forward<Fn>(functor))).MoveResult();
     }
 
     /// Run the given functor in the isolated Threadpool
     template <typename Fn>
     std::invoke_result_t<Fn> run_isolated(Fn && functor) const {
-        return arrow::DeferNotOk(this->io_pool->Submit(std::move(functor))).result();
+        return arrow::DeferNotOk(this->io_pool->Submit(std::forward<Fn>(functor))).MoveResult();
     }
 
 public:
@@ -57,6 +52,27 @@ public:
             ARROW_LOG(WARNING) << "Error closing file " << result.status();
         }
     };
+
+    template <typename Fn,
+              typename = std::enable_if_t<
+                std::is_invocable_v<Fn, const casacore::TableProxy &>>>
+    std::invoke_result_t<Fn, const casacore::TableProxy &> run(Fn && functor) const {
+        return run_isolated([this, functor = std::forward<Fn>(functor)]() mutable {
+            return std::invoke(std::forward<Fn>(functor),
+                               static_cast<const casacore::TableProxy &>(*this->table_proxy));
+        });
+    }
+
+    template <typename Fn,
+              typename = std::enable_if_t<
+                std::is_invocable_v<Fn, casacore::TableProxy &>>>
+    std::invoke_result_t<Fn, casacore::TableProxy &> run(Fn && functor) {
+        return run_isolated([this, functor = std::forward<Fn>(functor)]() mutable {
+            return std::invoke(std::forward<Fn>(functor),
+                               static_cast<casacore::TableProxy &>(*this->table_proxy));
+        });
+    }
+
 
     template <typename Fn>
     static arrow::Result<std::shared_ptr<SafeTableProxy>> Make(Fn && functor) {
@@ -72,40 +88,25 @@ public:
         return proxy;
     }
 
-    template <typename Fn,
-              typename = std::enable_if_t<
-                std::is_invocable_v<Fn, const casacore::TableProxy &>>>
-    std::invoke_result_t<Fn, const casacore::TableProxy &> run(Fn && functor) const {
-        return run_isolated([this, functor = std::move(functor)]() mutable {
-            return std::invoke(std::forward<Fn>(functor),
-                               static_cast<const casacore::TableProxy &>(*this->table_proxy));
-        });
-    }
-
-    template <typename Fn,
-              typename = std::enable_if_t<
-                std::is_invocable_v<Fn, casacore::TableProxy &>>>
-    std::invoke_result_t<Fn, casacore::TableProxy &> run(Fn && functor) {
-        return run_isolated([this, functor = std::move(functor)]() mutable {
-            return std::invoke(std::forward<Fn>(functor),
-                               static_cast<casacore::TableProxy &>(*this->table_proxy));
-        });
-    }
-
     static std::tuple<casacore::uInt, casacore::uInt>
     ClampRows(const casacore::Table & table,
               casacore::uInt startrow,
               casacore::uInt nrow);
 
+    bool IsClosed() const { return is_closed; }
+
     arrow::Result<std::shared_ptr<arrow::Table>> ToArrow(
-        casacore::uInt startrow=0,
-        casacore::uInt nrow=UINT_MAX,
+        const ColumnSelection & selection={},
         const std::vector<std::string> & columns = {}) const;
 
     arrow::Result<std::shared_ptr<arrow::Array>> GetColumn(
         const std::string & column,
-        casacore::uInt startrow,
-        casacore::uInt nrow) const;
+        const ColumnSelection & selection) const;
+
+    arrow::Result<bool> PutColumn(
+        const std::string & column,
+        const ColumnSelection & selection,
+        const std::shared_ptr<arrow::Array> & data) const;
 
     arrow::Result<std::string> GetTableDescriptor() const;
     arrow::Result<std::string> GetColumnDescriptor(const std::string & column) const;
