@@ -221,19 +221,27 @@ cdef class Table:
 
         return pyarrow_wrap_table(ctable)
 
-    def getcol(self, column: str, index: FullIndex = None) -> np.ndarray:
-        cdef string cpp_column = tobytes(column)
-        cdef SelectionObj selobj = SelectionObj(index)
+    def getcol(self, column: str, index: Optional[FullIndex] = None, result: Optional[np.ndarray] = None) -> np.ndarray:
+        cdef:
+            string cpp_column = tobytes(column)
+            SelectionObj selobj = SelectionObj(index)
+            shared_ptr[CArray] cpp_result
 
-        carray = GetResultValue(self.c_table.get().GetColumn(cpp_column, selobj.selection))
+        if result is not None:
+            pa_result = self._numpy_to_arrow(result)
+            cpp_result = pyarrow_unwrap_array(pa_result)
+
+        carray = GetResultValue(self.c_table.get().GetColumn(cpp_column, selobj.selection, cpp_result))
         py_column = pyarrow_wrap_array(carray)
         return self._arrow_to_numpy(column, py_column)
 
 
-    def putcol(self, column: str, data: np.ndarray, index: FullIndex = None):
-        cdef string cpp_column = tobytes(column)
-        cdef SelectionObj selobj = SelectionObj(index)
-        cdef shared_ptr[CArray] carray = pyarrow_unwrap_array(self._numpy_to_arrow(data))
+    def putcol(self, column: str, data: np.ndarray, index: Optional[FullIndex] = None):
+        cdef:
+            string cpp_column = tobytes(column)
+            SelectionObj selobj = SelectionObj(index)
+            shared_ptr[CArray] carray = pyarrow_unwrap_array(self._numpy_to_arrow(data))
+
         return GetResultValue(self.c_table.get().PutColumn(cpp_column, selobj.selection, carray))
 
     def _numpy_to_arrow(self, data: np.ndarray) -> pa.array:

@@ -39,7 +39,7 @@ else
     exit 1
 fi
 
-export VCPKG_HOST_BINARY_CACHE=/tmp/vcpkg-cache
+export VCPKG_HOST_BINARY_CACHE=/home/simon/tmp/vcpkg-cache
 export VCPKG_INSTALLED_DIR=/project/vcpkg/installed
 export MANYLINUX_PLATFORM=manylinux_x86_64
 export CIBW_BUILD=$CPYTHON_VERSION-$MANYLINUX_PLATFORM

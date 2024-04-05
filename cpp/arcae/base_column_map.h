@@ -9,7 +9,7 @@
 
 #include <absl/types/span.h>
 
-#include <arrow/result.h>
+#include <arrow/api.h>
 
 #include <casacore/casa/aipsxtype.h>
 #include <casacore/casa/Arrays/IPosition.h>
@@ -24,6 +24,14 @@ using RowId = std::int64_t;
 using RowIds = absl::Span<const RowId>;
 using ColumnSelection = std::vector<RowIds>;
 
+struct ArrayProperties {
+  std::optional<casacore::IPosition> shape;
+  std::size_t ndim;
+  std::shared_ptr<arrow::DataType> data_type;
+  bool is_complex;
+};
+
+
 // Type indicating the ending of an iteration
 struct EndSentinel {};
 
@@ -34,15 +42,27 @@ struct EndSentinel {};
 // 3. Number of column dimensions
 //
 // A return of < 0 indicates a non-existent selection
-std::ptrdiff_t SelectDim(std::size_t dim, std::size_t sdims, std::size_t ndims);
-arrow::Status CheckSelectionAgainstShape(const casacore::IPosition & shape,
-                                         const ColumnSelection & selection);
+std::ptrdiff_t SelectDim(
+  std::size_t dim,
+  std::size_t sdims,
+  std::size_t ndims);
+
+// Validate the Selection against the supplied shape
+arrow::Status CheckSelectionAgainstShape(
+  const casacore::IPosition & shape,
+  const ColumnSelection & selection);
+
+
+arrow::Result<ArrayProperties> GetArrayProperties(
+  const casacore::TableColumn & column,
+  const ColumnSelection & selection,
+  const std::shared_ptr<arrow::Array> & data);
 
 
 // Describes a mapping between disk and memory
 struct IdMap {
-  casacore::rownr_t disk;
-  casacore::rownr_t mem;
+  RowId disk;
+  RowId mem;
 
   constexpr bool operator==(const IdMap & lhs) const
       { return disk == lhs.disk && mem == lhs.mem; }
@@ -54,15 +74,17 @@ using ColumnMaps = std::vector<ColumnMap>;
 
 // Describes a range along a dimension (end is exclusive)
 struct Range {
-  casacore::rownr_t start = 0;
-  casacore::rownr_t end = 0;
+  RowId start = 0;
+  RowId end = 0;
   enum Type {
     // Refers to a series of specific row ids
     MAP=0,
     // A contiguous range of row ids
     FREE,
     // Specifies a range whose size varies
-    VARYING
+    VARYING,
+    // Specifies an empty range
+    EMPTY,
   } type = FREE;
 
   // The size of the range
@@ -91,6 +113,16 @@ struct Range {
   // Is this a varying range
   constexpr bool IsVarying() const
     { return type == VARYING; }
+
+  // Is this an empty range
+  constexpr bool IsEmpty() const
+    { return type == EMPTY; }
+
+  constexpr bool TypesSimilar(const Range & lhs) const {
+    return type == lhs.type ||
+      (type == MAP && lhs.type == EMPTY) ||
+      (type == EMPTY || lhs.type == MAP);
+  }
 };
 
 // Vectors of ranges
@@ -358,14 +390,20 @@ RangeIterator<ColumnMapping> & RangeIterator<ColumnMapping>::operator++() {
     index_[dim]++;
     mem_start_[dim] += range_length_[dim];
 
+    const auto & dim_ranges = DimRanges(dim);
+
     // We've achieved a successful iteration in this dimension
-    if(index_[dim] < DimRanges(dim).size()) { break; }
+    if(index_[dim] < dim_ranges.size()) {
+      break;
     // We've exceeded the size of the current dimension
     // reset to zero and retry the while loop
-    else if(dim < RowDim()) { index_[dim] = 0; mem_start_[dim] = 0; ++dim; }
+    } else if(dim < RowDim()) {
+      index_[dim] = 0;
+      mem_start_[dim] = 0;
+      ++dim;
     // Row is the slowest changing dimension so we're done
     // return without updating the iterator state
-    else { done_ = true; return *this; }
+    } else { done_ = true; return *this; }
   }
 
   // Increment output memory buffer offset
@@ -383,6 +421,7 @@ void RangeIterator<ColumnMapping>::UpdateState() {
         range_length_[dim] = range.end - range.start;
         break;
       }
+      case Range::EMPTY:
       case Range::MAP: {
         const auto & dim_maps = DimMap(dim);
         assert(range.start < dim_maps.size());
@@ -546,8 +585,10 @@ bool BaseColumnMap<T>::IsSimple() const {
         case Range::FREE:
         case Range::VARYING:
           break;
+        // Both disk and memory indexes must
+        // monotonically increase in time
         case Range::MAP:
-          for(std::size_t i = range.start + 1; i < range.end; ++i) {
+          for(RowId i = range.start + 1; i < range.end; ++i) {
             if(column_map[i].mem - column_map[i-1].mem != 1) {
               return false;
             }
@@ -556,6 +597,10 @@ bool BaseColumnMap<T>::IsSimple() const {
             }
           }
           break;
+        // TODO(sjperkins)
+        // Revisit this
+        case Range::EMPTY:
+          return false;
       }
     }
   }
@@ -583,6 +628,7 @@ std::size_t BaseColumnMap<T>::nElements() const {
             break;
           case Range::FREE:
           case Range::MAP:
+          case Range::EMPTY:
             assert(range.IsValid());
             dim_elements += range.Size();
             break;
@@ -622,11 +668,9 @@ ColumnMaps MapFactory(const SP & shape_prov, const ColumnSelection & selection) 
       ColumnMap column_map;
       column_map.reserve(dim_ids.size());
 
-      for(auto [disk_it, mem] = std::tuple{std::begin(dim_ids), casacore::rownr_t{0}};
-          disk_it != std::end(dim_ids); ++disk_it) {
-            if(*disk_it >= 0) {
-              column_map.push_back({casacore::rownr_t(*disk_it), mem++});
-            }
+      for(auto [disk_it, mem] = std::tuple{std::begin(dim_ids), RowId{0}};
+          disk_it != std::end(dim_ids); ++disk_it, ++mem) {
+            column_map.push_back({*disk_it, mem});
       }
 
       std::sort(std::begin(column_map), std::end(column_map),
@@ -655,7 +699,7 @@ FixedRangeFactory(const SP & shape_prov, const ColumnMaps & maps) {
     // from the column shape
     if(dim >= maps.size() || maps[dim].size() == 0) {
       ARROW_ASSIGN_OR_RAISE(auto dim_size, shape_prov.DimSize(dim));
-      column_ranges.emplace_back(ColumnRange{Range{0, dim_size, Range::FREE}});
+      column_ranges.emplace_back(ColumnRange{Range{0, RowId(dim_size), Range::FREE}});
       continue;
     }
 
@@ -663,15 +707,21 @@ FixedRangeFactory(const SP & shape_prov, const ColumnMaps & maps) {
     // from contiguous segments
     const auto & column_map = maps[dim];
     auto column_range = ColumnRange{};
+
     auto current = Range{0, 1, Range::MAP};
 
     for(auto [i, prev, next] = std::tuple{
-            casacore::rownr_t{1},
+            RowId{1},
             std::begin(column_map),
             std::next(std::begin(column_map))};
         next != std::end(column_map); ++i, ++prev, ++next) {
 
-      if(next->disk - prev->disk == 1) {
+      if(next->disk < 0) {
+        current.end += 1;
+      } else if(prev->disk < 0) {
+        column_range.emplace_back(Range{current.start, current.end, Range::EMPTY});
+        current = Range{i, i + 1, Range::MAP};
+      } else if(next->disk - prev->disk == 1) {
         current.end += 1;
       } else {
         column_range.push_back(current);
@@ -689,8 +739,9 @@ FixedRangeFactory(const SP & shape_prov, const ColumnMaps & maps) {
   for(std::size_t dim=0; dim < ndim; ++dim) {
     const auto & column_range = column_ranges[dim];
     for(std::size_t r=1; r < column_range.size(); ++r) {
-      if(column_range[r].type != column_range[r - 1].type) {
-        return arrow::Status::NotImplemented("Heterogenous Column Ranges in a dimension");
+      if(!column_range[r].TypesSimilar(column_range[r - 1])) {
+        return arrow::Status::NotImplemented(
+          "Heterogenous Column Ranges in a dimension");
       }
     }
   }
@@ -728,7 +779,7 @@ VariableRangeFactory(const SP & shape_prov, const ColumnMaps & maps) {
     auto current = Range{0, 1, Range::MAP};
 
     for(auto [i, prev, next] = std::tuple{
-            casacore::rownr_t{1},
+            RowId{1},
             std::begin(column_map),
             std::next(std::begin(column_map))};
         next != std::end(column_map); ++i, ++prev, ++next) {
@@ -753,14 +804,14 @@ VariableRangeFactory(const SP & shape_prov, const ColumnMaps & maps) {
     // No maps provided, derive from shape
     ARROW_ASSIGN_OR_RAISE(auto dim_size, shape_prov.DimSize(row_dim));
     row_range.reserve(dim_size);
-    for(std::size_t r=0; r < dim_size; ++r) {
+    for(RowId r=0; r < RowId(dim_size); ++r) {
       row_range.emplace_back(Range{r, r + 1, Range::FREE});
     }
   } else {
     // Derive from mapping
     const auto & row_maps = maps[row_dim];
     row_range.reserve(row_maps.size());
-    for(std::size_t r=0; r < row_maps.size(); ++r) {
+    for(RowId r=0; r < RowId(row_maps.size()); ++r) {
       row_range.emplace_back(Range{r, r + 1, Range::MAP});
     }
   }

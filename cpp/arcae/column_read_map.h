@@ -10,6 +10,7 @@
 #include <arrow/api.h>
 #include <arrow/result.h>
 #include <arrow/status.h>
+
 #include <casacore/casa/aipsxtype.h>
 #include <casacore/casa/Arrays/IPosition.h>
 #include <casacore/tables/Tables/TableColumn.h>

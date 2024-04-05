@@ -181,6 +181,8 @@ def test_getcol(getcol_table):
     assert_array_equal(T.getcol("TIME", (np.array([0, 2]),)), [0, 2])
     assert_array_equal(T.getcol("STRING"), ["0", "1", "2"])
 
+    T.getcol("FLOAT_DATA", index=(), result=np.ones((10, 10, 10)))
+
     assert_array_equal(T.getcol("FLOAT_DATA"), [
         [[0, 0, 0, 0], [0, 0, 0, 0]],
         [[1, 1, 1, 1], [1, 1, 1, 1]],

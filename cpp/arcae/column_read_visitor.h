@@ -16,6 +16,7 @@
 #include "arcae/complex_type.h"
 #include "arcae/configuration.h"
 #include "arcae/service_locator.h"
+
 namespace arcae {
 
 class ColumnReadVisitor : public CasaTypeVisitor {
@@ -24,14 +25,16 @@ public:
 
 public:
     std::reference_wrapper<const ColumnReadMap> map_;
-    arrow::MemoryPool * pool_;
     std::shared_ptr<arrow::Array> array_;
+    arrow::MemoryPool * pool_;
 
 public:
     explicit ColumnReadVisitor(
         const ColumnReadMap & column_map,
+        std::shared_ptr<arrow::Array> result=nullptr,
         arrow::MemoryPool * pool=arrow::default_memory_pool()) :
             map_(std::cref(column_map)),
+            array_(result),
             pool_(pool) {};
     virtual ~ColumnReadVisitor() = default;
 
@@ -47,6 +50,13 @@ public:
     const casacore::TableColumn & GetTableColumn() const {
         return map_.get().column_.get();
     }
+
+    // std::shared_ptr<arrow::Buffer> MaybeGetBufferOrAllocate(std::size_t nelements, std::size_t type_size) const {
+    //     if(result) {
+
+    //     }
+
+    // }
 
     template <typename T>
     arrow::Status ReadScalarColumn(const std::shared_ptr<arrow::DataType> & arrow_dtype) {
@@ -194,6 +204,9 @@ public:
     template <typename T>
     arrow::Status ReadVariableColumn(const std::shared_ptr<arrow::DataType> & arrow_dtype) {
         auto column = casacore::ArrayColumn<T>(GetTableColumn());
+        // if(casacore::TableMeasDescBase::hasMeasures(GetTableColumn())) {
+        //     auto meas = casacore::TableMeasColumn(GetTableColumn().table(), GetTableColumn().columnDesc().name());
+        // }
         column.setMaximumCacheSize(1);
 
         if constexpr(std::is_same_v<T, casacore::String>) {

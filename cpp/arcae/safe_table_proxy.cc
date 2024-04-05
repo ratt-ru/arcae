@@ -94,7 +94,9 @@ SafeTableProxy::GetColumnDescriptor(const std::string & column) const {
 
 
 Result<std::shared_ptr<arrow::Array>>
-SafeTableProxy::GetColumn(const std::string & column, const ColumnSelection & selection) const {
+SafeTableProxy::GetColumn(const std::string & column,
+                          const ColumnSelection & selection,
+                          std::shared_ptr<arrow::Array> result) const {
     ARROW_RETURN_NOT_OK(FailIfClosed(*this));
 
     return run_isolated([this, &column, &selection]() -> Result<std::shared_ptr<arrow::Array>> {

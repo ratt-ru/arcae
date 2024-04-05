@@ -393,4 +393,27 @@ TEST_F(ColumnConvertTest, SelectFromRange) {
     ++rit;
     ASSERT_EQ(rit, map.RangeEnd());
   }
+
+
+  {
+    // Select all data in a MODEL_DATA, which is defined as fixed
+    auto data_column = GetArrayColumn<CasaComplex>(proxy.table(), MS::MODEL_DATA);
+    ASSERT_OK_AND_ASSIGN(auto map, ColumnReadMap::Make(data_column, arcae::ColumnSelection{{-1, -1, 0, 1, 2}}));
+
+    ASSERT_FALSE(map.shape_provider_.IsVarying());
+    ASSERT_TRUE(map.shape_provider_.IsDefinitelyFixed());
+    ASSERT_TRUE(map.shape_provider_.IsActuallyFixed());
+    ASSERT_EQ(map.shape_provider_.nDim(), 3);
+    ASSERT_EQ(map.ranges_.size(), 3);
+    ASSERT_EQ(map.nRanges(), 2);
+    ASSERT_EQ(map.nElements(), kncorr*knchan*5);
+    ASSERT_EQ(map.shape_provider_.var_data_, nullptr);
+
+    auto rit = map.RangeBegin();
+    ASSERT_EQ(rit.GetRowSlicer(), Slicer(IPos({0}), IPos({3 - 1}), Slicer::endIsLast));
+    ASSERT_EQ(rit.GetSectionSlicer(), Slicer(IPos({0, 0}), IPos({kncorr - 1, knchan - 1}), Slicer::endIsLast));
+    ++rit;
+    ASSERT_EQ(rit, map.RangeEnd());
+  }
+
 }

@@ -67,6 +67,7 @@ MaybeMakeOutputShape(const ColumnRanges & ranges) {
       switch(range.type) {
         case Range::FREE:
         case Range::MAP:
+        case Range::EMPTY:
           assert(range.IsValid());
           size += range.Size();
           break;

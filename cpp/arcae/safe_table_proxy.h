@@ -1,7 +1,6 @@
 #ifndef ARCAE_SAFE_TABLE_PROXY_H
 #define ARCAE_SAFE_TABLE_PROXY_H
 
-#include <climits>
 #include <functional>
 #include <type_traits>
 
@@ -101,7 +100,8 @@ public:
 
     arrow::Result<std::shared_ptr<arrow::Array>> GetColumn(
         const std::string & column,
-        const ColumnSelection & selection) const;
+        const ColumnSelection & selection,
+        std::shared_ptr<arrow::Array> result=nullptr) const;
 
     arrow::Result<bool> PutColumn(
         const std::string & column,
