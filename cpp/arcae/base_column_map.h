@@ -695,23 +695,26 @@ ColumnMaps MapFactory(const SP & shape_prov, const ColumnSelection & selection) 
   return column_maps;
 }
 
-// Make ranges for fixed shape data
-// In this case, each row has the same shape
-// so we can make ranges that span multiple rows
+// Make ranges for ndim dimensions from maps
+// range_type specify the type of Range that will be created
+// if no maps exist for that dimension.
+// Should be either FREE for Fixed Ranges or VARYINNG for variable ranges
 template <typename SP>
-arrow::Result<ColumnRanges>
-FixedRangeFactory(const SP & shape_prov, const ColumnMaps & maps) {
-  //assert(shape_prov.IsDataFixed());
-  auto ndim = shape_prov.nDim();
-  ColumnRanges column_ranges;
-  column_ranges.reserve(ndim);
-
+arrow::Status
+MakeRanges(const SP & shape_prov, const ColumnMaps & maps, ColumnRanges & column_ranges, std::size_t ndim, Range::Type range_type) {
   for(std::size_t dim=0; dim < ndim; ++dim) {
     // If no mapping exists for this dimension, create a range
     // from the column shape
     if(dim >= maps.size() || maps[dim].size() == 0) {
-      ARROW_ASSIGN_OR_RAISE(auto dim_size, shape_prov.DimSize(dim));
-      column_ranges.emplace_back(ColumnRange{Range{0, RowId(dim_size), Range::FREE}});
+      if(range_type == Range::FREE) {
+        ARROW_ASSIGN_OR_RAISE(auto dim_size, shape_prov.DimSize(dim));
+        column_ranges.emplace_back(ColumnRange{Range{0, RowId(dim_size), Range::FREE}});
+      } else if(range_type == Range::VARYING) {
+        column_ranges.emplace_back(ColumnRange{Range{0, 0, Range::VARYING}});
+      } else {
+        return arrow::Status::Invalid("Unhandled Range::Type ", range_type);
+      }
+
       continue;
     }
 
@@ -719,7 +722,6 @@ FixedRangeFactory(const SP & shape_prov, const ColumnMaps & maps) {
     // from contiguous segments
     const auto & column_map = maps[dim];
     auto column_range = ColumnRange{};
-
     auto current = Range{0, 1, Range::MAP};
 
     for(auto [i, prev, next] = std::tuple{
@@ -744,6 +746,23 @@ FixedRangeFactory(const SP & shape_prov, const ColumnMaps & maps) {
     column_range.emplace_back(std::move(current));
     column_ranges.emplace_back(std::move(column_range));
   }
+
+  return arrow::Status::OK();
+}
+
+// Make ranges for fixed shape data
+// In this case, each row has the same shape
+// so we can make ranges that span multiple rows
+template <typename SP>
+arrow::Result<ColumnRanges>
+FixedRangeFactory(const SP & shape_prov, const ColumnMaps & maps) {
+  //assert(shape_prov.IsDataFixed());
+  auto ndim = shape_prov.nDim();
+  ColumnRanges column_ranges;
+  column_ranges.reserve(ndim);
+
+  // Make possibly FREE ranges
+  ARROW_RETURN_NOT_OK(MakeRanges(shape_prov, maps, column_ranges, ndim, Range::FREE));
 
   // Post construction checks
   assert(ndim == column_ranges.size());
@@ -774,39 +793,8 @@ VariableRangeFactory(const SP & shape_prov, const ColumnMaps & maps) {
   ColumnRanges column_ranges;
   column_ranges.reserve(ndim);
 
-
-  // Handle non-row dimensions first
-  for(std::size_t dim=0; dim < row_dim; ++dim) {
-    // If no mapping exists for this dimension
-    // create a single VARYING range
-    if(dim >= maps.size() || maps[dim].size() == 0) {
-      column_ranges.emplace_back(ColumnRange{Range{0, 0, Range::VARYING}});
-      continue;
-    }
-
-    // A mapping exists for this dimension, create ranges
-    // from contiguous segments
-    const auto & column_map = maps[dim];
-    auto column_range = ColumnRange{};
-    auto current = Range{0, 1, Range::MAP};
-
-    for(auto [i, prev, next] = std::tuple{
-            RowId{1},
-            std::begin(column_map),
-            std::next(std::begin(column_map))};
-        next != std::end(column_map); ++i, ++prev, ++next) {
-
-      if(next->disk - prev->disk == 1) {
-        current.end += 1;
-      } else {
-        column_range.push_back(current);
-        current = Range{i, i + 1, Range::MAP};
-      }
-    }
-
-    column_range.emplace_back(std::move(current));
-    column_ranges.emplace_back(std::move(column_range));
-  }
+  // Make possibly varying ranges up to the row dimension
+  ARROW_RETURN_NOT_OK(MakeRanges(shape_prov, maps, column_ranges, row_dim, Range::VARYING));
 
   // Lastly, the row dimension
   auto row_range = ColumnRange{};
