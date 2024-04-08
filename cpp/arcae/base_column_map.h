@@ -25,40 +25,6 @@ using RowId = std::int64_t;
 using RowIds = absl::Span<const RowId>;
 using ColumnSelection = std::vector<RowIds>;
 
-struct ArrayProperties {
-  std::optional<casacore::IPosition> shape;
-  std::size_t ndim;
-  std::shared_ptr<arrow::DataType> data_type;
-  bool is_complex;
-};
-
-
-// Type indicating the ending of an iteration
-struct EndSentinel {};
-
-// Return a selection dimension given
-//
-// 1. FORTRAN ordered dim
-// 2. Number of selection dimensions
-// 3. Number of column dimensions
-//
-// A return of < 0 indicates a non-existent selection
-std::ptrdiff_t SelectDim(
-  std::size_t dim,
-  std::size_t sdims,
-  std::size_t ndims);
-
-// Validate the Selection against the supplied shape
-arrow::Status CheckSelectionAgainstShape(
-  const casacore::IPosition & shape,
-  const ColumnSelection & selection);
-
-
-arrow::Result<ArrayProperties> GetArrayProperties(
-  const casacore::TableColumn & column,
-  const ColumnSelection & selection,
-  const std::shared_ptr<arrow::Array> & data);
-
 
 // Describes a mapping between disk and memory
 struct IdMap {
@@ -118,18 +84,53 @@ struct Range {
   // Is this an empty range
   constexpr bool IsEmpty() const
     { return type == EMPTY; }
-
-  constexpr bool TypesSimilar(const Range & lhs) const {
-    return type == lhs.type ||
-      (type == MAP && lhs.type == EMPTY) ||
-      (type == EMPTY || lhs.type == MAP);
-  }
 };
 
 // Vectors of ranges
 using ColumnRange = std::vector<Range>;
 using ColumnRanges = std::vector<ColumnRange>;
 
+struct ArrayProperties {
+  std::optional<casacore::IPosition> shape;
+  std::size_t ndim;
+  std::shared_ptr<arrow::DataType> data_type;
+  bool is_complex;
+};
+
+
+// Return a selection dimension given
+//
+// 1. FORTRAN ordered dim
+// 2. Number of selection dimensions
+// 3. Number of column dimensions
+//
+// A return of < 0 indicates a non-existent selection
+std::ptrdiff_t SelectDim(
+  std::size_t dim,
+  std::size_t sdims,
+  std::size_t ndims);
+
+// Validate the Selection against the supplied shape
+arrow::Status CheckSelectionAgainstShape(
+  const casacore::IPosition & shape,
+  const ColumnSelection & selection);
+
+
+arrow::Result<ArrayProperties> GetArrayProperties(
+  const casacore::TableColumn & column,
+  const ColumnSelection & selection,
+  const std::shared_ptr<arrow::Array> & data);
+
+
+// Checks that all Column Ranges
+// contain Ranges of the same type
+// OR
+// contain EMPTY ranges followed by MAPS
+arrow::Status CheckColumnRangeInvariants(const ColumnRanges & column_ranges);
+
+
+// Type indicating the ending of an iteration
+struct EndSentinel {};
 
 template <typename ColumnMapping> struct RangeIterator;
 
@@ -767,15 +768,7 @@ FixedRangeFactory(const SP & shape_prov, const ColumnMaps & maps) {
   // Post construction checks
   assert(ndim == column_ranges.size());
 
-  for(std::size_t dim=0; dim < ndim; ++dim) {
-    const auto & column_range = column_ranges[dim];
-    for(std::size_t r=1; r < column_range.size(); ++r) {
-      if(!column_range[r].TypesSimilar(column_range[r - 1])) {
-        return arrow::Status::NotImplemented(
-          "Heterogenous Column Ranges in a dimension");
-      }
-    }
-  }
+  ARROW_RETURN_NOT_OK(CheckColumnRangeInvariants(column_ranges));
 
   return column_ranges;
 }
@@ -818,8 +811,9 @@ VariableRangeFactory(const SP & shape_prov, const ColumnMaps & maps) {
 
   column_ranges.emplace_back(std::move(row_range));
 
-
   assert(ndim == column_ranges.size());
+  ARROW_RETURN_NOT_OK(CheckColumnRangeInvariants(column_ranges));
+
   return column_ranges;
 }
 

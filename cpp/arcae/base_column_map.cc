@@ -184,5 +184,25 @@ arrow::Result<ArrayProperties> GetArrayProperties(
   return ArrayProperties{std::make_optional(casa_shape), ndim, std::move(data_type), is_complex};
 }
 
+// Check column range invariants
+arrow::Status CheckColumnRangeInvariants(const ColumnRanges & column_ranges) {
+  auto ValidRanges = [](auto & lhs, auto & rhs) -> bool {
+    return lhs.type == rhs.type || (lhs.IsEmpty() && rhs.IsMap());
+  };
+
+  for(std::size_t dim=0; dim < column_ranges.size(); ++dim) {
+    const auto & column_range = column_ranges[dim];
+    for(std::size_t r=1; r < column_range.size(); ++r) {
+      if(!ValidRanges(column_range[r - 1], column_range[r])) {
+        return arrow::Status::NotImplemented(
+          "Heterogenous Column Ranges in a dimension ",
+          column_range[r-1].type, " ", column_range[r].type);
+      }
+    }
+  }
+
+  return arrow::Status::OK();
+}
+
 
 } // namespace arcae
