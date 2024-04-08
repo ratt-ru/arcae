@@ -10,6 +10,7 @@
 #include <absl/types/span.h>
 
 #include <arrow/api.h>
+#include <arrow/status.h>
 
 #include <casacore/casa/aipsxtype.h>
 #include <casacore/casa/Arrays/IPosition.h>
@@ -373,6 +374,15 @@ RangeIterator<ColumnMapping>::RangeIterator(ColumnMapping & column_map, bool don
   mem_start_(column_map.nDim(), 0),
   range_length_(column_map.nDim(), 0),
   done_(done) {
+    // Advance beyond any initial empty ranges
+    for(std::size_t dim=0; dim < column_map.nDim(); ++dim) {
+      const auto & dim_ranges = DimRanges(dim);
+      while(index_[dim] < dim_ranges.size() && dim_ranges[index_[dim]].IsEmpty()) {
+        ++index_[dim];
+        mem_start_[dim] += dim_ranges[index_[dim]].Size();
+      }
+    }
+
     UpdateState();
 }
 
@@ -387,10 +397,10 @@ RangeIterator<ColumnMapping> & RangeIterator<ColumnMapping>::operator++() {
   assert(!done_);
   // Iterate from fastest to slowest changing dimension: FORTRAN order
   for(std::size_t dim = 0; dim < nDim();) {
+    const auto & dim_ranges = DimRanges(dim);
+
     index_[dim]++;
     mem_start_[dim] += range_length_[dim];
-
-    const auto & dim_ranges = DimRanges(dim);
 
     // We've achieved a successful iteration in this dimension
     if(index_[dim] < dim_ranges.size()) {
@@ -421,11 +431,10 @@ void RangeIterator<ColumnMapping>::UpdateState() {
         range_length_[dim] = range.end - range.start;
         break;
       }
-      case Range::EMPTY:
       case Range::MAP: {
         const auto & dim_maps = DimMap(dim);
-        assert(range.start < dim_maps.size());
-        assert(range.end - 1 < dim_maps.size());
+        assert(range.start < RowId(dim_maps.size()));
+        assert(range.end - 1 < RowId(dim_maps.size()));
         auto start = disk_start_[dim] = dim_maps[range.start].disk;
         range_length_[dim] = dim_maps[range.end - 1].disk - start + 1;
         break;
@@ -440,6 +449,9 @@ void RangeIterator<ColumnMapping>::UpdateState() {
         range_length_[dim] = map_.get().RowDimSize(rr.start, dim);
         break;
       }
+      case Range::EMPTY:
+        // Empty ranges should have been skipped in the constructor
+        assert(false && "Invalid condition");
       default:
         assert(false && "Unhandled Range::Type enum");
     }
