@@ -9,7 +9,7 @@ namespace arcae {
 
 // Validate the constructed array
 arrow::Status ValidateArray(const std::shared_ptr<arrow::Array> & array);
-arrow::Result<std::shared_ptr<arrow::Array>> GetFlatArray(std::shared_ptr<arrow::Array> data, bool nulls);
+arrow::Result<std::shared_ptr<arrow::Array>> GetFlatArray(std::shared_ptr<arrow::Array> data, bool nulls=false);
 
 } // namespace arcae
 

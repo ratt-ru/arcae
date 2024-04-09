@@ -18,6 +18,7 @@
 #include <casacore/casa/Utilities/DataType.h>
 #include <casacore/tables/Tables.h>
 
+#include "arcae/array_util.h"
 #include "arcae/casa_visitors.h"
 #include "arcae/column_write_map.h"
 
@@ -74,7 +75,6 @@ private:
         return map_.get().column_.get();
     }
 
-    arrow::Result<std::shared_ptr<arrow::Array>> GetFlatArray(bool nulls=false) const;
     arrow::Status CheckElements(std::size_t map_size, std::size_t data_size) const;
     arrow::Status FailIfNotUTF8(const std::shared_ptr<arrow::DataType> & arrow_dtype) const;
 
@@ -83,7 +83,7 @@ private:
         auto column = casacore::ScalarColumn<T>(GetTableColumn());
         column.setMaximumCacheSize(1);
         auto nelements = map_.get().nElements();
-        ARROW_ASSIGN_OR_RAISE(auto flat_array, GetFlatArray());
+        ARROW_ASSIGN_OR_RAISE(auto flat_array, GetFlatArray(map_.get().data_));
         ARROW_ASSIGN_OR_RAISE(flat_array, MaybeCastFlatArray(flat_array));
 
         if constexpr(std::is_same_v<T, casacore::String>) {
@@ -154,13 +154,13 @@ private:
         auto column = casacore::ArrayColumn<T>(GetTableColumn());
         column.setMaximumCacheSize(1);
         ARROW_ASSIGN_OR_RAISE(auto shape, map_.get().GetOutputShape());
-        ARROW_ASSIGN_OR_RAISE(auto flat_array, GetFlatArray());
+        ARROW_ASSIGN_OR_RAISE(auto flat_array, GetFlatArray(map_.get().data_));
         ARROW_ASSIGN_OR_RAISE(flat_array, MaybeCastFlatArray(flat_array));
         auto nelements = map_.get().nElements();
 
         if(std::size_t(shape.product()) != nelements) {
             return arrow::Status::Invalid("Shape ", shape, " elements ", shape.nelements(),
-                                            " doesn't match map elements ", nelements);
+                                          " doesn't match map elements ", nelements);
         }
 
 
@@ -233,7 +233,7 @@ private:
     arrow::Status WriteVariableColumn() {
         auto column = casacore::ArrayColumn<T>(GetTableColumn());
         column.setMaximumCacheSize(1);
-        ARROW_ASSIGN_OR_RAISE(auto flat_array, GetFlatArray());
+        ARROW_ASSIGN_OR_RAISE(auto flat_array, GetFlatArray(map_.get().data_));
         ARROW_ASSIGN_OR_RAISE(flat_array, MaybeCastFlatArray(flat_array));
         auto nelements = map_.get().nElements();
 
