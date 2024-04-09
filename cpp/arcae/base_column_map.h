@@ -702,7 +702,12 @@ ColumnMaps MapFactory(const SP & shape_prov, const ColumnSelection & selection) 
 // Should be either FREE for Fixed Ranges or VARYINNG for variable ranges
 template <typename SP>
 arrow::Status
-MakeRanges(const SP & shape_prov, const ColumnMaps & maps, ColumnRanges & column_ranges, std::size_t ndim, Range::Type range_type) {
+MaybeMakeMapRanges(
+    const SP & shape_prov,
+    const ColumnMaps & maps,
+    ColumnRanges & column_ranges,
+    std::size_t ndim,
+    Range::Type range_type) {
   for(std::size_t dim=0; dim < ndim; ++dim) {
     // If no mapping exists for this dimension, create a range
     // from the column shape
@@ -762,12 +767,11 @@ FixedRangeFactory(const SP & shape_prov, const ColumnMaps & maps) {
   ColumnRanges column_ranges;
   column_ranges.reserve(ndim);
 
-  // Make possibly FREE ranges
-  ARROW_RETURN_NOT_OK(MakeRanges(shape_prov, maps, column_ranges, ndim, Range::FREE));
-
+  // Make map ranges, substituting FREE ranges
+  // in dimensions where they don't exist
+  ARROW_RETURN_NOT_OK(MaybeMakeMapRanges(shape_prov, maps, column_ranges, ndim, Range::FREE));
   // Post construction checks
   assert(ndim == column_ranges.size());
-
   ARROW_RETURN_NOT_OK(CheckColumnRangeInvariants(column_ranges));
 
   return column_ranges;
@@ -786,8 +790,10 @@ VariableRangeFactory(const SP & shape_prov, const ColumnMaps & maps) {
   ColumnRanges column_ranges;
   column_ranges.reserve(ndim);
 
-  // Make possibly varying ranges up to the row dimension
-  ARROW_RETURN_NOT_OK(MakeRanges(shape_prov, maps, column_ranges, row_dim, Range::VARYING));
+  // Make map ranges, substituting VARYING rnages
+  // in dimensions where they don't exist.
+  // Don't handle the row dimension
+  ARROW_RETURN_NOT_OK(MaybeMakeMapRanges(shape_prov, maps, column_ranges, row_dim, Range::VARYING));
 
   // Lastly, the row dimension
   auto row_range = ColumnRange{};
@@ -810,7 +816,6 @@ VariableRangeFactory(const SP & shape_prov, const ColumnMaps & maps) {
   }
 
   column_ranges.emplace_back(std::move(row_range));
-
   assert(ndim == column_ranges.size());
   ARROW_RETURN_NOT_OK(CheckColumnRangeInvariants(column_ranges));
 
