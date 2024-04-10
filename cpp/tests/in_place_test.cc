@@ -1,12 +1,13 @@
-#include "arrow/ipc/json_simple.h"
-#include <casacore/tables/Tables/ArrayColumn.h>
 #include <memory>
 
 #include <arrow/api.h>
+#include <arrow/ipc/json_simple.h>
+#include <arrow/type_fwd.h>
 #include <arrow/testing/gtest_util.h>
 
 #include <casacore/casa/aipsxtype.h>
 #include <casacore/tables/Tables.h>
+#include <casacore/tables/Tables/ArrayColumn.h>
 #include <casacore/tables/Tables/ArrColDesc.h>
 #include <casacore/tables/Tables/SetupNewTab.h>
 #include <casacore/tables/Tables/TableProxy.h>
@@ -91,23 +92,73 @@ TEST_F(InPlaceReadTest, Basic) {
   using CT = casacore::Float;
 
   {
-    auto dtype = arrow::list(arrow::list(arrow::int32()));
     ASSERT_OK_AND_ASSIGN(auto data,
-                          ArrayFromJSON(dtype,
-                                        R"([[[0, 1],
-                                             [2, 3]],
-                                            [[4, 5, 6],
-                                             [7, 8, 9],
-                                             [10, 11, 12]]])"));
+                         ArrayFromJSON(arrow::fixed_size_list(
+                                        arrow::fixed_size_list(arrow::float32(), 3), 3),
+                                       R"([[[1, 2, 3],
+                                            [0, 0, 0],
+                                            [4, 5, 6]],
+                                           [[7, 8, 9],
+                                            [0, 0, 0],
+                                            [10, 11, 12]]])"));
 
-    auto var = GetArrayColumn<casacore::Int>(table, "DATA");
+    auto var = GetArrayColumn<CT>(table, "FLOAT_DATA");
     ASSERT_OK_AND_ASSIGN(auto write_map, ColumnWriteMap::Make(var, {{0, 3}}, data));
     auto write_visitor = arcae::ColumnWriteVisitor(write_map);
     ASSERT_OK(write_visitor.Visit());
 
-    ASSERT_OK_AND_ASSIGN(auto read_map, ColumnReadMap::Make(var, {{0, -1, -1, 3}}));
+    EXPECT_THAT(var.getColumnCells(casacore::RefRows(0, 0)),
+                ::testing::ElementsAre(CT{1}, CT{2}, CT{3},
+                                       CT{0}, CT{0}, CT{0},
+                                       CT{4}, CT{5}, CT{6}));
+
+    EXPECT_FALSE(var.isDefined(1));
+    EXPECT_FALSE(var.isDefined(2));
+
+    EXPECT_THAT(var.getColumnCells(casacore::RefRows(3, 3)),
+                ::testing::ElementsAre(CT{7}, CT{8}, CT{9},
+                                       CT{0}, CT{0}, CT{0},
+                                       CT{10}, CT{11}, CT{12}));
+
+    ASSERT_OK_AND_ASSIGN(auto result,
+                         ArrayFromJSON(arrow::fixed_size_list(
+                                        arrow::fixed_size_list(arrow::float32(), 3), 3),
+                                       R"([[[0, 0, 0],
+                                            [0, 0, 0],
+                                            [0, 0, 0]],
+                                           [[0, 0, 0],
+                                            [0, 0, 0],
+                                            [0, 0, 0]],
+                                           [[0, 0, 0],
+                                            [0, 0, 0],
+                                            [0, 0, 0]],
+                                           [[0, 0, 0],
+                                            [0, 0, 0],
+                                            [0, 0, 0]]])"));
+
+
+    ASSERT_OK_AND_ASSIGN(auto read_map, ColumnReadMap::Make(var, {{0, -1, -1, 3}}, result));
     auto read_visitor = arcae::ColumnReadVisitor(read_map);
     ASSERT_OK(read_visitor.Visit());
-    ASSERT_TRUE(read_visitor.array_->Equals(data));
+
+
+    ASSERT_OK_AND_ASSIGN(auto expected,
+                         ArrayFromJSON(arrow::fixed_size_list(
+                                        arrow::fixed_size_list(arrow::float32(), 3), 3),
+                                       R"([[[1, 2, 3],
+                                            [0, 0, 0],
+                                            [4, 5, 6]],
+                                           [[0, 0, 0],
+                                            [0, 0, 0],
+                                            [0, 0, 0]],
+                                           [[0, 0, 0],
+                                            [0, 0, 0],
+                                            [0, 0, 0]],
+                                           [[7, 8, 9],
+                                            [0, 0, 0],
+                                            [10, 11, 12]]])"));
+
+    ASSERT_TRUE(read_visitor.array_->Equals(expected));
+    ASSERT_TRUE(result->Equals(expected));
   }
 }

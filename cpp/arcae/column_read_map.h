@@ -15,6 +15,7 @@
 #include <casacore/casa/Arrays/IPosition.h>
 #include <casacore/tables/Tables/TableColumn.h>
 
+#include "arcae/array_util.h"
 #include "arcae/base_column_map.h"
 
 namespace arcae {
@@ -23,7 +24,9 @@ namespace arcae {
 struct VariableShapeData {
   // Factory method for creating Variable Shape Data
   static arrow::Result<std::unique_ptr<VariableShapeData>>
-  Make(const casacore::TableColumn & column, const ColumnSelection & selection);
+  Make(const casacore::TableColumn & column,
+       const ColumnSelection & selection,
+       const std::optional<ArrayProperties> & result_props);
   // Returns true if the data shapes are fixed in practice
   bool IsActuallyFixed() const;
   // Number of dimensions, excluding row
@@ -47,7 +50,8 @@ struct ShapeProvider {
   std::unique_ptr<VariableShapeData> var_data_;
 
   static arrow::Result<ShapeProvider> Make(const casacore::TableColumn & column,
-                                           const ColumnSelection & selection);
+                                           const ColumnSelection & selection,
+                                           const std::optional<ArrayProperties> & result_props);
 
   // Returns true if the column is defined as having a fixed shape
   bool IsDefinitelyFixed() const {
@@ -82,6 +86,7 @@ struct ShapeProvider {
 struct ColumnReadMap : public BaseColumnMap<ColumnReadMap> {
   ShapeProvider shape_provider_;
   std::optional<casacore::IPosition> output_shape_;
+  std::shared_ptr<arrow::Array> result_;
 
   std::size_t nDim() const {
     return shape_provider_.nDim();
@@ -112,6 +117,7 @@ struct ColumnReadMap : public BaseColumnMap<ColumnReadMap> {
   static arrow::Result<ColumnReadMap> Make(
       const casacore::TableColumn & column,
       ColumnSelection selection,
+      const std::shared_ptr<arrow::Array> & result=nullptr,
       MapOrder order=MapOrder::C_ORDER);
 };
 

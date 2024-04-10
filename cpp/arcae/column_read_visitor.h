@@ -34,10 +34,8 @@ public:
 public:
     explicit ColumnReadVisitor(
         const ColumnReadMap & column_map,
-        std::shared_ptr<arrow::Array> result=nullptr,
         arrow::MemoryPool * pool=arrow::default_memory_pool()) :
             map_(std::cref(column_map)),
-            array_(result),
             pool_(pool) {};
     virtual ~ColumnReadVisitor() = default;
 
@@ -58,8 +56,9 @@ public:
     arrow::Result<std::shared_ptr<arrow::Buffer>>
     GetResultBufferOrAllocate(std::size_t nelements) const {
         auto GetBuffer = [&]() -> arrow::Result<std::shared_ptr<arrow::Buffer>> {
-            // Get the data buffer if a result array has been provided
-            if(array_) {
+            // Get the data buffer if a result array has been provided on the map
+            if(auto result = map_.get().result_; result) {
+                // TODO(sjperkins). Move most of these checks into the ColumnReadMap
                 auto shape_result = map_.get().GetOutputShape();
                 if(!shape_result.ok()) {
                     return arrow::Status::NotImplemented(
@@ -68,34 +67,63 @@ public:
                 }
 
                 auto selection_shape = shape_result.ValueOrDie();
-                ARROW_ASSIGN_OR_RAISE(auto array_props,
-                                      GetArrayProperties(GetTableColumn(), array_));
+                ARROW_ASSIGN_OR_RAISE(auto result_props,
+                                      GetArrayProperties(GetTableColumn(), result));
 
-                if(array_props.shape.has_value()) {
+                if(!result_props.shape.has_value()) {
                     return arrow::Status::NotImplemented(
                         "Reading to variably shaped result arrays "
                         "for fixed shaped selections");
                 }
 
-                auto array_shape = array_props.shape.value();
+                auto result_shape = result_props.shape.value();
 
-                if(array_shape != selection_shape) {
+                if(result_shape != selection_shape) {
                     return arrow::Status::Invalid(
                         "Selection shape ", selection_shape,
-                        "does not match result array shape ", array_shape);
+                        " does not match result array shape ", result_shape);
                 }
 
-                // data buffer is always in the last position
-                if(array_->data()->buffers.size() == 0) {
-                    return arrow::Status::Invalid("Result array does not contain a buffer");
+                auto array_data = result->data();
+
+                while(true) {
+                    switch(array_data->type->id()) {
+                        case arrow::Type::LARGE_LIST:
+                        case arrow::Type::LIST:
+                        case arrow::Type::FIXED_SIZE_LIST:
+                            array_data = array_data->child_data[0];
+                            break;
+                        case arrow::Type::BOOL:
+                        case arrow::Type::UINT8:
+                        case arrow::Type::UINT16:
+                        case arrow::Type::UINT32:
+                        case arrow::Type::UINT64:
+                        case arrow::Type::INT8:
+                        case arrow::Type::INT16:
+                        case arrow::Type::INT32:
+                        case arrow::Type::INT64:
+                        case arrow::Type::FLOAT:
+                        case arrow::Type::DOUBLE:
+                        case arrow::Type::STRING:
+                        {
+                            if(array_data->buffers.size() == 0) {
+                                return arrow::Status::Invalid("Result array does not contain a buffer");
+                            }
+
+                            if(auto buffer = array_data->buffers[array_data->buffers.size() - 1]; buffer) {
+                                return buffer;
+                            }
+
+                            return arrow::Status::Invalid("Result array does not contain a buffer");
+                        }
+                        default:
+                            return arrow::Status::TypeError(
+                                "Unable to obtain array root buffer "
+                                "for types ", array_data->type);
+                    }
                 }
 
-                // Data buffer is always in the last position
-                if(auto buffer = array_->data()->buffers[array_->data()->buffers.size()]; buffer) {
-                    return buffer;
-                }
-
-                return arrow::Status::Invalid("Result array does not contain a buffer");
+                return arrow::Status::Invalid("Result array does not contain a buffer ", result->ToString());
             } else {
                 // Allocate a result buffer
                 ARROW_ASSIGN_OR_RAISE(auto allocation, arrow::AllocateBuffer(nelements*sizeof(T), pool_));
