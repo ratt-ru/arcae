@@ -87,11 +87,12 @@ class InPlaceReadTest : public ::testing::Test {
     }
 };
 
-TEST_F(InPlaceReadTest, Basic) {
+TEST_F(InPlaceReadTest, FloatReadToResult) {
   const auto & table = table_proxy_.table();
   using CT = casacore::Float;
 
   {
+    // Write some fixed shape data to 2 rows
     ASSERT_OK_AND_ASSIGN(auto data,
                          ArrayFromJSON(arrow::fixed_size_list(
                                         arrow::fixed_size_list(arrow::float32(), 3), 3),
@@ -120,45 +121,225 @@ TEST_F(InPlaceReadTest, Basic) {
                                        CT{0}, CT{0}, CT{0},
                                        CT{10}, CT{11}, CT{12}));
 
-    ASSERT_OK_AND_ASSIGN(auto result,
+    {
+      // Create a result array and read from the written rows, ignoring two rows
+      ASSERT_OK_AND_ASSIGN(auto result,
+                          ArrayFromJSON(arrow::fixed_size_list(
+                                          arrow::fixed_size_list(arrow::float32(), 3), 3),
+                                        R"([[[0, 0, 0],
+                                              [0, 0, 0],
+                                              [0, 0, 0]],
+                                            [[0, 0, 0],
+                                              [0, 0, 0],
+                                              [0, 0, 0]],
+                                            [[0, 0, 0],
+                                              [0, 0, 0],
+                                              [0, 0, 0]],
+                                            [[0, 0, 0],
+                                              [0, 0, 0],
+                                              [0, 0, 0]]])"));
+
+
+      ASSERT_OK_AND_ASSIGN(auto read_map, ColumnReadMap::Make(var, {{0, -1, -1, 3}}, result));
+      auto read_visitor = arcae::ColumnReadVisitor(read_map);
+      ASSERT_OK(read_visitor.Visit());
+
+
+      ASSERT_OK_AND_ASSIGN(auto expected,
+                          ArrayFromJSON(arrow::fixed_size_list(
+                                          arrow::fixed_size_list(arrow::float32(), 3), 3),
+                                        R"([[[1, 2, 3],
+                                              [0, 0, 0],
+                                              [4, 5, 6]],
+                                            [[0, 0, 0],
+                                              [0, 0, 0],
+                                              [0, 0, 0]],
+                                            [[0, 0, 0],
+                                              [0, 0, 0],
+                                              [0, 0, 0]],
+                                            [[7, 8, 9],
+                                              [0, 0, 0],
+                                              [10, 11, 12]]])"));
+
+      ASSERT_TRUE(read_visitor.array_->Equals(expected)) << read_visitor.array_->Diff(*expected);
+      ASSERT_TRUE(result->Equals(expected)) << result->Diff(*expected);
+    }
+
+    {
+      ASSERT_OK_AND_ASSIGN(auto result,
+                          ArrayFromJSON(arrow::fixed_size_list(
+                                          arrow::fixed_size_list(arrow::float32(), 3), 3),
+                                        R"([[[0, 0, 0],
+                                              [0, 0, 0],
+                                              [0, 0, 0]],
+                                            [[0, 0, 0],
+                                              [0, 0, 0],
+                                              [0, 0, 0]],
+                                            [[0, 0, 0],
+                                              [0, 0, 0],
+                                              [0, 0, 0]],
+                                            [[0, 0, 0],
+                                              [0, 0, 0],
+                                              [0, 0, 0]]])"));
+
+
+      ASSERT_OK_AND_ASSIGN(auto read_map, ColumnReadMap::Make(var, {{0, -1, -1, 3}, {}, {2, -1, 0}}, result));
+      auto read_visitor = arcae::ColumnReadVisitor(read_map);
+      ASSERT_OK(read_visitor.Visit());
+
+      ASSERT_OK_AND_ASSIGN(auto expected,
+                          ArrayFromJSON(arrow::fixed_size_list(
+                                          arrow::fixed_size_list(arrow::float32(), 3), 3),
+                                        R"([[[3, 0, 1],
+                                              [0, 0, 0],
+                                              [6, 0, 4]],
+                                            [[0, 0, 0],
+                                              [0, 0, 0],
+                                              [0, 0, 0]],
+                                            [[0, 0, 0],
+                                              [0, 0, 0],
+                                              [0, 0, 0]],
+                                            [[9, 0, 7],
+                                              [0, 0, 0],
+                                              [12, 0, 10]]])"));
+
+      ASSERT_TRUE(read_visitor.array_->Equals(expected)) << read_visitor.array_->Diff(*expected);
+      ASSERT_TRUE(result->Equals(expected)) << result->Diff(*expected);
+    }
+  }
+}
+
+TEST_F(InPlaceReadTest, ComplexReadToResult) {
+  const auto & table = table_proxy_.table();
+  using CT = casacore::Complex;
+
+  {
+    // Write some fixed shape data to 2 rows
+    ASSERT_OK_AND_ASSIGN(auto data,
                          ArrayFromJSON(arrow::fixed_size_list(
-                                        arrow::fixed_size_list(arrow::float32(), 3), 3),
-                                       R"([[[0, 0, 0],
-                                            [0, 0, 0],
-                                            [0, 0, 0]],
-                                           [[0, 0, 0],
-                                            [0, 0, 0],
-                                            [0, 0, 0]],
-                                           [[0, 0, 0],
-                                            [0, 0, 0],
-                                            [0, 0, 0]],
-                                           [[0, 0, 0],
-                                            [0, 0, 0],
-                                            [0, 0, 0]]])"));
+                                        arrow::fixed_size_list(
+                                          arrow::fixed_size_list(
+                                            arrow::float32(), 2), 3), 3),
+                                       R"([[[[1, 1], [2, 2], [3, 3]],
+                                            [[0, 0], [0, 0], [0, 0]],
+                                            [[4, 4], [5, 5], [6, 6]]],
+                                           [[[7, 7], [8, 8], [9, 9]],
+                                            [[0, 0], [0, 0], [0, 0]],
+                                            [[10, 10], [11, 11], [12, 12]]]])"));
+
+    auto var = GetArrayColumn<CT>(table, "VAR_COMPLEX");
+    ASSERT_OK_AND_ASSIGN(auto write_map, ColumnWriteMap::Make(var, {{0, 3}}, data));
+    auto write_visitor = arcae::ColumnWriteVisitor(write_map);
+    ASSERT_OK(write_visitor.Visit());
+
+    EXPECT_THAT(var.getColumnCells(casacore::RefRows(0, 0)),
+                ::testing::ElementsAre(CT{1, 1}, CT{2, 2}, CT{3, 3},
+                                       CT{0, 0}, CT{0, 0}, CT{0, 0},
+                                       CT{4, 4}, CT{5, 5}, CT{6, 6}));
+
+    EXPECT_FALSE(var.isDefined(1));
+    EXPECT_FALSE(var.isDefined(2));
+
+    EXPECT_THAT(var.getColumnCells(casacore::RefRows(3, 3)),
+                ::testing::ElementsAre(CT{7, 7}, CT{8, 8}, CT{9, 9},
+                                       CT{0, 0}, CT{0, 0}, CT{0, 0},
+                                       CT{10, 10}, CT{11, 11}, CT{12, 12}));
 
 
-    ASSERT_OK_AND_ASSIGN(auto read_map, ColumnReadMap::Make(var, {{0, -1, -1, 3}}, result));
-    auto read_visitor = arcae::ColumnReadVisitor(read_map);
-    ASSERT_OK(read_visitor.Visit());
-
-
-    ASSERT_OK_AND_ASSIGN(auto expected,
+    {
+      // Create a result array and read from the written rows, ignoring two rows
+      ASSERT_OK_AND_ASSIGN(auto result,
                          ArrayFromJSON(arrow::fixed_size_list(
-                                        arrow::fixed_size_list(arrow::float32(), 3), 3),
-                                       R"([[[1, 2, 3],
-                                            [0, 0, 0],
-                                            [4, 5, 6]],
-                                           [[0, 0, 0],
-                                            [0, 0, 0],
-                                            [0, 0, 0]],
-                                           [[0, 0, 0],
-                                            [0, 0, 0],
-                                            [0, 0, 0]],
-                                           [[7, 8, 9],
-                                            [0, 0, 0],
-                                            [10, 11, 12]]])"));
+                                        arrow::fixed_size_list(
+                                          arrow::fixed_size_list(
+                                            arrow::float32(), 2), 3), 3),
+                                       R"([[[[0, 0], [0, 0], [0, 0]],
+                                            [[0, 0], [0, 0], [0, 0]],
+                                            [[0, 0], [0, 0], [0, 0]]],
+                                           [[[0, 0], [0, 0], [0, 0]],
+                                            [[0, 0], [0, 0], [0, 0]],
+                                            [[0, 0], [0, 0], [0, 0]]],
+                                           [[[0, 0], [0, 0], [0, 0]],
+                                            [[0, 0], [0, 0], [0, 0]],
+                                            [[0, 0], [0, 0], [0, 0]]],
+                                           [[[0, 0], [0, 0], [0, 0]],
+                                            [[0, 0], [0, 0], [0, 0]],
+                                            [[0, 0], [0, 0], [0, 0]]]])"));
 
-    ASSERT_TRUE(read_visitor.array_->Equals(expected));
-    ASSERT_TRUE(result->Equals(expected));
+
+      ASSERT_OK_AND_ASSIGN(auto read_map, ColumnReadMap::Make(var, {{0, -1, -1, 3}}, result));
+      auto read_visitor = arcae::ColumnReadVisitor(read_map);
+      ASSERT_OK(read_visitor.Visit());
+
+
+      ASSERT_OK_AND_ASSIGN(auto expected,
+                         ArrayFromJSON(arrow::fixed_size_list(
+                                        arrow::fixed_size_list(
+                                          arrow::fixed_size_list(
+                                            arrow::float32(), 2), 3), 3),
+                                       R"([[[[1, 1], [2, 2], [3, 3]],
+                                            [[0, 0], [0, 0], [0, 0]],
+                                            [[4, 4], [5, 5], [6, 6]]],
+                                           [[[0, 0], [0, 0], [0, 0]],
+                                            [[0, 0], [0, 0], [0, 0]],
+                                            [[0, 0], [0, 0], [0, 0]]],
+                                           [[[0, 0], [0, 0], [0, 0]],
+                                            [[0, 0], [0, 0], [0, 0]],
+                                            [[0, 0], [0, 0], [0, 0]]],
+                                           [[[7, 7], [8, 8], [9, 9]],
+                                            [[0, 0], [0, 0], [0, 0]],
+                                            [[10, 10], [11, 11], [12, 12]]]])"));
+
+
+      ASSERT_TRUE(read_visitor.array_->Equals(expected)) << read_visitor.array_->Diff(*expected);
+      ASSERT_TRUE(result->Equals(expected)) << result->Diff(*expected);
+    }
+
+    {
+      // Create a result array and read from the written rows, ignoring two rows
+      ASSERT_OK_AND_ASSIGN(auto result,
+                         ArrayFromJSON(arrow::fixed_size_list(
+                                        arrow::fixed_size_list(
+                                          arrow::fixed_size_list(
+                                            arrow::float32(), 2), 3), 3),
+                                       R"([[[[0, 0], [0, 0], [0, 0]],
+                                            [[0, 0], [0, 0], [0, 0]],
+                                            [[0, 0], [0, 0], [0, 0]]],
+                                           [[[0, 0], [0, 0], [0, 0]],
+                                            [[0, 0], [0, 0], [0, 0]],
+                                            [[0, 0], [0, 0], [0, 0]]],
+                                           [[[0, 0], [0, 0], [0, 0]],
+                                            [[0, 0], [0, 0], [0, 0]],
+                                            [[0, 0], [0, 0], [0, 0]]],
+                                           [[[0, 0], [0, 0], [0, 0]],
+                                            [[0, 0], [0, 0], [0, 0]],
+                                            [[0, 0], [0, 0], [0, 0]]]])"));
+
+
+      ASSERT_OK_AND_ASSIGN(auto read_map, ColumnReadMap::Make(var, {{0, -1, -1, 3}, {}, {2, -1, 0}}, result));
+      auto read_visitor = arcae::ColumnReadVisitor(read_map);
+      ASSERT_OK(read_visitor.Visit());
+
+      ASSERT_OK_AND_ASSIGN(auto expected,
+                         ArrayFromJSON(arrow::fixed_size_list(
+                                        arrow::fixed_size_list(
+                                          arrow::fixed_size_list(
+                                            arrow::float32(), 2), 3), 3),
+                                       R"([[[[3, 3], [0, 0], [1, 1]],
+                                            [[0, 0], [0, 0], [0, 0]],
+                                            [[6, 6], [0, 0], [4, 4]]],
+                                           [[[0, 0], [0, 0], [0, 0]],
+                                            [[0, 0], [0, 0], [0, 0]],
+                                            [[0, 0], [0, 0], [0, 0]]],
+                                           [[[0, 0], [0, 0], [0, 0]],
+                                            [[0, 0], [0, 0], [0, 0]],
+                                            [[0, 0], [0, 0], [0, 0]]],
+                                           [[[9, 9], [0, 0], [7, 7]],
+                                            [[0, 0], [0, 0], [0, 0]],
+                                            [[12, 12], [0, 0], [10, 10]]]])"));
+
+      ASSERT_TRUE(read_visitor.array_->Equals(expected)) << read_visitor.array_->Diff(*expected);
+      ASSERT_TRUE(result->Equals(expected)) << result->Diff(*expected);
+    }
   }
 }
