@@ -365,8 +365,9 @@ RangeIterator<ColumnMapping>::RangeIterator(ColumnMapping & column_map, bool don
     for(std::size_t dim=0; dim < column_map.nDim(); ++dim) {
       const auto & dim_ranges = DimRanges(dim);
       while(index_[dim] < dim_ranges.size() && dim_ranges[index_[dim]].IsEmpty()) {
+        auto rl = range_length_[dim] = dim_ranges[index_[dim]].Size();
         ++index_[dim];
-        mem_start_[dim] += dim_ranges[index_[dim]].Size();
+        mem_start_[dim] += rl;
       }
     }
 
