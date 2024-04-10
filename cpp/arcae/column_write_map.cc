@@ -23,6 +23,7 @@
 #include <casacore/tables/Tables/ArrayColumnBase.h>
 #include <casacore/tables/Tables/TableColumn.h>
 
+#include "arcae/array_util.h"
 
 namespace arcae {
 
@@ -106,7 +107,7 @@ arrow::Result<ArrowShapeProvider>
 ArrowShapeProvider::Make(const casacore::TableColumn & column,
                          const ColumnSelection & selection,
                          const std::shared_ptr<arrow::Array> & data) {
-  ARROW_ASSIGN_OR_RAISE(auto properties, GetArrayProperties(column, selection, data));
+  ARROW_ASSIGN_OR_RAISE(auto properties, GetArrayProperties(column, data));
   return ArrowShapeProvider{std::cref(column),
                             std::cref(selection),
                             data,

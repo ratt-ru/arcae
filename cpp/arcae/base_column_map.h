@@ -12,7 +12,6 @@
 #include <arrow/api.h>
 #include <arrow/status.h>
 
-#include <casacore/casa/aipsxtype.h>
 #include <casacore/casa/Arrays/IPosition.h>
 #include <casacore/casa/Arrays/Slicer.h>
 #include <casacore/tables/Tables/TableColumn.h>
@@ -90,13 +89,6 @@ struct Range {
 using ColumnRange = std::vector<Range>;
 using ColumnRanges = std::vector<ColumnRange>;
 
-struct ArrayProperties {
-  std::optional<casacore::IPosition> shape;
-  std::size_t ndim;
-  std::shared_ptr<arrow::DataType> data_type;
-  bool is_complex;
-};
-
 
 // Return a selection dimension given
 //
@@ -114,12 +106,6 @@ std::ptrdiff_t SelectDim(
 arrow::Status CheckSelectionAgainstShape(
   const casacore::IPosition & shape,
   const ColumnSelection & selection);
-
-
-arrow::Result<ArrayProperties> GetArrayProperties(
-  const casacore::TableColumn & column,
-  const ColumnSelection & selection,
-  const std::shared_ptr<arrow::Array> & data);
 
 
 // Checks that all Column Ranges

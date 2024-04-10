@@ -64,14 +64,6 @@ ColumnWriteVisitor::MaybeCastFlatArray(const std::shared_ptr<arrow::Array> & dat
 }
 
 
-
-arrow::Status
-ColumnWriteVisitor::CheckElements(std::size_t map_size, std::size_t data_size) const {
-    if(map_size == data_size) return arrow::Status::OK();
-    return arrow::Status::Invalid("Number of map elements ", map_size, " does not "
-                                    "match the length of the array ", data_size);
-}
-
 arrow::Status
 ColumnWriteVisitor::FailIfNotUTF8(const std::shared_ptr<arrow::DataType> & arrow_dtype) const {
     if(arrow_dtype == arrow::utf8()) { return arrow::Status::OK(); }

@@ -75,7 +75,6 @@ private:
         return map_.get().column_.get();
     }
 
-    arrow::Status CheckElements(std::size_t map_size, std::size_t data_size) const;
     arrow::Status FailIfNotUTF8(const std::shared_ptr<arrow::DataType> & arrow_dtype) const;
 
     template <typename T>

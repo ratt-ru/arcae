@@ -1,4 +1,5 @@
 #include "arcae/column_read_map.h"
+#include "arcae/base_column_map.h"
 
 #include <cassert>
 #include <cstddef>
@@ -95,8 +96,8 @@ RangeFactory(const ShapeProvider & shape_prov, const ColumnMaps & maps) {
 
 arrow::Result<casacore::IPosition> GetColumnRowShape(
   const casacore::TableColumn & column,
-  casacore::rownr_t row) {
-    if(row >= column.nrow()) {
+  RowId row) {
+    if(row < 0 || row >= RowId(column.nrow())) {
       return arrow::Status::IndexError("Row ", row, " in column ",
                                        column.columnDesc().name(),
                                        " is out of bounds");
