@@ -131,15 +131,16 @@ struct MapIterator {
   // ND index in the local buffer holding the values
   // described by this chunk
   std::vector<std::size_t> chunk_index_;
+  // Strides with the local buffer
+  std::vector<std::size_t> chunk_strides_;
   // ND index in the global buffer
   std::vector<std::size_t> global_index_;
-  std::vector<std::size_t> strides_;
   bool done_;
 
   MapIterator(const RangeIterator<ColumnMapping> & rit,
               const ColumnMapping & map,
               std::vector<std::size_t> chunk_index,
-              std::vector<std::size_t> strides,
+              std::vector<std::size_t> chunk_strides,
               bool done);
 
   static MapIterator Make(const RangeIterator<ColumnMapping> & rit, bool done);
@@ -184,16 +185,17 @@ struct MapIterator {
 
 
 template <typename ColumnMapping>
-MapIterator<ColumnMapping>::MapIterator(const RangeIterator<ColumnMapping> & rit,
+MapIterator<ColumnMapping>::MapIterator(
+                  const RangeIterator<ColumnMapping> & rit,
                   const ColumnMapping & map,
                   std::vector<std::size_t> chunk_index,
-                  std::vector<std::size_t> strides,
+                  std::vector<std::size_t> chunk_strides,
                   bool done) :
         rit_(std::cref(rit)),
         map_(std::cref(map)),
         chunk_index_(std::move(chunk_index)),
+        chunk_strides_(std::move(chunk_strides)),
         global_index_(chunk_index_.size(), 0),
-        strides_(std::move(strides)),
         done_(done) {
 
   for(std::size_t dim=0; dim < chunk_index_.size(); ++dim) {
@@ -205,17 +207,18 @@ template <typename ColumnMapping>
 MapIterator<ColumnMapping>
 MapIterator<ColumnMapping>::Make(const RangeIterator<ColumnMapping> & rit, bool done) {
   auto chunk_index = decltype(MapIterator::chunk_index_)(rit.nDim(), 0);
-  auto strides = decltype(MapIterator::strides_)(rit.nDim(), 1);
+  auto chunk_strides = decltype(MapIterator::chunk_strides_)(rit.nDim(), 1);
   using ItType = std::tuple<std::size_t, std::size_t>;
 
   for(auto [dim, product]=ItType{1, 1}; dim < rit.nDim(); ++dim) {
-    product = strides[dim] = product * rit.range_length_[dim - 1];
+    product = chunk_strides[dim] = product * rit.range_length_[dim - 1];
   }
 
-  return MapIterator{std::cref(rit), std::cref(rit.map_.get()),
+  return MapIterator(std::cref(rit),
+                     std::cref(rit.map_.get()),
                      std::move(chunk_index),
-                     std::move(strides),
-                     done};
+                     std::move(chunk_strides),
+                     done);
 }
 
 template <typename ColumnMapping>
@@ -223,7 +226,7 @@ std::size_t
 MapIterator<ColumnMapping>::ChunkOffset() const {
   std::size_t offset = 0;
   for(auto dim = std::size_t{0}; dim < nDim(); ++dim) {
-    offset += chunk_index_[dim] * strides_[dim];
+    offset += chunk_index_[dim] * chunk_strides_[dim];
   }
   return offset;
 }
