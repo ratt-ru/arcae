@@ -361,16 +361,6 @@ RangeIterator<ColumnMapping>::RangeIterator(ColumnMapping & column_map, bool don
   mem_start_(column_map.nDim(), 0),
   range_length_(column_map.nDim(), 0),
   done_(done) {
-    // Advance beyond any initial empty ranges
-    for(std::size_t dim=0; dim < column_map.nDim(); ++dim) {
-      const auto & dim_ranges = DimRanges(dim);
-      while(index_[dim] < dim_ranges.size() && dim_ranges[index_[dim]].IsEmpty()) {
-        auto rl = range_length_[dim] = dim_ranges[index_[dim]].Size();
-        ++index_[dim];
-        mem_start_[dim] += rl;
-      }
-    }
-
     UpdateState();
 }
 
@@ -386,7 +376,6 @@ RangeIterator<ColumnMapping> & RangeIterator<ColumnMapping>::operator++() {
   // Iterate from fastest to slowest changing dimension: FORTRAN order
   for(std::size_t dim = 0; dim < nDim();) {
     const auto & dim_ranges = DimRanges(dim);
-
     index_[dim]++;
     mem_start_[dim] += range_length_[dim];
 
@@ -394,7 +383,7 @@ RangeIterator<ColumnMapping> & RangeIterator<ColumnMapping>::operator++() {
     if(index_[dim] < dim_ranges.size()) {
       break;
     // We've exceeded the size of the current dimension
-    // reset to zero and retry the while loop
+    // reset to zero and retry in the next dimension
     } else if(dim < RowDim()) {
       index_[dim] = 0;
       mem_start_[dim] = 0;
@@ -409,10 +398,12 @@ RangeIterator<ColumnMapping> & RangeIterator<ColumnMapping>::operator++() {
   return *this;
 };
 
+// Updates the state of the iterator
 template <typename ColumnMapping>
 void RangeIterator<ColumnMapping>::UpdateState() {
   for(auto dim=std::size_t{0}; dim < nDim(); ++dim) {
-    const auto & range = DimRange(dim);
+    const auto & dim_ranges = DimRanges(dim);
+    const auto & range = dim_ranges[index_[dim]];
     switch(range.type) {
       case Range::FREE: {
         disk_start_[dim] = range.start;
@@ -427,6 +418,19 @@ void RangeIterator<ColumnMapping>::UpdateState() {
         range_length_[dim] = dim_maps[range.end - 1].disk - start + 1;
         break;
       }
+      case Range::EMPTY: {
+        // We want to skip empty ranges. To achieve this
+        // logic similar to operator++ is applied
+        auto rl = range_length_[dim] = range.Size();
+        // A dimension full of empty ranges -> we are done
+        if(index_[dim]++ >= dim_ranges.size()) {
+          done_ = true;
+          return;
+        }
+        mem_start_[dim] += rl;
+        --dim;  // Iterate again on this dimension
+        break;
+      }
       case Range::VARYING: {
         // In case of variably shaped columns,
         // the dimension size will vary by row
@@ -437,9 +441,6 @@ void RangeIterator<ColumnMapping>::UpdateState() {
         range_length_[dim] = map_.get().RowDimSize(rr.start, dim);
         break;
       }
-      case Range::EMPTY:
-        // Empty ranges should have been skipped in the constructor
-        assert(false && "Invalid condition");
       default:
         assert(false && "Unhandled Range::Type enum");
     }
