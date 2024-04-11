@@ -8,11 +8,12 @@
 /// Parts of this code are relicensed here under the BSD-3 license
 /// available at https://github.com/ratt-ru/arcae/blob/main/LICENSE
 
+#include "arcae/table_factory.h"
+
 #include <algorithm>
 
 #include "arcae/descriptor.h"
 #include "arcae/safe_table_proxy.h"
-#include "arcae/table_factory.h"
 
 #include <arrow/api.h>
 
@@ -27,9 +28,6 @@ using namespace std::literals;
 using ::arrow::Result;
 using ::arrow::Status;
 
-using ::casacore::String;
-
-using ::casacore::SetupNewTable;
 using ::casacore::TableProxy;
 using ::casacore::TableLock;
 using ::casacore::Table;
