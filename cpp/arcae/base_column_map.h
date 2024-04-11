@@ -732,6 +732,8 @@ MaybeMakeMapRanges(
       } else if(prev->disk < 0) {
         column_range.emplace_back(Range{current.start, current.end, Range::EMPTY});
         current = Range{i, i + 1, Range::MAP};
+      } else if(next->disk == prev->disk) {
+        return arrow::Status::IndexError("Duplicate row indices encountered");
       } else if(next->disk - prev->disk == 1) {
         current.end += 1;
       } else {
