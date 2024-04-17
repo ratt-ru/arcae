@@ -9,6 +9,7 @@
 #include <arrow/util/logging.h>  // IWYU pragma: keep
 #include <arrow/status.h>
 #include <arrow/result.h>
+#include <arrow/type.h>
 
 #include <casacore/tables/Tables.h>
 
@@ -54,8 +55,10 @@ public:
 
     template <typename T>
     arrow::Result<std::shared_ptr<arrow::Buffer>>
-    GetResultBufferOrAllocate(std::size_t nelements) const {
-        auto GetBuffer = [&]() -> arrow::Result<std::shared_ptr<arrow::Buffer>> {
+    GetResultBufferOrAllocate(
+            std::size_t nelements,
+            const std::shared_ptr<arrow::DataType> & arrow_dtype) const {
+        auto GetBuffer = [&, this]() -> arrow::Result<std::shared_ptr<arrow::Buffer>> {
             // Get the data buffer if a result array has been provided on the map
             if(auto result = map_.get().result_; result) {
                 // TODO(sjperkins). Move most of these checks into the ColumnReadMap
@@ -84,6 +87,30 @@ public:
                         " does not match result array shape ", result_shape);
                 }
 
+                // Result arrays won't be expressed in
+                // the custom complex data dtype.
+                // Get the data type of the real/imag components
+                auto CheckDtype = [&, this](auto & array_dtype) -> arrow::Status {
+                    if(auto cplx = std::dynamic_pointer_cast<ComplexType>(arrow_dtype); cplx) {
+                        if(cplx->value_type() != array_dtype) {
+                            return arrow::Status::TypeError(
+                                "Column ", GetTableColumn().columnDesc().name(),
+                                " has CASA type ", GetTableColumn().columnDesc().dataType(),
+                                ". Result array should have an arrow data type of ",
+                                cplx->value_type()->ToString());
+                        }
+                    } else if(arrow_dtype != array_dtype) {
+                        return arrow::Status::TypeError(
+                            "Column ", GetTableColumn().columnDesc().name(),
+                            " has CASA type ", GetTableColumn().columnDesc().dataType(),
+                            ". Result array should have an arrow data type of ",
+                            arrow_dtype->ToString());
+                    }
+                    return arrow::Status::OK();
+                };
+
+                // Extract the underlying buffer
+                // from the result array
                 auto array_data = result->data();
 
                 while(true) {
@@ -106,6 +133,7 @@ public:
                         case arrow::Type::DOUBLE:
                         case arrow::Type::STRING:
                         {
+                            ARROW_RETURN_NOT_OK((CheckDtype(array_data->type)));
                             if(array_data->buffers.size() == 0) {
                                 return arrow::Status::Invalid("Result array does not contain a buffer");
                             }
@@ -119,7 +147,7 @@ public:
                         default:
                             return arrow::Status::TypeError(
                                 "Unable to obtain array root buffer "
-                                "for types ", array_data->type);
+                                "for types ", array_data->type->ToString());
                     }
                 }
 
@@ -163,7 +191,7 @@ public:
         } else {
             // Wrap Arrow Buffer in casacore Vector
             auto nelements = map_.get().nElements();
-            ARROW_ASSIGN_OR_RAISE(auto buffer, GetResultBufferOrAllocate<T>(nelements));
+            ARROW_ASSIGN_OR_RAISE(auto buffer, GetResultBufferOrAllocate<T>(nelements, arrow_dtype));
             auto casa_vector = casacore::Vector<T>(casacore::IPosition(1, nelements),
                                                    buffer->template mutable_data_as<T>(),
                                                    casacore::SHARE);
@@ -230,7 +258,7 @@ public:
         } else {
             // Wrap Arrow Buffer in casacore Array
             auto nelements = map_.get().nElements();
-            ARROW_ASSIGN_OR_RAISE(auto buffer, GetResultBufferOrAllocate<T>(nelements));
+            ARROW_ASSIGN_OR_RAISE(auto buffer, GetResultBufferOrAllocate<T>(nelements, arrow_dtype));
             auto carray = casacore::Array<T>(shape,
                                              buffer->template mutable_data_as<T>(),
                                              casacore::SHARE);
@@ -305,7 +333,7 @@ public:
         } else {
             // Wrap Arrow Buffer in casacore Array
             auto nelements = map_.get().nElements();
-            ARROW_ASSIGN_OR_RAISE(auto buffer, GetResultBufferOrAllocate<T>(nelements));
+            ARROW_ASSIGN_OR_RAISE(auto buffer, GetResultBufferOrAllocate<T>(nelements, arrow_dtype));
             auto * buf_ptr = buffer->template mutable_data_as<T>();
 
             for(auto it = map_.get().RangeBegin(); it != map_.get().RangeEnd(); ++it) {
