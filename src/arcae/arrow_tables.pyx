@@ -211,7 +211,7 @@ cdef class Table:
                                                    tobytes(json_dminfo)))
         return table
 
-    def to_arrow(self, index: FullIndex = None, columns: list[str] | str = None):
+    def to_arrow(self, index: FullIndex = None, columns: Union[list[str], str] = None):
         cdef:
             vector[string] cpp_columns
             shared_ptr[CArray] carray
