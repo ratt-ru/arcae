@@ -15,8 +15,7 @@ add_library(arcae SHARED
     arcae/base_column_map.cc
     arcae/service_locator.cc
     arcae/safe_table_proxy.cc
-    arcae/table_factory.cc
-    arcae/utility.cc)
+    arcae/table_factory.cc)
 
 target_compile_options(arcae PRIVATE
     $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:
