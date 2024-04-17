@@ -2,12 +2,11 @@
 import pyarrow as pa  # noqa
 import os
 import sys
-from typing import TYPE_CHECKING
+from typing import Union
+
+from arcae.lib.arrow_tables import Table
 
 __version__ = "0.2.2"
-
-if TYPE_CHECKING:
-    from arcae.lib.arrow_tables import Table
 
 PYTHON_CASACORE_FOUND = "casacore" in sys.modules
 COEXIST_WITH_PYTHON_CASACORE = int(os.environ.get("ARCAE_WITH_CASACORE", 0)) != 0
@@ -23,7 +22,7 @@ if PYTHON_CASACORE_FOUND and not COEXIST_WITH_PYTHON_CASACORE:
         "continue regardless.")
 
 
-def table(filename: str, readonly: bool = True, lockoptions: str | dict = "auto") -> "Table":
+def table(filename: str, readonly: bool = True, lockoptions: Union[str, dict] = "auto") -> "Table":
     # Defer cython module import, to avoid conflicts between arcae casacore libraries
     # and python-casacore casacore libraries
     from arcae.lib.arrow_tables import Table
