@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Support table lock options (:pr:`86`)
 * Support complex indexing (:pr:`65`)
 * Configure dependabot (:pr:`85`)
 * Enable dependabot version updates (:pr:`84`)

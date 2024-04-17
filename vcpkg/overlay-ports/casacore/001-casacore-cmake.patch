@@ -115,6 +115,32 @@ index 5e8c1bd97..880d501b3 100644
  RUNTIME DESTINATION bin
  LIBRARY DESTINATION lib${LIB_SUFFIX}
  ARCHIVE DESTINATION lib${LIB_SUFFIX}
+diff --git a/casa/Json/JsonOut.h b/casa/Json/JsonOut.h
+index 460325102..becb19eec 100644
+--- a/casa/Json/JsonOut.h
++++ b/casa/Json/JsonOut.h
+@@ -176,6 +176,10 @@ namespace casacore { //# NAMESPACE CASACORE - BEGIN
+     void put (const DComplex& value);
+     void put (const char* value);
+     void put (const String& value);
++    // Put a Record which is written as a {} structure.
++    // The Record can be nested.
++    void put (const Record&);
++
+     // </group>
+ 
+     // Put a line defining an array value. Multi-dim arrays are written as
+@@ -217,10 +221,6 @@ namespace casacore { //# NAMESPACE CASACORE - BEGIN
+     // Write a key and valueholder.
+     void writeKV (const String& name, const ValueHolder& vh);
+ 
+-    // Put a Record which is written as a {} structure.
+-    // The Record can be nested.
+-    void put (const Record&);
+-
+     // Get the indentation after a name.
+     // It indents with the length of the name (including quotes and colon)
+     // with a maximum of 20 spaces.
 diff --git a/cmake/FindFFTW3.cmake b/cmake/FindFFTW3.cmake
 index 886f3bebb..66d117674 100644
 --- a/cmake/FindFFTW3.cmake
@@ -564,10 +590,20 @@ index 452e33cd3..bb46a0dba 100644
  
  
 diff --git a/tables/Tables/TableProxy.cc b/tables/Tables/TableProxy.cc
-index 66865e52d..1fda76d1c 100644
+index 66865e52d..4bd489373 100644
 --- a/tables/Tables/TableProxy.cc
 +++ b/tables/Tables/TableProxy.cc
-@@ -3405,6 +3405,8 @@ TableLock TableProxy::makeLockOptions (const Record& options)
+@@ -273,6 +273,9 @@ Record TableProxy::lockOptions()
+       option = "autonoread";
+     }
+     break;
++  case TableLock::NoLocking:
++    option = "nolock";
++    break;
+   default:
+     option = "unknown";
+   }
+@@ -3405,10 +3408,12 @@ TableLock TableProxy::makeLockOptions (const Record& options)
      opt = TableLock::PermanentLocking;
    } else if (str == "permanentwait") {
      opt = TableLock::PermanentLockingWait;
@@ -576,3 +612,8 @@ index 66865e52d..1fda76d1c 100644
    } else {
      throw TableError ("'" + str + "' is an unknown lock option; valid are "
  		      "default,auto,autonoread,user,usernoread,permanent,"
+-		      "permanentwait");
++		      "permanentwait,lock");
+   }
+   if (options.nfields() == 1) {
+     return TableLock(opt);

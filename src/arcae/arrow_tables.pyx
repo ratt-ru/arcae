@@ -184,9 +184,16 @@ cdef class Table:
       return table
 
     @staticmethod
-    def from_filename(filename: str, readonly=True) -> Table:
+    def from_filename(filename: str, readonly: bool = True, lockoptions: str | dict = "auto") -> Table:
         cdef Table table = Table.__new__(Table)
-        table.c_table = GetResultValue(COpenTable(tobytes(filename), readonly))
+        if isinstance(lockoptions, str):
+            lockoptions = f"{{\"option\": \"{lockoptions}\"}}"
+        elif isinstance(lockoptions, dict):
+            lockoptions = json.dumps(lockoptions)
+        else:
+            raise TypeError(f"Invalid lockoptions {lockoptions}")
+
+        table.c_table = GetResultValue(COpenTable(tobytes(filename), readonly, tobytes(lockoptions)))
         return table
 
     @staticmethod
@@ -308,7 +315,11 @@ cdef class Table:
 
         raise TypeError(f"Unhandled column type {array.type}")
 
+    def lockoptions(self):
+        return json.loads(GetResultValue(self.c_table.get().GetLockOptions()))
 
+    def reopenrw(self):
+        return GetResultValue(self.c_table.get().ReopenRW())
 
     def nrow(self):
         return GetResultValue(self.c_table.get().nRow())
