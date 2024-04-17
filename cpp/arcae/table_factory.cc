@@ -16,6 +16,9 @@
 
 #include <arrow/api.h>
 
+#include <casacore/casa/Json.h>
+#include <casacore/casa/Json/JsonKVMap.h>
+#include <casacore/casa/Json/JsonParser.h>
 #include <casacore/tables/Tables/SetupNewTab.h>
 #include <casacore/tables/Tables.h>
 #include <casacore/tables/Tables/TableProxy.h>
@@ -27,9 +30,8 @@ using namespace std::literals;
 using ::arrow::Result;
 using ::arrow::Status;
 
-using ::casacore::String;
+using ::casacore::JsonParser;
 
-using ::casacore::SetupNewTable;
 using ::casacore::TableProxy;
 using ::casacore::TableLock;
 using ::casacore::Table;
@@ -82,20 +84,16 @@ static constexpr char kWeather[] = "WEATHER";
 
 Result<std::shared_ptr<SafeTableProxy>> OpenTable(
         const std::string & filename,
-        bool readonly) {
-    return SafeTableProxy::Make([&filename, &readonly]() -> Result<std::shared_ptr<TableProxy>> {
-        Record record;
-        TableLock lock(TableLock::LockOption::AutoNoReadLocking);
-
-        record.define("option", "auto");
-        record.define("internal", lock.interval());
-        record.define("maxwait", casacore::Int(lock.maxWait()));
+        bool readonly,
+        const std::string & json_lockoptions) {
+    return SafeTableProxy::Make([&filename, &readonly, &json_lockoptions]() -> Result<std::shared_ptr<TableProxy>> {
+        auto lock_record = JsonParser::parse(json_lockoptions).toRecord();
 
         std::shared_ptr<TableProxy> proxy;
 
         try {
             proxy = std::make_shared<TableProxy>(
-                filename, record, Table::TableOption::Old);
+                filename, lock_record, Table::TableOption::Old);
 
             if(!readonly) {
                 proxy->reopenRW();

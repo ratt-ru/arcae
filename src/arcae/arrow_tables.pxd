@@ -54,6 +54,8 @@ cdef extern from "arcae/safe_table_proxy.h" namespace "arcae" nogil:
         CResult[bool] PutColumn " SafeTableProxy::PutColumn"(const string & column, const ColumnSelection & selection, const shared_ptr[CArray] & data)
         CResult[string] GetTableDescriptor " SafeTableProxy::GetTableDescriptor"()
         CResult[string] GetColumnDescriptor "SafeTableProxy::GetColumnDescriptor"(const string & column)
+        CResult[string] GetLockOptions "SafeTableProxy::GetLockOptions"()
+        CResult[bool] ReopenRW "SafeTableProxy::ReopenRW"()
         CResult[unsigned int] nRow " SafeTableProxy::nRow"()
         CResult[unsigned int] nColumns " SafeTableProxy::nColumns"()
         CResult[vector[string]] Columns " SafeTableProxy::Columns"()
@@ -64,7 +66,8 @@ cdef extern from "arcae/safe_table_proxy.h" namespace "arcae" nogil:
 cdef extern from "arcae/table_factory.h" namespace "arcae" nogil:
     cdef CResult[shared_ptr[CCasaTable]] COpenTable" arcae::OpenTable"(
                                                     const string & filename,
-                                                    bool readonly)
+                                                    bool readonly,
+                                                    const string & json_lockoptions)
     cdef CResult[shared_ptr[CCasaTable]] CDefaultMS" arcae::DefaultMS"(
                                                     const string & name,
                                                     const string & subtable,

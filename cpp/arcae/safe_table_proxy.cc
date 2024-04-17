@@ -126,6 +126,36 @@ SafeTableProxy::PutColumn(const std::string & column,
     });
 }
 
+Result<std::string>
+SafeTableProxy::GetLockOptions() const {
+    ARROW_RETURN_NOT_OK(FailIfClosed(*this));
+    return run_isolated([this]() -> Result<std::string> {
+        std::ostringstream json_oss;
+        casacore::JsonOut lock_json(json_oss);
+        const auto & lockoptions = this->table_proxy->lockOptions();
+        lock_json.put(lockoptions);
+        return json_oss.str();
+    });
+}
+
+Result<bool>
+SafeTableProxy::ReopenRW() const {
+    ARROW_RETURN_NOT_OK(FailIfClosed(*this));
+    return run_isolated([this]() -> Result<bool> {
+        this->table_proxy->table().reopenRW();
+        return true;
+    });
+}
+
+Result<bool>
+SafeTableProxy::IsWriteable() const {
+    ARROW_RETURN_NOT_OK(FailIfClosed(*this));
+    return run_isolated([this]() -> Result<bool> {
+        return this->table_proxy->table().isWritable();
+    });
+}
+
+
 Result<std::shared_ptr<arrow::Table>>
 SafeTableProxy::ToArrow(const ColumnSelection & selection, const std::vector<std::string> & columns) const {
     ARROW_RETURN_NOT_OK(FailIfClosed(*this));
