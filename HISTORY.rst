@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Remove unused utility code (:pr:`90`)
 * Upgrade to pyarrow 15.0.2 (:pr:`89`)
 * Fix python 3.9 typing (:pr:`87`, :pr:`88`)
 * Support table lock options (:pr:`86`)
