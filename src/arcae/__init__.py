@@ -2,9 +2,10 @@
 import pyarrow as pa  # noqa
 import os
 import sys
-from typing import Union
+from typing import Union, TYPE_CHECKING
 
-from arcae.lib.arrow_tables import Table
+if TYPE_CHECKING:
+    from arcae.lib.arrow_tables import Table
 
 __version__ = "0.2.2"
 
