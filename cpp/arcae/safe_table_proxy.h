@@ -111,6 +111,11 @@ public:
     arrow::Result<std::string> GetTableDescriptor() const;
     arrow::Result<std::string> GetColumnDescriptor(const std::string & column) const;
 
+    arrow::Result<std::string> GetLockOptions() const;
+
+    arrow::Result<bool> ReopenRW() const;
+    arrow::Result<bool> IsWriteable() const;
+
     arrow::Result<std::vector<std::string>> Columns() const;
     arrow::Result<casacore::uInt> nColumns() const;
     arrow::Result<casacore::uInt> nRow() const;
