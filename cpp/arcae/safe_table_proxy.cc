@@ -99,12 +99,12 @@ SafeTableProxy::GetColumn(const std::string & column,
                           std::shared_ptr<arrow::Array> result) const {
     ARROW_RETURN_NOT_OK(FailIfClosed(*this));
 
-    return run_isolated([this, &column, &selection]() -> Result<std::shared_ptr<arrow::Array>> {
+    return run_isolated([this, &column, &selection, &result]() -> Result<std::shared_ptr<arrow::Array>> {
         auto & casa_table = this->table_proxy->table();
         ARROW_RETURN_NOT_OK(FailIfColumnDoesntExist(casa_table, column));
 
         auto table_column = TableColumn(casa_table, column);
-        ARROW_ASSIGN_OR_RAISE(auto map, ColumnReadMap::Make(table_column, selection));
+        ARROW_ASSIGN_OR_RAISE(auto map, ColumnReadMap::Make(table_column, selection, result));
         auto visitor = ColumnReadVisitor(map);
         ARROW_RETURN_NOT_OK(visitor.Visit());
         return std::move(visitor.array_);
