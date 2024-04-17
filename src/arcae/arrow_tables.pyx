@@ -2,7 +2,6 @@
 # cython: language_level = 3
 
 from collections.abc import Iterable, MutableMapping
-import ctypes
 import cython
 import json
 from typing import Optional, Union
@@ -184,7 +183,7 @@ cdef class Table:
       return table
 
     @staticmethod
-    def from_filename(filename: str, readonly: bool = True, lockoptions: str | dict = "auto") -> Table:
+    def from_filename(filename: str, readonly: bool = True, lockoptions: Union[str, dict] = "auto") -> Table:
         cdef Table table = Table.__new__(Table)
         if isinstance(lockoptions, str):
             lockoptions = f"{{\"option\": \"{lockoptions}\"}}"
