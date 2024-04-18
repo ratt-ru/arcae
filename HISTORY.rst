@@ -2,7 +2,7 @@
 History
 =======
 
-X.Y.Z (YYYY-MM-DD)
+0.2.3 (2024-18-04)
 ------------------
 * Remove unused utility code (:pr:`90`)
 * Upgrade to pyarrow 15.0.2 (:pr:`89`)
