@@ -1,7 +1,7 @@
 C++ and Python Arrow Bindings for casacore
 ==========================================
 
-``arcae`` implements a limited subset of functionality from the more mature python-casacore_ package. It bypasses some existing limitations in python-casacore to provide safe, multi-threadded access to CASA formats, thereby enabling export into newer cloud native formats such as Apache Arrow and Zarr.
+``arcae`` implements a limited subset of functionality from the more mature python-casacore_ package. It bypasses some existing limitations in python-casacore to provide safe, multi-threaded access to CASA formats, thereby enabling export into newer cloud native formats such as Apache Arrow and Zarr.
 
 Rationale
 ---------
@@ -27,7 +27,7 @@ In the time since the CTDS was developed, newer, open-source formats such as Apa
 * Once in Apache Arrow format, it is easy to store data in modern, cloud-native disk formats such as parquet and Zarr.
 * Converting CASA Tables to Arrow in the C++ layer avoids the GIL
 * Access to non thread-safe CASA Tables is constrained to a ThreadPool containing a single thread
-* It also allows us to write astrometric routines in C++, potentially side-stepping thread-safety and GIL issues with the CASA Measures server.
+* It also allows us to write astrometry routines in C++, potentially side-stepping thread-safety and GIL issues with the CASA Measures server.
 
 Limitations
 -----------
@@ -37,7 +37,7 @@ Arrow supports both 1D arrays and nested structures:
 1. Fixed shape multi-dimensional data (i.e. visibility data) is currently represented as nested `FixedSizeListArrays <fixed_size_list_layout_>`_ .
 2. Variably-shaped multi-dimensional (i.e. subtable data) is currently represented as nested `ListArrays <variable_size_list_layout_>`_.
 3. Complex values are represented as an extra `FixedSizeListArray <fixed_size_list_layout_>`_ nesting of two floats.
-4. Currently, it is not trivially trivial (repitition intendead here) to convert between the above and numpy via ``to_numpy`` calls on Arrow Arrays, but it is relatively trivial to reinterpret the underlying data buffers from either API. This is done transparently in ``getcol`` and ``putcol`` funcions (see usage below).
+4. Currently, it is not trivially trivial (repetition intended here) to convert between the above and numpy via ``to_numpy`` calls on Arrow Arrays, but it is relatively trivial to reinterpret the underlying data buffers from either API. This is done transparently in ``getcol`` and ``putcol`` functions (see usage below).
 
 Going forward, `FixedShapeTensorArray <fixed_shape_tensor_array_>`_ and `VariableShapeTensorArray <variable_shape_tensor_array_>`_ will provide more ergonomic structures for representing multi-dimensional data. First class support for complex values in Apache Arrow will require implementing a `C++ extension type <cpp_extension_type_>`_ within Arrow itself:
 
