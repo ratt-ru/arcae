@@ -1,51 +1,67 @@
 C++ and Python Arrow Bindings for casacore
 ==========================================
 
+``arcae`` implements a limited subset of functionality from the more mature python-casacore_ package. It bypasses some existing limitations in python-casacore to provide safe, multi-threaded access to CASA formats, thereby enabling export into newer cloud native formats such as Apache Arrow and Zarr.
 
 Rationale
 ---------
 
-* The structure of Apache Arrow Tables is highly similar to that of CASA Tables
+``casacore`` and the ``python-casacore`` Python bindings provide access to the CASA Table Data System (CTDS) and Measurement Sets created within this system. The CTDS, as of casacore 3.5.0 is subject to the following limitations:
+
+* Access from multiple threads is unsafe.
+
+    - https://github.com/casacore/casacore/issues/1038
+    - https://github.com/casacore/casacore/issues/1163
+
+* ``python-casacore`` doesn't drop the Global Interpreter Lock
+
+    - https://github.com/casacore/python-casacore/pull/209
+
+Resolving these concerns is potentially a major effort, involving invasive changes across the CTDS system.
+
+In the time since the CTDS was developed, newer, open-source formats such as Apache Arrow and Zarr have been developed that are suitable for representing Radio Astronomy data.
+
+* The Apache Arrow project defines a programming language portable in-memory columnar storage format.
+* Translating CTDS data to Arrow is relatively simple, with some limitations mentioned below.
 * It's easy to convert Arrow Tables between many different languages
-* Once in Apache Arrow format, it is easy to store data in modern, cloud-native disk formats such as parquet and orc.
+* Once in Apache Arrow format, it is easy to store data in modern, cloud-native disk formats such as parquet and Zarr.
 * Converting CASA Tables to Arrow in the C++ layer avoids the GIL
 * Access to non thread-safe CASA Tables is constrained to a ThreadPool containing a single thread
-* It also allows us to write astrometric routines in C++, potentially side-stepping thread-safety
-  and GIL issues with the CASA Measures server.
+* It also allows us to write astrometry routines in C++, potentially side-stepping thread-safety and GIL issues with the CASA Measures server.
+
+Limitations
+-----------
+
+Arrow supports both 1D arrays and nested structures:
+
+1. Fixed shape multi-dimensional data (i.e. visibility data) is currently represented as nested `FixedSizeListArrays <fixed_size_list_layout_>`_ .
+2. Variably-shaped multi-dimensional (i.e. subtable data) is currently represented as nested `ListArrays <variable_size_list_layout_>`_.
+3. Complex values are represented as an extra `FixedSizeListArray <fixed_size_list_layout_>`_ nesting of two floats.
+4. Currently, it is not trivially trivial (repetition intended here) to convert between the above and numpy via ``to_numpy`` calls on Arrow Arrays, but it is relatively trivial to reinterpret the underlying data buffers from either API. This is done transparently in ``getcol`` and ``putcol`` functions (see usage below).
+
+Going forward, `FixedShapeTensorArray <fixed_shape_tensor_array_>`_ and `VariableShapeTensorArray <variable_shape_tensor_array_>`_ will provide more ergonomic structures for representing multi-dimensional data. First class support for complex values in Apache Arrow will require implementing a `C++ extension type <cpp_extension_type_>`_ within Arrow itself:
+
+Some other edge cases have not yet been implemented, but could be with some thought.
+
+* Columns with unconstrained rank (ndim == -1) whose rows, in practice, have differing dimensions.
+  Unconstrained rank columns whose rows actually have the same rank are catered for.
+* Not yet able to handle TpRecord columns. Probably simplest to convert these rows to json and store as a string.
+* Not yet able to handle TpQuantity columns. Possible to represent as a run-time parametric Arrow DataType.
 
 
-Build Wheel Locally
--------------------
+Installation
+------------
 
-In the user or, even better, a virtual environment:
+Binary wheels are providing for Linux and MacOSX for both x86_64 and arm64 architectures
 
-.. code-block:: python
+.. code-block:: bash
 
-  $ pip install -U pip cibuildwheel
-  $ bash scripts/run_cbuildwheel.sh -p 3.10
-
-.. warning::
-  Only linux wheels are currently supported.
-
-Local Development
------------------
-
-In the directory containing the source, setup your development environment as follows:
-
-.. code-block:: python
-
-  $ pip install -U pip virtualenv
-  $ virtualenv -p python3.10 /venv/arcaedev
-  $ . /venv/arcaedev/bin/activate
-  (arcaedev) export VCPKG_TARGET_TRIPLET=x64-linux-dynamic-cxx17-abi1-dbg
-  (arcaedev) pip install -e .[test]
-  (arcaedev) export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/vcpkg/installed/$VCPKG_TARGET_TRIPLET/lib
-  (arcaedev) py.test -s -vvv --pyargs arcae
+  $ pip install arcae
 
 Usage
 -----
 
-Example Usage:
+Example usage with Arrow Tables:
 
   .. code-block:: python
 
@@ -53,28 +69,31 @@ Example Usage:
     from pprint import pprint
 
     import arcae
-    import pandas as pd
     import pyarrow as pa
     import pyarrow.parquet as pq
 
     # Obtain (partial) Apache Arrow Table from a CASA Table
     casa_table = arcae.table("/path/to/measurementset.ms")
     arrow_table = casa_table.to_arrow()        # read entire table
-    arrow_table = casa_table.to_arrow(10, 20)  # startrow, nrow
+    arrow_table = casa_table.to_arrow(index=(slice(10, 20),)
     assert isinstance(arrow_table, pa.Table)
 
     # Print JSON-encoded Table and Column keywords
     pprint(json.loads(arrow_table.schema.metadata[b"__arcae_metadata__"]))
     pprint(json.loads(arrow_table.schema.field("DATA").metadata[b"__arcae_metadata__"]))
 
-    # Extract Arrow Table columns into numpy arrays
-    time = arrow_table.column("TIME").to_numpy()
-    data = arrow_table.column("DATA").to_numpy()   # currently, arrays of object arrays, overly slow and memory hungry
-    df = arrow_table.to_pandas()                   # currently slow, memory hungry due to arrays of object arrays
-
-    # Write Arrow Table to parquet file
     pq.write_table(arrow_table, "measurementset.parquet")
 
+Some reading and writing functionality from python-casacore_ is replicated,
+with added support for some `NumPy Advanced Indexing <numpy_advanced_indexing_>`_.
+
+  .. code-block:: python
+
+    casa_table = arcae.table("/path/to/measurementset.ms", readonly=False)
+    # Get rows 10 and 2, and channels 16 to 32, and all correlations
+    data = casa_table.getcol("DATA", index=([10, 2], slice(16, 32), None)
+    # Write some modified data back
+    casa_table.putcol("DATA", data + 1*1j, index=([10, 2], slice(16, 32), None)
 
 See the test cases for further use cases.
 
@@ -82,7 +101,13 @@ See the test cases for further use cases.
 Exporting Measurement Sets to Arrow Parquet Datasets
 ----------------------------------------------------
 
-An export script is available:
+Install the ``applications`` optional extra.
+
+  .. code-block:: bash
+
+    pip install arcae[applications]
+
+Then, an export script is available:
 
 .. code-block:: bash
 
@@ -133,21 +158,6 @@ This data can be loaded into an Arrow Dataset:
     >>> main_ds = pad.dataset("output.arrow/MAIN")
     >>> spw_ds = pad.dataset("output.arrow/SPECTRAL_WINDOW")
 
-Limitations
------------
-
-Some edge cases have not yet been implemented, but could be with some thought.
-
-* Columns with unconstrained rank (ndim == -1) whose rows, in practice, have differing dimensions.
-  Unconstrained rank columns whose rows actually have the same rank are catered for.
-* Not yet able to handle TpRecord columns. Probably simplest to convert these rows to json and store as a string.
-* Not yet able to handle TpQuantity columns. Possible to represent as a run-time parametric Arrow DataType.
-* `to_numpy()` conversion of nested lists produces nested numpy arrays, instead of tensors.
-  This is `possible <daskms_ext_types_>`_ but requires some changes to how
-  `C++ Extension Types are exposed in Python <arrow_python_expose_cpp_ext_types_>`_.
-
-
-
 Etymology
 ---------
 
@@ -157,6 +167,11 @@ A chest, box, coffer, safe (safe place for storing items, or anything of a simil
 Pronounced: `ar-ki <arcae_pronounce_>`_.
 
 
-.. _daskms_ext_types: https://github.com/ratt-ru/dask-ms/blob/1ff73ce3a60ea6479e40fc8cf440fd8d077e3d26/daskms/experimental/arrow/extension_types.py#L120-L152
-.. _arrow_python_expose_cpp_ext_types: https://github.com/apache/arrow/issues/33997
+.. _python-casacore: https://github.com/casacore/python-cascore
+.. _fixed_size_list_layout: https://arrow.apache.org/docs/format/Columnar.html#fixed-size-list-layout
+.. _variable_size_list_layout: https://arrow.apache.org/docs/format/Columnar.html#variable-size-list-layout
+.. _fixed_shape_tensor_array: https://arrow.apache.org/docs/python/generated/pyarrow.FixedShapeTensorArray.html
+.. _variable_shape_tensor_array: https://github.com/apache/arrow/pull/38008
+.. _numpy_advanced_indexing: https://numpy.org/doc/stable/user/basics.indexing.html#advanced-indexing
+.. _cpp_extension_type: https://arrow.apache.org/docs/cpp/api/datatype.html#extension-types
 .. _arcae_pronounce: https://translate.google.com/?sl=la&tl=en&text=arcae%0A&op=translate
