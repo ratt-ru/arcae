@@ -2,6 +2,11 @@
 History
 =======
 
+X.Y.Z (YYYY-MM-DD)
+------------------
+* Upgrade to pyarrow 16.0.0 (:pr:`92`)
+* Handle slice(None) in getcol index (:pr:`91`)
+
 0.2.3 (2024-18-04)
 ------------------
 * Remove unused utility code (:pr:`90`)

@@ -126,6 +126,10 @@ cdef class SelectionObj:
                 if dim_index is None:
                     self.selection.push_back(RowIds())
                 elif isinstance(dim_index, slice):
+                    if dim_index == slice(None):
+                        self.selection.push_back(RowIds())
+                        continue
+
                     # Convert a slice object into a vector, and then a span of RowId
                     if dim_index.step is not None and dim_index.step != 1:
                         raise ValueError(f"slice step {dim_index.step} is not 1")

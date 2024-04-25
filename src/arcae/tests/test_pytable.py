@@ -179,6 +179,8 @@ def test_getcol(getcol_table):
     assert_array_equal(T.getcol("TIME", (np.array([0, 1]),)), [0, 1])
     assert_array_equal(T.getcol("TIME", (np.array([2, 0]),)), [2, 0])
     assert_array_equal(T.getcol("TIME", (np.array([0, 2]),)), [0, 2])
+    assert_array_equal(T.getcol("TIME", (None,)), [0, 1, 2])
+    assert_array_equal(T.getcol("TIME", (slice(None),)), [0, 1, 2])
     assert_array_equal(T.getcol("STRING"), ["0", "1", "2"])
 
     index = (None, None, np.array([0, -1, -1, 2], np.int64))
