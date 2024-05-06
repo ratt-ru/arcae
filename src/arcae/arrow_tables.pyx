@@ -1,7 +1,7 @@
 # distutils: language = c++
 # cython: language_level = 3
 
-from collections.abc import Iterable, MutableMapping
+from collections.abc import Iterable, MutableMapping, Sequence
 import cython
 import json
 from typing import Optional, Union
@@ -181,9 +181,18 @@ cdef class Table:
         self.close()
 
     @staticmethod
-    def from_taql(taql: str) -> Table:
+    def from_taql(taql: str, tables: Optional[Union[Sequence[Table], Table]] = None) -> Table:
       cdef Table table = Table.__new__(Table)
-      table.c_table = GetResultValue(CTaql(tobytes(taql)))
+      cdef vector[shared_ptr[CCasaTable]] c_tables
+
+      if tables is not None:
+        if isinstance(tables, Table):
+            c_tables.push_back((<Table?> tables).c_table)
+        else:
+            for t in tables:
+                c_tables.push_back((<Table?> t).c_table)
+
+      table.c_table = GetResultValue(CTaql(tobytes(taql), c_tables))
       return table
 
     @staticmethod
