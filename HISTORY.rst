@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Support Table arguments in TAQL queries (:pr:`93`)
 * Upgrade to pyarrow 16.0.0 (:pr:`92`)
 * Handle slice(None) in getcol index (:pr:`91`)
 
