@@ -8,22 +8,25 @@
 /// Parts of this code are relicensed here under the BSD-3 license
 /// available at https://github.com/ratt-ru/arcae/blob/main/LICENSE
 
+#include "arcae/table_factory.h"
+
 #include <algorithm>
 
 #include "arcae/descriptor.h"
 #include "arcae/safe_table_proxy.h"
-#include "arcae/table_factory.h"
 
+#include <arrow/status.h>
 #include <arrow/api.h>
 
+#include <casacore/casa/Exceptions/Error.h>
 #include <casacore/casa/Json.h>
 #include <casacore/casa/Json/JsonKVMap.h>
 #include <casacore/casa/Json/JsonParser.h>
 #include <casacore/tables/Tables/SetupNewTab.h>
 #include <casacore/tables/Tables.h>
 #include <casacore/tables/Tables/TableProxy.h>
-#include <casacore/tables/Tables/TableLock.h>
 #include <casacore/ms/MeasurementSets/MeasurementSet.h>
+#include <memory>
 
 using namespace std::literals;
 
@@ -33,9 +36,7 @@ using ::arrow::Status;
 using ::casacore::JsonParser;
 
 using ::casacore::TableProxy;
-using ::casacore::TableLock;
 using ::casacore::Table;
-using ::casacore::Record;
 
 using ::casacore::MeasurementSet;
 using ::casacore::MSAntenna;
@@ -176,10 +177,43 @@ Result<std::shared_ptr<SafeTableProxy>> DefaultMS(
     });
 }
 
-arrow::Result<std::shared_ptr<SafeTableProxy>> Taql(const std::string & taql) {
+// Execute a TAQL query on the supplied tables
+arrow::Result<std::shared_ptr<SafeTableProxy>> Taql(
+    const std::string & taql,
+    const std::vector<std::shared_ptr<SafeTableProxy>> & tables) {
+
+    // Easy case
+    if(tables.size() == 0) {
+        return SafeTableProxy::Make([&]() -> arrow::Result<std::shared_ptr<TableProxy>> {
+            return std::make_shared<TableProxy>(taql, std::vector<TableProxy>{});
+        });
+    }
+
+    // Check that each SafeTableProxy is using the same io_pool
+    for(const auto & stp: tables) {
+        if(stp->io_pool != tables.front()->io_pool) {
+            return arrow::Status::NotImplemented(
+                "TAQL queries referencing tables created "
+                "in different executors");
+        }
+    }
+
+    // Use the common io_pool
     return SafeTableProxy::Make([&]() -> arrow::Result<std::shared_ptr<TableProxy>> {
-        return std::make_shared<TableProxy>(taql, std::vector<TableProxy>{});
-    });
+        auto proxies = std::vector<TableProxy>{};
+        proxies.reserve(tables.size());
+
+        for(const auto & stp: tables) {
+            proxies.push_back(*stp->table_proxy);
+        }
+
+        try {
+            return std::make_shared<TableProxy>(taql, proxies);
+        } catch (const casacore::AipsError & e) {
+            return arrow::Status::ExecutionError("Error executing TAQL query: ", e.what());
+        }
+    },
+    tables.front()->io_pool);
 }
 
 

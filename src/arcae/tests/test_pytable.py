@@ -2,7 +2,7 @@ import os
 
 
 import numpy as np
-from numpy.testing import assert_array_equal
+from numpy.testing import assert_array_equal, assert_array_almost_equal
 import pyarrow as pa
 import pyarrow.dataset as pad
 import pyarrow.parquet as pq
@@ -303,6 +303,30 @@ def test_complex_taql(sorting_table):
         # Ensure fields are ordered the same and have same types
         # TAQL returns indexing columns as int64 instead of original int32
         assert AT.select(QT.column_names).cast(QT.schema).equals(QT)
+
+
+def test_taql_table_arg(sorting_table):
+    with arcae.table(sorting_table) as T:
+        query = f"""
+        SELECT
+            TIME,
+            ANTENNA1,
+            ANTENNA2,
+            ROWID() AS ROW
+        FROM
+            $1
+        ORDER BY
+            TIME,
+            ANTENNA1,
+            ANTENNA2
+        """
+        with Table.from_taql(query, [T]) as Q:
+            result = Q.to_arrow()
+
+    assert_array_almost_equal(result["TIME"], np.linspace(0.1, 1.0, 10))
+    assert_array_equal(result["ANTENNA1"], [1, 0, 0, 1, 2, 1, 1, 1, 0, 0])
+    assert_array_equal(result["ANTENNA2"], [2, 1, 1, 0, 1, 2, 3, 2, 2, 1])
+    assert_array_equal(result["ROW"], [9, 8, 7, 6, 5, 4, 3, 2, 1, 0])
 
 
 def test_table_partitioning(sorting_table):

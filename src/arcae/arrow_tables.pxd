@@ -74,7 +74,8 @@ cdef extern from "arcae/table_factory.h" namespace "arcae" nogil:
                                                     const string & json_table_desc,
                                                     const string & json_dminfo)
     cdef CResult[shared_ptr[CCasaTable]] CTaql" arcae::Taql"(
-                                                    const string & taql)
+                                                    const string & taql,
+                                                    const vector[shared_ptr[CCasaTable]] & tables)
 
 
 cdef extern from "arcae/complex_type.h" namespace "arcae" nogil:
