@@ -11,6 +11,7 @@
 #include <arrow/util/thread_pool.h>
 
 #include "arcae/base_column_map.h"
+#include "arrow/status.h"
 
 namespace arcae {
 
@@ -25,6 +26,9 @@ private:
     std::shared_ptr<arrow::internal::ThreadPool> io_pool;
     bool is_closed;
 
+    friend arrow::Result<std::shared_ptr<SafeTableProxy>> Taql(
+            const std::string & taql,
+            const std::vector<std::shared_ptr<SafeTableProxy>> & tables);
 protected:
     SafeTableProxy() = default;
     SafeTableProxy(const SafeTableProxy & rhs) = delete;
@@ -74,10 +78,21 @@ public:
 
 
     template <typename Fn>
-    static arrow::Result<std::shared_ptr<SafeTableProxy>> Make(Fn && functor) {
+    static arrow::Result<std::shared_ptr<SafeTableProxy>> Make(
+            Fn && functor,
+            std::shared_ptr<arrow::internal::ThreadPool> io_pool=nullptr) {
         struct enable_make_shared_stp : public SafeTableProxy {};
         auto proxy = std::make_shared<enable_make_shared_stp>();
-        ARROW_ASSIGN_OR_RAISE(proxy->io_pool, ::arrow::internal::ThreadPool::Make(1));
+
+        if(io_pool) {
+            if(io_pool->GetCapacity() != 1) {
+                return arrow::Status::Invalid("Number of threads in supplied thread pool != 1");
+            }
+            proxy->io_pool = io_pool;
+        } else {
+            ARROW_ASSIGN_OR_RAISE(proxy->io_pool, ::arrow::internal::ThreadPool::Make(1));
+        }
+
 
         // Mark as closed so that if construction fails, we don't try to close it
         proxy->is_closed = true;
