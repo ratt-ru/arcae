@@ -36,6 +36,10 @@ add_executable(in_place_test in_place_test.cc)
 target_link_libraries(in_place_test PRIVATE GTest::gtest_main arcae test_utils)
 add_test(in_place_test in_place_test)
 
+add_executable(transpose_test transpose_test.cc)
+target_link_libraries(transpose_test PRIVATE GTest::gtest_main arcae test_utils)
+add_test(transpose_test transpose_test)
+
 set_tests_properties(basic_test range_test
                      column_iterator_test
                      column_rw_test
@@ -43,5 +47,6 @@ set_tests_properties(basic_test range_test
                      range_test
                      parallel_write_test
                      in_place_test
+                     transpose_test
                      var_write_test
                      PROPERTIES ENVIRONMENT "LD_LIBRARY_PATH=${VCPKG_LIBDIRS}")
