@@ -264,6 +264,7 @@ ArrowShapeProvider::Make(const casacore::TableColumn & column,
   ARROW_ASSIGN_OR_RAISE(auto properties, GetDataProperties(column, selection, data));
   return ArrowShapeProvider{std::cref(column),
                             std::cref(selection),
+                            column.columnDesc().isFixedShape(),
                             data,
                             std::move(properties.data_type),
                             std::move(properties.shape),
