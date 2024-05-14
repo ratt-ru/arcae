@@ -4,6 +4,8 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Avoid stripping debug information (:pr:`96`)
+* Set cmake build type to RelWithDebInfo (:pr:`96`)
 * Avoid creating ColumnDesc objects in inner loops (:pr:`95`)
 * Support Table arguments in TAQL queries (:pr:`93`)
 * Upgrade to pyarrow 16.0.0 (:pr:`92`)
