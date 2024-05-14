@@ -48,6 +48,7 @@ struct ShapeProvider {
   std::reference_wrapper<const casacore::TableColumn> column_;
   std::reference_wrapper<const ColumnSelection> selection_;
   std::unique_ptr<VariableShapeData> var_data_;
+  std::size_t ndim_;
 
   static arrow::Result<ShapeProvider> Make(const casacore::TableColumn & column,
                                            const ColumnSelection & selection,
@@ -70,7 +71,7 @@ struct ShapeProvider {
 
   // Returns the number of dimensions, including row
   std::size_t nDim() const {
-    return (IsDefinitelyFixed() ? column_.get().columnDesc().ndim() : var_data_->nDim()) + 1;
+    return ndim_;
   }
 
   std::size_t RowDim() const { return nDim() - 1; }

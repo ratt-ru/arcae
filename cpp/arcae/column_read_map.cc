@@ -288,14 +288,16 @@ ShapeProvider::Make(const casacore::TableColumn & column,
                     const std::optional<ArrayProperties> & result_props) {
 
   if(column.columnDesc().isFixedShape()) {
-    auto shape = column.columnDesc().shape();
+    auto column_desc = column.columnDesc();
+    auto shape = column_desc.shape();
     shape.append(casacore::IPosition({ssize_t(column.nrow())}));
     ARROW_RETURN_NOT_OK(CheckSelectionAgainstShape(shape, selection));
-    return ShapeProvider{std::cref(column), selection};
+    return ShapeProvider{column, selection, nullptr, std::size_t(column_desc.ndim()) + 1};
   }
 
   ARROW_ASSIGN_OR_RAISE(auto var_data, VariableShapeData::Make(column, selection, result_props));
-  return ShapeProvider{std::cref(column), std::cref(selection), std::move(var_data)};
+  auto ndim = var_data->nDim() + 1;
+  return ShapeProvider{column, selection, std::move(var_data), ndim};
 }
 
 // Returns the dimension size of this column

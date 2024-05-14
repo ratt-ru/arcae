@@ -29,6 +29,7 @@ namespace arcae {
 struct ArrowShapeProvider {
   std::reference_wrapper<const casacore::TableColumn> column_;
   std::reference_wrapper<const ColumnSelection> selection_;
+  bool is_fixed_;
   std::shared_ptr<arrow::Array> data_;
   std::shared_ptr<arrow::DataType> data_type_;
   std::optional<casacore::IPosition> shape_;
@@ -40,7 +41,7 @@ struct ArrowShapeProvider {
                                                 const std::shared_ptr<arrow::Array> & data);
 
   // returns true if the column shape is fixed
-  bool IsColumnFixed() const { return column_.get().columnDesc().isFixedShape(); }
+  bool IsColumnFixed() const { return is_fixed_; }
 
   // return true if the column shape varys
   bool IsColumnVarying() const { return !IsColumnFixed(); }
