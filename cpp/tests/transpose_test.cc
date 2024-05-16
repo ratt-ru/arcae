@@ -104,13 +104,8 @@ class TransposeTest : public ::testing::Test {
 
         auto ms = MS(setup_new_table, knrow);
         auto fixed_data = GetArrayColumn<casacore::Complex>(ms, "FIXED_DATA");
-
-        for(auto [r, v] = std::tuple{ssize_t{0}, std::size_t{0}}; r < knrow; ++r) {
-          auto fixed_array = Array<casacore::Complex>(IPos({kncorr, knchan, 1}), {float(r), float(r)});
-          auto refrows = casacore::RefRows(r, r);
-          fixed_data.putColumnCells(refrows, fixed_array);
-        }
-
+        auto fixed_array = Array<casacore::Complex>(IPos({kncorr, knchan, knrow}));
+        fixed_data.putColumn(fixed_array);
         return std::make_shared<TableProxy>(ms);
       };
 
@@ -133,6 +128,7 @@ TEST_F(TransposeTest, Basic) {
   auto fixed_data = GetArrayColumn<casacore::Complex>(table_proxy_.table(), "FIXED_DATA");
 
   auto row_ids = std::vector<arcae::RowId>(knrow, 0);
+  for(std::size_t i=0; i < knrow; ++i) row_ids[i] = i;
   std::random_shuffle(std::begin(row_ids), std::end(row_ids));
   auto selection = arcae::ColumnSelection{row_ids, {}, {}};
   ASSERT_OK_AND_ASSIGN(auto read_map, ColumnReadMap::Make(fixed_data, selection));
