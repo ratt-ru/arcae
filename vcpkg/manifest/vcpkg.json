@@ -5,6 +5,9 @@
             "features": ["cxx17"]
         },
         {
+            "name": "mdspan"
+        },
+        {
             "name": "casacore",
             "default-features": false,
             "features": ["dysco", "threads", "tablelocking"]
