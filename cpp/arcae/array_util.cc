@@ -7,10 +7,6 @@
 #include <arrow/array/util.h>
 #include <arrow/util/logging.h>
 
-#include <casacore/casa/aipsxtype.h>
-#include <casacore/tables/Tables.h>
-
-#include "arcae/configuration.h"
 #include "arcae/service_locator.h"
 
 using ::arrow::Array;
