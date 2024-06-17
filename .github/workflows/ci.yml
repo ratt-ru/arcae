@@ -170,7 +170,7 @@ jobs:
         run: echo "CIBW_ENVIRONMENT_COMMON=$COMMON_ENV" >> $GITHUB_ENV
 
       - name: Run cibuildwheel
-        uses: pypa/cibuildwheel@v2.17
+        uses: pypa/cibuildwheel@v2.19
         env:
           CIBW_BUILD: ${{ matrix.cpython }}-${{ matrix.extra_build }}*
           CIBW_ARCHS: ${{ matrix.arch }}
