@@ -16,7 +16,7 @@ env:
   # Need to reinstall gcc in order to get gfortran
   CIBW_BEFORE_ALL_MACOS: |
     brew install python llvm
-    brew reinstall gcc --build-from-source
+    brew reinstall gcc
   CIBW_BEFORE_BUILD_MACOS: |
     export PATH="/opt/homebrew/opt/llvm/bin:$PATH"
     export LDFLAGS="-L/opt/homebrew/opt/llvm/lib"
