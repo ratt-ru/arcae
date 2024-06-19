@@ -191,8 +191,6 @@ jobs:
               -v {wheel} \
               --exclude libarrow_python.dylib \
               --exclude libarrow.1600.dylib \
-              --exclude libgfortran.5.dylib \
-              --exclude libquadmath.0.dylib \
               --ignore-missing-dependencies
 
       - name: Upload wheel artifacts
