@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Restrict Numpy to less than 2.0.0 (:pr:`100`)
 * Avoid stripping debug information (:pr:`96`)
 * Set cmake build type to RelWithDebInfo (:pr:`96`)
 * Avoid creating ColumnDesc objects in inner loops (:pr:`95`)
