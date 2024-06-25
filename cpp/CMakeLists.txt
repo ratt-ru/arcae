@@ -14,6 +14,7 @@ add_library(arcae SHARED
     arcae/descriptor.cc
     arcae/base_column_map.cc
     arcae/service_locator.cc
+    arcae/selection.cc
     arcae/safe_table_proxy.cc
     arcae/table_factory.cc)
 

@@ -28,6 +28,10 @@ add_executable(parallel_write_test parallel_write_test.cc)
 target_link_libraries(parallel_write_test PRIVATE GTest::gtest_main arcae test_utils)
 add_test(parallel_write_test parallel_write_test)
 
+add_executable(selection_test selection_test.cc)
+target_link_libraries(selection_test PRIVATE GTest::gtest_main arcae test_utils)
+add_test(selection_test selection_test)
+
 add_executable(var_write_test var_write_test.cc)
 target_link_libraries(var_write_test PRIVATE GTest::gtest_main arcae test_utils)
 add_test(var_write_test var_write_test)
@@ -47,6 +51,7 @@ set_tests_properties(basic_test range_test
                      range_test
                      parallel_write_test
                      in_place_test
+                     selection_test
                      transpose_test
                      var_write_test
                      PROPERTIES ENVIRONMENT "LD_LIBRARY_PATH=${VCPKG_LIBDIRS}")
