@@ -20,7 +20,10 @@ struct ArrayProperties {
 
 // Validate the constructed array
 arrow::Status ValidateArray(const std::shared_ptr<arrow::Array> & array);
-arrow::Result<std::shared_ptr<arrow::Array>> GetFlatArray(std::shared_ptr<arrow::Array> data, bool nulls=false);
+// Get a flattened array
+arrow::Result<std::shared_ptr<arrow::Array>> GetFlatArray(
+  std::shared_ptr<arrow::Array> data,
+  bool nulls=false);
 arrow::Status CheckElements(std::size_t map_size, std::size_t data_size);
 // Get the Array properties of an Arrow Array
 arrow::Result<ArrayProperties> GetArrayProperties(

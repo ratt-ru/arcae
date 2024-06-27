@@ -16,68 +16,67 @@ using ::arrow::Status;
 namespace arcae {
 
 Status ValidateArray(const std::shared_ptr<Array> & array) {
-    auto & config = ServiceLocator::configuration();
-    auto validation_level = config.GetDefault("validation-level", "basic");
+  auto & config = ServiceLocator::configuration();
+  auto validation_level = config.GetDefault("validation-level", "basic");
 
-    if(validation_level == "basic") {
-        return array->Validate();
-    } else if(validation_level == "full") {
-        return array->ValidateFull();
-    } else if(validation_level == "none") {
-        return Status::OK();
-    } else {
-        ARROW_LOG(WARNING) << "Invalid validation-level=" << validation_level
-                            << ". No array construction validation will be performed";
-        return Status::OK();
-    }
+  if(validation_level == "basic") {
+    return array->Validate();
+  } else if(validation_level == "full") {
+    return array->ValidateFull();
+  } else if(validation_level == "none") {
+    return Status::OK();
+  } else {
+    ARROW_LOG(WARNING) << "Invalid validation-level=" << validation_level
+                        << ". No array construction validation will be performed";
+    return Status::OK();
+  }
 }
-
-
 
 Result<std::shared_ptr<Array>>
 GetFlatArray(std::shared_ptr<Array> array, bool nulls) {
-    auto array_data = array->data();
+  auto array_data = array->data();
 
-    while(true) {
-        switch(array_data->type->id()) {
-            case arrow::Type::LIST:
-            case arrow::Type::LARGE_LIST:
-            case arrow::Type::FIXED_SIZE_LIST:
-            {
-                if(!nulls && array_data->null_count > 0) {
-                    return arrow::Status::Invalid(
-                      "Null values were encountered "
-                      "during array flattening.");
-                }
-                array_data = array_data->child_data[0];
-                break;
-            }
-            case arrow::Type::BOOL:
-            case arrow::Type::UINT8:
-            case arrow::Type::UINT16:
-            case arrow::Type::UINT32:
-            case arrow::Type::UINT64:
-            case arrow::Type::INT8:
-            case arrow::Type::INT16:
-            case arrow::Type::INT32:
-            case arrow::Type::INT64:
-            case arrow::Type::FLOAT:
-            case arrow::Type::DOUBLE:
-            case arrow::Type::STRING:
-              return arrow::MakeArray(array_data);
-            default:
-                return arrow::Status::TypeError(
-                    "Flattening of type ", array->type(),
-                    " is not supported");
+  while(true) {
+    switch(array_data->type->id()) {
+      case arrow::Type::LIST:
+      case arrow::Type::LARGE_LIST:
+      case arrow::Type::FIXED_SIZE_LIST:
+      {
+        if(!nulls && array_data->null_count > 0) {
+          return arrow::Status::Invalid(
+            "Null values were encountered "
+            "during array flattening.");
         }
+        array_data = array_data->child_data[0];
+        break;
+      }
+      case arrow::Type::BOOL:
+      case arrow::Type::UINT8:
+      case arrow::Type::UINT16:
+      case arrow::Type::UINT32:
+      case arrow::Type::UINT64:
+      case arrow::Type::INT8:
+      case arrow::Type::INT16:
+      case arrow::Type::INT32:
+      case arrow::Type::INT64:
+      case arrow::Type::FLOAT:
+      case arrow::Type::DOUBLE:
+      case arrow::Type::STRING:
+        return arrow::MakeArray(array_data);
+      default:
+        return arrow::Status::TypeError(
+          "Flattening of type ", array->type(),
+          " is not supported");
     }
+  }
 }
 
 arrow::Status
 CheckElements(std::size_t map_size, std::size_t data_size) {
     if(map_size == data_size) return arrow::Status::OK();
-    return arrow::Status::Invalid("Number of map elements ", map_size, " does not "
-                                    "match the length of the array ", data_size);
+    return arrow::Status::Invalid(
+      "Number of map elements ", map_size, " does not "
+      "match the length of the array ", data_size);
 }
 
 
@@ -87,7 +86,7 @@ arrow::Result<ArrayProperties> GetArrayProperties(
   const std::shared_ptr<arrow::Array> & data)
 {
   if(!data) {
-    return arrow::Status::ExecutionError("data is null");
+    return arrow::Status::Invalid("data is null");
   }
 
   // Starting state is a fixed shape array of 1 dimension
@@ -100,7 +99,6 @@ arrow::Result<ArrayProperties> GetArrayProperties(
   auto MaybeUpdateShapeAndNdim = [&](auto list) -> arrow::Result<std::shared_ptr<arrow::Array>> {
     ++ndim;
     using ListType = std::decay<decltype(list)>;
-
     assert(list->null_count() == 0);
 
     if(!fixed_shape || list->length() == 0) {
@@ -204,7 +202,11 @@ arrow::Result<ArrayProperties> GetArrayProperties(
 
   // Variably shaped data
   if(!fixed_shape) {
-    return ArrayProperties{std::nullopt, ndim, std::move(data_type), is_complex};
+    return ArrayProperties{
+      std::nullopt,
+      ndim,
+      std::move(data_type),
+      is_complex};
   }
 
   // C-ORDER to FORTRAN-ORDER
@@ -215,7 +217,11 @@ arrow::Result<ArrayProperties> GetArrayProperties(
   }
 
   // Fixed shape data
-  return ArrayProperties{std::make_optional(casa_shape), ndim, std::move(data_type), is_complex};
+  return ArrayProperties{
+    std::make_optional(casa_shape),
+    ndim,
+    std::move(data_type),
+    is_complex};
 }
 
 
