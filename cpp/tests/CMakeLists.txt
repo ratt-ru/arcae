@@ -12,6 +12,10 @@ add_executable(range_test range_test.cc)
 target_link_libraries(range_test PRIVATE GTest::gtest_main arcae test_utils)
 add_test(range_test range_test)
 
+add_executable(result_shape_test result_shape_test.cc)
+target_link_libraries(result_shape_test PRIVATE GTest::gtest_main arcae test_utils)
+add_test(result_shape_test result_shape_test)
+
 add_executable(column_iterator_test column_iterator_test.cc)
 target_link_libraries(column_iterator_test PRIVATE GTest::gtest_main arcae test_utils)
 add_test(column_iterator_test column_iterator_test)
@@ -46,6 +50,7 @@ add_test(transpose_test transpose_test)
 
 set_tests_properties(basic_test range_test
                      column_iterator_test
+                     result_shape_test
                      column_rw_test
                      column_map_test
                      range_test

@@ -1,6 +1,8 @@
-#include "arcae/column_shape.h"
+#include <memory>
 
+#include <arrow/type_fwd.h>
 #include <arrow/testing/gtest_util.h>
+#include <arrow/ipc/json_simple.h>
 
 #include <casacore/casa/Utilities/DataType.h>
 #include <casacore/casa/aipsxtype.h>
@@ -16,6 +18,7 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
+#include "arcae/result_shape.h"
 #include "arcae/safe_table_proxy.h"
 #include "arcae/selection.h"
 
@@ -24,7 +27,9 @@
 
 using ::arcae::detail::Selection;
 using ::arcae::detail::SelectionBuilder;
-using ::arcae::detail::ColumnShapeData;
+using ::arcae::detail::ResultShapeData;
+
+using ::arrow::ipc::internal::json::ArrayFromJSON;
 
 using casacore::Array;
 using casacore::ArrayColumn;
@@ -50,6 +55,8 @@ using namespace std::string_literals;
 static constexpr std::size_t knrow = 10;
 static constexpr std::size_t knchan = 4;
 static constexpr std::size_t kncorr = 2;
+
+namespace {
 
 template <typename T> ScalarColumn<T>
 GetScalarColumn(const MS & ms, MSColumns column) {
@@ -130,6 +137,7 @@ class ColumnShapeTest : public ::testing::Test {
                                      [](auto init, auto & shape) -> std::size_t
                                       { return init + shape.product(); });
 
+
         for(std::size_t i=0; i < knrow; ++i) {
           auto corrected_array = Array<Complex>(
                   varshapes[i],
@@ -144,7 +152,7 @@ class ColumnShapeTest : public ::testing::Test {
       ASSERT_OK_AND_ASSIGN(auto stp, arcae::SafeTableProxy::Make(factory));
       stp.reset();
 
-      auto lock = TableLock(TableLock::LockOption::AutoNoReadLocking);
+      auto lock = TableLock(TableLock::LockOption::AutoLocking);
       auto lockoptions = Record();
       lockoptions.define("option", "auto");
       lockoptions.define("internal", lock.interval());
@@ -153,78 +161,158 @@ class ColumnShapeTest : public ::testing::Test {
     }
 };
 
-namespace {
 
-TEST_F(ColumnShapeTest, Fixed) {
+TEST_F(ColumnShapeTest, ReadFixed) {
   auto fixed = GetArrayColumn<Complex>(table_proxy_.table(), "MODEL_DATA");
-  ASSERT_OK_AND_ASSIGN(auto shape_data, ColumnShapeData::Make(fixed));
+  ASSERT_OK_AND_ASSIGN(auto shape_data, ResultShapeData::MakeRead(fixed));
 
   EXPECT_EQ(shape_data.GetName(), "MODEL_DATA");
   EXPECT_TRUE(shape_data.IsFixed());
   EXPECT_EQ(shape_data.GetShape(), IPos({2, 4, 10}));
   EXPECT_EQ(shape_data.nDim(), 3);
+  EXPECT_EQ(shape_data.nRows(), 10);
+  EXPECT_EQ(shape_data.nElements(), 80);
   EXPECT_EQ(shape_data.GetDataType(), DataType::TpComplex);
 }
 
-TEST_F(ColumnShapeTest, FixedSelection) {
+TEST_F(ColumnShapeTest, ReadFixedSelection) {
   auto fixed = GetArrayColumn<Complex>(table_proxy_.table(), "MODEL_DATA");
   auto sel = SelectionBuilder::FromInit({{0, 1}});
-  ASSERT_OK_AND_ASSIGN(auto shape_data, ColumnShapeData::Make(fixed, sel));
+  ASSERT_OK_AND_ASSIGN(auto shape_data, ResultShapeData::MakeRead(fixed, sel));
 
   EXPECT_EQ(shape_data.GetName(), "MODEL_DATA");
   EXPECT_TRUE(shape_data.IsFixed());
   EXPECT_EQ(shape_data.GetShape(), IPos({2, 4, 2}));
   EXPECT_EQ(shape_data.nDim(), 3);
+  EXPECT_EQ(shape_data.nRows(), 2);
+  EXPECT_EQ(shape_data.nElements(), 16);
   EXPECT_EQ(shape_data.GetDataType(), DataType::TpComplex);
 
   sel = SelectionBuilder::FromInit({{0, 1}, {0, 1}, {0}});
-  ASSERT_OK_AND_ASSIGN(shape_data, ColumnShapeData::Make(fixed, sel));
+  ASSERT_OK_AND_ASSIGN(shape_data, ResultShapeData::MakeRead(fixed, sel));
 
   EXPECT_EQ(shape_data.GetName(), "MODEL_DATA");
   EXPECT_TRUE(shape_data.IsFixed());
   EXPECT_EQ(shape_data.GetShape(), IPos({1, 2, 2}));
   EXPECT_EQ(shape_data.nDim(), 3);
+  EXPECT_EQ(shape_data.nRows(), 2);
+  EXPECT_EQ(shape_data.nElements(), 4);
   EXPECT_EQ(shape_data.GetDataType(), DataType::TpComplex);
 }
 
-TEST_F(ColumnShapeTest, Variable) {
+TEST_F(ColumnShapeTest, ReadVariable) {
   auto var = GetArrayColumn<Complex>(table_proxy_.table(), "VAR_DATA");
-  ASSERT_OK_AND_ASSIGN(auto shape_data, ColumnShapeData::Make(var));
+  ASSERT_OK_AND_ASSIGN(auto shape_data, ResultShapeData::MakeRead(var));
 
   EXPECT_EQ(shape_data.GetName(), "VAR_DATA");
   EXPECT_FALSE(shape_data.IsFixed());
   EXPECT_EQ(shape_data.nDim(), 3);
+  EXPECT_EQ(shape_data.nRows(), 10);
   EXPECT_EQ(shape_data.GetRowShape(0), IPos({3, 2}));
   EXPECT_EQ(shape_data.GetRowShape(9), IPos({2, 1}));
+  EXPECT_EQ(shape_data.nElements(), nelements_);
   EXPECT_EQ(shape_data.GetDataType(), DataType::TpComplex);
 }
 
-TEST_F(ColumnShapeTest, VariableSelection) {
+TEST_F(ColumnShapeTest, ReadVariableSelection) {
   auto var = GetArrayColumn<Complex>(table_proxy_.table(), "VAR_DATA");
   auto sel = SelectionBuilder::FromInit({{0, 1}});
-  ASSERT_OK_AND_ASSIGN(auto shape_data, ColumnShapeData::Make(var, sel));
+  ASSERT_OK_AND_ASSIGN(auto shape_data, ResultShapeData::MakeRead(var, sel));
 
   EXPECT_EQ(shape_data.GetName(), "VAR_DATA");
   EXPECT_FALSE(shape_data.IsFixed());
+  EXPECT_EQ(shape_data.nDim(), 3);
+  EXPECT_EQ(shape_data.nRows(), 2);
   EXPECT_EQ(shape_data.GetRowShape(0), IPos({3, 2}));
   EXPECT_EQ(shape_data.GetRowShape(1), IPos({4, 1}));
+  EXPECT_EQ(shape_data.nElements(), 10);
   EXPECT_EQ(shape_data.GetDataType(), DataType::TpComplex);
 
   sel = SelectionBuilder::FromInit({{0, 9}, {0}});
-  ASSERT_OK_AND_ASSIGN(shape_data, ColumnShapeData::Make(var, sel));
+  ASSERT_OK_AND_ASSIGN(shape_data, ResultShapeData::MakeRead(var, sel));
   EXPECT_EQ(shape_data.GetName(), "VAR_DATA");
   EXPECT_FALSE(shape_data.IsFixed());
+  EXPECT_EQ(shape_data.nDim(), 3);
+  EXPECT_EQ(shape_data.nRows(), 2);
+  EXPECT_EQ(shape_data.nElements(), 5);
   EXPECT_EQ(shape_data.GetRowShape(0), IPos({3, 1}));
   EXPECT_EQ(shape_data.GetRowShape(1), IPos({2, 1}));
   EXPECT_EQ(shape_data.GetDataType(), DataType::TpComplex);
 
   // Fixed shape selection over variably shaped data
   sel = SelectionBuilder::FromInit({{0, 9}, {0}, {0, 1}});
-  ASSERT_OK_AND_ASSIGN(shape_data, ColumnShapeData::Make(var, sel));
+  ASSERT_OK_AND_ASSIGN(shape_data, ResultShapeData::MakeRead(var, sel));
   EXPECT_EQ(shape_data.GetName(), "VAR_DATA");
   EXPECT_TRUE(shape_data.IsFixed());
+  EXPECT_EQ(shape_data.nDim(), 3);
+  EXPECT_EQ(shape_data.nRows(), 2);
+  EXPECT_EQ(shape_data.nElements(), 4);
   EXPECT_EQ(shape_data.GetShape(), IPos({2, 1, 2}));
   EXPECT_EQ(shape_data.GetDataType(), DataType::TpComplex);
 }
+
+TEST_F(ColumnShapeTest, WriteFixed) {
+  auto fixed = GetArrayColumn<Complex>(table_proxy_.table(), "MODEL_DATA");
+  auto dtype = arrow::fixed_size_list(
+                arrow::fixed_size_list(
+                  arrow::fixed_size_list(
+                    arrow::float32(), 2), 2), 2);
+  ASSERT_OK_AND_ASSIGN(auto data,
+                       ArrayFromJSON(dtype,
+                                     R"([[[[0, 0], [1, 1]],
+                                          [[2, 2], [3, 3]]],
+                                         [[[4, 4], [5, 5]],
+                                          [[6, 6], [7, 7]]]])"));
+
+  ASSERT_OK_AND_ASSIGN(auto shape_data, ResultShapeData::MakeWrite(fixed, data));
+  EXPECT_EQ(shape_data.GetName(), "MODEL_DATA");
+  EXPECT_TRUE(shape_data.IsFixed());
+  EXPECT_EQ(shape_data.nDim(), 3);
+  EXPECT_EQ(shape_data.nRows(), 2);
+  EXPECT_EQ(shape_data.nElements(), 8);
+  EXPECT_EQ(shape_data.GetShape(), IPos({2, 2, 2}));
+  EXPECT_EQ(shape_data.GetDataType(), DataType::TpComplex);
+}
+
+TEST_F(ColumnShapeTest, WriteVariable) {
+  auto var = GetArrayColumn<Complex>(table_proxy_.table(), "VAR_DATA");
+  auto dtype = arrow::list(arrow::list(arrow::list(arrow::float32())));
+
+  // Supplied as a list, but actually fixed
+  ASSERT_OK_AND_ASSIGN(auto data,
+                       ArrayFromJSON(dtype,
+                                     R"([[[[0, 0], [1, 1], [2, 2]],
+                                          [[3, 3], [4, 4], [5, 5]]],
+                                         [[[6, 6], [7, 7], [8, 8]],
+                                          [[9, 9], [10, 10], [11, 11]]]])"));
+
+  ASSERT_OK_AND_ASSIGN(auto shape_data, ResultShapeData::MakeWrite(var, data));
+  EXPECT_EQ(shape_data.GetName(), "VAR_DATA");
+  EXPECT_TRUE(shape_data.IsFixed());
+  EXPECT_EQ(shape_data.nDim(), 3);
+  EXPECT_EQ(shape_data.nRows(), 2);
+  EXPECT_EQ(shape_data.nElements(), 12);
+  EXPECT_EQ(shape_data.GetShape(), IPos({3, 2, 2}));
+  EXPECT_EQ(shape_data.GetDataType(), DataType::TpComplex);
+
+  // Variably shaped
+  ASSERT_OK_AND_ASSIGN(data,
+                       ArrayFromJSON(dtype,
+                                     R"([[[[0, 0], [1, 1]],
+                                          [[3, 3], [4, 4]]],
+                                         [[[6, 6], [7, 7], [8, 8]],
+                                          [[9, 9], [10, 10], [11, 11]]]])"));
+
+  ASSERT_OK_AND_ASSIGN(shape_data, ResultShapeData::MakeWrite(var, data));
+  EXPECT_EQ(shape_data.GetName(), "VAR_DATA");
+  EXPECT_FALSE(shape_data.IsFixed());
+  EXPECT_EQ(shape_data.nDim(), 3);
+  EXPECT_EQ(shape_data.nRows(), 2);
+  EXPECT_EQ(shape_data.nElements(), 10);
+  EXPECT_EQ(shape_data.GetDataType(), DataType::TpComplex);
+  EXPECT_EQ(shape_data.GetRowShape(0), IPos({2, 2}));
+  EXPECT_EQ(shape_data.GetRowShape(1), IPos({3, 2}));
+}
+
 
 } // namespace
