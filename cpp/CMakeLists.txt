@@ -7,6 +7,7 @@ add_library(arcae SHARED
     arcae/casa_visitors.cc
     arcae/column_read_map.cc
     arcae/column_read_visitor.cc
+    arcae/column_shape.cc
     arcae/column_write_map.cc
     arcae/column_write_visitor.cc
     arcae/complex_type.cc
