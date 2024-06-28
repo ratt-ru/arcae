@@ -8,12 +8,10 @@
 #include <type_traits>
 #include <vector>
 
-#include <experimental/mdspan>
+#include <absl/types/span.h>
 
 #include <arrow/status.h>
 #include <arrow/result.h>
-
-namespace stdex = std::experimental;
 
 namespace arcae {
 namespace detail {
@@ -22,10 +20,8 @@ namespace detail {
 using IndexType = std::int64_t;
 // A vector of indices
 using Index = std::vector<IndexType>;
-// a 1D dynamic extent, using in the IndexSpan below
-using ExtentType = stdex::extents<std::size_t, stdex::dynamic_extent>;
 // A span over a 1D contiguous sequence of Indexes
-using IndexSpan = stdex::mdspan<const IndexType, ExtentType>;
+using IndexSpan = absl::Span<const IndexType>;
 
 // Helper class for use with static_assert
 template <class...> constexpr std::false_type always_false{};
@@ -44,18 +40,6 @@ public:
   Selection & operator=(const Selection & rhs) = default;
   Selection & operator=(Selection && rhs) = default;
 
-  // Constant begin iterator for dimension
-  const IndexType * cbegin(std::size_t dim) const {
-    assert(dim < Size());
-    return spans_[dim].data_handle();
-  }
-
-  // Constant end iterator for dimensions
-  const IndexType * cend(std::size_t dim) const {
-    assert(dim < Size());
-    return spans_[dim].data_handle() + spans_[dim].size();
-  }
-
   // Number of dimensions in the selection
   std::size_t Size() const { return spans_.size(); }
 
@@ -68,11 +52,17 @@ public:
     return dim < Size() && !spans_[dim].empty();
   }
 
+  // Return true if
+  explicit inline operator bool() const { return Size() > 0; }
+
   // Return the selection indices for a specified dimension
   const IndexSpan & operator[](std::size_t dim) const {
     assert(dim < Size());
     return spans_[dim];
   }
+
+  // Return true if a valid row span exists
+  bool HasRowSpan() const { return Size() > 0 && !spans_[Size() - 1].empty(); }
 
   // Return the selection indices for the row dimension
   const IndexSpan & GetRowSpan() const {
@@ -123,10 +113,6 @@ struct SelectionBuilder {
     return Selection{std::move(indices), std::move(spans)};
   }
 
-  inline IndexSpan MakeIndexSpan(const Index & index) {
-    return IndexSpan{std::data(index), ExtentType{index.size()}};
-  }
-
   // ProcessArgs base case
   SelectionBuilder & ProcessArgs() { return *this; }
 
@@ -172,10 +158,10 @@ struct SelectionBuilder {
   template <typename T>
   SelectionBuilder & Add(const std::vector<T> & ids) {
     if constexpr(std::is_same_v<T, IndexType>) {
-      spans.emplace_back(MakeIndexSpan(ids));
+      spans.emplace_back(IndexSpan(ids));
     } else if constexpr(std::is_integral_v<T>) {
       indices.emplace_back(Index(std::begin(ids), std::end(ids)));
-      spans.emplace_back(MakeIndexSpan(indices.back()));
+      spans.emplace_back(IndexSpan(indices.back()));
     } else {
       static_assert(always_false<T>, "ids must contain integral types");
     }
@@ -188,10 +174,10 @@ struct SelectionBuilder {
   SelectionBuilder & Add(std::vector<T> && ids) {
     if constexpr(std::is_same_v<T, IndexType>) {
       indices.emplace_back(std::move(ids));
-      spans.emplace_back(MakeIndexSpan(indices.back()));
+      spans.emplace_back(IndexSpan(indices.back()));
     } else if constexpr(std::is_integral_v<T>) {
       indices.emplace_back(Index(std::begin(ids), std::end(ids)));
-      spans.emplace_back(MakeIndexSpan(indices.back()));
+      spans.emplace_back(IndexSpan(indices.back()));
     } else {
       static_assert(always_false<T>, "ids must contain integral types");
     }

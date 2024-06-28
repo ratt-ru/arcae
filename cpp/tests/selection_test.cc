@@ -7,7 +7,6 @@
 
 using ::arcae::detail::Index;
 using ::arcae::detail::IndexSpan;
-using ::arcae::detail::ExtentType;
 using ::arcae::detail::SelectionBuilder;
 
 TEST(SelectionTests, InitializerLists) {
@@ -15,11 +14,11 @@ TEST(SelectionTests, InitializerLists) {
   EXPECT_EQ(sel.nIndices(), 2);
   EXPECT_EQ(sel.Size(), 2);
 
-  auto data = sel.GetRowSpan().data_handle();
+  auto data = sel.GetRowSpan().data();
   auto size = sel.GetRowSpan().size();
   EXPECT_EQ(std::accumulate(data, data + size, 0.0), 3);
 
-  data = sel[0].data_handle();
+  data = sel[0].data();
   size = sel[0].size();
   EXPECT_EQ(std::accumulate(data, data + size, 0.0), 1);
 }
@@ -40,7 +39,7 @@ TEST(SelectionTests, ArgumentPacks) {
   EXPECT_EQ(sizeof(sums) / sizeof(int), sel.Size());
 
   for(int i=0; i < sel.Size(); ++i) {
-    auto data = sel[i].data_handle();
+    auto data = sel[i].data();
     auto size = sel[i].size();
     EXPECT_EQ(size, sizes[i]);
     EXPECT_EQ(std::accumulate(data, data + size, 0.0), sums[i]);
