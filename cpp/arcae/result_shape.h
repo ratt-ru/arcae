@@ -18,6 +18,9 @@
 namespace arcae {
 namespace detail {
 
+using RowShapes = std::vector<casacore::IPosition>;
+
+
 // Holds information about the shape of:
 //
 // 1. A read from a column
@@ -39,8 +42,6 @@ namespace detail {
 // Otherwise the shape varies per row, in which case `IsFixed` return false
 // and each individual row shape can be obtained by calling `GetRowShape`.
 struct ResultShapeData {
-  using RowShapes = std::vector<casacore::IPosition>;
-
   std::string column_name_;
   std::optional<casacore::IPosition> shape_;
   std::size_t ndim_;
@@ -48,29 +49,34 @@ struct ResultShapeData {
   std::optional<RowShapes> row_shapes_;
 
   // Return the Column Name
-  const std::string & GetName() const { return column_name_; }
+  const std::string & GetName() const noexcept { return column_name_; }
 
   // Return the Number of Dimensions in the Column
-  std::size_t nDim() const { return ndim_; }
+  std::size_t nDim() const noexcept { return ndim_; }
 
   // Number of Rows in the Shape
-  std::size_t nRows() const {
-    return IsFixed() ? shape_->last() : row_shapes_->size();
+  std::size_t nRows() const noexcept {
+    if(IsFixed()) return shape_->last();
+    assert(row_shapes_);
+    return row_shapes_->size();
   }
 
+  // Maximum dimension size
+  std::size_t MaxDimensionSize() const noexcept;
+
   // Is the result shape fixed?
-  bool IsFixed() const { return shape_.has_value(); }
+  bool IsFixed() const noexcept { return shape_.has_value(); }
 
   // Return the shape if it is fixed
   // Requires IsFixed() == true.
-  casacore::IPosition GetShape() const {
+  const casacore::IPosition & GetShape() const noexcept {
     assert(IsFixed());
     return shape_.value();
   }
 
   // Return the shape of the row
   // Requires IsFixed() == false.
-  const casacore::IPosition & GetRowShape(std::size_t row) const {
+  const casacore::IPosition & GetRowShape(std::size_t row) const noexcept {
     assert(!IsFixed());
     assert(row_shapes_);
     assert(row < row_shapes_->size());
@@ -78,10 +84,13 @@ struct ResultShapeData {
   }
 
   // Get the underlying CASA Data Type
-  casacore::DataType GetDataType() const { return dtype_; }
+  casacore::DataType GetDataType() const noexcept { return dtype_; }
 
   // Get the number of elements in the result
-  std::size_t nElements() const;
+  std::size_t nElements() const noexcept;
+
+  // Get ListArray offsets
+  arrow::Result<std::vector<std::shared_ptr<arrow::Int32Array>>> GetOffsets() const noexcept;
 
   // Create a ResultShapeData instance suitable for reading
   static arrow::Result<ResultShapeData> MakeRead(

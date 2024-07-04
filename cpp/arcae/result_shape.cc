@@ -1,8 +1,10 @@
 
+#include <algorithm>
 #include <cstddef>
 #include <memory>
 #include <numeric>
 #include <optional>
+#include <sys/types.h>
 
 #include <casacore/casa/aipsxtype.h>
 #include <casacore/casa/Arrays/IPosition.h>
@@ -12,12 +14,13 @@
 
 #include <arrow/result.h>
 #include <arrow/status.h>
+#include <arrow/type_fwd.h>
 
 #include "arcae/selection.h"
 #include "arcae/result_shape.h"
 
 using ::arcae::detail::IndexType;
-using RowShapes = ::arcae::detail::ResultShapeData::RowShapes;
+using RowShapes = ::arcae::detail::RowShapes;
 
 using ::casacore::ColumnDesc;
 using ::casacore::DataType;
@@ -98,20 +101,22 @@ MakeRowData(const TableColumn &column,
   RowShapes shapes;
   const auto & column_desc = column.columnDesc();
 
-  if(selection.Size() > 0) {
+  // Get the row selection if provided
+  if(selection.HasRowSpan()) {
     auto span = selection.GetRowSpan();
     shapes.reserve(span.size());
     for(std::size_t r=0; r < span.size(); ++r) {
       ARROW_ASSIGN_OR_RAISE(auto shape, GetRowShape(column, result_shape, span[r]));
       ARROW_RETURN_NOT_OK(ClipShape(column_desc, shape, selection));
-      shapes.push_back(std::move(shape));
+      shapes.emplace_back(std::move(shape));
     }
+  // otherwise, the entire column
   } else {
     shapes.reserve(column.nrow());
-    for(casacore::rownr_t r=0; r < column.nrow(); ++r) {
+    for(std::size_t r=0; r < column.nrow(); ++r) {
       ARROW_ASSIGN_OR_RAISE(auto shape, GetRowShape(column, result_shape, r));
       ARROW_RETURN_NOT_OK(ClipShape(column_desc, shape, selection));
-      shapes.push_back(std::move(shape));
+      shapes.emplace_back(std::move(shape));
     }
   }
 
@@ -338,6 +343,7 @@ GetResultShapeData(
         "Arrow result data must supply pairs of values ",
         "for complex valued column ", shape_data.GetName());
     }
+
     shape = shape.getLast(shape.size() - 1);
     auto ndim = shape.size();
     return ResultShapeData{
@@ -359,6 +365,7 @@ GetResultShapeData(
     }
     shapes[r] = shapes[r].getLast(shapes[r].size() - 1);
   }
+
   return ResultShapeData{
     std::move(shape_data.column_name_),
     std::nullopt,
@@ -370,9 +377,23 @@ GetResultShapeData(
 
 }  // namespace
 
-
+// Maximum dimension size
 std::size_t
-ResultShapeData::nElements() const {
+ResultShapeData::MaxDimensionSize() const noexcept {
+  if(IsFixed()) return *std::max_element(shape_->begin(), shape_->end());
+  std::size_t max_dim_size = 0;
+  for(std::size_t r=0; r < nRows(); ++r) {
+    const auto & shape = GetRowShape(r);
+    for(std::size_t dim=0; dim < nDim() - 1; ++dim) {
+      max_dim_size = std::max(max_dim_size, std::size_t(shape[dim]));
+    }
+  }
+  return max_dim_size;
+}
+
+// Number of elements in the result
+std::size_t
+ResultShapeData::nElements() const noexcept {
   if(IsFixed()) return shape_.value().product();
   return std::accumulate(
     row_shapes_->begin(),
@@ -380,6 +401,53 @@ ResultShapeData::nElements() const {
     std::size_t{0},
     [](auto i, auto s) { return s.product() + i; });
 }
+
+// Get ListArray offsets arrays
+arrow::Result<std::vector<std::shared_ptr<arrow::Int32Array>>>
+ResultShapeData::GetOffsets() const noexcept {
+  auto nrow = nRows();
+  // Don't build offsets for the row dimension (last in FORTRAN order)
+  auto ndim = nDim() - 1;
+  auto builders = std::vector<arrow::Int32Builder>(ndim);
+  auto offsets = std::vector<std::shared_ptr<arrow::Int32Array>>(ndim);
+  auto running_offsets = std::vector<std::size_t>(ndim, 0);
+
+  // Initialise offsets
+  for(std::size_t dim=0; dim < ndim; ++dim) {
+    ARROW_RETURN_NOT_OK(builders[dim].Reserve(nrow + 1));
+    ARROW_RETURN_NOT_OK(builders[dim].Append(0));
+  }
+
+  // Compute number of elements in each row by creating
+  // a product over each dimension
+  auto BuildFn = [&](auto && GetShapeFn) -> arrow::Status {
+    using ItType = std::tuple<std::ptrdiff_t, std::size_t>;
+    for(std::size_t row=0; row < nrow; ++row) {
+      for(auto [dim, product]=ItType{ndim - 1, 1}; dim >= 0; --dim) {
+        auto dim_size = GetShapeFn(row, dim);
+        for(std::size_t p=0; p < product; ++p) {
+          running_offsets[dim] += dim_size;
+          ARROW_RETURN_NOT_OK(builders[dim].Append(running_offsets[dim]));
+        }
+        product *= dim_size;
+      }
+    }
+    return arrow::Status::OK();
+  };
+
+  // Build the offset arrays
+  if(!IsFixed()) {
+    ARROW_RETURN_NOT_OK(BuildFn([&](auto r, auto d) { return GetRowShape(r)[d]; }));
+  } else {
+    ARROW_RETURN_NOT_OK(BuildFn([&](auto r, auto d) { return (*shape_)[d]; }));
+  }
+  // Finish the offset arrays
+  for(std::size_t dim=0; dim < ndim; ++dim) {
+    ARROW_RETURN_NOT_OK(builders[dim].Finish(&offsets[dim]));
+  }
+  return offsets;
+}
+
 
 arrow::Result<ResultShapeData>
 ResultShapeData::MakeRead(
@@ -446,6 +514,7 @@ ResultShapeData::MakeRead(
     }
   }
 
+  // Should have been caught above, but check again
   // The number of dimensions varies per row
   // This case is not handled
   if (ndim == -1) {
@@ -504,12 +573,41 @@ ResultShapeData::MakeWrite(
       column_desc.ndim() + 1);
   }
 
+  // Check the row dimension against the selection
   if(selection.HasRowSpan() && shape_data.nRows() != selection.GetRowSpan().size()) {
-    return arrow::Status::Invalid(
+    return arrow::Status::IndexError(
       "Row selection size ", selection.GetRowSpan().size(),
       " doesn't match the number of rows",
       " in the result shape ", shape_data.nRows()
     );
+  }
+
+  // Check secondary dimensions against the selection
+  auto other_dims = std::ptrdiff_t(shape_data.nDim() - 1);
+  auto sel_size = std::ptrdiff_t(selection.Size());
+
+  if(shape_data.IsFixed()) {
+    for(std::ptrdiff_t dim=0; dim < other_dims && dim < sel_size; ++dim) {
+      if(shape_data.GetShape()[dim] != ssize_t(selection[dim].size())) {
+        return arrow::Status::IndexError(
+          "Selection size ", selection[dim].size(),
+          " doesn't match dimension ", dim,
+          " of shape", shape_data.GetShape());
+      }
+    }
+  } else {
+    for(std::size_t r=0; r < shape_data.nRows(); ++r) {
+      const auto & row_shape = shape_data.GetRowShape(r);
+      for(std::ptrdiff_t dim=0; dim < other_dims && dim < sel_size; ++dim) {
+        if(row_shape[dim] != ssize_t(selection[dim].size())) {
+          return arrow::Status::IndexError(
+            "Selection size", selection[dim].size(),
+            " doesn't match dimension ", dim,
+            " of shape", shape_data.GetRowShape(r),
+            " in row ", r);
+        }
+      }
+    }
   }
 
   return shape_data;
