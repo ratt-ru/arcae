@@ -41,43 +41,45 @@ public:
   Selection & operator=(Selection && rhs) = default;
 
   // Number of dimensions in the selection
-  std::size_t Size() const { return spans_.size(); }
+  std::size_t Size() const noexcept { return spans_.size(); }
 
   // Number of stored indices in the selection
-  std::size_t nIndices() const { return indices_.size(); }
+  std::size_t nIndices() const noexcept { return indices_.size(); }
 
-  // Returns true if a selection exists at
-  // the specified dimension
-  bool IsValid(std::size_t dim) const {
+  // Returns true if a non-empty selection
+  // exists at the specified dimension
+  bool IsValid(std::size_t dim) const noexcept {
     return dim < Size() && !spans_[dim].empty();
   }
 
-  // Return true if
-  explicit inline operator bool() const { return Size() > 0; }
+  // Return true if the selection exists
+  explicit inline operator bool() const noexcept { return Size() > 0; }
 
   // Return the selection indices for a specified dimension
-  const IndexSpan & operator[](std::size_t dim) const {
+  const IndexSpan & operator[](std::size_t dim) const noexcept {
     assert(dim < Size());
     return spans_[dim];
   }
 
   // Return true if a valid row span exists
-  bool HasRowSpan() const { return Size() > 0 && !spans_[Size() - 1].empty(); }
+  bool HasRowSpan() const noexcept {
+    return !spans_.empty() && !spans_[Size() - 1].empty();
+  }
 
   // Return the selection indices for the row dimension
-  const IndexSpan & GetRowSpan() const {
+  const IndexSpan & GetRowSpan() const noexcept {
     assert(Size() > 0);
     return spans_[Size() - 1];
   }
 
   // Return the Span referenced by the C-ORDERED index
-  arrow::Result<IndexSpan> CSpan(std::size_t cdim) const {
+  arrow::Result<IndexSpan> CSpan(std::size_t cdim) const noexcept {
     return CSpan(cdim, Size());
   }
 
   // Return the Span referenced by the C-ORDERED index,
   // given the total number of dimensions
-  arrow::Result<IndexSpan> CSpan(std::size_t cdim, std::size_t ndim) const {
+  arrow::Result<IndexSpan> CSpan(std::size_t cdim, std::size_t ndim) const noexcept {
     auto fdim = std::ptrdiff_t(cdim) +
                 std::ptrdiff_t(Size()) -
                 std::ptrdiff_t(ndim);
