@@ -250,7 +250,6 @@ ColumnWriteMap::Make(
   if(order == MapOrder::C_ORDER) {
     std::reverse(std::begin(selection), std::end(selection));
   }
-
   ARROW_ASSIGN_OR_RAISE(auto shape_prov, ArrowShapeProvider::Make(column, selection, data));
   auto maps = MapFactory(shape_prov, selection);
 
@@ -270,8 +269,8 @@ ColumnWriteMap::Make(
   ARROW_ASSIGN_OR_RAISE(auto ranges, RangeFactory(shape_prov, maps));
 
   if(ranges.size() == 0) {
-    return arrow::Status::ExecutionError("Zero ranges generated for column ",
-                                          column.columnDesc().name());
+    return arrow::Status::IndexError("Zero ranges generated for column ",
+                                      column.columnDesc().name());
   }
 
   return ColumnWriteMap{{std::cref(column), std::move(maps), std::move(ranges)},
