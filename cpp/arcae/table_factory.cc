@@ -11,6 +11,7 @@
 #include "arcae/table_factory.h"
 
 #include <algorithm>
+#include <memory>
 
 #include "arcae/descriptor.h"
 #include "arcae/safe_table_proxy.h"
@@ -26,7 +27,6 @@
 #include <casacore/tables/Tables.h>
 #include <casacore/tables/Tables/TableProxy.h>
 #include <casacore/ms/MeasurementSets/MeasurementSet.h>
-#include <memory>
 
 using namespace std::literals;
 
@@ -209,7 +209,7 @@ arrow::Result<std::shared_ptr<SafeTableProxy>> Taql(
         try {
             return std::make_shared<TableProxy>(taql, proxies);
         } catch (const casacore::AipsError & e) {
-            return arrow::Status::ExecutionError("Error executing TAQL query: ", e.what());
+            return arrow::Status::UnknownError("Error executing TAQL query: ", e.what());
         }
     },
     tables.front()->io_pool);
