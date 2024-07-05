@@ -4,6 +4,7 @@
 #include <memory>
 #include <numeric>
 #include <optional>
+#include <string>
 #include <sys/types.h>
 
 #include <casacore/casa/aipsxtype.h>
@@ -75,7 +76,7 @@ arrow::Status ClipShape(
 
   if(selection.Size() <= 1) return arrow::Status::OK();
   for(std::size_t dim=0; dim < shape.size(); ++dim) {
-    if(auto result = selection.CSpan(dim, shape.size() + 1); result.ok()) {
+    if(auto result = selection.CSpan(dim); result.ok()) {
       auto span = result.ValueOrDie();
       for(auto i: span) {
         if(i >= shape[dim]) {
@@ -381,14 +382,47 @@ GetResultShapeData(
 std::size_t
 ResultShapeData::MaxDimensionSize() const noexcept {
   if(IsFixed()) return *std::max_element(shape_->begin(), shape_->end());
-  std::size_t max_dim_size = 0;
+  std::size_t max_size = nRows();
   for(std::size_t r=0; r < nRows(); ++r) {
     const auto & shape = GetRowShape(r);
-    for(std::size_t dim=0; dim < nDim() - 1; ++dim) {
-      max_dim_size = std::max(max_dim_size, std::size_t(shape[dim]));
-    }
+    auto shape_max = *std::max_element(shape.begin(), shape.end());
+    max_size = std::max<std::size_t>(max_size, shape_max);
   }
-  return max_dim_size;
+  return max_size;
+}
+
+std::size_t
+ResultShapeData::FlatOffset(const std::vector<IndexType> & index) const noexcept {
+  auto ndim = nDim();
+  std::size_t offset = 0;
+  IndexType product = 1;
+  assert(index.size() == ndim);
+
+  // Fixed case
+  if(IsFixed()) {
+    const auto & shape = GetShape();
+    for(std::size_t d=0; d < index.size() && d < ndim; ++d) {
+      offset += index[d] * product;
+      product *= shape[d];
+    }
+    return offset;
+  };
+
+  // Variable case
+  auto row = index[ndim-1];
+  assert(row < IndexType(nRows()));
+  const auto shape = GetRowShape(row);
+
+  for(std::size_t d=0; d < shape.size() && d < ndim - 1; ++d) {
+    offset += index[d] * product;
+    product *= shape[d];
+  }
+
+  return std::accumulate(
+    row_shapes_->begin(),
+    row_shapes_->begin() + row + 1,
+    offset,
+    [](auto i, auto s) { return i + s.product(); });
 }
 
 // Number of elements in the result

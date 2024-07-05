@@ -28,9 +28,17 @@ add_executable(column_map_test column_map_test.cc)
 target_link_libraries(column_map_test PRIVATE GTest::gtest_main arcae test_utils)
 add_test(column_map_test column_map_test)
 
+add_executable(isolated_table_proxy_test isolated_table_proxy_test.cc)
+target_link_libraries(isolated_table_proxy_test PRIVATE GTest::gtest_main arcae test_utils)
+add_test(isolated_table_proxy_test isolated_table_proxy_test)
+
 add_executable(parallel_write_test parallel_write_test.cc)
 target_link_libraries(parallel_write_test PRIVATE GTest::gtest_main arcae test_utils)
 add_test(parallel_write_test parallel_write_test)
+
+add_executable(data_partition_test data_partition_test.cc)
+target_link_libraries(data_partition_test PRIVATE GTest::gtest_main arcae test_utils)
+add_test(data_partition_test data_partition_test)
 
 add_executable(selection_test selection_test.cc)
 target_link_libraries(selection_test PRIVATE GTest::gtest_main arcae test_utils)
@@ -53,6 +61,8 @@ set_tests_properties(basic_test range_test
                      result_shape_test
                      column_rw_test
                      column_map_test
+                     data_partition_test
+                     isolated_table_proxy_test
                      range_test
                      parallel_write_test
                      in_place_test

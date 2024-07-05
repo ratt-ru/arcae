@@ -34,8 +34,8 @@ TEST(SelectionTests, ArgumentPacks) {
   EXPECT_EQ(sel.nIndices(), 3);
   EXPECT_EQ(sel.Size(), 4);
 
-  int sums []  = {6, 10, 6, 3};
-  int sizes [] = {3, 4, 3, 3};
+  int sums []  = {3, 6, 10, 6};
+  int sizes [] = {3, 3, 4, 3};
   EXPECT_EQ(sizeof(sums) / sizeof(int), sel.Size());
 
   for(int i=0; i < sel.Size(); ++i) {

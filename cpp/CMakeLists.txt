@@ -4,16 +4,18 @@ pkg_check_modules(casacore REQUIRED IMPORTED_TARGET casacore)
 
 add_library(arcae SHARED
     arcae/array_util.cc
+    arcae/base_column_map.cc
     arcae/casa_visitors.cc
+    arcae/configuration.cc
     arcae/column_read_map.cc
     arcae/column_read_visitor.cc
-    arcae/result_shape.cc
     arcae/column_write_map.cc
     arcae/column_write_visitor.cc
     arcae/complex_type.cc
-    arcae/configuration.cc
     arcae/descriptor.cc
-    arcae/base_column_map.cc
+    arcae/data_partition.cc
+    arcae/isolated_table_proxy.cc
+    arcae/result_shape.cc
     arcae/service_locator.cc
     arcae/selection.cc
     arcae/safe_table_proxy.cc

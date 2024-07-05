@@ -53,7 +53,11 @@ public:
   }
 
   // Return true if the selection exists
-  explicit inline operator bool() const noexcept { return Size() > 0; }
+  explicit inline operator bool() const noexcept {
+    if(Size() == 0) return false;
+    for(std::size_t i=0; i < Size(); ++i) if(spans_[i].empty()) return false;
+    return true;
+  }
 
   // Return the selection indices for a specified dimension
   const IndexSpan & operator[](std::size_t dim) const noexcept {
@@ -72,18 +76,26 @@ public:
     return spans_[Size() - 1];
   }
 
+
   // Return the Span referenced by the C-ORDERED index
   arrow::Result<IndexSpan> CSpan(std::size_t cdim) const noexcept {
-    return CSpan(cdim, Size());
+    auto size = std::ptrdiff_t(Size());
+    auto sdim = size - std::ptrdiff_t(cdim) - 1;
+    if(sdim >= 0 && sdim < size && !spans_[sdim].empty()) return spans_[sdim];
+    return arrow::Status::IndexError("Selection doesn't exist");
   }
 
-  // Return the Span referenced by the C-ORDERED index,
+  // Return the Span referenced by the F-ORDERED index
+  arrow::Result<IndexSpan> FSpan(std::size_t fdim) const noexcept {
+    return FSpan(fdim, Size());
+  }
+
+  // Return the Span referenced by the F-ORDERED index,
   // given the total number of dimensions
-  arrow::Result<IndexSpan> CSpan(std::size_t cdim, std::size_t ndim) const noexcept {
-    auto fdim = std::ptrdiff_t(cdim) +
-                std::ptrdiff_t(Size()) -
-                std::ptrdiff_t(ndim);
-    if(fdim >= 0 && fdim < std::ptrdiff_t(Size())) return spans_[fdim];
+  arrow::Result<IndexSpan> FSpan(std::size_t fdim, std::size_t ndim) const noexcept {
+    auto size = std::ptrdiff_t(Size());
+    auto sdim = std::ptrdiff_t(fdim) - std::ptrdiff_t(ndim) + size;
+    if(sdim >= 0 && sdim < size && !spans_[sdim].empty()) return spans_[sdim];
     return arrow::Status::IndexError("Selection doesn't exist");
   }
 
@@ -125,15 +137,15 @@ struct SelectionBuilder {
     return ProcessArgs(std::forward<Args>(args)...);
   }
 
-  // Create a Selection from an Argument Pack
+  // Create a Selection from an Argument Pack in C order
   template <typename... Args>
   static Selection FromArgs(Args && ... args) {
     SelectionBuilder builder;
     builder.ProcessArgs(std::forward<Args>(args)...);
-    return builder.Build();
+    return builder.Order('F').Build();
   }
 
-  // Create a Selection from a series of initializer_list<T>
+  // Create a Selection from a series of initializer_list<T> in C order
   template <typename T>
   static Selection FromInit(std::initializer_list<std::initializer_list<T>> init_list) {
     SelectionBuilder builder;

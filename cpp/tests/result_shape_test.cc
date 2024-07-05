@@ -173,6 +173,7 @@ TEST_F(ColumnShapeTest, ReadFixed) {
   EXPECT_EQ(shape_data.nRows(), 10);
   EXPECT_EQ(shape_data.nElements(), 80);
   EXPECT_EQ(shape_data.GetDataType(), DataType::TpComplex);
+  ASSERT_OK_AND_ASSIGN(auto offsets, shape_data.GetOffsets());
 }
 
 TEST_F(ColumnShapeTest, ReadFixedSelection) {
@@ -187,6 +188,7 @@ TEST_F(ColumnShapeTest, ReadFixedSelection) {
   EXPECT_EQ(shape_data.nRows(), 2);
   EXPECT_EQ(shape_data.nElements(), 16);
   EXPECT_EQ(shape_data.GetDataType(), DataType::TpComplex);
+  ASSERT_OK_AND_ASSIGN(auto offsets, shape_data.GetOffsets());
 
   sel = SelectionBuilder::FromInit({{0, 1}, {0, 1}, {0}});
   ASSERT_OK_AND_ASSIGN(shape_data, ResultShapeData::MakeRead(fixed, sel));
@@ -198,6 +200,7 @@ TEST_F(ColumnShapeTest, ReadFixedSelection) {
   EXPECT_EQ(shape_data.nRows(), 2);
   EXPECT_EQ(shape_data.nElements(), 4);
   EXPECT_EQ(shape_data.GetDataType(), DataType::TpComplex);
+  ASSERT_OK_AND_ASSIGN(offsets, shape_data.GetOffsets());
 }
 
 TEST_F(ColumnShapeTest, ReadVariable) {
@@ -212,6 +215,7 @@ TEST_F(ColumnShapeTest, ReadVariable) {
   EXPECT_EQ(shape_data.GetRowShape(9), IPos({2, 1}));
   EXPECT_EQ(shape_data.nElements(), nelements_);
   EXPECT_EQ(shape_data.GetDataType(), DataType::TpComplex);
+  ASSERT_OK_AND_ASSIGN(auto offsets, shape_data.GetOffsets());
 }
 
 TEST_F(ColumnShapeTest, ReadVariableSelection) {
@@ -227,6 +231,7 @@ TEST_F(ColumnShapeTest, ReadVariableSelection) {
   EXPECT_EQ(shape_data.GetRowShape(1), IPos({4, 1}));
   EXPECT_EQ(shape_data.nElements(), 10);
   EXPECT_EQ(shape_data.GetDataType(), DataType::TpComplex);
+  ASSERT_OK_AND_ASSIGN(auto offsets, shape_data.GetOffsets());
 
   sel = SelectionBuilder::FromInit({{0, 9}, {0}});
   ASSERT_OK_AND_ASSIGN(shape_data, ResultShapeData::MakeRead(var, sel));
@@ -238,6 +243,7 @@ TEST_F(ColumnShapeTest, ReadVariableSelection) {
   EXPECT_EQ(shape_data.GetRowShape(0), IPos({3, 1}));
   EXPECT_EQ(shape_data.GetRowShape(1), IPos({2, 1}));
   EXPECT_EQ(shape_data.GetDataType(), DataType::TpComplex);
+  ASSERT_OK_AND_ASSIGN(offsets, shape_data.GetOffsets());
 
   // Fixed shape selection over variably shaped data
   sel = SelectionBuilder::FromInit({{0, 9}, {0}, {0, 1}});
@@ -249,6 +255,7 @@ TEST_F(ColumnShapeTest, ReadVariableSelection) {
   EXPECT_EQ(shape_data.nElements(), 4);
   EXPECT_EQ(shape_data.GetShape(), IPos({2, 1, 2}));
   EXPECT_EQ(shape_data.GetDataType(), DataType::TpComplex);
+  ASSERT_OK_AND_ASSIGN(offsets, shape_data.GetOffsets());
 }
 
 TEST_F(ColumnShapeTest, WriteFixed) {
@@ -272,6 +279,7 @@ TEST_F(ColumnShapeTest, WriteFixed) {
   EXPECT_EQ(shape_data.nElements(), 8);
   EXPECT_EQ(shape_data.GetShape(), IPos({2, 2, 2}));
   EXPECT_EQ(shape_data.GetDataType(), DataType::TpComplex);
+  ASSERT_OK_AND_ASSIGN(auto offsets, shape_data.GetOffsets());
 }
 
 TEST_F(ColumnShapeTest, WriteVariable) {
@@ -294,6 +302,7 @@ TEST_F(ColumnShapeTest, WriteVariable) {
   EXPECT_EQ(shape_data.nElements(), 12);
   EXPECT_EQ(shape_data.GetShape(), IPos({3, 2, 2}));
   EXPECT_EQ(shape_data.GetDataType(), DataType::TpComplex);
+  ASSERT_OK_AND_ASSIGN(auto offsets, shape_data.GetOffsets());
 
   // Variably shaped
   ASSERT_OK_AND_ASSIGN(data,
@@ -312,6 +321,7 @@ TEST_F(ColumnShapeTest, WriteVariable) {
   EXPECT_EQ(shape_data.GetDataType(), DataType::TpComplex);
   EXPECT_EQ(shape_data.GetRowShape(0), IPos({2, 2}));
   EXPECT_EQ(shape_data.GetRowShape(1), IPos({3, 2}));
+  ASSERT_OK_AND_ASSIGN(offsets, shape_data.GetOffsets());
 }
 
 

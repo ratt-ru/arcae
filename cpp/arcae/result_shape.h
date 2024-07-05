@@ -64,6 +64,9 @@ struct ResultShapeData {
   // Maximum dimension size
   std::size_t MaxDimensionSize() const noexcept;
 
+  // Obtain the flat offset at the specified
+  std::size_t FlatOffset(const std::vector<IndexType> & index) const noexcept;
+
   // Is the result shape fixed?
   bool IsFixed() const noexcept { return shape_.has_value(); }
 
