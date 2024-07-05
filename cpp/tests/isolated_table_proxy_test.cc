@@ -1,7 +1,8 @@
-#include <casacore/tables/Tables/SetupNewTab.h>
 #include <memory>
 
+#include <arrow/status.h>
 #include <arrow/ipc/json_simple.h>
+#include <arrow/testing/gtest_util.h>
 
 #include <casacore/casa/Utilities/DataType.h>
 #include <casacore/casa/aipsxtype.h>
@@ -9,14 +10,13 @@
 #include <casacore/casa/BasicSL/Complexfwd.h>
 #include <casacore/tables/Tables/ArrColDesc.h>
 #include <casacore/tables/Tables/RefRows.h>
+#include <casacore/tables/Tables/SetupNewTab.h>
 #include <casacore/tables/Tables/TableProxy.h>
 #include <casacore/tables/Tables.h>
 #include <casacore/tables/Tables/TableColumn.h>
 #include <casacore/ms/MeasurementSets/MeasurementSet.h>
 
 #include "arcae/isolated_table_proxy.h"
-#include "arrow/status.h"
-#include "arrow/testing/gtest_util.h"
 #include <tests/test_utils.h>
 
 #include <gtest/gtest.h>
