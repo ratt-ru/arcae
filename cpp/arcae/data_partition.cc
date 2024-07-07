@@ -4,11 +4,15 @@
 #include <cstddef>
 
 #include <casacore/casa/Arrays/IPosition.h>
+#include <casacore/casa/Arrays/Slicer.h>
 
 #include <arrow/result.h>
 
 #include <arcae/result_shape.h>
 #include <arcae/selection.h>
+
+using casacore::IPosition;
+using casacore::Slicer;
 
 namespace arcae {
 namespace detail {
@@ -114,13 +118,26 @@ arrow::Result<std::vector<SpanPair>> MakeSubSpans(
 // Get a Row Slicer for the disk span
 Slicer
 DataChunk::GetRowSlicer() const noexcept {
-  return Slicer{};
+  auto row_span = dim_spans_[nDim() - 1];
+  return Slicer(
+    IPosition({row_span.disk[0]}),
+    IPosition({row_span.disk[row_span.disk.size() - 1]}),
+    Slicer::endIsLast);
 }
 
 // Get a Section Slicer for the disk span
 Slicer
 DataChunk::GetSectionSlicer() const noexcept {
-  return Slicer{};
+  auto row_dim = nDim() - 1;
+  IPosition start(row_dim, 0);
+  IPosition end(row_dim, 0);
+
+  for(std::size_t d = 0; d < row_dim; ++d) {
+    auto span = dim_spans_[d];
+    start[d] = span.disk[0];
+    end[d] = span.disk[span.disk.size() - 1];
+  }
+  return Slicer(std::move(start), std::move(end), Slicer::endIsLast);
 }
 
 // Factory function for creating a DataChunk

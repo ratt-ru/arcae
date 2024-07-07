@@ -40,6 +40,10 @@ struct DataChunk {
   static arrow::Result<DataChunk>
   Make(SpanPairs && dim_spans, const ResultShapeData & data_shape);
 
+  // Get a Row Slicer for the disk span
+  casacore::Slicer GetRowSlicer() const noexcept;
+  // Get a Section Slicer for the disk span
+  casacore::Slicer GetSectionSlicer() const noexcept;
   // Number of chunk dimensions
   std::size_t nDim() const noexcept { return dim_spans_.size(); }
   // Is the chunk contiguous
