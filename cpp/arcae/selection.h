@@ -82,7 +82,7 @@ public:
     auto size = std::ptrdiff_t(Size());
     auto sdim = size - std::ptrdiff_t(cdim) - 1;
     if(sdim >= 0 && sdim < size && !spans_[sdim].empty()) return spans_[sdim];
-    return arrow::Status::IndexError("Selection doesn't exist");
+    return arrow::Status::IndexError("Selection doesn't exist for dimension ", cdim);
   }
 
   // Return the Span referenced by the F-ORDERED index
@@ -96,7 +96,7 @@ public:
     auto size = std::ptrdiff_t(Size());
     auto sdim = std::ptrdiff_t(fdim) - std::ptrdiff_t(ndim) + size;
     if(sdim >= 0 && sdim < size && !spans_[sdim].empty()) return spans_[sdim];
-    return arrow::Status::IndexError("Selection doesn't exist");
+    return arrow::Status::IndexError("Selection doesn't exist for dimension ", fdim);
   }
 
 private:
@@ -142,6 +142,8 @@ struct SelectionBuilder {
   static Selection FromArgs(Args && ... args) {
     SelectionBuilder builder;
     builder.ProcessArgs(std::forward<Args>(args)...);
+    // Template argument pack gets processed in F order
+    // even though args are presented in C order
     return builder.Order('F').Build();
   }
 
