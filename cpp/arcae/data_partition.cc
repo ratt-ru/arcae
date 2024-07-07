@@ -111,22 +111,34 @@ arrow::Result<std::vector<SpanPair>> MakeSubSpans(
 } // namespace
 
 
+// Get a Row Slicer for the disk span
+Slicer
+DataChunk::GetRowSlicer() const noexcept {
+  return Slicer{};
+}
+
+// Get a Section Slicer for the disk span
+Slicer
+DataChunk::GetSectionSlicer() const noexcept {
+  return Slicer{};
+}
+
 // Factory function for creating a DataChunk
 arrow::Result<DataChunk>
 DataChunk::Make(SpanPairs &&dim_spans, const ResultShapeData & data_shape) {
   ARROW_ASSIGN_OR_RAISE(auto empty, DiskSpansContainNegativeRanges(dim_spans));
   if(!empty) ARROW_RETURN_NOT_OK(AreDiskSpansMonotonic(dim_spans));
   auto contiguous = IsMemoryContiguous(dim_spans);
-  std::vector<IndexType> index(dim_spans.size(), 0);
+  std::vector<IndexType> mem_index(dim_spans.size(), 0);
   for(std::size_t d = 0; d < dim_spans.size(); ++d) {
-    index[d] = *std::min_element(
+    mem_index[d] = *std::min_element(
       std::begin(dim_spans[d].mem),
       std::end(dim_spans[d].mem));
   }
-  auto flat_offset = data_shape.FlatOffset(index);
+  auto flat_offset = data_shape.FlatOffset(mem_index);
   return DataChunk{
     std::move(dim_spans),
-    std::move(index),
+    std::move(mem_index),
     flat_offset,
     contiguous,
     empty};
@@ -168,10 +180,11 @@ arrow::Result<DataPartition> DataPartition::Make(
   auto id_cache = std::vector<Index>{Index(result_shape.MaxDimensionSize())};
   std::iota(id_cache.back().begin(), id_cache.back().end(), 0);
   auto monotonic_ids = IndexSpan(id_cache.back());
+  auto ndim = result_shape.nDim();
 
   // Generate disk and memory spans for the specified dimension
   auto GetSpanPair = [&](auto dim, auto dim_size) -> SpanPair {
-    if(auto dim_span = selection.CSpan(dim); dim_span.ok()) {
+    if(auto dim_span = selection.FSpan(dim, ndim); dim_span.ok()) {
       // Sort selection indices to create
       // disk and memory indices
       auto [disk_ids, mem_ids] = MakeSortedIndices(dim_span.ValueOrDie());
@@ -191,6 +204,7 @@ arrow::Result<DataPartition> DataPartition::Make(
   // over each dimension in FORTRAN order
   if(result_shape.IsFixed()) {
     std::vector<SpanPairs> dim_spans;
+    dim_spans.reserve(result_shape.nDim());
     const auto & shape = result_shape.GetShape();
     for(std::size_t dim=0; dim < result_shape.nDim(); ++dim) {
       auto [disk_span, mem_span] = GetSpanPair(dim, shape[dim]);
@@ -203,29 +217,29 @@ arrow::Result<DataPartition> DataPartition::Make(
 
   // In the varying case, start with the row dimension
   auto nrows = result_shape.nRows();
-  auto [row_disk_span, row_mem_span] = GetSpanPair(0, nrows);
+  auto row_dim = result_shape.nDim() - 1;
+  auto [row_disk_span, row_mem_span] = GetSpanPair(row_dim, nrows);
   std::vector<DataChunk> chunks;
 
   for(std::size_t r = 0; r < nrows; ++r) {
-    // Initialise the row dimension spans
-    auto dim_spans = std::vector<SpanPairs> {
-      {
-        SpanPairs{
-          {
-            row_disk_span.subspan(r, 1),
-            row_mem_span.subspan(r, 1)
-          }
-        }
-      }
-    };
+    std::vector<SpanPairs> dim_spans;
+    dim_spans.reserve(result_shape.nDim());
+    const auto & row_shape = result_shape.GetRowShape(r);
 
     // Create span pairs for the secondary dimensions
-    const auto & shape = result_shape.GetRowShape(r);
-    for(std::size_t dim=0; dim < shape.size(); ++dim) {
-      auto [disk_span, mem_span] = GetSpanPair(dim + 1, shape[dim]);
+    for(std::size_t dim=0; dim < row_dim; ++dim) {
+      auto [disk_span, mem_span] = GetSpanPair(dim, row_shape[dim]);
       ARROW_ASSIGN_OR_RAISE(auto spans, MakeSubSpans(disk_span, mem_span));
       dim_spans.emplace_back(std::move(spans));
     }
+
+    // Create span pairs for the row dimension
+    dim_spans.emplace_back(SpanPairs{
+      {
+        row_disk_span.subspan(r, 1),
+        row_mem_span.subspan(r, 1)
+      }
+    });
 
     // Create data chunks for this row and add
     // to the greater chunk collection
