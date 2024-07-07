@@ -76,7 +76,7 @@ arrow::Status ClipShape(
 
   if(selection.Size() <= 1) return arrow::Status::OK();
   for(std::size_t dim=0; dim < shape.size(); ++dim) {
-    if(auto result = selection.CSpan(dim); result.ok()) {
+    if(auto result = selection.FSpan(dim, shape.size() + 1); result.ok()) {
       auto span = result.ValueOrDie();
       for(auto i: span) {
         if(i >= shape[dim]) {
