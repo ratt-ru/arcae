@@ -40,6 +40,16 @@ struct DataChunk {
   static arrow::Result<DataChunk>
   Make(SpanPairs && dim_spans, const ResultShapeData & data_shape);
 
+  // Return the disk span at the specified dimension
+  const IndexSpan & Disk(std::size_t dim) const {
+    return dim_spans_[dim].disk;
+  }
+
+  // Return the memory span at the specified dimension
+  const IndexSpan & Mem(std::size_t dim) const {
+    return dim_spans_[dim].mem;
+  }
+
   // Get a Row Slicer for the disk span
   casacore::Slicer GetRowSlicer() const noexcept;
   // Get a Section Slicer for the disk span
@@ -62,6 +72,13 @@ struct DataPartition {
   std::vector<DataChunk> data_chunks_;
   std::vector<Index> id_cache_;
 
+  // Return the number of chunks in the partition
+  std::size_t nChunks() const { return data_chunks_.size(); }
+
+  // Return the DataChunk at index
+  const DataChunk & Chunk(std::size_t index) const {
+    return data_chunks_[index];
+  }
 };
 
 }  // namespace detail
