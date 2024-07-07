@@ -20,7 +20,7 @@ arrow::Result<bool>
 IsolatedTableProxy::Close() {
   if(!is_closed_) {
     std::shared_ptr<void> defer_close(nullptr, [this](...) { this->is_closed_ = true; });
-    return run_isolated([](TableProxy & tp) {
+    return RunSync([](TableProxy & tp) {
       tp.close();
       return true;
     });
