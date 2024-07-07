@@ -30,7 +30,7 @@ bool IsMemoryContiguous(const SpanPairs & spans) {
   return true;
 }
 
-static arrow::Result<bool> DiskSpansContainNegativeRanges(const SpanPairs & spans) {
+arrow::Result<bool> DiskSpansContainNegativeRanges(const SpanPairs & spans) {
   for(auto &[disk, mem]: spans) {
     std::size_t negative = 0;
     for(auto d: disk) negative += int(d < 0);
@@ -40,6 +40,18 @@ static arrow::Result<bool> DiskSpansContainNegativeRanges(const SpanPairs & span
     }
   }
   return false;
+}
+
+arrow::Status AreDiskSpansMonotonic(const SpanPairs & spans) {
+  for(auto &[disk, mem]: spans) {
+    for(std::size_t i=1; i < disk.size(); ++i) {
+      if(disk[i] - disk[i - 1] != 1) {
+        return arrow::Status::Invalid(
+          "DataChunk disk span is not monotonic");
+      }
+    }
+  }
+  return arrow::Status::OK();
 }
 
 
@@ -103,6 +115,8 @@ arrow::Result<std::vector<SpanPair>> MakeSubSpans(
 arrow::Result<DataChunk>
 DataChunk::Make(SpanPairs &&dim_spans, const ResultShapeData & data_shape) {
   ARROW_ASSIGN_OR_RAISE(auto empty, DiskSpansContainNegativeRanges(dim_spans));
+  if(!empty) ARROW_RETURN_NOT_OK(AreDiskSpansMonotonic(dim_spans));
+  auto contiguous = IsMemoryContiguous(dim_spans);
   std::vector<IndexType> index(dim_spans.size(), 0);
   for(std::size_t d = 0; d < dim_spans.size(); ++d) {
     index[d] = *std::min_element(
@@ -110,7 +124,6 @@ DataChunk::Make(SpanPairs &&dim_spans, const ResultShapeData & data_shape) {
       std::end(dim_spans[d].mem));
   }
   auto flat_offset = data_shape.FlatOffset(index);
-  auto contiguous = IsMemoryContiguous(dim_spans);
   return DataChunk{
     std::move(dim_spans),
     std::move(index),
