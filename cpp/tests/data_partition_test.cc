@@ -33,9 +33,10 @@ TEST(DataPartitionTest, Fixed) {
     std::nullopt};
 
   auto selection = SelectionBuilder()
-                      .Add({2, 1, -1, 5, 6, -1})
-                      .Add({3, 0, 1})
-                      .Build();
+                      .Order('F')                 // 1 range in dim 0
+                      .Add({3, 0, 1})             // 2 ranges in dim 1
+                      .Add({2, 1, -1, 5, 6, -1})  // 3 ranges in dim 2
+                      .Build();                   // 1 x 2 x 3
 
   ASSERT_OK_AND_ASSIGN(auto partition, DataPartition::Make(selection, result_shape));
   EXPECT_EQ(partition.data_chunks_.size(), 6);
@@ -115,12 +116,13 @@ TEST(DataPartitionTest, Variable) {
     std::vector<IPosition>{IPosition({3, 4}), IPosition({1, 4})}};
 
   auto selection = SelectionBuilder()
-                      .Add({-1, 0})
-                      .Add({3, 0, 1})
+                      .Order('F')      // 1 range in dim 0
+                      .Add({3, 0, 1})  // 2 ranges in dim 1
+                      .Add({-1, 0})    // 2 rows
                       .Build();
 
   ASSERT_OK_AND_ASSIGN(auto partition, DataPartition::Make(selection, result_shape));
-  EXPECT_EQ(partition.data_chunks_.size(), 4);
+  EXPECT_EQ(partition.data_chunks_.size(), 4);  // 1x1x1 + 1x2x2
 
   EXPECT_THAT(partition.data_chunks_[0].dim_spans_[0].disk, ::testing::ElementsAre(0, 1, 2));
   EXPECT_THAT(partition.data_chunks_[0].dim_spans_[0].mem, ::testing::ElementsAre(0, 1, 2));
