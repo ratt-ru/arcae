@@ -116,7 +116,7 @@ TEST(DataPartitionTest, Variable) {
     std::vector<IPosition>{IPosition({3, 4}), IPosition({1, 4})}};
 
   auto selection = SelectionBuilder()
-                      .Order('F')      // 1 range in dim 0
+                      .Order('F')      // 1 range in dim 0 (varies per row)
                       .Add({3, 0, 1})  // 2 ranges in dim 1
                       .Add({-1, 0})    // 2 rows
                       .Build();
