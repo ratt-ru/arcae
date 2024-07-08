@@ -32,9 +32,10 @@ struct DataChunk {
   std::vector<IndexType> min_mem_indices_;
   // Flattened chunk offset within output
   std::size_t flat_offset_;
-  // Is the memory layout contiguous
+  // Is the memory layout contiguous?
   unsigned int contiguous_:1;
-  // Does this data chunk contain empty disk ranges
+  // Does this data chunk represent an empty selection?
+  // i.e. it contains negative disk id ranges
   unsigned int empty_:1;
 
   static arrow::Result<DataChunk>
