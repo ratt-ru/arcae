@@ -94,6 +94,12 @@ struct ArrowFutureTypeImpl<T, false, true, false> {
   using type = arrow::Future<arrow::internal::Empty>;
 };
 
+template <typename T>
+struct ArrowFutureTypeImpl<T, true, false, false> {
+  using type = arrow::Future<typename T::ValueType>;
+};
+
+
 template <typename Fn, typename ... Args>
 using ArrowFutureType = typename ArrowFutureTypeImpl<std::invoke_result_t<Fn, Args...>>::type;
 
