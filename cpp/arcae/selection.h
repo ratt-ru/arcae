@@ -13,6 +13,8 @@
 #include <arrow/status.h>
 #include <arrow/result.h>
 
+#include "arcae/type_traits.h"
+
 namespace arcae {
 namespace detail {
 
@@ -22,9 +24,6 @@ using IndexType = std::int64_t;
 using Index = std::vector<IndexType>;
 // A span over a 1D contiguous sequence of Indexes
 using IndexSpan = absl::Span<const IndexType>;
-
-// Helper class for use with static_assert
-template <class...> constexpr std::false_type always_false{};
 
 // Forward Declaration
 struct SelectionBuilder;

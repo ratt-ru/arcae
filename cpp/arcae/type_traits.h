@@ -11,6 +11,9 @@
 namespace arcae {
 namespace detail {
 
+// Helper class for use with static_assert
+template <class...> constexpr std::false_type always_false{};
+
 // Template metaprogramming construct that checks
 // whether the given type is an arrow::Result
 template <typename T>
@@ -55,13 +58,19 @@ template <
 struct ArrowResultTypeImpl { using type = T; };
 
 template <typename T>
-struct ArrowResultTypeImpl<T, false, false, false> { using type = arrow::Result<T>; };
+struct ArrowResultTypeImpl<T, false, false, false> {
+  using type = arrow::Result<T>;
+};
 
 template <typename T>
-struct ArrowResultTypeImpl<T, false, true, false> { using type = arrow::Result<arrow::internal::Empty>; };
+struct ArrowResultTypeImpl<T, false, true, false> {
+  using type = arrow::Result<arrow::internal::Empty>;
+};
 
 template <typename T>
-struct ArrowResultTypeImpl<T, false, false, true> { using type = arrow::Future<T>; };
+struct ArrowResultTypeImpl<T, false, false, true> {
+  static_assert(always_false<T>, "Cannot coerce arrow::Future<T> to an arrow::Result<T>");
+ };
 
 template <typename Fn, typename ... Args>
 using ArrowResultType = typename ArrowResultTypeImpl<std::invoke_result_t<Fn, Args...>>::type;
@@ -76,13 +85,14 @@ template <
 struct ArrowFutureTypeImpl { using type = T; };
 
 template <typename T>
-struct ArrowFutureTypeImpl<T, false, false, false> { using type = arrow::Future<T>; };
+struct ArrowFutureTypeImpl<T, false, false, false> {
+  using type = arrow::Future<T>;
+};
 
 template <typename T>
-struct ArrowFutureTypeImpl<T, false, true, false> { using type = arrow::Future<arrow::internal::Empty>; };
-
-template <typename T>
-struct ArrowFutureTypeImpl<T, false, false, true> { using type = T; };
+struct ArrowFutureTypeImpl<T, false, true, false> {
+  using type = arrow::Future<arrow::internal::Empty>;
+};
 
 template <typename Fn, typename ... Args>
 using ArrowFutureType = typename ArrowFutureTypeImpl<std::invoke_result_t<Fn, Args...>>::type;
