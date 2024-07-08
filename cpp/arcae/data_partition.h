@@ -5,6 +5,8 @@
 
 #include <arrow/result.h>
 
+#include <casacore/casa/Arrays/IPosition.h>
+
 #include "arcae/result_shape.h"
 #include "arcae/selection.h"
 
@@ -57,6 +59,10 @@ struct DataChunk {
   casacore::Slicer GetSectionSlicer() const noexcept;
   // Number of chunk dimensions
   std::size_t nDim() const noexcept { return dim_spans_.size(); }
+  // Number of elements in the chunk
+  std::size_t nElements() const noexcept;
+  // Shape of the chunk
+  casacore::IPosition GetShape() const noexcept;
   // Is the chunk contiguous
   constexpr bool IsContiguous() const noexcept { return contiguous_; }
   // Is the chunk negative

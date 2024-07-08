@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <numeric>
 
 #include <casacore/casa/Arrays/IPosition.h>
 #include <casacore/casa/Arrays/Slicer.h>
@@ -112,6 +113,31 @@ arrow::Result<std::vector<SpanPair>> MakeSubSpans(
     return result;
 }
 
+// Creates a cartesian product of span pairs
+arrow::Result<std::vector<DataChunk>>
+MakeDataChunks(
+    const std::vector<SpanPairs> & dim_spans,
+    const ResultShapeData & data_shape) {
+  std::vector<SpanPairs> product = {{}};
+
+  for(const auto & span_pairs: dim_spans) {
+    std::vector<SpanPairs> next_product;
+    for(const auto & result: product) {
+      for(const auto & span_pair: span_pairs) {
+        next_product.push_back(result);
+        next_product.back().push_back(span_pair);
+      }
+    }
+    product = std::move(next_product);
+  }
+
+  std::vector<DataChunk> chunks(product.size());
+  for(std::size_t i=0; i < product.size(); ++i) {
+    ARROW_ASSIGN_OR_RAISE(chunks[i], DataChunk::Make(std::move(product[i]), data_shape));
+  }
+  return chunks;
+}
+
 } // namespace
 
 
@@ -140,9 +166,30 @@ DataChunk::GetSectionSlicer() const noexcept {
   return Slicer(std::move(start), std::move(end), Slicer::endIsLast);
 }
 
+// Number of elements in the chunk
+std::size_t
+DataChunk::nElements() const noexcept {
+  return std::accumulate(
+    std::begin(dim_spans_),
+    std::end(dim_spans_),
+    std::size_t(1),
+    [](auto i, auto v) {return i * v.disk.size(); });
+}
+
+// FORTRAN ordered shape of the chunk
+casacore::IPosition
+DataChunk::GetShape() const noexcept {
+  casacore::IPosition shape(dim_spans_.size(), 0);
+  for(std::size_t d=0; d < dim_spans_.size(); ++d) shape[d] = dim_spans_[d].disk.size();
+  return shape;
+}
+
 // Factory function for creating a DataChunk
 arrow::Result<DataChunk>
 DataChunk::Make(SpanPairs &&dim_spans, const ResultShapeData & data_shape) {
+  for(auto &[disk, mem]: dim_spans) {
+    if(disk.size() != mem.size()) return arrow::Status::Invalid("disk and memory span size mismatch");
+  }
   ARROW_ASSIGN_OR_RAISE(auto empty, DiskSpansContainNegativeRanges(dim_spans));
   if(!empty) ARROW_RETURN_NOT_OK(AreDiskSpansMonotonic(dim_spans));
   auto contiguous = IsMemoryContiguous(dim_spans);
@@ -159,31 +206,6 @@ DataChunk::Make(SpanPairs &&dim_spans, const ResultShapeData & data_shape) {
     flat_offset,
     contiguous,
     empty};
-}
-
-// Creates a cartesian product of span pairs
-arrow::Result<std::vector<DataChunk>>
-MakeDataChunks(
-    const std::vector<SpanPairs> & dim_spans,
-    const ResultShapeData & data_shape) {
-  std::vector<SpanPairs> product = {{}};
-
-  for(const auto & span_pairs: dim_spans) {
-    std::vector<SpanPairs> next_product;
-    for(const auto & result: product) {
-      for(const auto & span_pair: span_pairs) {
-        next_product.push_back(result);
-        next_product.back().push_back(span_pair);
-      }
-    }
-    product = std::move(next_product);
-  }
-
-  std::vector<DataChunk> chunks(product.size());
-  for(std::size_t i=0; i < product.size(); ++i) {
-    ARROW_ASSIGN_OR_RAISE(chunks[i], DataChunk::Make(std::move(product[i]), data_shape));
-  }
-  return chunks;
 }
 
 arrow::Result<DataPartition> DataPartition::Make(
