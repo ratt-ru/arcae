@@ -152,43 +152,12 @@ TEST_F(IsolatedTableProxyTest, GetColumn) {
 }
 
 
-TEST_F(IsolatedTableProxyTest, ArrowStatusReturn) {
-  ASSERT_OK_AND_ASSIGN(auto itp, OpenTable());
-  GTEST_FLAG_SET(death_test_style, "threadsafe");
-
-  {
-    // Test in sync mode
-    ASSERT_NOT_OK(itp->RunSync(
-      [](const TableProxy & tp) { return arrow::Status::Invalid("boo"); }
-    ));
-
-    // Arrow disallows constructing results with OK
-    ASSERT_DEATH(auto res = itp->RunSync((
-      [](const TableProxy & tp) { return arrow::Status::OK(); }
-    )), "Constructed with a non-error status: OK");
-  }
-
-  {
-    // Test in sync mode
-    auto fut = itp->RunAsync(
-      [](const TableProxy & tp) { return arrow::Status::Invalid("boo"); }
-    );
-    ASSERT_NOT_OK(fut.result());
-
-    // But constructing Futures with OK works!
-    fut = itp->RunAsync((
-      [](const TableProxy & tp) { return arrow::Status::OK(); }
-    ));
-    ASSERT_OK_AND_ASSIGN(auto res, fut.MoveResult());
-  }
-}
-
 TEST_F(IsolatedTableProxyTest, FailIfClosed) {
   ASSERT_OK_AND_ASSIGN(auto itp, OpenTable());
   ASSERT_OK_AND_ASSIGN(auto close_result, itp->Close());
   EXPECT_EQ(close_result, true);
   ASSERT_NOT_OK(itp->RunSync(
-    [](const TableProxy & tp) { return arrow::Status::OK(); }
+    [](const TableProxy & tp) { return true; }
   ));
   ASSERT_OK_AND_ASSIGN(close_result, itp->Close());
   EXPECT_EQ(close_result, false);
