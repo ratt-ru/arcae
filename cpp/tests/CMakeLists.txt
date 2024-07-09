@@ -1,4 +1,5 @@
 find_package(GTest CONFIG REQUIRED)
+find_package(absl CONFIG REQUIRED)
 
 add_library(test_utils test_utils.cc)
 add_compile_options("-fsanitize=address")
@@ -55,7 +56,6 @@ add_test(in_place_test in_place_test)
 add_executable(dev_transpose_test dev_transpose_test.cc)
 target_link_libraries(dev_transpose_test PRIVATE GTest::gtest_main arcae absl::time absl::str_format test_utils)
 add_test(dev_transpose_test dev_transpose_test)
-
 
 set_tests_properties(basic_test range_test
                      column_iterator_test
