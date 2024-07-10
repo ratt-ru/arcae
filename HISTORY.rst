@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Pin manylinux_2_28 image to manylinux_2_28_x86_64:2024.07.02-0 (:pr:`102`)
 * Restrict Numpy to less than 2.0.0 (:pr:`100`)
 * Avoid stripping debug information (:pr:`96`)
 * Set cmake build type to RelWithDebInfo (:pr:`96`)
