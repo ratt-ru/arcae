@@ -28,11 +28,12 @@
 using ::arcae::detail::Selection;
 using ::arcae::detail::SelectionBuilder;
 using ::arcae::detail::ResultShapeData;
+using ::arcae::GetArrayColumn;
+using ::arcae::GetScalarColumn;
 
 using ::arrow::ipc::internal::json::ArrayFromJSON;
 
 using casacore::Array;
-using casacore::ArrayColumn;
 using casacore::ArrayColumnDesc;
 using casacore::ColumnDesc;
 using casacore::Complex;
@@ -41,10 +42,8 @@ using MS = casacore::MeasurementSet;
 using MSColumns = casacore::MSMainEnums::PredefinedColumns;
 using casacore::Record;
 using casacore::SetupNewTable;
-using casacore::ScalarColumn;
 using casacore::Table;
 using casacore::TableDesc;
-using casacore::TableColumn;
 using casacore::TableLock;
 using casacore::TableProxy;
 using casacore::TiledColumnStMan;
@@ -57,26 +56,6 @@ static constexpr std::size_t knchan = 4;
 static constexpr std::size_t kncorr = 2;
 
 namespace {
-
-template <typename T> ScalarColumn<T>
-GetScalarColumn(const MS & ms, MSColumns column) {
-    return ScalarColumn<T>(TableColumn(ms, MS::columnName(column)));
-}
-
-template <typename T> ScalarColumn<T>
-GetScalarColumn(const MS & ms, const std::string & column) {
-    return ScalarColumn<T>(TableColumn(ms, column));
-}
-
-template <typename T> ArrayColumn<T>
-GetArrayColumn(const MS & ms, MSColumns column) {
-    return ArrayColumn<T>(TableColumn(ms, MS::columnName(column)));
-}
-
-template <typename T> ArrayColumn<T>
-GetArrayColumn(const MS & ms, const std::string & column) {
-  return ArrayColumn<T>(TableColumn(ms, column));
-}
 
 class ColumnShapeTest : public ::testing::Test {
   protected:
@@ -133,16 +112,17 @@ class ColumnShapeTest : public ::testing::Test {
 
         assert(varshapes.size() == knrow);
 
-        nelements_ = std::accumulate(std::begin(varshapes), std::end(varshapes), std::size_t{0},
-                                     [](auto init, auto & shape) -> std::size_t
-                                      { return init + shape.product(); });
+        nelements_ = std::accumulate(
+                        std::begin(varshapes),
+                        std::end(varshapes),
+                        std::size_t{0},
+                        [](auto init, auto & shape) -> std::size_t
+                        { return init + shape.product(); });
 
 
         for(std::size_t i=0; i < knrow; ++i) {
-          auto corrected_array = Array<Complex>(
-                  varshapes[i],
-                  {static_cast<float>(i), static_cast<float>(i)});
-
+          auto fv = static_cast<float>(i);
+          auto corrected_array = Array<Complex>(varshapes[i], {fv, fv});
           var_data.putColumnCells(casacore::RefRows(i, i), corrected_array);
         }
 
