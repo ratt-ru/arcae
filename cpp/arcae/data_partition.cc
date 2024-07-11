@@ -251,7 +251,10 @@ arrow::Result<DataPartition> DataPartition::Make(
       dim_spans.emplace_back(std::move(spans));
     }
     ARROW_ASSIGN_OR_RAISE(auto chunks, MakeDataChunks(dim_spans, result_shape))
-    return DataPartition{std::move(chunks), std::move(id_cache)};
+    return DataPartition{
+      std::move(chunks),
+      result_shape.GetDataType(),
+      std::move(id_cache)};
   }
 
   // In the varying case, start with the row dimension
@@ -289,7 +292,12 @@ arrow::Result<DataPartition> DataPartition::Make(
       std::move_iterator(row_chunks.end()));
   }
 
-  return DataPartition{std::move(chunks), std::move(id_cache)};
+  if(chunks.size() == 0) return arrow::Status::Invalid("Data partition produced no chunks!");
+
+  return DataPartition{
+    std::move(chunks),
+    result_shape.GetDataType(),
+    std::move(id_cache)};
 }
 
 }  // namespace detail

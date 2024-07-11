@@ -6,6 +6,7 @@
 #include <arrow/result.h>
 
 #include <casacore/casa/Arrays/IPosition.h>
+#include <casacore/casa/Utilities/DataType.h>
 
 #include "arcae/result_shape.h"
 #include "arcae/selection.h"
@@ -35,21 +36,21 @@ struct DataChunk {
   // Flattened chunk offset within output
   std::size_t flat_offset_;
   // Is the memory layout contiguous?
-  unsigned int contiguous_:1;
+  bool contiguous_;
   // Does this data chunk represent an empty selection?
   // i.e. it contains negative disk id ranges
-  unsigned int empty_:1;
+  bool empty_;
 
   static arrow::Result<DataChunk>
   Make(SpanPairs && dim_spans, const ResultShapeData & data_shape);
 
   // Return the disk span at the specified dimension
-  const IndexSpan & Disk(std::size_t dim) const {
+  const IndexSpan & Disk(std::size_t dim) const noexcept {
     return dim_spans_[dim].disk;
   }
 
   // Return the memory span at the specified dimension
-  const IndexSpan & Mem(std::size_t dim) const {
+  const IndexSpan & Mem(std::size_t dim) const noexcept {
     return dim_spans_[dim].mem;
   }
 
@@ -77,13 +78,31 @@ struct DataPartition {
     const ResultShapeData & result_shape);
 
   std::vector<DataChunk> data_chunks_;
+  casacore::DataType casa_dtype_;
   std::vector<Index> id_cache_;
 
+  // Consume chunks in the partition
+  std::vector<DataChunk> && TakeChunks() noexcept {
+    return std::move(data_chunks_);
+  }
+
+  // Get the casa data type associated with the data partition;
+  casacore::DataType GetDataType() const noexcept { return casa_dtype_; }
+
   // Return the number of chunks in the partition
-  std::size_t nChunks() const { return data_chunks_.size(); }
+  std::size_t nChunks() const noexcept { return data_chunks_.size(); }
+
+  // Return the number of elements in the partition
+  std::size_t nElements() const noexcept {
+    return std::accumulate(
+      std::begin(data_chunks_),
+      std::end(data_chunks_),
+      std::size_t(0),
+      [](auto i, auto v) { return i + v.nElements(); });
+  }
 
   // Return the DataChunk at index
-  const DataChunk & Chunk(std::size_t index) const {
+  const DataChunk & Chunk(std::size_t index) const noexcept {
     return data_chunks_[index];
   }
 };
