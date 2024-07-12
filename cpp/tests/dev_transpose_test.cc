@@ -1,5 +1,4 @@
 
-#include <absl/time/time.h>
 #include <algorithm>
 #include <cstddef>
 #include <filesystem>
@@ -11,6 +10,7 @@
 #include <casacore/tables/Tables.h>
 #include <casacore/tables/Tables/ColumnDesc.h>
 #include <casacore/tables/Tables/SetupNewTab.h>
+#include <casacore/tables/Tables/TableColumn.h>
 #include <casacore/tables/Tables/TableLock.h>
 #include <casacore/tables/Tables/TableProxy.h>
 #include <casacore/tables/DataMan/TiledColumnStMan.h>
@@ -31,9 +31,9 @@
 #include "arcae/selection.h"
 
 #include <absl/time/clock.h>
+#include <absl/time/time.h>
 #include <absl/strings/str_format.h>
 
-#include <memory>
 #include <tests/test_utils.h>
 
 using namespace std::string_literals;
@@ -180,7 +180,7 @@ TEST_F(DevTransposeTest, Basic) {
       std::shared_ptr<void> time_it(nullptr, [start = absl::Now()](...) {
         read_shape_duration += absl::Now() - start;
       });
-      auto data = GetArrayColumn<Complex>(tp.table(), column);
+      auto data = TableColumn(tp.table(), column);
       return ResultShapeData::MakeRead(data, selection);
   });
 
@@ -314,7 +314,7 @@ TEST_F(DevTransposeTest, Basic) {
   ARROW_LOG(INFO) << "Extract shape data in " << read_shape_duration;
   ARROW_LOG(INFO) << "Partition shape in " << partition_duration;
   ARROW_LOG(INFO) << "  Requires a sort of " << knrow << " indices in " << sort_duration;
-  ARROW_LOG(INFO) << "Read " << float(bytes_read) / (1024.*1024.) << "MB of data in " << read_duration;
+  ARROW_LOG(INFO) << "Read " << float(bytes_read) / (1024.*1024.) << "MB of contiguous data in " << read_duration;
   ARROW_LOG(INFO) << "Transposed data in " << transpose_duration;
 
   ARROW_LOG(INFO) << "Total " << read_shape_duration + partition_duration + read_duration + transpose_duration;
