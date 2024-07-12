@@ -25,12 +25,28 @@ struct IndexResult {
   std::vector<IndexType> mem;
 };
 
-
-bool IsMemoryContiguous(const SpanPairs & spans) {
-  for(auto &[disk, mem]: spans) {
-    for(std::size_t i=1; i < mem.size(); ++i) {
-      if(mem[i] - mem[i - 1] != 1) return false;
+// Given a range of sub-spans in each dimension, determine whether
+// the memory ordering is contiguous. This means there must be a
+// single range which is an arithmetic progression
+// spanning the entire dimension
+bool SecondaryDimensionsContiguous(const std::vector<SpanPairs> & spans) {
+  // For non-row ranges,
+  for(std::size_t d = 0; d < spans.size() - 1; ++d) {
+    if(spans[d].size() > 1) return false;
+    const auto & mem = spans[d][0].mem;
+    for(std::size_t i = 0; i < mem.size(); ++i) {
+      if(mem[i] != IndexType(i)) return false;
     }
+  }
+
+  return true;
+}
+
+// Returns true if the memory ordering is contiguous
+bool IsMemoryContiguous(const SpanPair & spans) {
+  const auto & mem = spans.mem;
+  for(std::size_t i = 1; i < mem.size(); ++i) {
+    if(mem[i] - mem[i - 1] != 1) return false;
   }
   return true;
 }
@@ -47,12 +63,12 @@ arrow::Result<bool> DiskSpansContainNegativeRanges(const SpanPairs & spans) {
   return false;
 }
 
-arrow::Status AreDiskSpansMonotonic(const SpanPairs & spans) {
+arrow::Status AreDiskSpanContiguous(const SpanPairs & spans) {
   for(auto &[disk, mem]: spans) {
     for(std::size_t i=1; i < disk.size(); ++i) {
       if(disk[i] - disk[i - 1] != 1) {
         return arrow::Status::Invalid(
-          "DataChunk disk span is not monotonic");
+          "DataChunk disk span is not an arithmetic progression");
       }
     }
   }
@@ -120,6 +136,7 @@ MakeDataChunks(
     const ResultShapeData & data_shape) {
   std::vector<SpanPairs> product = {{}};
 
+
   for(const auto & span_pairs: dim_spans) {
     std::vector<SpanPairs> next_product;
     for(const auto & result: product) {
@@ -132,8 +149,15 @@ MakeDataChunks(
   }
 
   std::vector<DataChunk> chunks(product.size());
+  auto other_contiguous = SecondaryDimensionsContiguous(dim_spans);
+
   for(std::size_t i=0; i < product.size(); ++i) {
-    ARROW_ASSIGN_OR_RAISE(chunks[i], DataChunk::Make(std::move(product[i]), data_shape));
+    auto row_dim = product[i].size() - 1;
+    bool row_contiguous = IsMemoryContiguous(product[i][row_dim]);
+    bool chunk_contiguous = other_contiguous & row_contiguous;
+    ARROW_ASSIGN_OR_RAISE(
+      chunks[i],
+      DataChunk::Make(std::move(product[i]), data_shape, chunk_contiguous));
   }
   return chunks;
 }
@@ -186,13 +210,12 @@ DataChunk::GetShape() const noexcept {
 
 // Factory function for creating a DataChunk
 arrow::Result<DataChunk>
-DataChunk::Make(SpanPairs &&dim_spans, const ResultShapeData & data_shape) {
+DataChunk::Make(SpanPairs &&dim_spans, const ResultShapeData & data_shape, bool contiguous) {
   for(auto &[disk, mem]: dim_spans) {
     if(disk.size() != mem.size()) return arrow::Status::Invalid("disk and memory span size mismatch");
   }
   ARROW_ASSIGN_OR_RAISE(auto empty, DiskSpansContainNegativeRanges(dim_spans));
-  if(!empty) ARROW_RETURN_NOT_OK(AreDiskSpansMonotonic(dim_spans));
-  auto contiguous = IsMemoryContiguous(dim_spans);
+  if(!empty) ARROW_RETURN_NOT_OK(AreDiskSpanContiguous(dim_spans));
   std::vector<IndexType> mem_index(dim_spans.size(), 0);
   for(std::size_t d = 0; d < dim_spans.size(); ++d) {
     mem_index[d] = *std::min_element(
@@ -242,15 +265,15 @@ arrow::Result<DataPartition> DataPartition::Make(
   // In the fixed case, create disk and memory spans
   // over each dimension in FORTRAN order
   if(result_shape.IsFixed()) {
-    std::vector<SpanPairs> dim_spans;
-    dim_spans.reserve(result_shape.nDim());
+    std::vector<SpanPairs> dim_subspans;
+    dim_subspans.reserve(result_shape.nDim());
     const auto & shape = result_shape.GetShape();
     for(std::size_t dim=0; dim < result_shape.nDim(); ++dim) {
       auto [disk_span, mem_span] = GetSpanPair(dim, shape[dim]);
       ARROW_ASSIGN_OR_RAISE(auto spans, MakeSubSpans(disk_span, mem_span));
-      dim_spans.emplace_back(std::move(spans));
+      dim_subspans.emplace_back(std::move(spans));
     }
-    ARROW_ASSIGN_OR_RAISE(auto chunks, MakeDataChunks(dim_spans, result_shape))
+    ARROW_ASSIGN_OR_RAISE(auto chunks, MakeDataChunks(dim_subspans, result_shape))
     return DataPartition{
       std::move(chunks),
       result_shape.GetDataType(),

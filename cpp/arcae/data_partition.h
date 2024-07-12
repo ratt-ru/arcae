@@ -42,7 +42,7 @@ struct DataChunk {
   bool empty_;
 
   static arrow::Result<DataChunk>
-  Make(SpanPairs && dim_spans, const ResultShapeData & data_shape);
+  Make(SpanPairs && dim_spans, const ResultShapeData & data_shape, bool contiguous=false);
 
   // Return the disk span at the specified dimension
   const IndexSpan & Disk(std::size_t dim) const noexcept {
