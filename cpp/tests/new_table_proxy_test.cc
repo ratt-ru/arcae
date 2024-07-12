@@ -3,7 +3,7 @@
 
 #include <arrow/api.h>
 #include <arrow/result.h>
-#include <arrow/status.h>
+#include <arrow/type_fwd.h>
 #include <arrow/ipc/json_simple.h>
 #include <arrow/testing/gtest_util.h>
 
@@ -13,8 +13,6 @@
 #include <casacore/ms/MeasurementSets/MeasurementSet.h>
 #include <casacore/tables/Tables/SetupNewTab.h>
 #include <casacore/tables/Tables/TableProxy.h>
-#include <casacore/tables/Tables.h>
-#include <casacore/casa/Arrays/Vector.h>
 
 #include <tests/test_utils.h>
 
@@ -22,7 +20,6 @@
 
 #include "arcae/new_table_proxy.h"
 #include "arcae/selection.h"
-#include "arrow/type_fwd.h"
 
 using ::arrow::ipc::internal::json::ArrayFromJSON;
 
