@@ -15,11 +15,13 @@ add_library(arcae SHARED
     arcae/descriptor.cc
     arcae/data_partition.cc
     arcae/isolated_table_proxy.cc
+    arcae/new_table_proxy.cc
     arcae/result_shape.cc
     arcae/service_locator.cc
     arcae/selection.cc
     arcae/safe_table_proxy.cc
-    arcae/table_factory.cc)
+    arcae/table_factory.cc
+    arcae/type_traits.cc)
 
 target_compile_options(arcae PRIVATE
     $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:
