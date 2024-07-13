@@ -9,13 +9,13 @@
 #include <arrow/result.h>
 #include <arrow/status.h>
 #include <arrow/type.h>
+#include <arrow/type_fwd.h>
 #include <arrow/array/array_base.h>
 #include <arrow/array/array_nested.h>
 #include <arrow/util/async_generator.h>
 #include <arrow/util/future.h>
 #include <arrow/util/logging.h>
 #include <arrow/util/thread_pool.h>
-#include <arrow/type_fwd.h>
 
 #include <casacore/casa/Utilities/DataType.h>
 #include <casacore/tables/Tables.h>
@@ -126,8 +126,8 @@ TransposeData(
 }
 
 // Reads a chunk of data from disk
-// before tranposing it into the desired order in
-// the output buffer
+// before tranposing it into the desired order
+// in the output buffer
 template <
   DataType CDT,
   typename CT = typename CasaDataTypeTraits<CDT>::CasaType>
@@ -163,7 +163,7 @@ struct ReadAndTransposeImpl {
     ](const CasaArray<CT> & data) -> bool {
       auto transpose = TransposeData(data, dim_spans, out_span);
       return true;
-    });
+    }, {}, CallbackOptions{ShouldSchedule::Always, GetCpuThreadPool()});
   }
 };
 
@@ -178,6 +178,7 @@ struct ReadInPlaceImpl {
   std::shared_ptr<Buffer> buffer;
 
   Future<bool> operator()(const DataChunk & chunk) const {
+    assert(chunk.IsContiguous());
     // Create a span over the appropriate output range in the buffer
     auto out_span = buffer->mutable_span_as<CT>();
     out_span = out_span.subspan(chunk.flat_offset_, chunk.nElements());
@@ -212,7 +213,10 @@ struct ReadCallback {
   std::shared_ptr<Buffer> buffer;
   casacore::DataType dtype;
 
-  template <DataType CDT, typename CT = typename CasaDataTypeTraits<CDT>::CasaType>
+  // Dispatch to different callback implementations
+  // dependent on the casacore DataType and
+  // chunk characteristics
+  template <DataType CDT>
   inline Future<bool> Dispatch(const DataChunk & chunk) const {
     if(chunk.IsEmpty()) return true;
     if(chunk.IsContiguous()) {
@@ -227,6 +231,8 @@ struct ReadCallback {
       std::move(buffer)}(chunk);
   }
 
+  // Read a chunk of data into the encapsulated buffer
+  // returning true on success
   Future<bool> operator()(const DataChunk & chunk) const {
     if(chunk.nDim() == 0) return Status::Invalid("Zero dimension chunk");
     if(chunk.nDim() >= kMaxTransposeDims) {
@@ -315,7 +321,8 @@ GetResultBufferOrAllocate(
         case arrow::Type::INT64:
         case arrow::Type::FLOAT:
         case arrow::Type::DOUBLE: {
-            // The data buffer is in the last position
+            // The value buffer is in the last position
+            // https://arrow.apache.org/docs/format/Columnar.html#fixed-size-primitive-layout
             if(tmp->buffers.size() == 0 || !tmp->buffers[tmp->buffers.size() - 1]) {
               return Status::Invalid("Result array does not contain a buffer");
             }
