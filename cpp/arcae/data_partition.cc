@@ -12,6 +12,9 @@
 #include <arcae/result_shape.h>
 #include <arcae/selection.h>
 
+using arrow::Status;
+using arrow::Result;
+
 using casacore::IPosition;
 using casacore::Slicer;
 
@@ -51,28 +54,28 @@ bool IsMemoryContiguous(const SpanPair & spans) {
   return true;
 }
 
-arrow::Result<bool> DiskSpansContainNegativeRanges(const SpanPairs & spans) {
+Result<bool> DiskSpansContainNegativeRanges(const SpanPairs & spans) {
   for(auto &[disk, mem]: spans) {
     std::size_t negative = 0;
     for(auto d: disk) negative += int(d < 0);
     if(negative == disk.size()) return true;
     if(negative > 0) {
-      return arrow::Status::Invalid("Partially negative disk span");
+      return Status::Invalid("Partially negative disk span");
     }
   }
   return false;
 }
 
-arrow::Status AreDiskSpanContiguous(const SpanPairs & spans) {
+Status AreDiskSpanContiguous(const SpanPairs & spans) {
   for(auto &[disk, mem]: spans) {
     for(std::size_t i=1; i < disk.size(); ++i) {
       if(disk[i] - disk[i - 1] != 1) {
-        return arrow::Status::Invalid(
+        return Status::Invalid(
           "DataChunk disk span is not an arithmetic progression");
       }
     }
   }
-  return arrow::Status::OK();
+  return Status::OK();
 }
 
 
@@ -91,7 +94,7 @@ IndexResult MakeSortedIndices(const IndexSpan & ids) {
 
 // Decompose disk and memory spans into span pairs
 // associated with contiguous disk id ranges
-arrow::Result<std::vector<SpanPair>> MakeSubSpans(
+Result<std::vector<SpanPair>> MakeSubSpans(
   const IndexSpan & disk_span,
   const IndexSpan & mem_span) {
     assert(disk_span.size() == mem_span.size());
@@ -114,7 +117,7 @@ arrow::Result<std::vector<SpanPair>> MakeSubSpans(
         // create the negative range
         MakeSubSpan(i);
       } else if(disk_span[i] == disk_span[i - 1]) {
-        return arrow::Status::IndexError("Duplicate positive row indices encountered");
+        return Status::IndexError("Duplicate selection index ", disk_span[i]);
       } else if(disk_span[i] - disk_span[i - 1] == 1) {
         // monotonic range, advance
         continue;
@@ -130,7 +133,7 @@ arrow::Result<std::vector<SpanPair>> MakeSubSpans(
 }
 
 // Creates a cartesian product of span pairs
-arrow::Result<std::vector<DataChunk>>
+Result<std::vector<DataChunk>>
 MakeDataChunks(
     const std::vector<SpanPairs> & dim_spans,
     const ResultShapeData & data_shape) {
@@ -201,18 +204,18 @@ DataChunk::nElements() const noexcept {
 }
 
 // FORTRAN ordered shape of the chunk
-casacore::IPosition
+IPosition
 DataChunk::GetShape() const noexcept {
-  casacore::IPosition shape(dim_spans_.size(), 0);
+  IPosition shape(dim_spans_.size(), 0);
   for(std::size_t d=0; d < dim_spans_.size(); ++d) shape[d] = dim_spans_[d].disk.size();
   return shape;
 }
 
 // Factory function for creating a DataChunk
-arrow::Result<DataChunk>
+Result<DataChunk>
 DataChunk::Make(SpanPairs &&dim_spans, const ResultShapeData & data_shape, bool contiguous) {
   for(auto &[disk, mem]: dim_spans) {
-    if(disk.size() != mem.size()) return arrow::Status::Invalid("disk and memory span size mismatch");
+    if(disk.size() != mem.size()) return Status::Invalid("disk and memory span size mismatch");
   }
   ARROW_ASSIGN_OR_RAISE(auto empty, DiskSpansContainNegativeRanges(dim_spans));
   if(!empty) ARROW_RETURN_NOT_OK(AreDiskSpanContiguous(dim_spans));
@@ -231,7 +234,7 @@ DataChunk::Make(SpanPairs &&dim_spans, const ResultShapeData & data_shape, bool 
     empty};
 }
 
-arrow::Result<DataPartition> DataPartition::Make(
+Result<DataPartition> DataPartition::Make(
     const Selection &selection,
     const ResultShapeData &result_shape) {
 
@@ -315,7 +318,7 @@ arrow::Result<DataPartition> DataPartition::Make(
       std::move_iterator(row_chunks.end()));
   }
 
-  if(chunks.size() == 0) return arrow::Status::Invalid("Data partition produced no chunks!");
+  if(chunks.size() == 0) return Status::Invalid("Data partition produced no chunks!");
 
   return DataPartition{
     std::move(chunks),
