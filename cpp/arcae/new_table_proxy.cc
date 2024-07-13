@@ -74,13 +74,11 @@ namespace {
 static constexpr std::size_t kMaxTransposeDims = 5;
 
 template <typename CT>
-CasaArray<CT>
-TransposeData(
+bool TransposeData(
     const CasaArray<CT> & data,
     const SpanPairs & spans,
     arrow::util::span<CT> output_span) {
   const CT * in_ptr = data.data();
-  CasaArray<CT> result(data.shape());
   std::ptrdiff_t ndim = spans.size();
   std::ptrdiff_t row_dim = std::ptrdiff_t(ndim) - 1;
 
@@ -120,7 +118,7 @@ TransposeData(
     for(std::ptrdiff_t d=0; d < ndim; ++d) {
       if(++pos[d] < DimSize(d)) break;
       pos[d] = 0;
-      if(d == row_dim) return result;
+      if(d == row_dim) return true;
     }
   }
 }
@@ -161,8 +159,7 @@ struct ReadAndTransposeImpl {
       dim_spans = std::move(chunk.dim_spans_),
       out_span = std::move(out_span)
     ](const CasaArray<CT> & data) -> bool {
-      auto transpose = TransposeData(data, dim_spans, out_span);
-      return true;
+      return TransposeData(data, dim_spans, out_span);
     }, {}, CallbackOptions{ShouldSchedule::Always, GetCpuThreadPool()});
   }
 };
