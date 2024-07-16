@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <initializer_list>
+#include <memory>
 #include <type_traits>
 #include <vector>
 
@@ -32,47 +33,49 @@ struct SelectionBuilder;
 // over multiple dimensions
 class Selection {
 public:
-  // Rule of 5
-  Selection() = default;
+  Selection() : indices_(std::make_shared<std::vector<Index>>()),
+                spans_(std::make_shared<std::vector<IndexSpan>>()) {};
   Selection(const Selection & rhs) = default;
   Selection(Selection && rhs) = default;
   Selection & operator=(const Selection & rhs) = default;
   Selection & operator=(Selection && rhs) = default;
 
   // Number of dimensions in the selection
-  std::size_t Size() const noexcept { return spans_.size(); }
+  std::size_t Size() const noexcept { return spans_->size(); }
 
   // Number of stored indices in the selection
-  std::size_t nIndices() const noexcept { return indices_.size(); }
+  std::size_t nIndices() const noexcept { return indices_->size(); }
 
   // Returns true if a non-empty selection
   // exists at the specified dimension
   bool IsValid(std::size_t dim) const noexcept {
-    return dim < Size() && !spans_[dim].empty();
+    return dim < Size() && !spans_->operator[](dim).empty();
   }
 
   // Return true if the selection exists
   explicit inline operator bool() const noexcept {
     if(Size() == 0) return false;
-    for(std::size_t i=0; i < Size(); ++i) if(spans_[i].empty()) return false;
+    for(std::size_t i=0; i < Size(); ++i) {
+      if(spans_->operator[](i).empty()) return false;
+    }
     return true;
   }
 
   // Return the selection indices for a specified dimension
   const IndexSpan & operator[](std::size_t dim) const noexcept {
     assert(dim < Size());
-    return spans_[dim];
+    return spans_->operator[](dim);
   }
 
   // Return true if a valid row span exists
   bool HasRowSpan() const noexcept {
-    return !spans_.empty() && !spans_[Size() - 1].empty();
+    return !spans_->empty() && !spans_->operator[](Size() - 1).empty();
   }
 
   // Return the selection indices for the row dimension
   const IndexSpan & GetRowSpan() const noexcept {
     assert(Size() > 0);
-    return spans_[Size() - 1];
+    return spans_->operator[](Size() - 1);
   }
 
 
@@ -80,7 +83,9 @@ public:
   arrow::Result<IndexSpan> CSpan(std::size_t cdim) const noexcept {
     auto size = std::ptrdiff_t(Size());
     auto sdim = size - std::ptrdiff_t(cdim) - 1;
-    if(sdim >= 0 && sdim < size && !spans_[sdim].empty()) return spans_[sdim];
+    if(sdim >= 0 && sdim < size && !spans_->operator[](sdim).empty()) {
+      return spans_->operator[](sdim);
+    }
     return arrow::Status::IndexError("Selection doesn't exist for dimension ", cdim);
   }
 
@@ -94,7 +99,9 @@ public:
   arrow::Result<IndexSpan> FSpan(std::size_t fdim, std::size_t ndim) const noexcept {
     auto size = std::ptrdiff_t(Size());
     auto sdim = std::ptrdiff_t(fdim) - std::ptrdiff_t(ndim) + size;
-    if(sdim >= 0 && sdim < size && !spans_[sdim].empty()) return spans_[sdim];
+    if(sdim >= 0 && sdim < size && !spans_->operator[](sdim).empty()) {
+      return spans_->operator[](sdim);
+    }
     return arrow::Status::IndexError("Selection doesn't exist for dimension ", fdim);
   }
 
@@ -102,10 +109,11 @@ private:
   friend SelectionBuilder;
 
   Selection(std::vector<Index> && indices, std::vector<IndexSpan> && spans) :
-    indices_(std::move(indices)), spans_(std::move(spans)) {}
+    indices_(std::make_shared<std::vector<Index>>(std::move(indices))),
+    spans_(std::make_shared<std::vector<IndexSpan>>(std::move(spans))) {}
 
-  std::vector<Index> indices_;
-  std::vector<IndexSpan> spans_;
+  std::shared_ptr<std::vector<Index>> indices_;
+  std::shared_ptr<std::vector<IndexSpan>> spans_;
 };
 
 // Defines whether the SelectionBuilder describes
