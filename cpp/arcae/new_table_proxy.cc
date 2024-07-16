@@ -59,12 +59,6 @@ using ::casacore::String;
 
 using ::arcae::detail::DataChunk;
 
-template <>
-struct arrow::IterationTraits<DataChunk> {
-  static DataChunk End() { return {}; }
-  static bool IsEnd(const DataChunk& val) { return val.nDim() == 0; }
-};
-
 namespace arcae {
 namespace detail {
 

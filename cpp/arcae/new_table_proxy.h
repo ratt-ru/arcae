@@ -35,7 +35,7 @@ public:
 
   arrow::Result<std::shared_ptr<arrow::Array>> GetColumn(
     const std::string & column,
-    Selection selection=Selection(),
+    const Selection & selection=Selection(),
     const std::shared_ptr<arrow::Array> & result=nullptr) const;
 
 private:

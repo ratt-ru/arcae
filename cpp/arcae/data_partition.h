@@ -111,4 +111,13 @@ struct DataPartition {
 }  // namespace arcae
 
 
+// Define arrow IterationTraits for DataChunk
+template <>
+struct arrow::IterationTraits<arcae::detail::DataChunk> {
+  static arcae::detail::DataChunk End() { return {}; }
+  static bool IsEnd(const arcae::detail::DataChunk& val) {
+    return val.nDim() == 0;
+  }
+};
+
 #endif // ARCAE_DATA_PARTITION_H
