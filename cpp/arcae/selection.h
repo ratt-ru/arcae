@@ -160,6 +160,11 @@ struct SelectionBuilder {
     return *this;
   }
 
+  SelectionBuilder & AddEmpty() {
+    spans.emplace_back(IndexSpan{});
+    return *this;
+  }
+
   // Base case, which reminds the developer of the vector<T> expectation
   template <typename T>
   SelectionBuilder & Add(T ids) {
