@@ -394,14 +394,13 @@ ResultShapeData::MaxDimensionSize() const noexcept {
 std::size_t
 ResultShapeData::FlatOffset(const std::vector<IndexType> & index) const noexcept {
   auto ndim = nDim();
-  std::size_t offset = 0;
-  IndexType product = 1;
   assert(index.size() == ndim);
+  std::size_t offset = 0;
 
   // Fixed case
   if(IsFixed()) {
     const auto & shape = GetShape();
-    for(std::size_t d=0; d < index.size() && d < ndim; ++d) {
+    for(std::size_t d = 0, product = 1; d < index.size() && d < ndim; ++d) {
       offset += index[d] * product;
       product *= shape[d];
     }
@@ -409,11 +408,11 @@ ResultShapeData::FlatOffset(const std::vector<IndexType> & index) const noexcept
   };
 
   // Variable case
-  auto row = index[ndim-1];
+  auto row = index[ndim - 1];
   assert(row < IndexType(nRows()));
   const auto shape = GetRowShape(row);
 
-  for(std::size_t d=0; d < shape.size() && d < ndim - 1; ++d) {
+  for(std::size_t d = 0, product = 1; d < shape.size() && d < ndim - 1; ++d) {
     offset += index[d] * product;
     product *= shape[d];
   }

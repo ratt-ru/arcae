@@ -71,13 +71,12 @@ template <typename CT>
 bool TransposeData(
     const CasaArray<CT> & data,
     const SpanPairs & spans,
-    arrow::util::span<CT> output_span) {
+    CT * out_ptr,
+    std::size_t flat_offset,
+    const std::vector<std::size_t> & buffer_strides) {
   const CT * in_ptr = data.data();
   std::ptrdiff_t ndim = spans.size();
   std::ptrdiff_t row_dim = std::ptrdiff_t(ndim) - 1;
-
-  auto DimSize = [&](auto d) -> std::ptrdiff_t { return spans[d].mem.size(); };
-  auto Mem = [&](auto d, auto i) -> std::ptrdiff_t { return spans[d].mem[i]; };
 
   // Initialise minimum memory index
   std::array<IndexType, kMaxTransposeDims> min_mem;
@@ -85,30 +84,59 @@ bool TransposeData(
     min_mem[d] = *std::min_element(std::begin(spans[d].mem), std::end(spans[d].mem));
   }
 
+  auto DimSize = [&](auto d) -> std::ptrdiff_t { return spans[d].mem.size(); };
+
   // Initialise strides
-  std::array<std::ptrdiff_t, kMaxTransposeDims> strides{1};
+  std::array<std::ptrdiff_t, kMaxTransposeDims> in_strides{1};
+  const auto & data_shape = data.shape();
   for(std::ptrdiff_t d = 1, product = 1; d < ndim; ++d) {
-    strides[d] = DimSize(d - 1) * product;
-    product *= DimSize(d - 1);
+    product *= data_shape[d- 1];
+    in_strides[d] = product;
   }
 
   // Initialise position array
   std::array<std::ptrdiff_t, kMaxTransposeDims> pos;
   pos.fill(0);
 
+  auto MemRelative = [&](auto d, auto i) -> std::ptrdiff_t {
+    return spans[d].mem[i] - min_mem[d];
+  };
+
   // Iterate over the spans in memory, copying data
   while(true) {
     std::ptrdiff_t in_offset = 0;
     std::ptrdiff_t out_offset = 0;
-    for(std::ptrdiff_t d=0; d < ndim; ++d) {
-      in_offset += (Mem(d, pos[d]) - min_mem[d])*strides[d];
-      out_offset += pos[d] * strides[d];
+    for(std::ptrdiff_t d = 0; d < ndim; ++d) {
+      in_offset += pos[d] * in_strides[d];
+      out_offset += MemRelative(d, pos[d]) * buffer_strides[d];
     }
+
+    // std::stringstream oss;
+    // oss << "Position [";
+    // for(std::ptrdiff_t d = 0; d < ndim; ++d) {
+    //   if(d > 0) oss << ',';
+    //   oss << spans[d].mem[pos[d]];
+    // }
+    // oss << "] Relative [";
+    // for(std::ptrdiff_t d = 0; d < ndim; ++d) {
+    //   if(d > 0) oss << ',';
+    //   oss << MemRelative(d, pos[d]);
+    // }
+
+    // oss << "] Strides [";
+    // for(std::ptrdiff_t d = 0; d < ndim; ++d) {
+    //   if(d > 0) oss << ',';
+    //   oss << in_strides[d];
+    // }
+
+    // oss << "] " << flat_offset << ' '  << in_offset << ' ' << out_offset << ' ' << flat_offset + out_offset << ' ' << in_ptr[in_offset];
+    // ARROW_LOG(INFO) << oss.str();
+
     // Moves degrade to copies for simple (i.e. numeric) types
     // but it should make casacore::String more efficient
-    output_span[out_offset] = std::move(in_ptr[in_offset]);
+    out_ptr[out_offset] = std::move(in_ptr[in_offset]);
 
-    // FORTRAN ordering
+    // Iterate in FORTRAN order
     for(std::ptrdiff_t d=0; d < ndim; ++d) {
       if(++pos[d] < DimSize(d)) break;
       pos[d] = 0;
@@ -143,17 +171,14 @@ struct ReadAndTransposeImpl {
       return data.getColumnRange(row_slicer, section_slicer);
     });
 
-    // Create a span over the appropriate
-    // output range in the buffer
-    auto out_span = buffer->mutable_span_as<CT>();
-    out_span = out_span.subspan(chunk.flat_offset_, chunk.nElements());
-
     // Perform the transpose
     return read_fut.Then([
       dim_spans = std::move(chunk.dim_spans_),
-      out_span = std::move(out_span)
-    ](const CasaArray<CT> & data) -> bool {
-      return TransposeData(data, dim_spans, out_span);
+      out_ptr = buffer->mutable_data_as<CT>() + chunk.flat_offset_,
+      offset = chunk.flat_offset_,
+      buffer_strides = std::move(chunk.buffer_strides_)
+    ](const CasaArray<CT> & data) mutable -> bool {
+      return TransposeData(data, dim_spans, out_ptr, offset, buffer_strides);
     }, {}, CallbackOptions{ShouldSchedule::Always, GetCpuThreadPool()});
   }
 };
@@ -170,27 +195,22 @@ struct ReadInPlaceImpl {
 
   Future<bool> operator()(const DataChunk & chunk) const {
     assert(chunk.IsContiguous());
-    // Create a span over the appropriate output range in the buffer
-    auto out_span = buffer->mutable_span_as<CT>();
-    out_span = out_span.subspan(chunk.flat_offset_, chunk.nElements());
-
     return itp->RunAsync([
-      column = column,
-      ndim = chunk.nDim(),
+      column = std::move(column),
       row_slicer = chunk.GetRowSlicer(),
       section_slicer = chunk.GetSectionSlicer(),
       shape = chunk.GetShape(),
-      out_span = std::move(out_span)
+      out_ptr = buffer->mutable_data_as<CT>() + chunk.flat_offset_
     ](const TableProxy & tp) -> Future<bool> {
-      if(ndim == 1) {
+      if(shape.size() == 1) {
         auto data = ScalarColumn<CT>(tp.table(), column);
-        auto vector = CasaVector<CT>(shape, out_span.data(), casacore::SHARE);
+        auto vector = CasaVector<CT>(shape, out_ptr, casacore::SHARE);
         data.getColumnRange(row_slicer, vector);
         return true;
       }
       auto data = ArrayColumn<CT>(tp.table(), column);
-      auto array = CasaArray<CT>(shape, out_span.data(), casacore::SHARE);
-      data.getColumnRange(row_slicer, section_slicer);
+      auto array = CasaArray<CT>(shape, out_ptr, casacore::SHARE);
+      data.getColumnRange(row_slicer, section_slicer, array);
       return true;
     });
   }
@@ -321,8 +341,8 @@ GetResultBufferOrAllocate(
             if(std::size_t(buffer->size()) != nbytes) {
               return arrow::Status::Invalid(
                 "Result buffer of ", buffer->size(),
-                " bytes does not contain the "
-                "expected number of bytes ", nbytes);
+                " bytes does not contain the"
+                " expected number of bytes ", nbytes);
             }
             return buffer;
           }
@@ -402,7 +422,7 @@ Result<std::shared_ptr<Array>> MakeArray(
     } else if(strat == ConvertStrategy::LIST) {
       arrow::Int32Builder builder;
       ARROW_RETURN_NOT_OK(builder.Reserve(nelements + 1));
-      for(std::size_t i = 0; i < nelements; ++i) {
+      for(std::size_t i = 0; i < nelements + 1; ++i) {
         ARROW_RETURN_NOT_OK(builder.Append(2*i));
       }
       ARROW_ASSIGN_OR_RAISE(auto offsets, builder.Finish())
@@ -443,7 +463,7 @@ Status ColumnExists(const CasaTable & table, const std::string & column) {
 arrow::Result<std::shared_ptr<Array>>
 NewTableProxy::GetColumn(
     const std::string & column,
-    Selection selection,
+    const Selection & selection,
     const std::shared_ptr<Array> & result) const {
   // Get the shape of the result, given the supplied selection
   // and the given result array
@@ -452,24 +472,26 @@ NewTableProxy::GetColumn(
       column = column,
       selection = std::move(selection),
       result = result
-    ](const TableProxy & tp) -> Result<ShapeResult> {
+    ](const TableProxy & tp) mutable -> Result<std::shared_ptr<ShapeResult>>  {
       ARROW_RETURN_NOT_OK(ColumnExists(tp.table(), column));
       auto table_column = TableColumn(tp.table(), column);
       ARROW_ASSIGN_OR_RAISE(
         auto shape_data,
         ResultShapeData::MakeRead(table_column, selection, result));
-      return ShapeResult{std::move(shape_data), std::move(selection)};
+      return std::make_shared<AggregateAdapter<ShapeResult>>(
+        std::move(shape_data), std::move(selection));
     });
 
   // Partition the resulting shape into contiguous chunks
   // of data to read from disk
   struct PartitionResult { DataPartition partition; ResultShapeData shape; };
   auto part_fut = shape_fut.Then(
-    [](const ShapeResult & result) -> Result<PartitionResult> {
+    [](const std::shared_ptr<ShapeResult> & result) mutable -> Result<std::shared_ptr<PartitionResult>> {
       ARROW_ASSIGN_OR_RAISE(
         auto partition,
-        DataPartition::Make(result.selection, result.shape));
-      return PartitionResult{std::move(partition), result.shape};
+        DataPartition::Make(result->selection, result->shape));
+      return std::make_shared<AggregateAdapter<PartitionResult>>(
+        std::move(partition), std::move(result->shape));
     }, {}, CallbackOptions{ShouldSchedule::Always, GetCpuThreadPool()});
 
   // Read each contiguous chunk of data on disk independently
@@ -478,15 +500,15 @@ NewTableProxy::GetColumn(
       column = column,
       itp = itp_,
       result_array = result
-    ](const PartitionResult & result) -> Future<std::shared_ptr<Array>> {
-      auto casa_dtype = result.partition.GetDataType();
-      auto nelements = result.partition.nElements();
+    ](const std::shared_ptr<PartitionResult> & result) mutable -> Future<std::shared_ptr<Array>> {
+      auto casa_dtype = result->partition.GetDataType();
+      auto nelements = result->partition.nElements();
       ARROW_ASSIGN_OR_RAISE(auto buffer,
         GetResultBufferOrAllocate(nelements, casa_dtype, result_array));
 
       // Make an async generator over the data chunks
       // Map ReadCallBack over all data chunks
-      auto data_chunk_gen = MakeVectorGenerator(result.partition.data_chunks_);
+      auto data_chunk_gen = MakeVectorGenerator(result->partition.data_chunks_);
       auto read_and_copy_data_gen = MakeMappedGenerator(
         std::move(data_chunk_gen),
         ReadCallback{std::move(column), itp, buffer, casa_dtype});
@@ -494,9 +516,9 @@ NewTableProxy::GetColumn(
       // Collect the read results
       auto collect = CollectAsyncGenerator(std::move(read_and_copy_data_gen));
 
-      // Make the array
+      // Make the array from the now populated buffer
       return collect.Then([
-        result_shape = std::move(result.shape),
+        result_shape = std::move(result->shape),
         buffer = buffer
       ](const std::vector<bool> & result) {
         return MakeArray(result_shape, buffer);

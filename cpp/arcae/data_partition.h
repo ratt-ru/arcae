@@ -31,10 +31,10 @@ using SpanPairs = std::vector<SpanPair>;
 struct DataChunk {
   // Disk and memory spans for each dimension
   SpanPairs dim_spans_;
-  // Minimum memory indices
-  std::vector<IndexType> min_mem_indices_;
   // Flattened chunk offset within output
   std::size_t flat_offset_;
+  // Strides for the associated position in the data buffer
+  std::vector<std::size_t> buffer_strides_;
   // Is the memory layout contiguous?
   bool contiguous_;
   // Does this data chunk represent an empty selection?

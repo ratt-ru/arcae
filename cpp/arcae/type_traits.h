@@ -29,9 +29,23 @@ template <typename Fn, typename ... Args>
 using ArrowFutureType = typename arrow::EnsureFuture<std::invoke_result_t<Fn, Args...>>::type;
 
 // Get the size of a CASA Data Type
-arrow::Result<std::size_t> CasaDataTypeSize(casacore::DataType data_type);
+arrow::Result<std::size_t>
+CasaDataTypeSize(casacore::DataType data_type);
+
 // Get the primitive arrow Data type associated with a CASA Data Type
-arrow::Result<std::shared_ptr<arrow::DataType>> ArrowDataType(casacore::DataType data_type);
+arrow::Result<std::shared_ptr<arrow::DataType>>
+ArrowDataType(casacore::DataType data_type);
+
+// From https://stackoverflow.com/a/35300172/1611416
+// Supports initialisation of aggregate structures in std::make_shared<T>
+//
+//   struct Data { std::string a; int b; float c; };
+//   std::make_shared<AggregateAdapter<Data>>{"hello", 1, 10.0f};
+template<class T>
+struct AggregateAdapter : public T {
+    template<class... Args>
+    AggregateAdapter(Args&&... args) : T{ std::forward<Args>(args)... } {}
+};
 
 template <casacore::DataType CDT>
 struct CasaDataTypeTraits {

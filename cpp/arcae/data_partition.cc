@@ -139,7 +139,6 @@ MakeDataChunks(
     const ResultShapeData & data_shape) {
   std::vector<SpanPairs> product = {{}};
 
-
   for(const auto & span_pairs: dim_spans) {
     std::vector<SpanPairs> next_product;
     for(const auto & result: product) {
@@ -156,8 +155,7 @@ MakeDataChunks(
 
   for(std::size_t i=0; i < product.size(); ++i) {
     auto row_dim = product[i].size() - 1;
-    bool row_contiguous = IsMemoryContiguous(product[i][row_dim]);
-    bool chunk_contiguous = other_contiguous & row_contiguous;
+    bool chunk_contiguous = other_contiguous & IsMemoryContiguous(product[i][row_dim]);
     ARROW_ASSIGN_OR_RAISE(
       chunks[i],
       DataChunk::Make(std::move(product[i]), data_shape, chunk_contiguous));
@@ -214,25 +212,99 @@ DataChunk::GetShape() const noexcept {
 // Factory function for creating a DataChunk
 Result<DataChunk>
 DataChunk::Make(SpanPairs &&dim_spans, const ResultShapeData & data_shape, bool contiguous) {
+  // Sanity checks
+  if(data_shape.nDim() != dim_spans.size()) {
+    return Status::Invalid("data_shape.nDim() != dim_spans.size()");
+  }
   for(auto &[disk, mem]: dim_spans) {
     if(disk.size() != mem.size()) return Status::Invalid("disk and memory span size mismatch");
   }
   ARROW_ASSIGN_OR_RAISE(auto empty, DiskSpansContainNegativeRanges(dim_spans));
   if(!empty) ARROW_RETURN_NOT_OK(AreDiskSpanContiguous(dim_spans));
-  std::vector<IndexType> mem_index(dim_spans.size(), 0);
+  // Derive the minimum memory index in each dimension,
+  // used to compute the flat offset of this chunk
+  // in the output buffer
+  std::vector<IndexType> min_mem_index(dim_spans.size(), 0);
   for(std::size_t d = 0; d < dim_spans.size(); ++d) {
-    mem_index[d] = *std::min_element(
+    min_mem_index[d] = *std::min_element(
       std::begin(dim_spans[d].mem),
       std::end(dim_spans[d].mem));
   }
-  auto flat_offset = data_shape.FlatOffset(mem_index);
+
+  // Derive the output buffer strides
+  std::vector<std::size_t> strides(dim_spans.size(), 1);
+
+  if(data_shape.IsFixed()) {
+    const auto & shape = data_shape.GetShape();
+    for(std::size_t d = 1, product = 1; d < dim_spans.size(); ++d) {
+      product *= shape[d - 1];
+      strides[d] *= product;
+    }
+  } else {
+    auto row_span = dim_spans[dim_spans.size() - 1].mem;
+    if(row_span.size() != 1) return Status::Invalid("Expected a single row dimension");
+    const auto & shape = data_shape.GetRowShape(row_span[0]);
+    for(std::size_t d = 1, product = 1; d < dim_spans.size(); ++d) {
+      product *= shape[d - 1];
+      strides[d] *= product;
+    }
+  }
+
   return DataChunk{
     std::move(dim_spans),
-    std::move(mem_index),
-    flat_offset,
+    data_shape.FlatOffset(min_mem_index),
+    std::move(strides),
     contiguous,
     empty};
 }
+
+// Commented out debugging function
+// std::string
+// DataChunk::ToString() const {
+//   std::ostringstream oss;
+//   oss << '\n';
+//   bool first_dim = true;
+//   std::size_t nelements = 1;
+//   for(std::size_t d = 0; d < dim_spans_.size(); ++d) {
+//     if(!first_dim) oss << ' ';
+//     first_dim = false;
+//     oss << '[';
+//     bool first_index = true;
+//     nelements *= dim_spans_[d].mem.size();
+//     for(auto i: dim_spans_[d].mem) {
+//       if(!first_index) oss << ',';
+//       first_index = false;
+//       oss << std::to_string(i);
+//     }
+//     oss << ']';
+//   }
+
+//   oss << '\n';
+
+//   first_dim = true;
+//   for(std::size_t d = 0; d < dim_spans_.size(); ++d) {
+//     if(!first_dim) oss << ' ';
+//     first_dim = false;
+//     oss << '[';
+//     bool first_index = true;
+//     for(auto i: dim_spans_[d].disk) {
+//       if(!first_index) oss << ',';
+//       first_index = false;
+//       oss << std::to_string(i);
+//     }
+//     oss << ']';
+//   }
+
+//   oss << '\n';
+//   oss << "row slicer:" << GetRowSlicer() << '\n';
+//   oss << "sec slicer:" << GetSectionSlicer() << '\n';
+//   oss << " elements: " + std::to_string(nelements);
+//   oss << " offset: " + std::to_string(flat_offset_);
+//   oss << " contiguous: ";
+//   oss << (contiguous_ ? 'Y' : 'N');
+
+//   return oss.str();
+// }
 
 Result<DataPartition> DataPartition::Make(
     const Selection &selection,
