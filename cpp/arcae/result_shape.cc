@@ -419,7 +419,7 @@ ResultShapeData::FlatOffset(const std::vector<IndexType> & index) const noexcept
 
   return std::accumulate(
     row_shapes_->begin(),
-    row_shapes_->begin() + row + 1,
+    row_shapes_->begin() + row,
     offset,
     [](auto i, auto s) { return i + s.product(); });
 }

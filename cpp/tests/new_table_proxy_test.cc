@@ -154,7 +154,7 @@ INSTANTIATE_TEST_SUITE_P(
     Parametrization{{true, true, true}, {true, true, true}, {1, 3, 5}},
     Parametrization{{true, true, true}, {false, false, false}, {1, 3, 5}}));
 
-TEST_P(ParametrizedTest, Basic) {
+TEST_P(ParametrizedTest, Fixed) {
   ASSERT_OK_AND_ASSIGN(auto ntp, OpenTable());
   const auto & params = GetParam();
   auto builder = SelectionBuilder().Order('F');
