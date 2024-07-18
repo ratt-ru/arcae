@@ -72,12 +72,6 @@ using ::casacore::TiledColumnStMan;
 
 
 template <>
-struct arrow::IterationTraits<DataChunk> {
-  static DataChunk End() { return {}; }
-  static bool IsEnd(const DataChunk& val) { return val.nDim() == 0; }
-};
-
-template <>
 struct arrow::IterationTraits<IPosition> {
   static IPosition End() { return {}; }
   static bool IsEnd(const IPosition& val) { return val.size() == 0; }
