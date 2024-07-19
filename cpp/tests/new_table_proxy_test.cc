@@ -459,10 +459,11 @@ TEST_P(VariableProxyTest, Variable) {
                     ->child_data[0]); // corr
 
   auto rows = GetIndexSpan(2, nRow());
+  std::size_t row_offset = 0;
 
   // Check that the expected value at the selected disk indices
   // matches the buffer values
-  for(std::size_t r = 0, row_offset = 0; r < rows.size(); ++r) {
+  for(std::size_t r = 0; r < rows.size(); ++r) {
     auto row = rows[r];
     EXPECT_TRUE(row < nRow()); // sanity
     const auto & shape = row_shapes_[row];
@@ -484,6 +485,10 @@ TEST_P(VariableProxyTest, Variable) {
     // Advance row offset within the output buffer
     row_offset += chans.size() * corrs.size();
   }
+
+  // All values in the output have been considered
+  EXPECT_EQ(row_offset, var_data_buffer.size());
+  EXPECT_EQ(row_offset, str_data->length());
 }
 
 }
