@@ -381,20 +381,21 @@ TEST_P(VariableProxyTest, Variable) {
   EXPECT_TRUE(nRow() > 0);
   auto params = GetParam();
 
-  // Setup a dummy index for the secondary dimensions
+  // Derive minimum viable dimension size.
+  // i.e. the maximum viable selection size along each dimension
+  // as well as the maximum of all dimension sizes
   std::size_t max_dim = nRow();
   casacore::IPosition min_shape(kNDim, std::numeric_limits<ssize_t>::max());
   min_shape[2] = nRow();  // row dimension is trivial
   for(const auto & shape : row_shapes_) {
     EXPECT_EQ(shape.size(), kNDim - 1);
-    // Derive minimum size in each secondary dimension
-    // as well as the maximum dimension size
     for(std::size_t d = 0; d < shape.size(); ++d) {
       min_shape[d] = std::min(min_shape[d], shape[d]);
       max_dim = std::max<std::size_t>(max_dim, shape[d]);
     }
   }
 
+  // Setup a dummy index for empty dimensions
   Index dummy_index(max_dim, 0);
   std::iota(std::begin(dummy_index), std::end(dummy_index), 0);
 
