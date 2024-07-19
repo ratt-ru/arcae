@@ -66,7 +66,6 @@ namespace {
 
 // Maximum number of DataChunk dimensions on the fast path
 static constexpr std::size_t kMaxTransposeDims = 5;
-} // namespace
 
 template <typename CT>
 bool TransposeData(
@@ -467,6 +466,7 @@ Status ColumnExists(const CasaTable & table, const std::string & column) {
   return Status::Invalid("Column ", column, " does not exist");
 }
 
+} // namespace
 
 arrow::Future<std::shared_ptr<Array>>
 ReadImpl(
