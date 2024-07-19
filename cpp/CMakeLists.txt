@@ -16,6 +16,7 @@ add_library(arcae SHARED
     arcae/data_partition.cc
     arcae/isolated_table_proxy.cc
     arcae/new_table_proxy.cc
+    arcae/read_impl.cc
     arcae/result_shape.cc
     arcae/service_locator.cc
     arcae/selection.cc
