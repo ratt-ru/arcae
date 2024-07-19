@@ -440,9 +440,7 @@ TEST_P(VariableProxyTest, Variable) {
   ASSERT_OK_AND_ASSIGN(str_data, ntp->GetColumn("VAR_STRING_DATA", selection));
 
   auto GetIndexSpan = [&](auto dim, auto dim_size) -> IndexSpan {
-    if(auto result = selection.FSpan(dim, kNDim); result.ok()) {
-      return result.ValueOrDie();
-    }
+    if(auto r = selection.FSpan(dim, kNDim); r.ok()) return r.ValueOrDie();
     return IndexSpan(dummy_index).subspan(0, dim_size);
   };
 
