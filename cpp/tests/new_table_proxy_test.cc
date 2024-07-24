@@ -204,7 +204,6 @@ TEST_P(FixedTableProxyTest, Fixed) {
   for(std::size_t d = 0; d < kNDim; ++d) {
     if(!params.empty_selection[d]) continue;
     EXPECT_FALSE(selection.FSpan(d).ok());
-    auto result = selection.FSpan(d);
     Index expected(kDimensions[d], 0);
     std::iota(std::begin(expected), std::end(expected), 0);
     EXPECT_EQ(indices[d], expected);
