@@ -9,6 +9,7 @@
 
 #include <casacore/casa/aipsxtype.h>
 #include <casacore/casa/Arrays/IPosition.h>
+#include <casacore/tables/Tables/ArrayColumnBase.h>
 #include <casacore/tables/Tables/ColumnDesc.h>
 #include <casacore/tables/Tables/TableColumn.h>
 #include <casacore/casa/Utilities/DataType.h>
@@ -20,9 +21,14 @@
 #include "arcae/selection.h"
 #include "arcae/result_shape.h"
 
+using ::arrow::Result;
+using ::arrow::Status;
+
 using ::arcae::detail::IndexType;
 using RowShapes = ::arcae::detail::RowShapes;
 
+using ::casacore::rownr_t;
+using ::casacore::ArrayColumnBase;
 using ::casacore::ColumnDesc;
 using ::casacore::DataType;
 using ::casacore::IPosition;
@@ -40,14 +46,14 @@ namespace {
 // If, the supplied row is negative (-1) and a result_shape is supplied
 // the shape is derived from this source, otherwise the CASA shape is
 // used as the reference value
-arrow::Result<IPosition> GetRowShape(
+Result<IPosition> GetRowShape(
     const TableColumn & column,
     const std::optional<IPosition> & result_shape,
     IndexType r) {
 
   if(r < 0) {
     if(!result_shape.has_value()) {
-      return arrow::Status::IndexError(
+      return Status::IndexError(
         "Negative selection indices may only be present "
         "when a fixed shape result array is provided");
     }
@@ -55,32 +61,32 @@ arrow::Result<IPosition> GetRowShape(
     // Return secondary dimensions
     return shape.getFirst(shape.size() - 1);
   } else if(r >= IndexType(column.nrow())) {
-    return arrow::Status::IndexError(
+    return Status::IndexError(
       "Row ", r, " in column ",
       column.columnDesc().name(),
       " is out of bounds");
   } else if(column.isDefined(r)) {
     return column.shape(r);
   }
-  return arrow::Status::IndexError(
+  return Status::IndexError(
     "Row ", r, " in column ",
     column.columnDesc().name(),
     " is not defined");
 }
 
 // Clips the shape against the selection
-arrow::Status ClipShape(
-    const casacore::ColumnDesc & column_desc,
+Status ClipShape(
+    const ColumnDesc & column_desc,
     IPosition & shape,
     const Selection & selection) {
 
-  if(selection.Size() <= 1) return arrow::Status::OK();
+  if(selection.Size() <= 1) return Status::OK();
   for(std::size_t dim=0; dim < shape.size(); ++dim) {
     if(auto result = selection.FSpan(dim, shape.size() + 1); result.ok()) {
       auto span = result.ValueOrDie();
       for(auto i: span) {
         if(i >= shape[dim]) {
-          return arrow::Status::IndexError(
+          return Status::IndexError(
             "Selection index ", i,
             " exceeds dimension ", dim,
             " of shape ", shape,
@@ -90,11 +96,11 @@ arrow::Status ClipShape(
       shape[dim] = span.size();
     }
   }
-  return arrow::Status::OK();
+  return Status::OK();
 }
 
 // Create variably shaped row data
-arrow::Result<RowShapes>
+Result<RowShapes>
 MakeRowData(const TableColumn &column,
             const Selection &selection,
             const std::optional<IPosition> & result_shape) {
@@ -126,19 +132,19 @@ MakeRowData(const TableColumn &column,
 
 // Check that the column shape matches the
 // shape of the result array
-arrow::Status CheckShapeMatchesResult(
+Status CheckShapeMatchesResult(
     const std::string & column_name,
     const IPosition & shape,
     const std::optional<IPosition> & result_shape) {
   if(result_shape.has_value()) {
     if(shape != result_shape.value()) {
-      return arrow::Status::Invalid(
+      return Status::Invalid(
         "Result shape ", result_shape.value(),
         " does not match the selection shape ", shape,
         " in column ", column_name);
     }
   }
-  return arrow::Status::OK();
+  return Status::OK();
 }
 
 //----------------------------------------------------------------------------
@@ -146,7 +152,7 @@ arrow::Status CheckShapeMatchesResult(
 //----------------------------------------------------------------------------
 
 // Get the row shapes of variably shaped list arrays
-arrow::Result<RowShapes>
+Result<RowShapes>
 GetRowShapes(const std::shared_ptr<arrow::Array> & data, std::size_t ndim) {
   auto result = RowShapes(data->length(), IPosition(ndim - 1));
 
@@ -156,13 +162,13 @@ GetRowShapes(const std::shared_ptr<arrow::Array> & data, std::size_t ndim) {
       std::int64_t & start,
       std::int64_t & end,
       std::size_t & nd
-  ) -> arrow::Result<std::shared_ptr<arrow::Array>> {
-    if (list->null_count() > 0) return arrow::Status::NotImplemented("nulls");
+  ) -> Result<std::shared_ptr<arrow::Array>> {
+    if (list->null_count() > 0) return Status::NotImplemented("nulls");
     auto dim_size = list->value_length(start);
     if constexpr (!std::is_same_v<decltype(list), std::shared_ptr<arrow::FixedSizeListArray>>) {
       for (std::int64_t i=start + 1; i < end; ++i) {
         if(dim_size != list->value_length(i)) {
-          return arrow::Status::Invalid("Offsets in row ", r, " don't match");
+          return Status::Invalid("Offsets in row ", r, " don't match");
         }
       }
     }
@@ -209,7 +215,7 @@ GetRowShapes(const std::shared_ptr<arrow::Array> & data, std::size_t ndim) {
           done = true;
           break;
         default:
-          return arrow::Status::NotImplemented(
+          return Status::NotImplemented(
             "Shape derivation of ",
             tmp->type()->ToString(),
             " is not supported");
@@ -221,20 +227,20 @@ GetRowShapes(const std::shared_ptr<arrow::Array> & data, std::size_t ndim) {
 }
 
 // Get shape information for the supplied array
-arrow::Result<ResultShapeData>
+Result<ResultShapeData>
 GetArrowResultShapeData(
     const ColumnDesc & column_desc,
     const std::shared_ptr<arrow::Array> & data) {
 
-  if (!data) return arrow::Status::Invalid("data is null");
+  if (!data) return Status::Invalid("data is null");
   auto fixed_shape = true;
   auto shape = std::vector<std::int64_t>{data->length()};
   auto ndim = std::size_t{1};
   auto tmp = data;
   std::shared_ptr<arrow::DataType> dtype;
 
-  auto MaybeUpdateShapeAndNdim = [&](auto list) -> arrow::Result<std::shared_ptr<arrow::Array>> {
-    if(list->null_count() > 0) return arrow::Status::NotImplemented("null handling");
+  auto MaybeUpdateShapeAndNdim = [&](auto list) -> Result<std::shared_ptr<arrow::Array>> {
+    if(list->null_count() > 0) return Status::NotImplemented("null handling");
     ++ndim;
     if(!fixed_shape) return list->values();
     auto dim_size = list->value_length(0);
@@ -284,7 +290,7 @@ GetArrowResultShapeData(
         done = true;
         break;
       default:
-        return arrow::Status::NotImplemented(
+        return Status::NotImplemented(
           "Shape derivation of ",
           tmp->type()->ToString(),
           " is not supported");
@@ -324,7 +330,7 @@ GetArrowResultShapeData(
 // This function massages Arrow shape data
 // into CASA shape data, by removing the
 // associated dimension of 2 values from the shape data.
-arrow::Result<ResultShapeData>
+Result<ResultShapeData>
 GetResultShapeData(
     const ColumnDesc & column_desc,
     const std::shared_ptr<arrow::Array>& data) {
@@ -340,7 +346,7 @@ GetResultShapeData(
   if(shape_data.IsFixed()) {
     auto shape = shape_data.GetShape();
     if(shape.size() == 0 || shape[0] != 2) {
-      return arrow::Status::Invalid(
+      return Status::Invalid(
         "Arrow result data must supply pairs of values ",
         "for complex valued column ", shape_data.GetName());
     }
@@ -360,7 +366,7 @@ GetResultShapeData(
   auto & shapes = shape_data.row_shapes_.value();
   for(std::size_t r=0; r < shapes.size(); ++r) {
     if(shapes[r].size() == 0 || shapes[r][0] != 2) {
-      return arrow::Status::Invalid(
+      return Status::Invalid(
         "Arrow result data must supply pairs of values ",
         "for complex valued column ", shape_data.column_name_);
     }
@@ -436,7 +442,7 @@ ResultShapeData::nElements() const noexcept {
 }
 
 // Get ListArray offsets arrays
-arrow::Result<std::vector<std::shared_ptr<arrow::Int32Array>>>
+Result<std::vector<std::shared_ptr<arrow::Int32Array>>>
 ResultShapeData::GetOffsets() const noexcept {
   auto nrow = nRows();
   // Don't build offsets for the row dimension (last in FORTRAN order)
@@ -453,7 +459,7 @@ ResultShapeData::GetOffsets() const noexcept {
 
   // Compute number of elements in each row by creating
   // a product over each dimension
-  auto BuildFn = [&](auto && GetShapeFn) -> arrow::Status {
+  auto BuildFn = [&](auto && GetShapeFn) -> ::Status {
     using ItType = std::tuple<std::ptrdiff_t, std::size_t>;
     for(std::size_t row=0; row < nrow; ++row) {
       for(auto [dim, product]=ItType{ndim - 1, 1}; dim >= 0; --dim) {
@@ -465,7 +471,7 @@ ResultShapeData::GetOffsets() const noexcept {
         product *= dim_size;
       }
     }
-    return arrow::Status::OK();
+    return Status::OK();
   };
 
   // Build the offset arrays
@@ -482,7 +488,7 @@ ResultShapeData::GetOffsets() const noexcept {
 }
 
 
-arrow::Result<ResultShapeData>
+Result<ResultShapeData>
 ResultShapeData::MakeRead(
     const TableColumn &column,
     const Selection &selection,
@@ -503,7 +509,7 @@ ResultShapeData::MakeRead(
   // The number of dimensions varies per row
   // This case is not handled
   if (column_desc.ndim() == -1) {
-    return arrow::Status::NotImplemented(
+    return Status::NotImplemented(
       "Column ", column_name,
       " has varying dimensions");
   }
@@ -551,7 +557,7 @@ ResultShapeData::MakeRead(
   // The number of dimensions varies per row
   // This case is not handled
   if (ndim == -1) {
-    return arrow::Status::NotImplemented(
+    return Status::NotImplemented(
       "Column ", column_name,
       " has varying dimensions");
   }
@@ -582,63 +588,119 @@ ResultShapeData::MakeRead(
     std::move(shapes)};
 }
 
-arrow::Result<ResultShapeData>
+Result<ResultShapeData>
 ResultShapeData::MakeWrite(
     const TableColumn &column,
     const std::shared_ptr<arrow::Array> & data,
     const Selection &selection) {
 
-  if (!data) return arrow::Status::Invalid("data array is null");
+  if (!data) return Status::Invalid("data array is null");
   auto column_desc = column.columnDesc();
 
   // Varying dimensions in each row are not supported
   if (column_desc.ndim() < 0) {
-    return arrow::Status::NotImplemented(
+    return Status::NotImplemented(
       "Writing to unconstrained dimension column ",
       column_desc.name());
   }
 
   ARROW_ASSIGN_OR_RAISE(auto shape_data, GetResultShapeData(column_desc, data));
+
   if (shape_data.nDim() != std::size_t(column_desc.ndim() + 1)) {
-    return arrow::Status::Invalid(
+    return Status::Invalid(
       "Number of data dimensions ", shape_data.nDim(),
       " does not match number of column dimensions ",
       column_desc.ndim() + 1);
   }
 
   // Check the row dimension against the selection
-  if(selection.HasRowSpan() && shape_data.nRows() != selection.GetRowSpan().size()) {
-    return arrow::Status::IndexError(
-      "Row selection size ", selection.GetRowSpan().size(),
-      " doesn't match the number of rows",
-      " in the result shape ", shape_data.nRows()
-    );
+  if(selection.HasRowSpan()) {
+    const auto & row_span = selection.GetRowSpan();
+    if(row_span.size() >= column.nrow()) {
+      return Status::IndexError(
+        "Row selection size ", row_span.size(),
+        " exceeds the number of rows",
+        " in the result shape ", column.nrow());
+    }
+
+    // Check the row selection if valid
+    for(std::size_t r = 0; r < row_span.size(); ++r) {
+      if(rownr_t(row_span[r]) >= column.nrow()) {
+        return Status::IndexError(
+          "Row selection ", row_span[r],
+          " exceeds the number of rows ", column.nrow(),
+          " in column ", column_desc.name());
+      }
+    }
   }
 
   // Check secondary dimensions against the selection
-  auto other_dims = std::ptrdiff_t(shape_data.nDim() - 1);
-  auto sel_size = std::ptrdiff_t(selection.Size());
+  auto row_dim = std::ptrdiff_t(shape_data.nDim() - 1);
+  // No secondary dimensions, exit early
+  if(row_dim <= 0) return shape_data;
 
-  if(shape_data.IsFixed()) {
-    for(std::ptrdiff_t dim=0; dim < other_dims && dim < sel_size; ++dim) {
-      if(shape_data.GetShape()[dim] != ssize_t(selection[dim].size())) {
-        return arrow::Status::IndexError(
-          "Selection size ", selection[dim].size(),
-          " doesn't match dimension ", dim,
-          " of shape", shape_data.GetShape());
+  auto CheckSelectionAgainstShape = [&](
+      const IndexSpan & span,
+      const IPosition & shape,
+      std::size_t dim) -> arrow::Status {
+    if(ssize_t(span.size()) >= shape[dim]) {
+      return Status::IndexError(
+        "Selection size ", span.size(),
+        " exceeds the dimension size ", shape[dim],
+        " of dimension ", dim,
+        " in column ", column_desc.name());
+    }
+    for(std::size_t i = 0; i < span.size(); ++i) {
+      if(span[i] >= shape[dim]) {
+        return Status::IndexError(
+          "Selection ", span[i],
+          " exceeds the dimension size ", shape[dim],
+          " of dimension ", dim,
+          " in column ", column_desc.name());
+      }
+    }
+    return Status::OK();
+  };
+
+  if(column_desc.isFixedShape()) {
+    const auto & shape = column.shapeColumn();
+    for(std::ptrdiff_t dim=0; dim < row_dim; ++dim) {
+      if(auto res = selection.FSpan(dim, shape_data.nDim()); res.ok()) {
+        auto span = res.ValueOrDie();
+        ARROW_RETURN_NOT_OK(CheckSelectionAgainstShape(span, shape, dim));
       }
     }
   } else {
-    for(std::size_t r=0; r < shape_data.nRows(); ++r) {
-      const auto & row_shape = shape_data.GetRowShape(r);
-      for(std::ptrdiff_t dim=0; dim < other_dims && dim < sel_size; ++dim) {
-        if(row_shape[dim] != ssize_t(selection[dim].size())) {
-          return arrow::Status::IndexError(
-            "Selection size", selection[dim].size(),
-            " doesn't match dimension ", dim,
-            " of shape", shape_data.GetRowShape(r),
-            " in row ", r);
+    auto array_column = ArrayColumnBase(column);
+    auto has_row_span = selection.HasRowSpan();
+    auto row_span = has_row_span ? selection.GetRowSpan() : IndexSpan{};
+    rownr_t nrows = has_row_span ? row_span.size() : column.nrow();
+
+    for(rownr_t r=0; r < nrows; ++r) {
+      rownr_t row = has_row_span ? row_span[r] : r;
+      // If the row is defined, check the selection
+      // against the shape of the row
+      if(column.isDefined(row)) {
+        auto row_shape = column.shape(row);
+        for(std::ptrdiff_t dim=0; dim < row_dim; ++dim) {
+          if(auto res = selection.FSpan(dim, shape_data.nDim()); res.ok()) {
+            auto span = res.ValueOrDie();
+            ARROW_RETURN_NOT_OK(CheckSelectionAgainstShape(span, row_shape, dim));
+          }
         }
+      } else {
+        // The row is undefined
+        // Set the row shape from the shape of the result,
+        // taking any maximum selection into account
+        auto row_shape = shape_data.GetRowShape(row);
+        for(std::ptrdiff_t dim=0; dim < row_dim; ++dim) {
+          if(auto res = selection.FSpan(dim, shape_data.nDim()); res.ok()) {
+            auto span = res.ValueOrDie();
+            auto span_max = *std::max_element(std::begin(span), std::end(span));
+            row_shape[dim] = std::max(span_max, row_shape[dim]);
+          }
+        }
+        array_column.setShape(row, row_shape);
       }
     }
   }
