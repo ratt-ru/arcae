@@ -31,6 +31,10 @@ arrow::Result<ArrayProperties> GetArrayProperties(
   const std::shared_ptr<arrow::Array> & data);
 
 
+arrow::Result<std::shared_ptr<arrow::Buffer>> GetResultBuffer(
+  const std::shared_ptr<arrow::Array> & result,
+  std::size_t nbytes);
+
 
 } // namespace arcae
 

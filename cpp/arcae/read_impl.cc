@@ -23,6 +23,7 @@
 #include <casacore/tables/Tables/TableColumn.h>
 #include <casacore/tables/Tables/TableProxy.h>
 
+#include "arcae/array_util.h"
 #include "arcae/data_partition.h"
 #include "arcae/isolated_table_proxy.h"
 #include "arcae/result_shape.h"
@@ -317,52 +318,7 @@ GetResultBufferOrAllocate(
 
   ARROW_ASSIGN_OR_RAISE(auto casa_type_size, CasaDataTypeSize(casa_type));
   auto nbytes = nelements * casa_type_size;
-
-  if(result) {
-    // Extract underlying buffer from result array
-    auto tmp = result->data();
-    while(true) {
-      switch(tmp->type->id()) {
-        case arrow::Type::LARGE_LIST:
-        case arrow::Type::LIST:
-        case arrow::Type::FIXED_SIZE_LIST:
-          if(tmp->child_data.size() == 0) return Status::Invalid("No child data");
-          tmp = tmp->child_data[0];
-          break;
-        case arrow::Type::BOOL:
-        case arrow::Type::UINT8:
-        case arrow::Type::UINT16:
-        case arrow::Type::UINT32:
-        case arrow::Type::UINT64:
-        case arrow::Type::INT8:
-        case arrow::Type::INT16:
-        case arrow::Type::INT32:
-        case arrow::Type::INT64:
-        case arrow::Type::FLOAT:
-        case arrow::Type::DOUBLE: {
-            // The value buffer is in the last position
-            // https://arrow.apache.org/docs/format/Columnar.html#fixed-size-primitive-layout
-            if(tmp->buffers.size() == 0 || !tmp->buffers[tmp->buffers.size() - 1]) {
-              return Status::Invalid("Result array does not contain a buffer");
-            }
-            auto buffer = tmp->buffers[tmp->buffers.size() - 1];
-            if(std::size_t(buffer->size()) != nbytes) {
-              return arrow::Status::Invalid(
-                "Result buffer of ", buffer->size(),
-                " bytes does not contain the"
-                " expected number of bytes ", nbytes);
-            }
-            return buffer;
-          }
-        case arrow::Type::STRING:
-        default:
-          return Status::NotImplemented(
-            "Extracting base array buffer for type ",
-            tmp->type->ToString());
-      }
-    }
-  }
-
+  if(auto r = GetResultBuffer(result, nbytes); r.ok()) return r;
   ARROW_ASSIGN_OR_RAISE(auto allocation, arrow::AllocateBuffer(nbytes, casa_type_size));
 
   if(casacore::isNumeric(casa_type)) {

@@ -7,11 +7,16 @@
 #include <arrow/array/util.h>
 #include <arrow/util/logging.h>
 
+#include <casacore/casa/Utilities/DataType.h>
+
 #include "arcae/service_locator.h"
 
 using ::arrow::Array;
+using ::arrow::Buffer;
 using ::arrow::Result;
 using ::arrow::Status;
+
+using ::casacore::DataType;
 
 namespace arcae {
 
@@ -224,5 +229,57 @@ arrow::Result<ArrayProperties> GetArrayProperties(
     is_complex};
 }
 
+
+// Extracts the data buffer of the underlying result array
+// ensuring it equals nbytes.
+// Otherwise allocates a buffer of nbytes
+Result<std::shared_ptr<Buffer>>
+GetResultBuffer(const std::shared_ptr<Array> & result,
+                std::size_t nbytes) {
+
+  if(!result) return Status::Invalid("Result array is null");
+  // Extract underlying buffer from result array
+  auto tmp = result->data();
+  while(true) {
+    switch(tmp->type->id()) {
+      case arrow::Type::LARGE_LIST:
+      case arrow::Type::LIST:
+      case arrow::Type::FIXED_SIZE_LIST:
+        if(tmp->child_data.size() == 0) return Status::Invalid("No child data");
+        tmp = tmp->child_data[0];
+        break;
+      case arrow::Type::BOOL:
+      case arrow::Type::UINT8:
+      case arrow::Type::UINT16:
+      case arrow::Type::UINT32:
+      case arrow::Type::UINT64:
+      case arrow::Type::INT8:
+      case arrow::Type::INT16:
+      case arrow::Type::INT32:
+      case arrow::Type::INT64:
+      case arrow::Type::FLOAT:
+      case arrow::Type::DOUBLE: {
+          // The value buffer is in the last position
+          // https://arrow.apache.org/docs/format/Columnar.html#fixed-size-primitive-layout
+          if(tmp->buffers.size() == 0 || !tmp->buffers[tmp->buffers.size() - 1]) {
+            return Status::Invalid("Result array does not contain a buffer");
+          }
+          auto buffer = tmp->buffers[tmp->buffers.size() - 1];
+          if(std::size_t(buffer->size()) != nbytes) {
+            return arrow::Status::Invalid(
+              "Result buffer of ", buffer->size(),
+              " bytes does not contain the"
+              " expected number of bytes ", nbytes);
+          }
+          return buffer;
+      }
+      case arrow::Type::STRING:
+      default:
+        return Status::NotImplemented(
+          "Extracting base array buffer for type ",
+          tmp->type->ToString());
+    }
+  }
+}
 
 } // namespace arcae
