@@ -484,7 +484,7 @@ ReadImpl(
 
       // Make an async generator over the data chunks
       // Map ReadCallBack over all data chunks
-      auto data_chunk_gen = MakeVectorGenerator(std::move(result.partition->data_chunks_));
+      auto data_chunk_gen = MakeVectorGenerator(std::move(result.partition->TakeChunks()));
       auto read_and_copy_data_gen = MakeMappedGenerator(
         std::move(data_chunk_gen),
         ReadCallback{std::move(column), itp, result.partition, buffer, casa_dtype});
