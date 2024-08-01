@@ -8,9 +8,10 @@
 #include <sys/types.h>
 
 #include <arrow/api.h>
+#include <arrow/array/array_nested.h>
 #include <arrow/result.h>
-#include <arrow/ipc/json_simple.h>
 #include <arrow/util/logging.h>
+#include <arrow/testing/builder.h>
 #include <arrow/testing/gtest_util.h>
 
 #include <casacore/casa/Arrays/IPosition.h>
@@ -59,6 +60,9 @@ static constexpr std::size_t kncorr = 4;
 static constexpr std::size_t kNDim = 3;
 static constexpr std::array<std::size_t, kNDim> kDimensions = {kncorr, knchan, knrow};
 static constexpr std::size_t kElements = knrow*knchan*kncorr;
+
+// Default value in result arrays
+static constexpr float kDefaultRealValue = -10.0f;
 
 namespace {
 
@@ -270,6 +274,72 @@ TEST_P(FixedTableProxyTest, Fixed) {
         EXPECT_EQ(str_val->ToString(), "FOO-" + std::to_string(real));
         ASSERT_OK_AND_ASSIGN(str_val, var_str_data->GetScalar(buf_i));
         EXPECT_EQ(str_val->ToString(), "FOO-" + std::to_string(real));
+      }
+    }
+  }
+}
+
+TEST_F(FixedTableProxyTest, NegativeSelection) {
+  ASSERT_OK_AND_ASSIGN(auto ntp, OpenTable());
+
+  // Create a selection with negative indices
+  Index rows(knrow);
+  Index chans(knchan);
+  Index corrs(kncorr);
+
+  std::iota(std::begin(rows), std::end(rows), 0);
+  std::iota(std::begin(chans), std::end(chans), 0);
+  std::iota(std::begin(corrs), std::end(corrs), 0);
+
+  for(auto r: {0, 3, 6}) rows[r] = -1;
+  for(auto ch: {1, 3, 11}) chans[ch] = -1;
+  for(auto co: {1, 3}) corrs[co] = -1;
+
+  auto selection = SelectionBuilder().Order('F')
+                                     .Add(corrs)
+                                     .Add(chans)
+                                     .Add(rows)
+                                     .Build();
+
+  // Create a result array filled with default values
+  std::shared_ptr<arrow::Array> result;
+  std::vector<float> values(rows.size()*chans.size()*corrs.size()*2, kDefaultRealValue);
+  arrow::ArrayFromVector<arrow::FloatType>(arrow::float32(), values, &result);
+  ASSERT_OK_AND_ASSIGN(result, arrow::FixedSizeListArray::FromArrays(result, 2));
+  ASSERT_OK_AND_ASSIGN(result, arrow::FixedSizeListArray::FromArrays(result, corrs.size()));
+  ASSERT_OK_AND_ASSIGN(result, arrow::FixedSizeListArray::FromArrays(result, chans.size()));
+  EXPECT_EQ(result->length(), rows.size());
+  ASSERT_OK_AND_ASSIGN(auto data, ntp->GetColumn("MODEL_DATA", selection, result));
+
+  // Get the underlying buffer containing the complex values
+  auto buffer = data->data()
+                    ->child_data[0] // chan
+                    ->child_data[0] // corr
+                    ->child_data[0] // complex pair
+                    ->buffers[1]    // value buffer
+                    ->span_as<Complex>();
+
+  // Check that the expected value at the selected disk indices
+  // matches the buffer values
+  for(std::size_t r = 0; r < rows.size(); ++r) {
+    auto row = rows[r];
+    EXPECT_TRUE(row < IndexType(knrow));  // sanity
+    for(std::size_t ch = 0; ch < chans.size(); ++ch) {
+      auto chan = chans[ch];
+      EXPECT_TRUE(chan < IndexType(knchan));  // sanity
+      for(std::size_t co = 0; co < corrs.size(); ++co) {
+        auto corr = corrs[co];
+        EXPECT_TRUE(corr < IndexType(kncorr));  // sanity
+        auto buf_i = r*chans.size()*corrs.size() + ch*corrs.size() + co;
+        if(row < 0 || chan < 0 || corr < 0) {
+          // Negative index, the buffer should not be populated
+          EXPECT_EQ(buffer[buf_i], Complex(kDefaultRealValue, kDefaultRealValue));
+        } else {
+          // We expect this value to be populated
+          auto real = row*knchan*kncorr + chan*kncorr + corr;
+          EXPECT_EQ(complex_vals_(IPosition({corr, chan, row})), Complex(real, real));
+          EXPECT_EQ(buffer[buf_i], Complex(real, real));
+        }
       }
     }
   }
@@ -487,5 +557,84 @@ TEST_P(VariableProxyTest, Variable) {
   EXPECT_EQ(row_offset, var_data_buffer.size());
   EXPECT_EQ(row_offset, str_data->length());
 }
+
+TEST_F(VariableProxyTest, NegativeSelection) {
+  ASSERT_OK_AND_ASSIGN(auto ntp, OpenTable());
+
+  // Derive minimum viable dimension size.
+  casacore::IPosition min_shape(kNDim, std::numeric_limits<ssize_t>::max());
+  min_shape[2] = nRow();  // row dimension is trivial
+  for(const auto & shape : row_shapes_) {
+    EXPECT_EQ(shape.size(), kNDim - 1);
+    for(std::size_t d = 0; d < shape.size(); ++d) {
+      min_shape[d] = std::min(min_shape[d], shape[d]);
+    }
+  }
+
+  // Create a selection with negative indices
+  Index rows(min_shape[2]);
+  Index chans(min_shape[1]);
+  Index corrs(min_shape[0]);
+
+  std::iota(std::begin(rows), std::end(rows), 0);
+  std::iota(std::begin(chans), std::end(chans), 0);
+  std::iota(std::begin(corrs), std::end(corrs), 0);
+
+  for(auto r: {1, 3}) rows[r] = -1;
+  for(auto ch: {1, 3, 11}) chans[ch] = -1;
+  for(auto co: {2}) corrs[co] = -1;
+
+  auto selection = SelectionBuilder().Order('F')
+                                     .Add(corrs)
+                                     .Add(chans)
+                                     .Add(rows)
+                                     .Build();
+
+  // Create a result array filled with a default value
+  std::shared_ptr<arrow::Array> result;
+  std::vector<float> values(rows.size()*chans.size()*corrs.size()*2, kDefaultRealValue);
+  arrow::ArrayFromVector<arrow::FloatType>(arrow::float32(), values, &result);
+  ASSERT_OK_AND_ASSIGN(result, arrow::FixedSizeListArray::FromArrays(result, 2));
+  ASSERT_OK_AND_ASSIGN(result, arrow::FixedSizeListArray::FromArrays(result, corrs.size()));
+  ASSERT_OK_AND_ASSIGN(result, arrow::FixedSizeListArray::FromArrays(result, chans.size()));
+  EXPECT_EQ(result->length(), rows.size());
+  ASSERT_OK_AND_ASSIGN(auto data, ntp->GetColumn("VAR_DATA", selection, result));
+
+  // Get the underlying buffer containing the complex values
+  auto buffer = data->data()
+                    ->child_data[0] // chan
+                    ->child_data[0] // corr
+                    ->child_data[0] // complex pair
+                    ->buffers[1]    // value buffer
+                    ->span_as<Complex>();
+
+  std::size_t row_offset = 0;
+
+  // Check that the expected value at the selected disk indices
+  // matches the buffer values
+  for(std::size_t r = 0; r < rows.size(); ++r) {
+    auto row = rows[r];
+    EXPECT_TRUE(row < IndexType(nRow())); // sanity
+    for(std::size_t ch = 0; ch < chans.size(); ++ch) {
+      auto chan = chans[ch];
+      for(std::size_t co = 0; co < corrs.size(); ++co) {
+        auto corr = corrs[co];
+        auto buf_i = row_offset + ch*corrs.size() + co;
+        if(row < 0 || chan < 0 || corr < 0) {
+          EXPECT_EQ(buffer[buf_i], Complex(kDefaultRealValue, kDefaultRealValue));
+        } else {
+          auto real = RealValue(row, chan, corr);
+          EXPECT_EQ(buffer[buf_i], Complex(real, real));
+        }
+      }
+    }
+    // Advance row offset within the output buffer
+    row_offset += chans.size() * corrs.size();
+  }
+
+  // All values in the output have been considered
+  EXPECT_EQ(row_offset, buffer.size());
+}
+
 
 }

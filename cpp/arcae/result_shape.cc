@@ -518,8 +518,8 @@ ResultShapeData::MakeRead(
   if (column_desc.isFixedShape()) {
     auto shape = column_desc.shape();
     ARROW_RETURN_NOT_OK(ClipShape(column_desc, shape, selection));
-    ARROW_RETURN_NOT_OK(CheckShapeMatchesResult(column_name, shape, result_shape));
     shape.append(IPosition({nselrow}));
+    ARROW_RETURN_NOT_OK(CheckShapeMatchesResult(column_name, shape, result_shape));
     std::size_t ndim = shape.size();
     return ResultShapeData{
       std::move(column_name),
