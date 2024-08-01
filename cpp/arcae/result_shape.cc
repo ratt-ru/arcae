@@ -697,7 +697,7 @@ ResultShapeData::MakeWrite(
           if(auto res = selection.FSpan(dim, shape_data.nDim()); res.ok()) {
             auto span = res.ValueOrDie();
             auto span_max = *std::max_element(std::begin(span), std::end(span));
-            row_shape[dim] = std::max(span_max, row_shape[dim]);
+            row_shape[dim] = std::max<ssize_t>(span_max, row_shape[dim]);
           }
         }
         array_column.setShape(row, row_shape);
