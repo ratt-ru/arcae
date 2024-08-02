@@ -17,7 +17,7 @@ namespace detail {
 
 class NewTableProxy {
 public:
-  // Construct an NewTableProxy with the supplied function
+  // Construct a NewTableProxy with the supplied function
   template <
     typename Fn,
     typename = std::enable_if<
@@ -33,10 +33,32 @@ public:
     return ntp;
   }
 
+  arrow::Result<arrow::Table> ToArrow(
+    const std::vector<std::string> & columns={},
+    const Selection & selection={}) const;
+
+  // Get the table descriptor as a JSON string
+  arrow::Result<std::string> GetTableDescriptor() const;
+
+  // Get the column descriptor as a JSON string
+  arrow::Result<std::string> GetColumnDescriptor(const std::string & column) const;
+
+  // Get data from the column, possibly guided by
+  // a selection along each index, and possibly
+  // writing into a provided result array
   arrow::Result<std::shared_ptr<arrow::Array>> GetColumn(
     const std::string & column,
-    const Selection & selection=Selection(),
+    const Selection & selection={},
     const std::shared_ptr<arrow::Array> & result=nullptr) const;
+
+  // Return the names of the columns in this table
+  arrow::Result<std::vector<std::string>> Columns() const;
+
+  // Return the number of columns in this table
+  arrow::Result<std::size_t> nColumns() const;
+
+  // Return the number of rows in this table
+  arrow::Result<std::size_t> nRows() const;
 
 private:
   std::shared_ptr<IsolatedTableProxy> itp_;

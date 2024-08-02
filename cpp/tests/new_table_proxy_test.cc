@@ -25,6 +25,7 @@
 #include <tests/test_utils.h>
 
 #include <gtest/gtest.h>
+#include <gmock/gmock.h>
 
 #include "arcae/new_table_proxy.h"
 #include "arcae/selection.h"
@@ -343,6 +344,44 @@ TEST_F(FixedTableProxyTest, NegativeSelection) {
       }
     }
   }
+}
+
+
+// Test basic column and row getting functionality
+TEST_F(FixedTableProxyTest, ColumnAndRowGet) {
+  ASSERT_OK_AND_ASSIGN(auto ntp, OpenTable());
+  ASSERT_OK_AND_ASSIGN(auto columns, ntp->Columns());
+  ASSERT_OK_AND_ASSIGN(auto ncolumns, ntp->nColumns());
+  ASSERT_OK_AND_ASSIGN(auto nrow, ntp->nRows());
+  EXPECT_EQ(nrow, knrow);
+  EXPECT_EQ(ncolumns, 25);
+  EXPECT_EQ(ncolumns, columns.size());
+  EXPECT_THAT(columns, ::testing::ElementsAre(
+    "UVW",
+    "FLAG",
+    "FLAG_CATEGORY",
+    "WEIGHT",
+    "SIGMA",
+    "ANTENNA1",
+    "ANTENNA2",
+    "ARRAY_ID",
+    "DATA_DESC_ID",
+    "EXPOSURE",
+    "FEED1",
+    "FEED2",
+    "FIELD_ID",
+    "FLAG_ROW",
+    "INTERVAL",
+    "OBSERVATION_ID",
+    "PROCESSOR_ID",
+    "SCAN_NUMBER",
+    "STATE_ID",
+    "TIME",
+    "TIME_CENTROID",
+    "MODEL_DATA",
+    "VAR_DATA",
+    "STRING_DATA",
+    "VAR_STRING_DATA"));
 }
 
 
