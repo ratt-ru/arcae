@@ -56,6 +56,16 @@ NewTableProxy::GetColumnDescriptor(const std::string & column) const {
   }).MoveResult();
 }
 
+Result<std::string>
+NewTableProxy::GetLockOptions() const {
+  return itp_->RunAsync([](TableProxy & tp) {
+    std::ostringstream oss;
+    JsonOut lock_json(oss);
+    lock_json.put(tp.lockOptions());
+    return oss.str();
+  }).MoveResult();
+}
+
 Result<Table>
 NewTableProxy::ToArrow(
     const std::vector<std::string> & columns,

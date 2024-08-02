@@ -43,6 +43,9 @@ public:
   // Get the column descriptor as a JSON string
   arrow::Result<std::string> GetColumnDescriptor(const std::string & column) const;
 
+  // Get the table locking options as a JSON string
+  arrow::Result<std::string> GetLockOptions() const;
+
   // Get data from the column, possibly guided by
   // a selection along each index, and possibly
   // writing into a provided result array
