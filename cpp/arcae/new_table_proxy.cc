@@ -3,12 +3,14 @@
 #include <sstream>
 
 #include <arrow/api.h>
+#include <arrow/status.h>
 
 #include <casacore/casa/Json.h>
 #include <casacore/tables/Tables/TableProxy.h>
 
 #include "arcae/read_impl.h"
-#include "arrow/status.h"
+#include "arcae/table_utils.h"
+#include "arcae/write_impl.h"
 
 using ::arrow::Array;
 using ::arrow::Result;
@@ -23,11 +25,6 @@ namespace detail {
 namespace {
 
 static constexpr char kCasaDescriptorKey[] = "__casa_descriptor__";
-
-Status ColumnExists(const TableProxy & tp, const std::string & column) {
-  if(tp.table().tableDesc().isColumn(column)) return Status::OK();
-  return Status::KeyError(column, " is not a valid column");
-}
 
 }  // namespace
 
@@ -107,7 +104,7 @@ NewTableProxy::nRows() const {
 Result<bool>
 NewTableProxy::AddRows(std::size_t nrows) {
   return itp_->RunAsync([nrows = nrows](TableProxy & tp) {
-    if(!tp.isWritable()) tp.reopenRW();
+    MaybeReopenRW(tp);
     tp.addRow(nrows);
     return true;
   }).MoveResult();

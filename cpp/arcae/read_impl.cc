@@ -29,6 +29,7 @@
 #include "arcae/result_shape.h"
 #include "arcae/selection.h"
 #include "arcae/service_locator.h"
+#include "arcae/table_utils.h"
 #include "arcae/type_traits.h"
 
 using ::arrow::Array;
@@ -415,11 +416,6 @@ Result<std::shared_ptr<Array>> MakeArray(
   }
 
   return result;
-}
-
-Status ColumnExists(const CasaTable & table, const std::string & column) {
-  if(table.tableDesc().isColumn(column)) return Status::OK();
-  return Status::Invalid("Column ", column, " does not exist");
 }
 
 } // namespace

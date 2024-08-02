@@ -22,6 +22,7 @@ add_library(arcae SHARED
     arcae/selection.cc
     arcae/safe_table_proxy.cc
     arcae/table_factory.cc
+    arcae/table_utils.cc
     arcae/type_traits.cc)
 
 target_compile_options(arcae PRIVATE
