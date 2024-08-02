@@ -347,6 +347,17 @@ TEST_F(FixedTableProxyTest, NegativeSelection) {
 }
 
 
+// Test that adding rows to the table works
+TEST_F(FixedTableProxyTest, AddRows) {
+  ASSERT_OK_AND_ASSIGN(auto ntp, OpenTable());
+  ASSERT_OK_AND_ASSIGN(auto nrow, ntp->nRows());
+  EXPECT_EQ(nrow, knrow);
+  ASSERT_OK(ntp->AddRows(100));
+  ASSERT_OK_AND_ASSIGN(nrow, ntp->nRows());
+  EXPECT_EQ(nrow, knrow + 100);
+}
+
+
 // Test basic column and row getting functionality
 TEST_F(FixedTableProxyTest, ColumnAndRowGet) {
   ASSERT_OK_AND_ASSIGN(auto ntp, OpenTable());

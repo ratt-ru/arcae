@@ -60,6 +60,8 @@ public:
   // Return the number of rows in this table
   arrow::Result<std::size_t> nRows() const;
 
+  // Add rows to the table
+  arrow::Result<bool> AddRows(std::size_t nrows);
 private:
   std::shared_ptr<IsolatedTableProxy> itp_;
 };

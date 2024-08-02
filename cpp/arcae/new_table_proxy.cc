@@ -94,5 +94,14 @@ NewTableProxy::nRows() const {
   }).MoveResult();
 }
 
+Result<bool>
+NewTableProxy::AddRows(std::size_t nrows) {
+  return itp_->RunAsync([nrows = nrows](TableProxy & tp) {
+    if(!tp.isWritable()) tp.reopenRW();
+    tp.addRow(nrows);
+    return true;
+  }).MoveResult();
+}
+
 }  // namespace detail
 }  // namespace arcae
