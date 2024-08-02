@@ -531,7 +531,7 @@ ResultShapeData::MakeRead(
 
   // Get shapes of each row in the selection
   ARROW_ASSIGN_OR_RAISE(auto shapes, MakeRowData(column, selection, result_shape));
-  auto shape = std::optional<IPosition>{};
+  auto shape = std::optional<IPosition>{std::nullopt};
   int ndim = -1;
   bool first = true;
   bool shapes_equal = true;
