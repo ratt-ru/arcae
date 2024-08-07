@@ -10,7 +10,6 @@
 
 #include "arcae/read_impl.h"
 #include "arcae/table_utils.h"
-#include "arcae/write_impl.h"
 
 using ::arrow::Array;
 using ::arrow::Result;
