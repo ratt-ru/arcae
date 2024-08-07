@@ -65,6 +65,9 @@ public:
 
   // Add rows to the table
   arrow::Result<bool> AddRows(std::size_t nrows);
+
+  // Close the table
+  arrow::Result<bool> Close();
 private:
   std::shared_ptr<IsolatedTableProxy> itp_;
 };

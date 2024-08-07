@@ -110,5 +110,10 @@ NewTableProxy::AddRows(std::size_t nrows) {
   }).MoveResult();
 }
 
+Result<bool>
+NewTableProxy::Close() {
+  return itp_->Close();
+}
+
 }  // namespace detail
 }  // namespace arcae
