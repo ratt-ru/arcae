@@ -3,6 +3,8 @@
 
 #include <vector>
 
+#include <absl/types/span.h>
+
 #include <arrow/result.h>
 
 #include <casacore/casa/Arrays/IPosition.h>
@@ -23,51 +25,145 @@ struct SpanPair {
 // A vector of SpanPairs
 using SpanPairs = std::vector<SpanPair>;
 
+// Data shared by chunks in an
+// Array of Structs configuration
+struct SharedChunkData {
+  // Number of chunks
+  std::size_t nchunks_;
+  // Number of dimensions of each chunk
+  std::size_t ndim_;
+  // Cache of disk and memory indexes
+  std::vector<Index> id_cache_;
+  // Vector span pairs for each chunk
+  std::vector<SpanPairs> dim_spans_;
+  // Vector of minimum elements for each chunk
+  // There are a total of nchunks_ * ndim_ values
+  std::vector<IndexType> min_elements_;
+  // Vector of strides for each chunk
+  // There are a total of nchunks_ * ndim_ values
+  std::vector<std::size_t> chunk_strides_;
+  // Vector of related buffer strides for each chunk
+  // There are a total of nchunks_ * ndim_ values
+  std::vector<std::size_t> buffer_strides_;
+  // Vector of flat offsets for each chunk
+  // There are a total of nchunks_ values
+  std::vector<std::size_t> flat_offsets_;
+  // Vector indicating whether each chunk is contiguous
+  std::vector<bool> contiguous_;
+
+  // Number of dimensions in each chunk
+  std::size_t nDim() const { return ndim_; }
+
+  // A span over the index pairs of this hcunk
+  absl::Span<const SpanPair> DimensionSpans(std::size_t chunk) const {
+    assert(chunk < nchunks_);
+    return absl::MakeSpan(dim_spans_[chunk]);
+  }
+
+  // A span over the minimum elements in each dimension of the chunk
+  absl::Span<const IndexType> MinElements(std::size_t chunk) const {
+    assert(chunk < nchunks_);
+    return absl::MakeSpan(&min_elements_[chunk * ndim_], ndim_);
+  }
+
+  // A span over the chunk strides for each dimension of the chunk
+  absl::Span<const std::size_t> ChunkStrides(std::size_t chunk) const {
+    assert(chunk < nchunks_);
+    return absl::MakeSpan(&chunk_strides_[chunk * ndim_], ndim_);
+  }
+
+  // A span over the strides in the output buffer location associated
+  // with the chunk
+  absl::Span<const std::size_t> BufferStrides(std::size_t chunk) const {
+    assert(chunk < nchunks_);
+    return absl::MakeSpan(&buffer_strides_[chunk * ndim_], ndim_);
+  }
+
+  // The starting position in the output buffer location associated
+  // with the chunk
+  std::size_t FlatOffset(std::size_t chunk) const {
+    assert(chunk < nchunks_);
+    return flat_offsets_[chunk];
+  }
+
+  // Is the chunk contiguous
+  bool IsContiguous(std::size_t chunk) const {
+    assert(chunk < nchunks_);
+    return contiguous_[chunk];
+  }
+};
+
 // A mapping of a chunk of data from
 // contiguous areas of disk to possibly
 // contiguous areas of memory.
 // Multiple chunks form part of a
 // DataPartition
 struct DataChunk {
-  // Disk and memory spans for each dimension
-  SpanPairs dim_spans_;
-  // Flattened chunk offset within output
-  std::size_t flat_offset_;
-  // Strides for the associated position in the data buffer
-  std::vector<std::size_t> buffer_strides_;
-  // Is the memory layout contiguous?
-  bool contiguous_;
-  // Does this data chunk represent an empty selection?
-  // i.e. it contains negative disk id ranges
-  bool empty_;
+  // Index into SharedChunkData
+  std::size_t chunk_id_;
+  // Shared Chunk Data
+  std::shared_ptr<SharedChunkData> shared_;
 
-  static arrow::Result<DataChunk>
-  Make(SpanPairs && dim_spans, const ResultShapeData & data_shape, bool contiguous=false);
+  // Is this a valid chunk
+  explicit operator bool() const { return bool(shared_); }
 
-  // Return the disk span at the specified dimension
-  const IndexSpan & Disk(std::size_t dim) const noexcept {
-    return dim_spans_[dim].disk;
+// Return the disk span at the specified dimension
+  const IndexSpan & Disk(std::size_t dim) const {
+    return DimensionSpans()[dim].disk;
   }
 
-  // Return the memory span at the specified dimension
-  const IndexSpan & Mem(std::size_t dim) const noexcept {
-    return dim_spans_[dim].mem;
+ // Return the memory span at the specified dimension
+  const IndexSpan & Mem(std::size_t dim) const {
+    return DimensionSpans()[dim].mem;
+  }
+  // Obtain the disk and memory index spans for this chunk
+  absl::Span<const SpanPair> DimensionSpans() const {
+    return shared_->DimensionSpans(chunk_id_);
+  }
+
+  // Obtain the minimum elements of the memory spans
+  absl::Span<const IndexType> MinElements() const {
+    return shared_->MinElements(chunk_id_);
+  }
+
+  // Obtain the strides for this chunk
+  absl::Span<const std::size_t> ChunkStrides() const {
+    return shared_->ChunkStrides(chunk_id_);
+  }
+
+  // Obtain the initial starting offset within the output buffer
+  std::size_t FlatOffset() const {
+    return shared_->FlatOffset(chunk_id_);
+  }
+
+  // Obtain the strides for the location in the output buffer
+  // associated with this chunk
+  absl::Span<const std::size_t> BufferStrides() const {
+    return shared_->BufferStrides(chunk_id_);
+  }
+
+  // Is the chunk contiguous?
+  bool IsContiguous() const {
+    return shared_->IsContiguous(chunk_id_);
   }
 
   // Get a Row Slicer for the disk span
   casacore::Slicer GetRowSlicer() const noexcept;
+
   // Get a Section Slicer for the disk span
   casacore::Slicer GetSectionSlicer() const noexcept;
+
   // Number of chunk dimensions
-  std::size_t nDim() const noexcept { return dim_spans_.size(); }
+  std::size_t nDim() const noexcept { return shared_->nDim(); }
+
   // Number of elements in the chunk
   std::size_t nElements() const noexcept;
+
   // Shape of the chunk
   casacore::IPosition GetShape() const noexcept;
-  // Is the chunk contiguous
-  constexpr bool IsContiguous() const noexcept { return contiguous_; }
-  // Is the chunk negative
-  constexpr bool IsEmpty() const noexcept { return empty_; }
+
+  // Does the chunk refer to negative disk indices
+  bool IsEmpty() const noexcept;
 };
 
 // A partition of the data into a series
@@ -116,7 +212,7 @@ template <>
 struct arrow::IterationTraits<arcae::detail::DataChunk> {
   static arcae::detail::DataChunk End() { return {}; }
   static bool IsEnd(const arcae::detail::DataChunk& val) {
-    return val.nDim() == 0;
+    return !val;
   }
 };
 

@@ -9,6 +9,8 @@
 #include <arrow/api.h>
 #include <arrow/result.h>
 
+#include <absl/types/span.h>
+
 #include <casacore/tables/Tables/TableColumn.h>
 #include <casacore/casa/Arrays/IPosition.h>
 #include <casacore/casa/Utilities/DataType.h>
@@ -65,7 +67,7 @@ struct ResultShapeData {
   std::size_t MaxDimensionSize() const noexcept;
 
   // Obtain the flat offset at the specified
-  std::size_t FlatOffset(const std::vector<IndexType> & index) const noexcept;
+  std::size_t FlatOffset(const absl::Span<const IndexType> & index) const noexcept;
 
   // Is the result shape fixed?
   bool IsFixed() const noexcept { return shape_.has_value(); }

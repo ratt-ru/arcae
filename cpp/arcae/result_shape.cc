@@ -398,7 +398,7 @@ ResultShapeData::MaxDimensionSize() const noexcept {
 }
 
 std::size_t
-ResultShapeData::FlatOffset(const std::vector<IndexType> & index) const noexcept {
+ResultShapeData::FlatOffset(const absl::Span<const IndexType> & index) const noexcept {
   auto ndim = nDim();
   assert(index.size() == ndim);
   std::size_t offset = 0;

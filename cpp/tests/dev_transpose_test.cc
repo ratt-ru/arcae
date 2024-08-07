@@ -231,8 +231,8 @@ TEST_F(DevTransposeTest, Basic) {
           }
 
           return read_fut.Then([
-            spans = std::move(chunk.dim_spans_),
-            offset = chunk.flat_offset_
+            spans = chunk.DimensionSpans(),
+            offset = chunk.FlatOffset()
           ] (const casacore::Array<Complex> & data) -> Array<Complex> {
             Array<Complex> result(data.shape());
             const Complex * in_ptr = data.data();
