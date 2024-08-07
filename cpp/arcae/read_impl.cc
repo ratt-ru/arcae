@@ -177,7 +177,7 @@ struct ReadAndTransposeImpl {
       return TransposeData<CT>(
         data.data(),
         chunk.DimensionSpans(),
-        buffer->mutable_data_as<CT>() + chunk.FlatOffset(),
+        buffer->template mutable_data_as<CT>() + chunk.FlatOffset(),
         chunk.BufferStrides(),
         chunk.ChunkStrides(),
         chunk.FlatOffset());
@@ -203,7 +203,7 @@ struct ReadInPlaceImpl {
       chunk = chunk,
       buffer = buffer
     ](const TableProxy & tp) -> Future<bool> {
-      auto out_ptr = buffer->mutable_data_as<CT>() + chunk.FlatOffset();
+      auto out_ptr = buffer->template mutable_data_as<CT>() + chunk.FlatOffset();
       auto shape = chunk.GetShape();
       if(shape.size() == 1) {
         auto data = ScalarColumn<CT>(tp.table(), column);
