@@ -61,7 +61,7 @@ struct SharedChunkData {
   }
 
   // A span over the minimum elements in each dimension of the chunk
-  absl::Span<const IndexType> MinElements(std::size_t chunk) const {
+  absl::Span<const IndexType> MinMemElements(std::size_t chunk) const {
     assert(chunk < nchunks_);
     return absl::MakeSpan(&min_elements_[chunk * ndim_], ndim_);
   }
@@ -122,8 +122,8 @@ struct DataChunk {
   }
 
   // Obtain the minimum elements of the memory spans
-  absl::Span<const IndexType> MinElements() const {
-    return shared_->MinElements(chunk_id_);
+  absl::Span<const IndexType> MinMemElements() const {
+    return shared_->MinMemElements(chunk_id_);
   }
 
   // Obtain the strides for this chunk
