@@ -36,7 +36,7 @@ struct SharedChunkData {
   std::vector<Index> id_cache_;
   // Vector span pairs for each chunk
   std::vector<SpanPairs> dim_spans_;
-  // Vector of minimum elements for each chunk
+  // Vector of minimum memory index elements for each chunk
   // There are a total of nchunks_ * ndim_ values
   std::vector<IndexType> min_elements_;
   // Vector of strides for each chunk
