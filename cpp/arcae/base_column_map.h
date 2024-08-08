@@ -9,9 +9,9 @@
 
 #include <absl/types/span.h>
 
-#include <arrow/result.h>
+#include <arrow/api.h>
+#include <arrow/status.h>
 
-#include <casacore/casa/aipsxtype.h>
 #include <casacore/casa/Arrays/IPosition.h>
 #include <casacore/casa/Arrays/Slicer.h>
 #include <casacore/tables/Tables/TableColumn.h>
@@ -24,25 +24,11 @@ using RowId = std::int64_t;
 using RowIds = absl::Span<const RowId>;
 using ColumnSelection = std::vector<RowIds>;
 
-// Type indicating the ending of an iteration
-struct EndSentinel {};
-
-// Return a selection dimension given
-//
-// 1. FORTRAN ordered dim
-// 2. Number of selection dimensions
-// 3. Number of column dimensions
-//
-// A return of < 0 indicates a non-existent selection
-std::ptrdiff_t SelectDim(std::size_t dim, std::size_t sdims, std::size_t ndims);
-arrow::Status CheckSelectionAgainstShape(const casacore::IPosition & shape,
-                                         const ColumnSelection & selection);
-
 
 // Describes a mapping between disk and memory
 struct IdMap {
-  casacore::rownr_t disk;
-  casacore::rownr_t mem;
+  RowId disk;
+  RowId mem;
 
   constexpr bool operator==(const IdMap & lhs) const
       { return disk == lhs.disk && mem == lhs.mem; }
@@ -54,15 +40,17 @@ using ColumnMaps = std::vector<ColumnMap>;
 
 // Describes a range along a dimension (end is exclusive)
 struct Range {
-  casacore::rownr_t start = 0;
-  casacore::rownr_t end = 0;
+  RowId start = 0;
+  RowId end = 0;
   enum Type {
     // Refers to a series of specific row ids
     MAP=0,
     // A contiguous range of row ids
     FREE,
     // Specifies a range whose size varies
-    VARYING
+    VARYING,
+    // Specifies an empty range
+    EMPTY,
   } type = FREE;
 
   // The size of the range
@@ -91,12 +79,44 @@ struct Range {
   // Is this a varying range
   constexpr bool IsVarying() const
     { return type == VARYING; }
+
+  // Is this an empty range
+  constexpr bool IsEmpty() const
+    { return type == EMPTY; }
 };
 
 // Vectors of ranges
 using ColumnRange = std::vector<Range>;
 using ColumnRanges = std::vector<ColumnRange>;
 
+
+// Return a selection dimension given
+//
+// 1. FORTRAN ordered dim
+// 2. Number of selection dimensions
+// 3. Number of column dimensions
+//
+// A return of < 0 indicates a non-existent selection
+std::ptrdiff_t SelectDim(
+  std::size_t dim,
+  std::size_t sdims,
+  std::size_t ndims);
+
+// Validate the Selection against the supplied shape
+arrow::Status CheckSelectionAgainstShape(
+  const casacore::IPosition & shape,
+  const ColumnSelection & selection);
+
+
+// Checks that all Column Ranges
+// contain Ranges of the same type
+// OR
+// contain EMPTY ranges followed by MAPS
+arrow::Status CheckColumnRangeInvariants(const ColumnRanges & column_ranges);
+
+
+// Type indicating the ending of an iteration
+struct EndSentinel {};
 
 template <typename ColumnMapping> struct RangeIterator;
 
@@ -111,15 +131,16 @@ struct MapIterator {
   // ND index in the local buffer holding the values
   // described by this chunk
   std::vector<std::size_t> chunk_index_;
+  // Strides with the local buffer
+  std::vector<std::size_t> chunk_strides_;
   // ND index in the global buffer
   std::vector<std::size_t> global_index_;
-  std::vector<std::size_t> strides_;
   bool done_;
 
   MapIterator(const RangeIterator<ColumnMapping> & rit,
               const ColumnMapping & map,
               std::vector<std::size_t> chunk_index,
-              std::vector<std::size_t> strides,
+              std::vector<std::size_t> chunk_strides,
               bool done);
 
   static MapIterator Make(const RangeIterator<ColumnMapping> & rit, bool done);
@@ -164,16 +185,17 @@ struct MapIterator {
 
 
 template <typename ColumnMapping>
-MapIterator<ColumnMapping>::MapIterator(const RangeIterator<ColumnMapping> & rit,
+MapIterator<ColumnMapping>::MapIterator(
+                  const RangeIterator<ColumnMapping> & rit,
                   const ColumnMapping & map,
                   std::vector<std::size_t> chunk_index,
-                  std::vector<std::size_t> strides,
+                  std::vector<std::size_t> chunk_strides,
                   bool done) :
         rit_(std::cref(rit)),
         map_(std::cref(map)),
         chunk_index_(std::move(chunk_index)),
+        chunk_strides_(std::move(chunk_strides)),
         global_index_(chunk_index_.size(), 0),
-        strides_(std::move(strides)),
         done_(done) {
 
   for(std::size_t dim=0; dim < chunk_index_.size(); ++dim) {
@@ -185,17 +207,18 @@ template <typename ColumnMapping>
 MapIterator<ColumnMapping>
 MapIterator<ColumnMapping>::Make(const RangeIterator<ColumnMapping> & rit, bool done) {
   auto chunk_index = decltype(MapIterator::chunk_index_)(rit.nDim(), 0);
-  auto strides = decltype(MapIterator::strides_)(rit.nDim(), 1);
+  auto chunk_strides = decltype(MapIterator::chunk_strides_)(rit.nDim(), 1);
   using ItType = std::tuple<std::size_t, std::size_t>;
 
   for(auto [dim, product]=ItType{1, 1}; dim < rit.nDim(); ++dim) {
-    product = strides[dim] = product * rit.range_length_[dim - 1];
+    product = chunk_strides[dim] = product * rit.range_length_[dim - 1];
   }
 
-  return MapIterator{std::cref(rit), std::cref(rit.map_.get()),
+  return MapIterator(std::cref(rit),
+                     std::cref(rit.map_.get()),
                      std::move(chunk_index),
-                     std::move(strides),
-                     done};
+                     std::move(chunk_strides),
+                     done);
 }
 
 template <typename ColumnMapping>
@@ -203,7 +226,7 @@ std::size_t
 MapIterator<ColumnMapping>::ChunkOffset() const {
   std::size_t offset = 0;
   for(auto dim = std::size_t{0}; dim < nDim(); ++dim) {
-    offset += chunk_index_[dim] * strides_[dim];
+    offset += chunk_index_[dim] * chunk_strides_[dim];
   }
   return offset;
 }
@@ -355,17 +378,22 @@ RangeIterator<ColumnMapping> & RangeIterator<ColumnMapping>::operator++() {
   assert(!done_);
   // Iterate from fastest to slowest changing dimension: FORTRAN order
   for(std::size_t dim = 0; dim < nDim();) {
+    const auto & dim_ranges = DimRanges(dim);
     index_[dim]++;
     mem_start_[dim] += range_length_[dim];
 
     // We've achieved a successful iteration in this dimension
-    if(index_[dim] < DimRanges(dim).size()) { break; }
+    if(index_[dim] < dim_ranges.size()) {
+      break;
     // We've exceeded the size of the current dimension
-    // reset to zero and retry the while loop
-    else if(dim < RowDim()) { index_[dim] = 0; mem_start_[dim] = 0; ++dim; }
+    // reset to zero and retry in the next dimension
+    } else if(dim < RowDim()) {
+      index_[dim] = 0;
+      mem_start_[dim] = 0;
+      ++dim;
     // Row is the slowest changing dimension so we're done
     // return without updating the iterator state
-    else { done_ = true; return *this; }
+    } else { done_ = true; return *this; }
   }
 
   // Increment output memory buffer offset
@@ -373,10 +401,12 @@ RangeIterator<ColumnMapping> & RangeIterator<ColumnMapping>::operator++() {
   return *this;
 };
 
+// Updates the state of the iterator
 template <typename ColumnMapping>
 void RangeIterator<ColumnMapping>::UpdateState() {
   for(auto dim=std::size_t{0}; dim < nDim(); ++dim) {
-    const auto & range = DimRange(dim);
+    const auto & dim_ranges = DimRanges(dim);
+    const auto & range = dim_ranges[index_[dim]];
     switch(range.type) {
       case Range::FREE: {
         disk_start_[dim] = range.start;
@@ -385,10 +415,23 @@ void RangeIterator<ColumnMapping>::UpdateState() {
       }
       case Range::MAP: {
         const auto & dim_maps = DimMap(dim);
-        assert(range.start < dim_maps.size());
-        assert(range.end - 1 < dim_maps.size());
+        assert(range.start < RowId(dim_maps.size()));
+        assert(range.end - 1 < RowId(dim_maps.size()));
         auto start = disk_start_[dim] = dim_maps[range.start].disk;
         range_length_[dim] = dim_maps[range.end - 1].disk - start + 1;
+        break;
+      }
+      case Range::EMPTY: {
+        // We want to skip empty ranges. To achieve this
+        // logic similar to operator++ is applied
+        auto rl = range_length_[dim] = range.Size();
+        // A dimension full of empty ranges -> we are done
+        if(index_[dim]++ >= dim_ranges.size()) {
+          done_ = true;
+          return;
+        }
+        mem_start_[dim] += rl;
+        --dim;  // Iterate again on this dimension
         break;
       }
       case Range::VARYING: {
@@ -546,8 +589,10 @@ bool BaseColumnMap<T>::IsSimple() const {
         case Range::FREE:
         case Range::VARYING:
           break;
+        // Both disk and memory indexes must
+        // monotonically increase in time
         case Range::MAP:
-          for(std::size_t i = range.start + 1; i < range.end; ++i) {
+          for(RowId i = range.start + 1; i < range.end; ++i) {
             if(column_map[i].mem - column_map[i-1].mem != 1) {
               return false;
             }
@@ -556,6 +601,10 @@ bool BaseColumnMap<T>::IsSimple() const {
             }
           }
           break;
+        // TODO(sjperkins)
+        // Revisit this
+        case Range::EMPTY:
+          return false;
       }
     }
   }
@@ -583,6 +632,7 @@ std::size_t BaseColumnMap<T>::nElements() const {
             break;
           case Range::FREE:
           case Range::MAP:
+          case Range::EMPTY:
             assert(range.IsValid());
             dim_elements += range.Size();
             break;
@@ -622,11 +672,9 @@ ColumnMaps MapFactory(const SP & shape_prov, const ColumnSelection & selection) 
       ColumnMap column_map;
       column_map.reserve(dim_ids.size());
 
-      for(auto [disk_it, mem] = std::tuple{std::begin(dim_ids), casacore::rownr_t{0}};
-          disk_it != std::end(dim_ids); ++disk_it) {
-            if(*disk_it >= 0) {
-              column_map.push_back({casacore::rownr_t(*disk_it), mem++});
-            }
+      for(auto [disk_it, mem] = std::tuple{std::begin(dim_ids), RowId{0}};
+          disk_it != std::end(dim_ids); ++disk_it, ++mem) {
+            column_map.push_back({*disk_it, mem});
       }
 
       std::sort(std::begin(column_map), std::end(column_map),
@@ -637,6 +685,68 @@ ColumnMaps MapFactory(const SP & shape_prov, const ColumnSelection & selection) 
   }
 
   return column_maps;
+}
+
+// Make ranges for ndim dimensions from maps
+// range_type specify the type of Range that will be created
+// if no maps exist for that dimension.
+// Should be either FREE for Fixed Ranges or VARYINNG for variable ranges
+template <typename SP>
+arrow::Status
+MaybeMakeMapRanges(
+    const SP & shape_prov,
+    const ColumnMaps & maps,
+    ColumnRanges & column_ranges,
+    std::size_t ndim,
+    Range::Type range_type) {
+  for(std::size_t dim=0; dim < ndim; ++dim) {
+    // If no mapping exists for this dimension, create a range
+    // from the column shape
+    if(dim >= maps.size() || maps[dim].size() == 0) {
+      if(range_type == Range::FREE) {
+        ARROW_ASSIGN_OR_RAISE(auto dim_size, shape_prov.DimSize(dim));
+        column_ranges.emplace_back(ColumnRange{Range{0, RowId(dim_size), Range::FREE}});
+      } else if(range_type == Range::VARYING) {
+        column_ranges.emplace_back(ColumnRange{Range{0, 0, Range::VARYING}});
+      } else {
+        return arrow::Status::Invalid("Unhandled Range::Type ", range_type);
+      }
+
+      continue;
+    }
+
+    // A mapping exists for this dimension, create ranges
+    // from contiguous segments
+    const auto & column_map = maps[dim];
+    auto column_range = ColumnRange{};
+    auto current = Range{0, 1, Range::MAP};
+
+    for(auto [i, prev, next] = std::tuple{
+            RowId{1},
+            std::begin(column_map),
+            std::next(std::begin(column_map))};
+        next != std::end(column_map); ++i, ++prev, ++next) {
+
+      if(next->disk < 0) {
+        current.end += 1;
+      } else if(prev->disk < 0) {
+        column_range.emplace_back(Range{current.start, current.end, Range::EMPTY});
+        current = Range{i, i + 1, Range::MAP};
+      } else if(next->disk == prev->disk) {
+        return arrow::Status::IndexError("Duplicate row indices encountered");
+      } else if(next->disk - prev->disk == 1) {
+        current.end += 1;
+      } else {
+        column_range.push_back(current);
+        current = Range{i, i + 1, Range::MAP};
+      }
+    }
+
+    column_range.emplace_back(std::move(current));
+    column_ranges.emplace_back(std::move(column_range));
+  }
+
+  return arrow::Status::OK();
 }
 
 // Make ranges for fixed shape data
@@ -650,50 +760,12 @@ FixedRangeFactory(const SP & shape_prov, const ColumnMaps & maps) {
   ColumnRanges column_ranges;
   column_ranges.reserve(ndim);
 
-  for(std::size_t dim=0; dim < ndim; ++dim) {
-    // If no mapping exists for this dimension, create a range
-    // from the column shape
-    if(dim >= maps.size() || maps[dim].size() == 0) {
-      ARROW_ASSIGN_OR_RAISE(auto dim_size, shape_prov.DimSize(dim));
-      column_ranges.emplace_back(ColumnRange{Range{0, dim_size, Range::FREE}});
-      continue;
-    }
-
-    // A mapping exists for this dimension, create ranges
-    // from contiguous segments
-    const auto & column_map = maps[dim];
-    auto column_range = ColumnRange{};
-    auto current = Range{0, 1, Range::MAP};
-
-    for(auto [i, prev, next] = std::tuple{
-            casacore::rownr_t{1},
-            std::begin(column_map),
-            std::next(std::begin(column_map))};
-        next != std::end(column_map); ++i, ++prev, ++next) {
-
-      if(next->disk - prev->disk == 1) {
-        current.end += 1;
-      } else {
-        column_range.push_back(current);
-        current = Range{i, i + 1, Range::MAP};
-      }
-    }
-
-    column_range.emplace_back(std::move(current));
-    column_ranges.emplace_back(std::move(column_range));
-  }
-
+  // Make map ranges, substituting FREE ranges
+  // in dimensions where they don't exist
+  ARROW_RETURN_NOT_OK(MaybeMakeMapRanges(shape_prov, maps, column_ranges, ndim, Range::FREE));
   // Post construction checks
   assert(ndim == column_ranges.size());
-
-  for(std::size_t dim=0; dim < ndim; ++dim) {
-    const auto & column_range = column_ranges[dim];
-    for(std::size_t r=1; r < column_range.size(); ++r) {
-      if(column_range[r].type != column_range[r - 1].type) {
-        return arrow::Status::NotImplemented("Heterogenous Column Ranges in a dimension");
-      }
-    }
-  }
+  ARROW_RETURN_NOT_OK(CheckColumnRangeInvariants(column_ranges));
 
   return column_ranges;
 }
@@ -711,39 +783,10 @@ VariableRangeFactory(const SP & shape_prov, const ColumnMaps & maps) {
   ColumnRanges column_ranges;
   column_ranges.reserve(ndim);
 
-
-  // Handle non-row dimensions first
-  for(std::size_t dim=0; dim < row_dim; ++dim) {
-    // If no mapping exists for this dimension
-    // create a single VARYING range
-    if(dim >= maps.size() || maps[dim].size() == 0) {
-      column_ranges.emplace_back(ColumnRange{Range{0, 0, Range::VARYING}});
-      continue;
-    }
-
-    // A mapping exists for this dimension, create ranges
-    // from contiguous segments
-    const auto & column_map = maps[dim];
-    auto column_range = ColumnRange{};
-    auto current = Range{0, 1, Range::MAP};
-
-    for(auto [i, prev, next] = std::tuple{
-            casacore::rownr_t{1},
-            std::begin(column_map),
-            std::next(std::begin(column_map))};
-        next != std::end(column_map); ++i, ++prev, ++next) {
-
-      if(next->disk - prev->disk == 1) {
-        current.end += 1;
-      } else {
-        column_range.push_back(current);
-        current = Range{i, i + 1, Range::MAP};
-      }
-    }
-
-    column_range.emplace_back(std::move(current));
-    column_ranges.emplace_back(std::move(column_range));
-  }
+  // Make map ranges, substituting VARYING rnages
+  // in dimensions where they don't exist.
+  // Don't handle the row dimension
+  ARROW_RETURN_NOT_OK(MaybeMakeMapRanges(shape_prov, maps, column_ranges, row_dim, Range::VARYING));
 
   // Lastly, the row dimension
   auto row_range = ColumnRange{};
@@ -753,22 +796,22 @@ VariableRangeFactory(const SP & shape_prov, const ColumnMaps & maps) {
     // No maps provided, derive from shape
     ARROW_ASSIGN_OR_RAISE(auto dim_size, shape_prov.DimSize(row_dim));
     row_range.reserve(dim_size);
-    for(std::size_t r=0; r < dim_size; ++r) {
+    for(RowId r=0; r < RowId(dim_size); ++r) {
       row_range.emplace_back(Range{r, r + 1, Range::FREE});
     }
   } else {
     // Derive from mapping
     const auto & row_maps = maps[row_dim];
     row_range.reserve(row_maps.size());
-    for(std::size_t r=0; r < row_maps.size(); ++r) {
+    for(RowId r=0; r < RowId(row_maps.size()); ++r) {
       row_range.emplace_back(Range{r, r + 1, Range::MAP});
     }
   }
 
   column_ranges.emplace_back(std::move(row_range));
-
-
   assert(ndim == column_ranges.size());
+  ARROW_RETURN_NOT_OK(CheckColumnRangeInvariants(column_ranges));
+
   return column_ranges;
 }
 

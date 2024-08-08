@@ -1,21 +1,26 @@
 #ifndef ARCAE_COLUMN_READ_VISITOR_H
 #define ARCAE_COLUMN_READ_VISITOR_H
 
+#include <cstddef>
 #include <functional>
 #include <memory>
 
 #include <arrow/array/array_nested.h>
 #include <arrow/util/logging.h>  // IWYU pragma: keep
+#include <arrow/status.h>
 #include <arrow/result.h>
+#include <arrow/type.h>
 
 #include <casacore/tables/Tables.h>
 
 #include "arcae/array_util.h"
+#include "arcae/base_column_map.h"
 #include "arcae/casa_visitors.h"
 #include "arcae/column_read_map.h"
 #include "arcae/complex_type.h"
 #include "arcae/configuration.h"
 #include "arcae/service_locator.h"
+
 namespace arcae {
 
 class ColumnReadVisitor : public CasaTypeVisitor {
@@ -24,8 +29,8 @@ public:
 
 public:
     std::reference_wrapper<const ColumnReadMap> map_;
-    arrow::MemoryPool * pool_;
     std::shared_ptr<arrow::Array> array_;
+    arrow::MemoryPool * pool_;
 
 public:
     explicit ColumnReadVisitor(
@@ -49,8 +54,120 @@ public:
     }
 
     template <typename T>
-    arrow::Status ReadScalarColumn(const std::shared_ptr<arrow::DataType> & arrow_dtype) {
+    arrow::Result<std::shared_ptr<arrow::Buffer>>
+    GetResultBufferOrAllocate(
+            std::size_t nelements,
+            const std::shared_ptr<arrow::DataType> & arrow_dtype) const {
+        auto GetBuffer = [&, this]() -> arrow::Result<std::shared_ptr<arrow::Buffer>> {
+            // Get the data buffer if a result array has been provided on the map
+            if(auto result = map_.get().result_; result) {
+                // TODO(sjperkins). Move most of these checks into the ColumnReadMap
+                auto shape_result = map_.get().GetOutputShape();
+                if(!shape_result.ok()) {
+                    return arrow::Status::NotImplemented(
+                        "Reading to supplied result arrays "
+                        "from variably shaped selections");
+                }
 
+                auto selection_shape = shape_result.ValueOrDie();
+                ARROW_ASSIGN_OR_RAISE(auto result_props,
+                                      GetArrayProperties(GetTableColumn(), result));
+
+                if(!result_props.shape.has_value()) {
+                    return arrow::Status::NotImplemented(
+                        "Reading to variably shaped result arrays "
+                        "for fixed shaped selections");
+                }
+
+                auto result_shape = result_props.shape.value();
+
+                if(result_shape != selection_shape) {
+                    return arrow::Status::Invalid(
+                        "Selection shape ", selection_shape,
+                        " does not match result array shape ", result_shape);
+                }
+
+                // Result arrays won't be expressed in
+                // the custom complex data dtype.
+                // Get the data type of the real/imag components
+                auto CheckDtype = [&, this](auto & array_dtype) -> arrow::Status {
+                    if(auto cplx = std::dynamic_pointer_cast<ComplexType>(arrow_dtype); cplx) {
+                        if(cplx->value_type() != array_dtype) {
+                            return arrow::Status::TypeError(
+                                "Column ", GetTableColumn().columnDesc().name(),
+                                " has CASA type ", GetTableColumn().columnDesc().dataType(),
+                                ". Result array should have an arrow data type of ",
+                                cplx->value_type()->ToString());
+                        }
+                    } else if(arrow_dtype != array_dtype) {
+                        return arrow::Status::TypeError(
+                            "Column ", GetTableColumn().columnDesc().name(),
+                            " has CASA type ", GetTableColumn().columnDesc().dataType(),
+                            ". Result array should have an arrow data type of ",
+                            arrow_dtype->ToString());
+                    }
+                    return arrow::Status::OK();
+                };
+
+                // Extract the underlying buffer
+                // from the result array
+                auto array_data = result->data();
+
+                while(true) {
+                    switch(array_data->type->id()) {
+                        case arrow::Type::LARGE_LIST:
+                        case arrow::Type::LIST:
+                        case arrow::Type::FIXED_SIZE_LIST:
+                            array_data = array_data->child_data[0];
+                            break;
+                        case arrow::Type::BOOL:
+                        case arrow::Type::UINT8:
+                        case arrow::Type::UINT16:
+                        case arrow::Type::UINT32:
+                        case arrow::Type::UINT64:
+                        case arrow::Type::INT8:
+                        case arrow::Type::INT16:
+                        case arrow::Type::INT32:
+                        case arrow::Type::INT64:
+                        case arrow::Type::FLOAT:
+                        case arrow::Type::DOUBLE:
+                        case arrow::Type::STRING:
+                        {
+                            ARROW_RETURN_NOT_OK((CheckDtype(array_data->type)));
+                            if(array_data->buffers.size() == 0) {
+                                return arrow::Status::Invalid("Result array does not contain a buffer");
+                            }
+
+                            if(auto buffer = array_data->buffers[array_data->buffers.size() - 1]; buffer) {
+                                return buffer;
+                            }
+
+                            return arrow::Status::Invalid("Result array does not contain a buffer");
+                        }
+                        default:
+                            return arrow::Status::TypeError(
+                                "Unable to obtain array root buffer "
+                                "for types ", array_data->type->ToString());
+                    }
+                }
+
+                return arrow::Status::Invalid("Result array does not contain a buffer ", result->ToString());
+            } else {
+                // Allocate a result buffer
+                ARROW_ASSIGN_OR_RAISE(auto allocation, arrow::AllocateBuffer(nelements*sizeof(T), pool_));
+                return std::shared_ptr<arrow::Buffer>(std::move(allocation));
+            }
+        };
+
+        ARROW_ASSIGN_OR_RAISE(auto buffer, GetBuffer());
+        auto span = buffer->template span_as<T>();
+        ARROW_RETURN_NOT_OK(CheckElements(span.size(), nelements));
+        return buffer;
+    }
+
+    template <typename T>
+    arrow::Status
+    ReadScalarColumn(const std::shared_ptr<arrow::DataType> & arrow_dtype) {
         auto column = casacore::ScalarColumn<T>(GetTableColumn());
         column.setMaximumCacheSize(1);
 
@@ -74,11 +191,10 @@ public:
         } else {
             // Wrap Arrow Buffer in casacore Vector
             auto nelements = map_.get().nElements();
-            ARROW_ASSIGN_OR_RAISE(auto allocation, arrow::AllocateBuffer(nelements*sizeof(T), pool_));
-            auto buffer = std::shared_ptr<arrow::Buffer>(std::move(allocation));
+            ARROW_ASSIGN_OR_RAISE(auto buffer, GetResultBufferOrAllocate<T>(nelements, arrow_dtype));
             auto casa_vector = casacore::Vector<T>(casacore::IPosition(1, nelements),
-                                                    buffer->mutable_data_as<T>(),
-                                                    casacore::SHARE);
+                                                   buffer->template mutable_data_as<T>(),
+                                                   casacore::SHARE);
             auto casa_ptr = casa_vector.data();
 
             if(map_.get().IsSimple()) {
@@ -116,7 +232,8 @@ public:
     }
 
     template <typename T>
-    arrow::Status ReadFixedColumn(const std::shared_ptr<arrow::DataType> & arrow_dtype) {
+    arrow::Status
+    ReadFixedColumn(const std::shared_ptr<arrow::DataType> & arrow_dtype) {
         auto column = casacore::ArrayColumn<T>(GetTableColumn());
         column.setMaximumCacheSize(1);
         ARROW_ASSIGN_OR_RAISE(auto shape, map_.get().GetOutputShape());
@@ -141,10 +258,9 @@ public:
         } else {
             // Wrap Arrow Buffer in casacore Array
             auto nelements = map_.get().nElements();
-            ARROW_ASSIGN_OR_RAISE(auto allocation, arrow::AllocateBuffer(nelements*sizeof(T), pool_));
-            auto buffer = std::shared_ptr<arrow::Buffer>(std::move(allocation));
+            ARROW_ASSIGN_OR_RAISE(auto buffer, GetResultBufferOrAllocate<T>(nelements, arrow_dtype));
             auto carray = casacore::Array<T>(shape,
-                                             buffer->mutable_data_as<T>(),
+                                             buffer->template mutable_data_as<T>(),
                                              casacore::SHARE);
             auto casa_ptr = carray.data();
 
@@ -192,7 +308,8 @@ public:
 
 
     template <typename T>
-    arrow::Status ReadVariableColumn(const std::shared_ptr<arrow::DataType> & arrow_dtype) {
+    arrow::Status
+    ReadVariableColumn(const std::shared_ptr<arrow::DataType> & arrow_dtype) {
         auto column = casacore::ArrayColumn<T>(GetTableColumn());
         column.setMaximumCacheSize(1);
 
@@ -216,9 +333,8 @@ public:
         } else {
             // Wrap Arrow Buffer in casacore Array
             auto nelements = map_.get().nElements();
-            ARROW_ASSIGN_OR_RAISE(auto allocation, arrow::AllocateBuffer(nelements*sizeof(T), pool_));
-            auto buffer = std::shared_ptr<arrow::Buffer>(std::move(allocation));
-            auto * buf_ptr = buffer->mutable_data_as<T>();
+            ARROW_ASSIGN_OR_RAISE(auto buffer, GetResultBufferOrAllocate<T>(nelements, arrow_dtype));
+            auto * buf_ptr = buffer->template mutable_data_as<T>();
 
             for(auto it = map_.get().RangeBegin(); it != map_.get().RangeEnd(); ++it) {
                 // Copy sections of data into the Arrow Buffer
