@@ -235,13 +235,13 @@ MakeDataChunks(
 
     // Compute minimum element
     for(std::size_t d = 0; d < ndim; ++d) {
-      shared->min_elements_[offset + d] = *std::min_element(
+      shared->min_mem_index_[offset + d] = *std::min_element(
         std::begin(dim_span[d].mem),
         std::end(dim_span[d].mem));
     }
 
     // Compute flat offsets
-    auto min_span = absl::MakeSpan(&shared->min_elements_[offset], ndim);
+    auto min_span = absl::MakeSpan(&shared->min_mem_index_[offset], ndim);
     shared->flat_offsets_[chunk] = data_shape.FlatOffset(min_span);
 
     // Create the chunk

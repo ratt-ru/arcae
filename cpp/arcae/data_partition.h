@@ -38,7 +38,7 @@ struct SharedChunkData {
   std::vector<SpanPairs> dim_spans_;
   // Vector of minimum memory index elements for each chunk
   // There are a total of nchunks_ * ndim_ values
-  std::vector<IndexType> min_elements_;
+  std::vector<IndexType> min_mem_index_;
   // Vector of strides for each chunk
   // There are a total of nchunks_ * ndim_ values
   std::vector<std::size_t> chunk_strides_;
@@ -60,10 +60,10 @@ struct SharedChunkData {
     return absl::MakeSpan(dim_spans_[chunk]);
   }
 
-  // A span over the minimum elements in each dimension of the chunk
-  absl::Span<const IndexType> MinMemElements(std::size_t chunk) const {
+  // A span over the minimum indices in each dimension of the chunk
+  absl::Span<const IndexType> MinMemIndex(std::size_t chunk) const {
     assert(chunk < nchunks_);
-    return absl::MakeSpan(&min_elements_[chunk * ndim_], ndim_);
+    return absl::MakeSpan(&min_mem_index_[chunk * ndim_], ndim_);
   }
 
   // A span over the chunk strides for each dimension of the chunk
@@ -122,8 +122,8 @@ struct DataChunk {
   }
 
   // Obtain the minimum elements of the memory spans
-  absl::Span<const IndexType> MinMemElements() const {
-    return shared_->MinMemElements(chunk_id_);
+  absl::Span<const IndexType> MinMemIndex() const {
+    return shared_->MinMemIndex(chunk_id_);
   }
 
   // Obtain the strides for this chunk

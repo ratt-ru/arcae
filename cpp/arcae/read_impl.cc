@@ -76,21 +76,21 @@ bool TransposeData(
     CT * out_ptr,
     absl::Span<const std::size_t> buffer_strides,
     absl::Span<const std::size_t> chunk_strides,
-    absl::Span<const IndexType> min_mem_elements,
+    absl::Span<const IndexType> min_mem_index,
     std::size_t flat_offset) {
 
   std::ptrdiff_t ndim = spans.size();
-  std::ptrdiff_t row_dim = std::ptrdiff_t(ndim) - 1;
+  std::ptrdiff_t row_dim = ndim - 1;
 
   auto DimSize = [&](auto d) -> std::ptrdiff_t { return spans[d].mem.size(); };
+  auto MemRelative = [&](auto d, auto i) -> std::ptrdiff_t {
+    return spans[d].mem[i] - min_mem_index[d];
+  };
 
   // Initialise position array
   std::array<std::ptrdiff_t, kMaxTransposeDims> pos;
   pos.fill(0);
 
-  auto MemRelative = [&](auto d, auto i) -> std::ptrdiff_t {
-    return spans[d].mem[i] - min_mem_elements[d];
-  };
 
   // Iterate over the spans in memory, copying data
   while(true) {
@@ -175,7 +175,7 @@ struct ReadAndTransposeImpl {
         buffer->template mutable_data_as<CT>() + chunk.FlatOffset(),
         chunk.BufferStrides(),
         chunk.ChunkStrides(),
-        chunk.MinMemElements(),
+        chunk.MinMemIndex(),
         chunk.FlatOffset());
     }, {}, CallbackOptions{ShouldSchedule::Always, GetCpuThreadPool()});
   }
