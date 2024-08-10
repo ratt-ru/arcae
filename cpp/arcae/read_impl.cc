@@ -92,13 +92,13 @@ struct ReadCallback {
         auto shape = chunk.GetShape();
         if(shape.size() == 1) {
           auto column = ScalarColumn<CT>(tp.table(), column_name);
-          auto vector = CasaVector<CT>(shape, out_ptr, casacore::SHARE);
-          column.getColumnRange(chunk.RowSlicer(), vector);
+          auto data = CasaVector<CT>(chunk.GetShape(), out_ptr, casacore::SHARE);
+          column.getColumnRange(chunk.RowSlicer(), data);
           return true;
         }
         auto column = ArrayColumn<CT>(tp.table(), column_name);
-        auto array = CasaArray<CT>(shape, out_ptr, casacore::SHARE);
-        column.getColumnRange(chunk.RowSlicer(), chunk.SectionSlicer(), array);
+        auto data = CasaArray<CT>(chunk.GetShape(), out_ptr, casacore::SHARE);
+        column.getColumnRange(chunk.RowSlicer(), chunk.SectionSlicer(), data);
         return true;
       });
     }
@@ -331,20 +331,20 @@ ReadImpl(
   };
 
   auto shape_fut = itp->RunAsync([
-      column = column,
-      selection = selection,
-      result = result
-    ](const TableProxy & tp) mutable -> Result<ShapeResult>  {
-      ARROW_RETURN_NOT_OK(ColumnExists(tp.table(), column));
-      auto table_column = TableColumn(tp.table(), column);
-      ARROW_ASSIGN_OR_RAISE(
-        auto shape_data,
-        ResultShapeData::MakeRead(table_column, selection, result));
-      return ShapeResult{
-        std::make_shared<ResultShapeData>(std::move(shape_data)),
-        std::make_shared<Selection>(std::move(selection))
-      };
-    });
+    column = column,
+    selection = selection,
+    result = result
+  ](const TableProxy & tp) mutable -> Result<ShapeResult>  {
+    ARROW_RETURN_NOT_OK(ColumnExists(tp.table(), column));
+    auto table_column = TableColumn(tp.table(), column);
+    ARROW_ASSIGN_OR_RAISE(
+      auto shape_data,
+      ResultShapeData::MakeRead(table_column, selection, result));
+    return ShapeResult{
+      std::make_shared<ResultShapeData>(std::move(shape_data)),
+      std::make_shared<Selection>(std::move(selection))
+    };
+  });
 
   // Partition the resulting shape into contiguous chunks
   // of data to read from disk
@@ -366,33 +366,33 @@ ReadImpl(
   // Read each contiguous chunk of data on disk independently
   // then create an output array
   auto read_fut = part_fut.Then([
-      column = column,
-      itp = itp,
-      result_array = result
-    ](const PartitionResult & result) mutable -> Future<std::shared_ptr<Array>> {
-      auto casa_dtype = result.partition->GetDataType();
-      auto nelements = result.partition->nElements();
-      ARROW_ASSIGN_OR_RAISE(auto buffer,
-        GetResultBufferOrAllocate(nelements, casa_dtype, result_array));
+    column = column,
+    itp = itp,
+    result_array = result
+  ](const PartitionResult & result) mutable -> Future<std::shared_ptr<Array>> {
+    auto casa_dtype = result.partition->GetDataType();
+    auto nelements = result.partition->nElements();
+    ARROW_ASSIGN_OR_RAISE(auto buffer,
+      GetResultBufferOrAllocate(nelements, casa_dtype, result_array));
 
-      // Make an async generator over the data chunks
-      auto data_chunk_gen = MakeVectorGenerator(std::move(result.partition->TakeChunks()));
-      // Map ReadCallBack over all data chunks
-      auto read_and_copy_data_gen = MakeMappedGenerator(
-        std::move(data_chunk_gen),
-        ReadCallback{std::move(column), itp, buffer});
+    // Make an async generator over the data chunks
+    auto data_chunk_gen = MakeVectorGenerator(std::move(result.partition->TakeChunks()));
+    // Map ReadCallBack over all data chunks
+    auto read_and_copy_data_gen = MakeMappedGenerator(
+      std::move(data_chunk_gen),
+      ReadCallback{std::move(column), itp, buffer});
 
-      // Collect the read results
-      auto collect = CollectAsyncGenerator(std::move(read_and_copy_data_gen));
+    // Collect the read results
+    auto collect = CollectAsyncGenerator(std::move(read_and_copy_data_gen));
 
-      // Make the array from the now populated buffer
-      return collect.Then([
-        result_shape = result.shape,
-        buffer = buffer
-      ](const std::vector<bool> & result) {
-        return MakeArray(*result_shape, buffer);
-      });
-    }, {}, CallbackOptions{ShouldSchedule::Always, GetCpuThreadPool()});
+    // Make the array from the now populated buffer
+    return collect.Then([
+      result_shape = result.shape,
+      buffer = buffer
+    ](const std::vector<bool> & result) {
+      return MakeArray(*result_shape, buffer);
+    });
+  }, {}, CallbackOptions{ShouldSchedule::Always, GetCpuThreadPool()});
 
   return read_fut;
 }
