@@ -198,9 +198,9 @@ MakeDataChunks(
     std::move(id_cache),                  // id_cache_
     std::move(dim_spans),                 // dim_spans_
     std::vector<IndexType>(offset),       // min_elements_
-    std::vector<std::size_t>(offset, 1),  // chunk_strides_
-    std::vector<std::size_t>(offset, 1),  // buffer_stride_
     std::vector<std::size_t>(nchunks),    // flat_offsets_
+    std::vector<std::size_t>(offset, 1),  // buffer_stride_
+    std::vector<std::size_t>(offset, 1),  // chunk_strides_
     std::move(contiguous));               // contiguous_
 
   std::vector<DataChunk> chunks(nchunks);
@@ -258,7 +258,7 @@ MakeDataChunks(
 
 // Get a Row Slicer for the disk span
 Slicer
-DataChunk::GetRowSlicer() const noexcept {
+DataChunk::RowSlicer() const noexcept {
   auto row_span = DimensionSpans()[nDim() - 1];
   return Slicer(
     IPosition({row_span.disk[0]}),
@@ -268,7 +268,7 @@ DataChunk::GetRowSlicer() const noexcept {
 
 // Get a Section Slicer for the disk span
 Slicer
-DataChunk::GetSectionSlicer() const noexcept {
+DataChunk::SectionSlicer() const noexcept {
   auto dim_spans = DimensionSpans();
   auto row_dim = nDim() - 1;
   IPosition start(row_dim, 0);

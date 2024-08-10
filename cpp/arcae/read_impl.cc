@@ -82,24 +82,25 @@ bool TransposeData(
   std::ptrdiff_t ndim = spans.size();
   std::ptrdiff_t row_dim = ndim - 1;
 
-  auto DimSize = [&](auto d) -> std::ptrdiff_t { return spans[d].mem.size(); };
-  auto MemRelative = [&](auto d, auto i) -> std::ptrdiff_t {
-    return spans[d].mem[i] - min_mem_index[d];
-  };
-
   // Initialise position array
   std::array<std::ptrdiff_t, kMaxTransposeDims> pos;
   pos.fill(0);
-
 
   // Iterate over the spans in memory, copying data
   while(true) {
     std::ptrdiff_t in_offset = 0;
     std::ptrdiff_t out_offset = 0;
+
     for(std::ptrdiff_t d = 0; d < ndim; ++d) {
       in_offset += pos[d] * chunk_strides[d];
-      out_offset += MemRelative(d, pos[d]) * buffer_strides[d];
+      auto mem_offset = spans[d].mem[pos[d]] - min_mem_index[d];
+      out_offset += mem_offset * buffer_strides[d];
     }
+
+    // Moves degrade to copies for simple (i.e. numeric) types
+    // but it should make casacore::String more efficient
+    // by avoiding copies
+    out_ptr[out_offset] = std::move(in_ptr[in_offset]);
 
     // std::stringstream oss;
     // oss << "Position [";
@@ -122,103 +123,14 @@ bool TransposeData(
     // oss << "] " << flat_offset << ' '  << in_offset << ' ' << out_offset << ' ' << flat_offset + out_offset << ' ' << in_ptr[in_offset];
     // ARROW_LOG(INFO) << oss.str();
 
-    // Moves degrade to copies for simple (i.e. numeric) types
-    // but it should make casacore::String more efficient
-    // by avoiding copies
-    out_ptr[out_offset] = std::move(in_ptr[in_offset]);
-
     // Iterate in FORTRAN order
     for(std::ptrdiff_t d=0; d < ndim; ++d) {
-      if(++pos[d] < DimSize(d)) break;
+      if(++pos[d] < std::ptrdiff_t(spans[d].mem.size())) break;
       pos[d] = 0;
       if(d == row_dim) return true;
     }
   }
 }
-
-// Reads a chunk of data from disk
-// before tranposing it into the desired order
-// in the output buffer
-template <
-  DataType CDT,
-  typename CT = typename CasaDataTypeTraits<CDT>::CasaType>
-struct ReadAndTransposeImpl {
-  std::string column;
-  std::shared_ptr<IsolatedTableProxy> itp;
-  std::shared_ptr<Buffer> buffer;
-
-  Future<bool> operator()(const DataChunk & chunk) const {
-    assert(itp != nullptr);
-    auto read_fut = itp->RunAsync([
-      column = std::move(column),
-      chunk = chunk
-    ](const TableProxy & tp) -> Future<CasaArray<CT>> {
-      if(chunk.nDim() == 1) {
-        auto data = ScalarColumn<CT>(tp.table(), column);
-        return data.getColumnRange(chunk.GetRowSlicer());
-      }
-      auto data = ArrayColumn<CT>(tp.table(), column);
-      auto section_slicer = chunk.GetSectionSlicer();
-      return data.getColumnRange(
-        chunk.GetRowSlicer(),
-        chunk.GetSectionSlicer());
-    });
-
-    // Perform the transpose
-    return read_fut.Then([
-      chunk = chunk,
-      buffer = buffer
-    ](const CasaArray<CT> & data) mutable -> bool {
-      return TransposeData<CT>(
-        data.data(),
-        chunk.DimensionSpans(),
-        buffer->template mutable_data_as<CT>() + chunk.FlatOffset(),
-        chunk.BufferStrides(),
-        chunk.ChunkStrides(),
-        chunk.MinMemIndex(),
-        chunk.FlatOffset());
-    }, {}, CallbackOptions{ShouldSchedule::Always, GetCpuThreadPool()});
-  }
-};
-
-// Reads a chunk of data from disk
-// directly into the output buffer
-template <
-  DataType CDT,
-  typename CT = typename CasaDataTypeTraits<CDT>::CasaType>
-struct ReadInPlaceImpl {
-  std::string column;
-  std::shared_ptr<IsolatedTableProxy> itp;
-  std::shared_ptr<Buffer> buffer;
-
-  Future<bool> operator()(const DataChunk & chunk) const {
-    assert(itp != nullptr);
-    assert(chunk.IsContiguous());
-    return itp->RunAsync([
-      column = std::move(column),
-      chunk = chunk,
-      buffer = buffer
-    ](const TableProxy & tp) -> Future<bool> {
-      auto out_ptr = buffer->template mutable_data_as<CT>() + chunk.FlatOffset();
-      auto shape = chunk.GetShape();
-      if(shape.size() == 1) {
-        auto data = ScalarColumn<CT>(tp.table(), column);
-        auto vector = CasaVector<CT>(shape, out_ptr, casacore::SHARE);
-        data.getColumnRange(chunk.GetRowSlicer(), vector);
-        return true;
-      }
-      auto data = ArrayColumn<CT>(tp.table(), column);
-      auto array = CasaArray<CT>(shape, out_ptr, casacore::SHARE);
-      auto section_slicer = chunk.GetSectionSlicer();
-      data.getColumnRange(
-        chunk.GetRowSlicer(),
-        chunk.GetSectionSlicer(),
-        array);
-      return true;
-    });
-  }
-};
-
 
 // Functor implementing dispatch of disk reading functionality
 struct ReadCallback {
@@ -236,16 +148,59 @@ struct ReadCallback {
   // chunk characteristics
   template <DataType CDT>
   inline Future<bool> Dispatch(const DataChunk & chunk) const {
+    using CT = typename CasaDataTypeTraits<CDT>::CasaType;
+
+    // If the chunk is contiguous in memory, we can read
+    // directly into it's position in the output buffer
     if(chunk.IsContiguous()) {
-      return ReadInPlaceImpl<CDT>{
-        std::move(column),
-        std::move(itp),
-        std::move(buffer)}(chunk);
+      return itp->RunAsync([
+        column = std::move(column),
+        chunk = chunk,
+        buffer = buffer
+      ](const TableProxy & tp) -> Future<bool> {
+        auto out_ptr = buffer->template mutable_data_as<CT>() + chunk.FlatOffset();
+        auto shape = chunk.GetShape();
+        if(shape.size() == 1) {
+          auto data = ScalarColumn<CT>(tp.table(), column);
+          auto vector = CasaVector<CT>(shape, out_ptr, casacore::SHARE);
+          data.getColumnRange(chunk.RowSlicer(), vector);
+          return true;
+        }
+        auto data = ArrayColumn<CT>(tp.table(), column);
+        auto array = CasaArray<CT>(shape, out_ptr, casacore::SHARE);
+        data.getColumnRange(chunk.RowSlicer(), chunk.SectionSlicer(), array);
+        return true;
+      });
     }
-    return ReadAndTransposeImpl<CDT>{
-      std::move(column),
-      std::move(itp),
-      std::move(buffer)}(chunk);
+
+    // Read data into a casa array
+    auto read_fut = itp->RunAsync([
+      column = std::move(column),
+      chunk = chunk
+    ](const TableProxy & tp) -> Future<CasaArray<CT>> {
+      if(chunk.nDim() == 1) {
+        auto data = ScalarColumn<CT>(tp.table(), column);
+        return data.getColumnRange(chunk.RowSlicer());
+      }
+      auto data = ArrayColumn<CT>(tp.table(), column);
+      auto section_slicer = chunk.SectionSlicer();
+      return data.getColumnRange(chunk.RowSlicer(), chunk.SectionSlicer());
+    });
+
+    // Transpose the array into the output buffer
+    return read_fut.Then([
+      chunk = chunk,
+      buffer = buffer
+    ](const CasaArray<CT> & data) mutable -> bool {
+      return TransposeData<CT>(
+        data.data(),
+        chunk.DimensionSpans(),
+        buffer->template mutable_data_as<CT>() + chunk.FlatOffset(),
+        chunk.BufferStrides(),
+        chunk.ChunkStrides(),
+        chunk.MinMemIndex(),
+        chunk.FlatOffset());
+    }, {}, CallbackOptions{ShouldSchedule::Always, GetCpuThreadPool()});
   }
 
   // Read a chunk of data into the encapsulated buffer

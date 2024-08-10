@@ -1,6 +1,7 @@
 #ifndef ARCAE_DATA_PARTITION_H
 #define ARCAE_DATA_PARTITION_H
 
+#include <cassert>
 #include <vector>
 
 #include <absl/types/span.h>
@@ -33,21 +34,28 @@ struct SharedChunkData {
   // Number of dimensions of each chunk
   std::size_t ndim_;
   // Cache of disk and memory indexes
+  // These are the backing values for the Dimension Spans below
   std::vector<Index> id_cache_;
   // Vector span pairs for each chunk
+  // There are a total of ndim_ SpanPairs
   std::vector<SpanPairs> dim_spans_;
   // Vector of minimum memory index elements for each chunk
+  // These values are used to compute the flat offset below
+  // but are also used when transposing data into the output buffer
   // There are a total of nchunks_ * ndim_ values
   std::vector<IndexType> min_mem_index_;
-  // Vector of strides for each chunk
-  // There are a total of nchunks_ * ndim_ values
-  std::vector<std::size_t> chunk_strides_;
-  // Vector of related buffer strides for each chunk
-  // There are a total of nchunks_ * ndim_ values
-  std::vector<std::size_t> buffer_strides_;
-  // Vector of flat offsets for each chunk
+  // Vector of starting offsets for the location
+  // in the output buffer associated with this chunk
+  // Used when transposing data into the output buffer.
   // There are a total of nchunks_ values
   std::vector<std::size_t> flat_offsets_;
+  // Vector of output buffer strides for each chunk
+  // There are a total of nchunks_ * ndim_ values
+  std::vector<std::size_t> buffer_strides_;
+  // Vector of strides for each chunk
+  // Used when when transposing data into the output buffer.
+  // There are a total of nchunks_ * ndim_ values
+  std::vector<std::size_t> chunk_strides_;
   // Vector indicating whether each chunk is contiguous
   std::vector<bool> contiguous_;
 
@@ -148,10 +156,10 @@ struct DataChunk {
   }
 
   // Get a Row Slicer for the disk span
-  casacore::Slicer GetRowSlicer() const noexcept;
+  casacore::Slicer RowSlicer() const noexcept;
 
   // Get a Section Slicer for the disk span
-  casacore::Slicer GetSectionSlicer() const noexcept;
+  casacore::Slicer SectionSlicer() const noexcept;
 
   // Number of chunk dimensions
   std::size_t nDim() const noexcept { return shared_->nDim(); }
