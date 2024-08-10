@@ -33,6 +33,8 @@ struct SharedChunkData {
   std::size_t nchunks_;
   // Number of dimensions of each chunk
   std::size_t ndim_;
+  // Casa Data Type
+  casacore::DataType casa_dtype_;
   // Cache of disk and memory indexes
   // These are the backing values for the Dimension Spans below
   std::vector<Index> id_cache_;
@@ -61,6 +63,9 @@ struct SharedChunkData {
 
   // Number of dimensions in each chunk
   std::size_t nDim() const { return ndim_; }
+
+  // Get the Casa Data Type
+  casacore::DataType CasaDataType() const { return casa_dtype_; }
 
   // A span over the index pairs of this hcunk
   absl::Span<const SpanPair> DimensionSpans(std::size_t chunk) const {
@@ -114,6 +119,9 @@ struct DataChunk {
 
   // Is this a valid chunk
   explicit operator bool() const { return bool(shared_); }
+
+  // Get the Casa Data Type associated with the chunk
+  casacore::DataType CasaDataType() const { return shared_->CasaDataType(); }
 
 // Return the disk span at the specified dimension
   const IndexSpan & Disk(std::size_t dim) const {

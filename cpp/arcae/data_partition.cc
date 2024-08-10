@@ -195,6 +195,7 @@ MakeDataChunks(
   auto shared = std::make_shared<AggregateAdapter<SharedChunkData>>(
     nchunks,                              // nchunks_
     ndim,                                 // ndim_
+    data_shape.GetDataType(),             // casa_dtype_
     std::move(id_cache),                  // id_cache_
     std::move(dim_spans),                 // dim_spans_
     std::vector<IndexType>(offset),       // min_elements_
