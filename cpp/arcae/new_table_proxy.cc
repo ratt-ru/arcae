@@ -10,6 +10,7 @@
 
 #include "arcae/read_impl.h"
 #include "arcae/table_utils.h"
+#include "arcae/write_impl.h"
 
 using ::arrow::Array;
 using ::arrow::Result;
@@ -77,6 +78,13 @@ NewTableProxy::GetColumn(
   return ReadImpl(itp_, column, selection, result).MoveResult();
 }
 
+Result<bool>
+NewTableProxy::PutColumn(
+  const std::string & column,
+  const std::shared_ptr<Array> & result,
+  const Selection & selection) const {
+    return WriteImpl(itp_, column, result, selection).MoveResult();
+}
 
 Result<std::vector<std::string>>
 NewTableProxy::Columns() const {

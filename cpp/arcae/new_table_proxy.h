@@ -54,6 +54,13 @@ public:
     const Selection & selection={},
     const std::shared_ptr<arrow::Array> & result=nullptr) const;
 
+  // Put data into the column from the given array,
+  // possibly guided by a selection along each index
+  arrow::Result<bool> PutColumn(
+    const std::string & column,
+    const std::shared_ptr<arrow::Array> & result,
+    const Selection & selection={}) const;
+
   // Return the names of the columns in this table
   arrow::Result<std::vector<std::string>> Columns() const;
 
