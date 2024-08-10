@@ -84,36 +84,36 @@ struct ReadCallback {
     // directly into it's position in the output buffer
     if(chunk.IsContiguous()) {
       return itp->RunAsync([
-        column = std::move(column),
+        column_name = std::move(column),
         chunk = chunk,
         buffer = buffer
       ](const TableProxy & tp) -> Future<bool> {
         auto out_ptr = buffer->template mutable_data_as<CT>() + chunk.FlatOffset();
         auto shape = chunk.GetShape();
         if(shape.size() == 1) {
-          auto data = ScalarColumn<CT>(tp.table(), column);
+          auto column = ScalarColumn<CT>(tp.table(), column_name);
           auto vector = CasaVector<CT>(shape, out_ptr, casacore::SHARE);
-          data.getColumnRange(chunk.RowSlicer(), vector);
+          column.getColumnRange(chunk.RowSlicer(), vector);
           return true;
         }
-        auto data = ArrayColumn<CT>(tp.table(), column);
+        auto column = ArrayColumn<CT>(tp.table(), column_name);
         auto array = CasaArray<CT>(shape, out_ptr, casacore::SHARE);
-        data.getColumnRange(chunk.RowSlicer(), chunk.SectionSlicer(), array);
+        column.getColumnRange(chunk.RowSlicer(), chunk.SectionSlicer(), array);
         return true;
       });
     }
 
-    // Read data into a casa array
+    // Read column data into a casa array
     auto read_fut = itp->RunAsync([
-      column = std::move(column),
+      column_name = std::move(column),
       chunk = chunk
     ](const TableProxy & tp) -> Future<CasaArray<CT>> {
       if(chunk.nDim() == 1) {
-        auto data = ScalarColumn<CT>(tp.table(), column);
-        return data.getColumnRange(chunk.RowSlicer());
+        auto column = ScalarColumn<CT>(tp.table(), column_name);
+        return column.getColumnRange(chunk.RowSlicer());
       }
-      auto data = ArrayColumn<CT>(tp.table(), column);
-      return data.getColumnRange(chunk.RowSlicer(), chunk.SectionSlicer());
+      auto column = ArrayColumn<CT>(tp.table(), column_name);
+      return column.getColumnRange(chunk.RowSlicer(), chunk.SectionSlicer());
     });
 
     // Transpose the array into the output buffer
