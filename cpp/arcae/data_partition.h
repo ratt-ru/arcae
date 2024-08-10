@@ -58,6 +58,9 @@ struct SharedChunkData {
   // Used when when transposing data into the output buffer.
   // There are a total of nchunks_ * ndim_ values
   std::vector<std::size_t> chunk_strides_;
+  // Scratch space for position iterator in transpose function
+  // There are a total of nchunks_ * ndim_ values
+  std::vector<std::size_t> position_;
   // Vector indicating whether each chunk is contiguous
   std::vector<bool> contiguous_;
 
@@ -90,6 +93,12 @@ struct SharedChunkData {
   absl::Span<const std::size_t> BufferStrides(std::size_t chunk) const {
     assert(chunk < nchunks_);
     return absl::MakeSpan(&buffer_strides_[chunk * ndim_], ndim_);
+  }
+
+  // A span over the position scratch space associated with the chunk
+  absl::Span<std::size_t> ScratchPositions(std::size_t chunk) {
+    assert(chunk < nchunks_);
+    return absl::MakeSpan(&position_[chunk * ndim_], ndim_);
   }
 
   // The starting position in the output buffer location associated
@@ -156,6 +165,11 @@ struct DataChunk {
   // associated with this chunk
   absl::Span<const std::size_t> BufferStrides() const {
     return shared_->BufferStrides(chunk_id_);
+  }
+
+  // Obtain the position scratch values associated with this chunk
+  absl::Span<std::size_t> ScratchPositions() {
+    return shared_->ScratchPositions(chunk_id_);
   }
 
   // Is the chunk contiguous?

@@ -18,7 +18,7 @@
 #include <arrow/util/thread_pool.h>
 
 #include <casacore/casa/Utilities/DataType.h>
-#include <casacore/tables/Tables.h>
+#include <casacore/tables/Tables/ArrayColumn.h>
 #include <casacore/tables/Tables/ScalarColumn.h>
 #include <casacore/tables/Tables/TableColumn.h>
 #include <casacore/tables/Tables/TableProxy.h>
@@ -66,72 +66,6 @@ namespace detail {
 
 namespace {
 
-// Maximum number of DataChunk dimensions on the fast path
-static constexpr std::size_t kMaxTransposeDims = 5;
-
-template <typename CT>
-bool TransposeData(
-    const CT * in_ptr,
-    absl::Span<const SpanPair> spans,
-    CT * out_ptr,
-    absl::Span<const std::size_t> buffer_strides,
-    absl::Span<const std::size_t> chunk_strides,
-    absl::Span<const IndexType> min_mem_index,
-    std::size_t flat_offset) {
-
-  std::ptrdiff_t ndim = spans.size();
-  std::ptrdiff_t row_dim = ndim - 1;
-
-  // Initialise position array
-  std::array<std::ptrdiff_t, kMaxTransposeDims> pos;
-  pos.fill(0);
-
-  // Iterate over the spans in memory, copying data
-  while(true) {
-    std::ptrdiff_t in_offset = 0;
-    std::ptrdiff_t out_offset = 0;
-
-    for(std::ptrdiff_t d = 0; d < ndim; ++d) {
-      in_offset += pos[d] * chunk_strides[d];
-      auto mem_offset = spans[d].mem[pos[d]] - min_mem_index[d];
-      out_offset += mem_offset * buffer_strides[d];
-    }
-
-    // Moves degrade to copies for simple (i.e. numeric) types
-    // but it should make casacore::String more efficient
-    // by avoiding copies
-    out_ptr[out_offset] = std::move(in_ptr[in_offset]);
-
-    // std::stringstream oss;
-    // oss << "Position [";
-    // for(std::ptrdiff_t d = 0; d < ndim; ++d) {
-    //   if(d > 0) oss << ',';
-    //   oss << spans[d].mem[pos[d]];
-    // }
-    // oss << "] Relative [";
-    // for(std::ptrdiff_t d = 0; d < ndim; ++d) {
-    //   if(d > 0) oss << ',';
-    //   oss << MemRelative(d, pos[d]);
-    // }
-
-    // oss << "] Strides [";
-    // for(std::ptrdiff_t d = 0; d < ndim; ++d) {
-    //   if(d > 0) oss << ',';
-    //   oss << chunk_strides[d];
-    // }
-
-    // oss << "] " << flat_offset << ' '  << in_offset << ' ' << out_offset << ' ' << flat_offset + out_offset << ' ' << in_ptr[in_offset];
-    // ARROW_LOG(INFO) << oss.str();
-
-    // Iterate in FORTRAN order
-    for(std::ptrdiff_t d=0; d < ndim; ++d) {
-      if(++pos[d] < std::ptrdiff_t(spans[d].mem.size())) break;
-      pos[d] = 0;
-      if(d == row_dim) return true;
-    }
-  }
-}
-
 // Functor implementing dispatch of disk reading functionality
 struct ReadCallback {
   // Column name
@@ -140,14 +74,10 @@ struct ReadCallback {
   std::shared_ptr<IsolatedTableProxy> itp;
   // Output buffer
   std::shared_ptr<Buffer> buffer;
-  // CASA Data Type
-  casacore::DataType dtype;
 
-  // Dispatch to different callback implementations
-  // dependent on the casacore DataType and
-  // chunk characteristics
+  // Read data, dependent on chunk characteristics and CASA data type
   template <DataType CDT>
-  inline Future<bool> Dispatch(const DataChunk & chunk) const {
+  inline Future<bool> DoRead(const DataChunk & chunk) const {
     using CT = typename CasaDataTypeTraits<CDT>::CasaType;
 
     // If the chunk is contiguous in memory, we can read
@@ -183,7 +113,6 @@ struct ReadCallback {
         return data.getColumnRange(chunk.RowSlicer());
       }
       auto data = ArrayColumn<CT>(tp.table(), column);
-      auto section_slicer = chunk.SectionSlicer();
       return data.getColumnRange(chunk.RowSlicer(), chunk.SectionSlicer());
     });
 
@@ -192,14 +121,32 @@ struct ReadCallback {
       chunk = chunk,
       buffer = buffer
     ](const CasaArray<CT> & data) mutable -> bool {
-      return TransposeData<CT>(
-        data.data(),
-        chunk.DimensionSpans(),
-        buffer->template mutable_data_as<CT>() + chunk.FlatOffset(),
-        chunk.BufferStrides(),
-        chunk.ChunkStrides(),
-        chunk.MinMemIndex(),
-        chunk.FlatOffset());
+      std::ptrdiff_t ndim = chunk.nDim();
+      std::ptrdiff_t last_dim = ndim - 1;
+      auto spans = chunk.DimensionSpans();
+      auto min_mem = chunk.MinMemIndex();
+      auto chunk_strides = chunk.ChunkStrides();
+      auto buffer_strides = chunk.BufferStrides();
+      const CT * in_ptr = data.data();
+      CT * out_ptr = buffer->template mutable_data_as<CT>() + chunk.FlatOffset();
+      auto pos = chunk.ScratchPositions();
+      for(std::size_t i = 0; i < pos.size(); ++i) pos[i] = 0;
+
+      while(true) {  // Iterate over the spans in memory, copying data
+        std::size_t i = 0, o = 0;
+        for(std::ptrdiff_t d = 0; d < ndim; ++d) {
+          i += pos[d] * chunk_strides[d];
+          o += (spans[d].mem[pos[d]] - min_mem[d]) * buffer_strides[d];
+        }
+        // Moves degrade to copies for simple (i.e. numeric) types
+        // but it should make casacore::String more efficient by avoiding copies
+        out_ptr[o] = std::move(in_ptr[i]);
+        for(std::ptrdiff_t d=0; d < ndim; ++d) {     // Iterate in FORTRAN order
+          if(++pos[d] < spans[d].mem.size()) break;  // Iteration doesn't reach dim end
+          pos[d] = 0;                                // OtherwBasic iteration worksise reset, next dim
+          if(d == last_dim) return true;             // The last dim is reset, we're done
+        }
+      }
     }, {}, CallbackOptions{ShouldSchedule::Always, GetCpuThreadPool()});
   }
 
@@ -208,53 +155,51 @@ struct ReadCallback {
   Future<bool> operator()(const DataChunk & chunk) const {
     if(!chunk) return Status::Invalid("Invalid chunk");
     if(chunk.IsEmpty()) return true;
-    if(chunk.nDim() >= kMaxTransposeDims) {
-      return Status::Invalid("Chunk has dimension > ", kMaxTransposeDims);
-    }
-    switch(dtype) {
+    switch(chunk.CasaDataType()) {
       case DataType::TpBool:
-        return Dispatch<DataType::TpBool>(chunk);
+        return DoRead<DataType::TpBool>(chunk);
         break;
       case DataType::TpChar:
-        return Dispatch<DataType::TpChar>(chunk);
+        return DoRead<DataType::TpChar>(chunk);
         break;
       case DataType::TpUChar:
-        return Dispatch<DataType::TpUChar>(chunk);
+        return DoRead<DataType::TpUChar>(chunk);
         break;
       case DataType::TpShort:
-        return Dispatch<DataType::TpShort>(chunk);
+        return DoRead<DataType::TpShort>(chunk);
         break;
       case DataType::TpUShort:
-        return Dispatch<DataType::TpUShort>(chunk);
+        return DoRead<DataType::TpUShort>(chunk);
         break;
       case DataType::TpInt:
-        return Dispatch<DataType::TpInt>(chunk);
+        return DoRead<DataType::TpInt>(chunk);
         break;
       case DataType::TpUInt:
-        return Dispatch<DataType::TpUInt>(chunk);
+        return DoRead<DataType::TpUInt>(chunk);
         break;
       case DataType::TpInt64:
-        return Dispatch<DataType::TpInt64>(chunk);
+        return DoRead<DataType::TpInt64>(chunk);
         break;
       case DataType::TpFloat:
-        return Dispatch<DataType::TpFloat>(chunk);
+        return DoRead<DataType::TpFloat>(chunk);
         break;
       case DataType::TpDouble:
-        return Dispatch<DataType::TpDouble>(chunk);
+        return DoRead<DataType::TpDouble>(chunk);
         break;
       case DataType::TpComplex:
-        return Dispatch<DataType::TpComplex>(chunk);
+        return DoRead<DataType::TpComplex>(chunk);
         break;
       case DataType::TpDComplex:
-        return Dispatch<DataType::TpDComplex>(chunk);
+        return DoRead<DataType::TpDComplex>(chunk);
         break;
       case DataType::TpString:
-        return Dispatch<DataType::TpString>(chunk);
+        return DoRead<DataType::TpString>(chunk);
         break;
       default:
         return Status::NotImplemented(
           "Column ", column,
-          " with data type ", dtype);
+          " with data type ",
+          chunk.CasaDataType());
     }
   }
 };
@@ -435,7 +380,7 @@ ReadImpl(
       // Map ReadCallBack over all data chunks
       auto read_and_copy_data_gen = MakeMappedGenerator(
         std::move(data_chunk_gen),
-        ReadCallback{std::move(column), itp, buffer, casa_dtype});
+        ReadCallback{std::move(column), itp, buffer});
 
       // Collect the read results
       auto collect = CollectAsyncGenerator(std::move(read_and_copy_data_gen));

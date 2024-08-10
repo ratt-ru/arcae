@@ -202,6 +202,7 @@ MakeDataChunks(
     std::vector<std::size_t>(nchunks),    // flat_offsets_
     std::vector<std::size_t>(offset, 1),  // buffer_stride_
     std::vector<std::size_t>(offset, 1),  // chunk_strides_
+    std::vector<std::size_t>(offset, 0),  // position_
     std::move(contiguous));               // contiguous_
 
   std::vector<DataChunk> chunks(nchunks);
