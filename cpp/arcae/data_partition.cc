@@ -306,11 +306,8 @@ DataChunk::GetShape() const noexcept {
 
 bool
 DataChunk::IsEmpty() const noexcept {
-  auto dim_spans = DimensionSpans();
-  for(std::size_t d = 0; d < dim_spans.size(); ++d) {
-    for(auto d: dim_spans[d].disk) {
-      if (d < 0) return true;
-    }
+  for(const auto & span: DimensionSpans()) {
+    for(auto i: span.disk) { if (i < 0) return true; }
   }
   return false;
 }

@@ -149,7 +149,7 @@ struct WriteCallback {
       });
   }
 
-  // Read a chunk of data into the encapsulated buffer
+  // Write a chunk of data from the encapsulated buffer
   // returning true on success
   Future<bool> operator()(const DataChunk & chunk) const {
     if(!chunk) return Status::Invalid("Invalid chunk");

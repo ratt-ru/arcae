@@ -1,6 +1,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <limits>
 #include <memory>
 #include <numeric>
 #include <optional>
@@ -382,6 +383,17 @@ GetResultShapeData(
   };
 }
 
+// Check that the number of rows in the table
+// fit into the IndexType used by arcae
+arrow::Status CheckRowNumberLimit(
+    const std::string & column,
+    rownr_t nrows) {
+  if(nrows <= std::numeric_limits<IndexType>::max()) return Status::OK();
+  return Status::IndexError(
+    "Number of rows ", nrows, " in column ", column,
+    " is too large for arcae's IndexType");
+}
+
 }  // namespace
 
 // Maximum dimension size
@@ -495,6 +507,7 @@ ResultShapeData::MakeRead(
     const std::shared_ptr<arrow::Array> & result) {
   auto column_desc = column.columnDesc();
   auto column_name = column_desc.name();
+  ARROW_RETURN_NOT_OK(CheckRowNumberLimit(column_name, column.nrow()));
   auto dtype = column_desc.dataType();
   auto nselrow = selection.HasRowSpan() ? ssize_t(selection.GetRowSpan().size())
                                         : ssize_t(column.nrow());
@@ -596,6 +609,8 @@ ResultShapeData::MakeWrite(
 
   if (!data) return Status::Invalid("data array is null");
   auto column_desc = column.columnDesc();
+  auto column_name = column_desc.name();
+  ARROW_RETURN_NOT_OK(CheckRowNumberLimit(column_name, column.nrow()));
 
   // Varying dimensions in each row are not supported
   if (column_desc.ndim() < 0) {
@@ -606,7 +621,7 @@ ResultShapeData::MakeWrite(
 
   ARROW_ASSIGN_OR_RAISE(auto shape_data, GetResultShapeData(column_desc, data));
 
-  if (shape_data.nDim() != std::size_t(column_desc.ndim() + 1)) {
+  if (shape_data.nDim() != std::size_t(column_desc.ndim()) + 1) {
     return Status::Invalid(
       "Number of data dimensions ", shape_data.nDim(),
       " does not match number of column dimensions ",
@@ -674,10 +689,12 @@ ResultShapeData::MakeWrite(
     auto array_column = ArrayColumnBase(column);
     auto has_row_span = selection.HasRowSpan();
     auto row_span = has_row_span ? selection.GetRowSpan() : IndexSpan{};
-    rownr_t nrows = has_row_span ? row_span.size() : column.nrow();
+    IndexType nrows = has_row_span ? row_span.size() : column.nrow();
 
-    for(rownr_t r=0; r < nrows; ++r) {
-      rownr_t row = has_row_span ? row_span[r] : r;
+
+    for(IndexType r=0; r < nrows; ++r) {
+      IndexType row = has_row_span ? row_span[r] : r;
+      if(row < 0) continue;  // Don't check negative row indices
       // If the row is defined, check the selection
       // against the shape of the row
       if(column.isDefined(row)) {
@@ -692,12 +709,17 @@ ResultShapeData::MakeWrite(
         // The row is undefined
         // Set the row shape from the shape of the result,
         // taking any maximum selection into account
-        auto row_shape = shape_data.GetRowShape(row);
+        auto row_shape = [&]() -> casacore::IPosition {
+          if(!shape_data.IsFixed()) shape_data.GetRowShape(row);
+          auto shape = shape_data.GetShape();
+          return shape.getFirst(shape.size() - 1);
+        }();
+
         for(std::ptrdiff_t dim=0; dim < row_dim; ++dim) {
           if(auto res = selection.FSpan(dim, shape_data.nDim()); res.ok()) {
             auto span = res.ValueOrDie();
             auto span_max = *std::max_element(std::begin(span), std::end(span));
-            row_shape[dim] = std::max<ssize_t>(span_max, row_shape[dim]);
+            row_shape[dim] = std::max<ssize_t>(span_max + 1, row_shape[dim]);
           }
         }
         array_column.setShape(row, row_shape);

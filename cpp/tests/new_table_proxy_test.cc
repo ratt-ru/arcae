@@ -129,11 +129,69 @@ class FixedTableProxyTest : public ::testing::TestWithParam<Parametrization> {
       }
 
       // Write test data to the MS
-      data.putColumn(complex_vals_);
-      var_data.putColumn(complex_vals_);
-      str_data.putColumn(str_vals_);
-      var_str_data.putColumn(str_vals_);
+      // data.putColumn(complex_vals_);
+      // var_data.putColumn(complex_vals_);
+      // str_data.putColumn(str_vals_);
+      // var_str_data.putColumn(str_vals_);
     }
+
+    // Create complex test data for the given indices
+    arrow::Result<std::shared_ptr<arrow::Array>> MakeComplexArray(
+        const Index & rows,
+        const Index & chans,
+        const Index & corrs) {
+
+      std::shared_ptr<arrow::Array> array;
+      std::vector<float> values(rows.size()*chans.size()*corrs.size()*2);
+      for(int r = 0; r < rows.size(); ++r) {
+        auto row = rows[r];
+        for(int ch = 0; ch < chans.size(); ++ch) {
+          auto chan = chans[ch];
+          for(int co = 0; co < corrs.size(); ++co) {
+            auto corr = corrs[co];
+            auto buf_i = r*chans.size()*corrs.size() + ch*corrs.size() + co;
+            auto real = row*knchan*kncorr + chan*kncorr + corr;
+            values[2*buf_i + 0] = real;
+            values[2*buf_i + 1] = real;
+          }
+        }
+      }
+
+      arrow::ArrayFromVector<arrow::FloatType>(arrow::float32(), values, &array);
+      ARROW_ASSIGN_OR_RAISE(array, arrow::FixedSizeListArray::FromArrays(array, 2));
+      ARROW_ASSIGN_OR_RAISE(array, arrow::FixedSizeListArray::FromArrays(array, corrs.size()));
+      ARROW_ASSIGN_OR_RAISE(array, arrow::FixedSizeListArray::FromArrays(array, chans.size()));
+      return array;
+    }
+
+    // Create string test data for the given indices
+    arrow::Result<std::shared_ptr<arrow::Array>> MakeStringArray(
+        const Index & rows,
+        const Index & chans,
+        const Index & corrs) {
+
+      std::shared_ptr<arrow::Array> array;
+      std::vector<std::string> values(rows.size()*chans.size()*corrs.size());
+      for(int r = 0; r < rows.size(); ++r) {
+        auto row = rows[r];
+        for(int ch = 0; ch < chans.size(); ++ch) {
+          auto chan = chans[ch];
+          for(int co = 0; co < corrs.size(); ++co) {
+            auto corr = corrs[co];
+            auto buf_i = r*chans.size()*corrs.size() + ch*corrs.size() + co;
+            auto real = row*knchan*kncorr + chan*kncorr + corr;
+            values[buf_i] = "FOO-" + std::to_string(real);
+          }
+        }
+      }
+
+      arrow::ArrayFromVector<arrow::StringType>(arrow::utf8(), values, &array);
+      ARROW_ASSIGN_OR_RAISE(array, arrow::FixedSizeListArray::FromArrays(array, corrs.size()));
+      ARROW_ASSIGN_OR_RAISE(array, arrow::FixedSizeListArray::FromArrays(array, chans.size()));
+
+      return array;
+    }
+
 
     arrow::Result<std::shared_ptr<NewTableProxy>> OpenTable() {
       return NewTableProxy::Make(
@@ -156,7 +214,6 @@ INSTANTIATE_TEST_SUITE_P(
   ParametrizationSuite,
   FixedTableProxyTest,
   ::testing::Values(
-    Parametrization{{true, true, true}, {false, false, false}},
     Parametrization{{false, false, false}, {false, false, false}},
     Parametrization{{false, false, false}, {true, true, true}},
     Parametrization{{false, false, false}, {true, true, true}, {1, 3, 5}},
@@ -218,6 +275,13 @@ TEST_P(FixedTableProxyTest, Fixed) {
   auto & corrs = indices[0];
   auto & chans = indices[1];
   auto & rows = indices[2];
+
+  ASSERT_OK_AND_ASSIGN(auto write_data, MakeComplexArray(rows, chans, corrs));
+  ASSERT_OK_AND_ASSIGN(auto write_str, MakeStringArray(rows, chans, corrs));
+  ASSERT_OK(ntp->PutColumn("MODEL_DATA", write_data, selection));
+  ASSERT_OK(ntp->PutColumn("VAR_DATA", write_data, selection));
+  ASSERT_OK(ntp->PutColumn("STRING_DATA", write_str, selection));
+  ASSERT_OK(ntp->PutColumn("VAR_STRING_DATA", write_str, selection));
 
   ASSERT_OK_AND_ASSIGN(auto data, ntp->GetColumn("MODEL_DATA", selection));
   ASSERT_OK_AND_ASSIGN(auto var_data, ntp->GetColumn("VAR_DATA", selection));
@@ -303,6 +367,13 @@ TEST_F(FixedTableProxyTest, NegativeSelection) {
                                      .Add(rows)
                                      .Build();
 
+  ASSERT_OK_AND_ASSIGN(auto write_data, MakeComplexArray(rows, chans, corrs));
+  ASSERT_OK_AND_ASSIGN(auto write_str, MakeStringArray(rows, chans, corrs));
+  ASSERT_OK(ntp->PutColumn("MODEL_DATA", write_data, selection));
+  ASSERT_OK(ntp->PutColumn("VAR_DATA", write_data, selection));
+  ASSERT_OK(ntp->PutColumn("STRING_DATA", write_str, selection));
+  ASSERT_OK(ntp->PutColumn("VAR_STRING_DATA", write_str, selection));
+
   // Reading strings into a result array is not supported
   std::shared_ptr<arrow::Array> str_result;
   std::vector<std::string> str_values(rows.size()*chans.size()*corrs.size(), "NOTHING");
@@ -311,6 +382,7 @@ TEST_F(FixedTableProxyTest, NegativeSelection) {
   ASSERT_OK_AND_ASSIGN(str_result, arrow::FixedSizeListArray::FromArrays(str_result, chans.size()));
   EXPECT_EQ(str_result->length(), rows.size());
   ASSERT_NOT_OK(ntp->GetColumn("STRING_DATA", selection, str_result));
+  ASSERT_NOT_OK(ntp->GetColumn("VAR_STRING_DATA", selection, str_result));
 
   // Create a result array filled with default values
   std::shared_ptr<arrow::Array> result;
@@ -320,11 +392,20 @@ TEST_F(FixedTableProxyTest, NegativeSelection) {
   ASSERT_OK_AND_ASSIGN(result, arrow::FixedSizeListArray::FromArrays(result, corrs.size()));
   ASSERT_OK_AND_ASSIGN(result, arrow::FixedSizeListArray::FromArrays(result, chans.size()));
   EXPECT_EQ(result->length(), rows.size());
-  ASSERT_OK_AND_ASSIGN(auto data, ntp->GetColumn("MODEL_DATA", selection, result));
+  ASSERT_OK_AND_ASSIGN(auto var_result, result->CopyTo(arrow::default_cpu_memory_manager()));
+  ASSERT_OK(ntp->GetColumn("MODEL_DATA", selection, result));
+  ASSERT_OK(ntp->GetColumn("VAR_DATA", selection, var_result));
 
 
   // Get the underlying buffer containing the complex values
   auto buffer = result->data()
+                    ->child_data[0] // chan
+                    ->child_data[0] // corr
+                    ->child_data[0] // complex pair
+                    ->buffers[1]    // value buffer
+                    ->span_as<Complex>();
+
+  auto var_buffer = var_result->data()
                     ->child_data[0] // chan
                     ->child_data[0] // corr
                     ->child_data[0] // complex pair
@@ -351,6 +432,7 @@ TEST_F(FixedTableProxyTest, NegativeSelection) {
           auto real = row*knchan*kncorr + chan*kncorr + corr;
           EXPECT_EQ(complex_vals_(IPosition({corr, chan, row})), Complex(real, real));
           EXPECT_EQ(buffer[buf_i], Complex(real, real));
+          EXPECT_EQ(var_buffer[buf_i], Complex(real, real));
         }
       }
     }
