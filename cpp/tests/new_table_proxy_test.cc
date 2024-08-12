@@ -12,6 +12,7 @@
 #include <arrow/result.h>
 #include <arrow/util/logging.h>
 #include <arrow/testing/builder.h>
+#include <arrow/type_fwd.h>
 #include <arrow/testing/gtest_util.h>
 
 #include <casacore/casa/Arrays/IPosition.h>
@@ -29,7 +30,6 @@
 
 #include "arcae/new_table_proxy.h"
 #include "arcae/selection.h"
-#include "arrow/type_fwd.h"
 
 using ::arcae::GetArrayColumn;
 using ::arcae::GetScalarColumn;
