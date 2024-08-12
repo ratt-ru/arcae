@@ -29,6 +29,7 @@
 
 #include "arcae/new_table_proxy.h"
 #include "arcae/selection.h"
+#include "arrow/type_fwd.h"
 
 using ::arcae::GetArrayColumn;
 using ::arcae::GetScalarColumn;
@@ -302,6 +303,15 @@ TEST_F(FixedTableProxyTest, NegativeSelection) {
                                      .Add(rows)
                                      .Build();
 
+  // Reading strings into a result array is not supported
+  std::shared_ptr<arrow::Array> str_result;
+  std::vector<std::string> str_values(rows.size()*chans.size()*corrs.size(), "NOTHING");
+  arrow::ArrayFromVector<arrow::StringType>(arrow::utf8(), str_values, &str_result);
+  ASSERT_OK_AND_ASSIGN(str_result, arrow::FixedSizeListArray::FromArrays(str_result, corrs.size()));
+  ASSERT_OK_AND_ASSIGN(str_result, arrow::FixedSizeListArray::FromArrays(str_result, chans.size()));
+  EXPECT_EQ(str_result->length(), rows.size());
+  ASSERT_NOT_OK(ntp->GetColumn("STRING_DATA", selection, str_result));
+
   // Create a result array filled with default values
   std::shared_ptr<arrow::Array> result;
   std::vector<float> values(rows.size()*chans.size()*corrs.size()*2, kDefaultRealValue);
@@ -312,8 +322,9 @@ TEST_F(FixedTableProxyTest, NegativeSelection) {
   EXPECT_EQ(result->length(), rows.size());
   ASSERT_OK_AND_ASSIGN(auto data, ntp->GetColumn("MODEL_DATA", selection, result));
 
+
   // Get the underlying buffer containing the complex values
-  auto buffer = data->data()
+  auto buffer = result->data()
                     ->child_data[0] // chan
                     ->child_data[0] // corr
                     ->child_data[0] // complex pair

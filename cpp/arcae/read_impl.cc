@@ -216,7 +216,7 @@ GetResultBufferOrAllocate(
 
   ARROW_ASSIGN_OR_RAISE(auto casa_type_size, CasaDataTypeSize(casa_type));
   auto nbytes = nelements * casa_type_size;
-  if(auto r = GetResultBuffer(result, nbytes); r.ok()) return r;
+  if(result) return GetResultBuffer(result, nbytes);
   ARROW_ASSIGN_OR_RAISE(auto allocation, arrow::AllocateBuffer(nbytes, casa_type_size));
 
   if(casacore::isNumeric(casa_type)) {
@@ -225,17 +225,12 @@ GetResultBufferOrAllocate(
     // We need to use placement new and delete for non-POD types
     // Probably could use some std::is_pod_v<T> strategy,
     // just use if(casa_type == TpString) for now
-    for(auto & s: allocation->mutable_span_as<String>()) {
-      new (&s) String;
-    }
-
+    for(auto & s: allocation->mutable_span_as<String>()) new (&s) String;
     return std::shared_ptr<Buffer>(
       std::unique_ptr<Buffer, void(*)(Buffer*)>(
         allocation.release(),
         [](Buffer * buffer) {
-          for(auto & s: buffer->mutable_span_as<String>()) {
-            s.String::~String();
-          }
+          for(auto & s: buffer->mutable_span_as<String>()) s.String::~String();
           delete buffer;
         }));
   }
