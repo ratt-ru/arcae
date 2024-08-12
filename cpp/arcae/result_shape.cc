@@ -616,7 +616,7 @@ ResultShapeData::MakeWrite(
   // Check the row dimension against the selection
   if(selection.HasRowSpan()) {
     const auto & row_span = selection.GetRowSpan();
-    if(row_span.size() >= column.nrow()) {
+    if(row_span.size() > column.nrow()) {
       return Status::IndexError(
         "Row selection size ", row_span.size(),
         " exceeds the number of rows",
@@ -625,7 +625,7 @@ ResultShapeData::MakeWrite(
 
     // Check the row selection if valid
     for(std::size_t r = 0; r < row_span.size(); ++r) {
-      if(rownr_t(row_span[r]) >= column.nrow()) {
+      if(row_span[r] >= IndexType(column.nrow())) {
         return Status::IndexError(
           "Row selection ", row_span[r],
           " exceeds the number of rows ", column.nrow(),
@@ -643,7 +643,7 @@ ResultShapeData::MakeWrite(
       const IndexSpan & span,
       const IPosition & shape,
       std::size_t dim) -> arrow::Status {
-    if(ssize_t(span.size()) >= shape[dim]) {
+    if(ssize_t(span.size()) > shape[dim]) {
       return Status::IndexError(
         "Selection size ", span.size(),
         " exceeds the dimension size ", shape[dim],

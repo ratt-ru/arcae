@@ -264,7 +264,8 @@ WriteImpl(
     column = column,
     selection = selection,
     data = data
-  ](const TableProxy & tp) mutable -> Result<ShapeResult>  {
+  ](TableProxy & tp) mutable -> Result<ShapeResult>  {
+    if(!tp.isWritable()) tp.reopenRW();
     ARROW_RETURN_NOT_OK(ColumnExists(tp.table(), column));
     auto table_column = TableColumn(tp.table(), column);
     ARROW_ASSIGN_OR_RAISE(
@@ -302,6 +303,7 @@ WriteImpl(
   ](const PartitionResult & result) mutable -> Future<bool> {
     auto casa_dtype = result.partition->GetDataType();
     auto nelements = result.partition->nElements();
+    if(casacore::isComplex(casa_dtype)) nelements *= 2;
     ARROW_ASSIGN_OR_RAISE(auto flat_array, GetFlatArray(data));
     if(decltype(nelements)(flat_array->length()) != nelements) {
       return Status::Invalid(
