@@ -1,4 +1,4 @@
-#include "arcae/read_impl.h"
+#include "arcae/write_impl.h"
 
 #include <cstddef>
 #include <memory>
@@ -6,6 +6,7 @@
 
 #include <arrow/api.h>
 #include <arrow/buffer.h>
+#include <arrow/compute/cast.h>
 #include <arrow/result.h>
 #include <arrow/status.h>
 #include <arrow/type.h>
@@ -35,15 +36,10 @@ using ::arrow::Array;
 using ::arrow::Buffer;
 using ::arrow::CallbackOptions;
 using ::arrow::CollectAsyncGenerator;
-using ::arrow::Int32Builder;
-using ::arrow::ListArray;
-using ::arrow::FixedSizeListArray;
-using ::arrow::PrimitiveArray;
 using ::arrow::MakeVectorGenerator;
 using ::arrow::MakeMappedGenerator;
 using ::arrow::Future;
 using ::arrow::Status;
-using ::arrow::StringBuilder;
 using ::arrow::Result;
 using ::arrow::ShouldSchedule;
 using ::arrow::internal::GetCpuThreadPool;
@@ -86,7 +82,7 @@ struct WriteCallback {
         column_name = std::move(column),
         chunk = chunk,
         buffer = buffer
-      ](const TableProxy & tp) -> Future<bool> {
+      ](const TableProxy & tp) -> bool {
         auto in_ptr = buffer->template mutable_data_as<CT>() + chunk.FlatOffset();
         auto shape = chunk.GetShape();
         if(shape.size() == 1) {
@@ -103,59 +99,54 @@ struct WriteCallback {
     }
 
     // Transpose the array into the output buffer
-    return arrow::DeferNotOk(
+    auto transpose_fut = arrow::DeferNotOk(
       GetCpuThreadPool()->Submit([
-          chunk = chunk,
-          buffer = buffer,
-          itp = itp,
-          column_name = std::move(column)
-        ]() mutable -> Future<bool> {
-          std::ptrdiff_t ndim = chunk.nDim();
-          std::ptrdiff_t last_dim = ndim - 1;
-          auto spans = chunk.DimensionSpans();
-          auto min_mem = chunk.MinMemIndex();
-          auto chunk_strides = chunk.ChunkStrides();
-          auto buffer_strides = chunk.BufferStrides();
-          const CT * in_ptr = buffer->template mutable_data_as<CT>() + chunk.FlatOffset();
-          auto array = CasaArray<CT>(chunk.GetShape());
-          CT * out_ptr = array.data();
-          auto pos = chunk.ScratchPositions();
-          for(std::size_t i = 0; i < pos.size(); ++i) pos[i] = 0;
+        chunk = chunk,
+        buffer = buffer
+      ]() mutable -> CasaArray<CT> {
+        std::ptrdiff_t ndim = chunk.nDim();
+        std::ptrdiff_t last_dim = ndim - 1;
+        auto spans = chunk.DimensionSpans();
+        auto min_mem = chunk.MinMemIndex();
+        auto chunk_strides = chunk.ChunkStrides();
+        auto buffer_strides = chunk.BufferStrides();
+        const CT * in_ptr = buffer->template mutable_data_as<CT>() + chunk.FlatOffset();
+        auto array = CasaArray<CT>(chunk.GetShape());
+        CT * out_ptr = array.data();
+        auto pos = chunk.ScratchPositions();
+        for(std::size_t i = 0; i < pos.size(); ++i) pos[i] = 0;
 
-          // Iterate over the spans in memory, copying data
-          for(bool done = false; !done; ) {
-            std::size_t i = 0, o = 0;
-            for(std::ptrdiff_t d = 0; d < ndim; ++d) {
-              i += (spans[d].mem[pos[d]] - min_mem[d]) * buffer_strides[d];
-              o += pos[d] * chunk_strides[d];
-            }
-            // Moves degrade to copies for simple (i.e. numeric) types
-            // but it should make casacore::String more efficient by avoiding copies
-            out_ptr[o] = std::move(in_ptr[i]);
-            for(std::ptrdiff_t d=0; d < ndim; ++d) {     // Iterate in FORTRAN order
-              if(++pos[d] < spans[d].mem.size()) break;  // Iteration doesn't reach dim end
-              pos[d] = 0;                                // OtherwBasic iteration worksise reset, next dim
-              if(d == last_dim) done = true;             // The last dim is reset, we're done
-            }
+        // Iterate over the spans in memory, copying data
+        while(true) {
+          std::size_t i = 0, o = 0;
+          for(std::ptrdiff_t d = 0; d < ndim; ++d) {
+            i += (spans[d].mem[pos[d]] - min_mem[d]) * buffer_strides[d];
+            o += pos[d] * chunk_strides[d];
           }
+          // Moves degrade to copies for simple (i.e. numeric) types
+          // but it should make casacore::String more efficient by avoiding copies
+          out_ptr[o] = std::move(in_ptr[i]);
+          for(std::ptrdiff_t d=0; d < ndim; ++d) {     // Iterate in FORTRAN order
+            if(++pos[d] < spans[d].mem.size()) break;  // Iteration doesn't reach dim end
+            pos[d] = 0;                                // OtherwBasic iteration worksise reset, next dim
+            if(d == last_dim) return array;            // The last dim is reset, we're done
+          }
+        }
+      }));
 
-          // Write from CASA Array into the CASA column
-          return itp->RunAsync([
-            column_name = std::move(column_name),
-            array = std::move(array),
-            chunk = std::move(chunk),
-            itp = std::move(itp)
-          ](const TableProxy & tp) -> Future<bool> {
-            if(chunk.nDim() == 1) {
-              auto column = ScalarColumn<CT>(tp.table(), column_name);
-              column.putColumnRange(chunk.RowSlicer(), array);
-              return true;
-            }
-            auto column = ArrayColumn<CT>(tp.table(), column_name);
-            column.putColumnRange(chunk.RowSlicer(), chunk.SectionSlicer(), array);
-            return true;
-          });
-        }));
+      return itp->Then(transpose_fut, [
+        column_name = std::move(column),
+        chunk = chunk
+      ](const CasaArray<CT> & data, const TableProxy & tp) -> bool {
+        if(chunk.nDim() == 1) {
+          auto column = ScalarColumn<CT>(tp.table(), column_name);
+          column.putColumnRange(chunk.RowSlicer(), data);
+          return true;
+        }
+        auto column = ArrayColumn<CT>(tp.table(), column_name);
+        column.putColumnRange(chunk.RowSlicer(), chunk.SectionSlicer(), data);
+        return true;
+      });
   }
 
   // Read a chunk of data into the encapsulated buffer
@@ -211,6 +202,47 @@ struct WriteCallback {
     }
   }
 };
+
+// Attempt to return the underlying buffer of the supplied array
+// Arrow strings are converted to casacore Strings
+// If the Arrow data type of the array doesn't match the
+// associated Arrow data type of the column, a cast is performed
+Result<std::shared_ptr<Buffer>> ExtractBufferOrCopyValues(
+    const std::shared_ptr<arrow::Array> & flat_array,
+    DataType casa_dtype) {
+
+  if (casacore::isNumeric(casa_dtype))  {
+    ARROW_ASSIGN_OR_RAISE(auto arrow_dtype, ArrowDataType(casa_dtype));
+    if(arrow_dtype == flat_array->type()) return flat_array->data()->buffers[1];
+    // Need to cast the supplied data to the type appropriate to the CASA column
+    ARROW_ASSIGN_OR_RAISE(auto datum, arrow::compute::Cast(flat_array, arrow_dtype));
+    return datum.make_array()->data()->buffers[1];
+  } else if (casa_dtype == DataType::TpString) {
+    // We need to copy arrow strings to casacore strings.
+    auto flat_strings = std::dynamic_pointer_cast<arrow::StringArray>(flat_array);
+    if(!flat_strings) return Status::Invalid("Cast to StringArray");
+    auto nbytes = sizeof(String) * flat_strings->length();
+    ARROW_ASSIGN_OR_RAISE(auto allocation, arrow::AllocateBuffer(nbytes, sizeof(String)));
+    auto span = allocation->mutable_span_as<String>();
+    assert(span.size() == flat_strings.size());
+    for (std::size_t i = 0; i < span.size(); ++i) {
+      // Strings aren't POD, use in-place new on the buffer elements
+      auto sv = flat_strings->GetView(i);
+      new (&span[i]) String(std::begin(sv), std::end(sv));
+    }
+
+    // and in-place delete when releasing the buffer
+    return std::shared_ptr<Buffer>(
+      std::unique_ptr<Buffer, void(*)(Buffer*)>(
+        allocation.release(),
+        [](Buffer * buffer) {
+          for(auto & s: buffer->mutable_span_as<String>()) s.String::~String();
+          delete buffer;
+        }));
+  }
+
+  return Status::TypeError("Unhandled CASA type", casa_dtype);
+}
 
 } // namespace
 
@@ -269,10 +301,15 @@ WriteImpl(
     data = data
   ](const PartitionResult & result) mutable -> Future<bool> {
     auto casa_dtype = result.partition->GetDataType();
-    ARROW_ASSIGN_OR_RAISE(auto casa_type_size, CasaDataTypeSize(casa_dtype));
     auto nelements = result.partition->nElements();
-    auto nbytes = nelements * casa_type_size;
-    ARROW_ASSIGN_OR_RAISE(auto buffer, GetResultBuffer(data, nbytes));
+    ARROW_ASSIGN_OR_RAISE(auto flat_array, GetFlatArray(data));
+    if(decltype(nelements)(flat_array->length()) != nelements) {
+      return Status::Invalid(
+        "Partition elements ", nelements,
+        " don't match flat array elements ", flat_array->length());
+    }
+
+    ARROW_ASSIGN_OR_RAISE(auto buffer, ExtractBufferOrCopyValues(flat_array, casa_dtype));
 
     // Make an async generator over the data chunks
     // Map WriteCallback over all data chunks

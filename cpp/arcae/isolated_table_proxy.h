@@ -73,6 +73,42 @@ public:
       });
   }
 
+  template <
+    typename Fn,
+    typename R,
+    typename = std::enable_if_t<
+                std::is_invocable_v<Fn, const R &, const casacore::TableProxy &>>>
+  ArrowFutureType<Fn, const R &, const casacore::TableProxy &>
+  Then(arrow::Future<R> & future, Fn && functor) const {
+    using ResultType = ArrowFutureType<Fn, const R &, const casacore::TableProxy &>;
+    if(IsClosed()) return arrow::Status::Invalid("Table is closed");
+    return future.Then([this, fn = std::move(functor)](const R & result) mutable -> ResultType {
+      try {
+        return std::invoke(std::forward<Fn>(fn), result, *this->table_proxy_);
+      } catch(casacore::AipsError & e) {
+        return arrow::Status::Invalid("Unhandled casacore exception: ", e.what());
+      }
+    }, {}, arrow::CallbackOptions{arrow::ShouldSchedule::Always, io_pool_.get()});
+  }
+
+  template <
+    typename Fn,
+    typename R,
+    typename = std::enable_if_t<
+                std::is_invocable_v<Fn, const R &, casacore::TableProxy &>>>
+  ArrowFutureType<Fn, const R &, casacore::TableProxy &>
+  Then(arrow::Future<R> & future, Fn && functor) {
+    using ResultType = ArrowFutureType<Fn, const R &, casacore::TableProxy &>;
+    if(IsClosed()) return arrow::Status::Invalid("Table is closed");
+    return future.Then([this, fn = std::move(functor)](const R & result) mutable -> ResultType {
+      try {
+        return std::invoke(std::forward<Fn>(fn), result, *this->table_proxy_);
+      } catch(casacore::AipsError & e) {
+        return arrow::Status::Invalid("Unhandled casacore exception: ", e.what());
+      }
+    }, {}, arrow::CallbackOptions{arrow::ShouldSchedule::Always, io_pool_.get()});
+  }
+
 
   // Runs functions with signature
   // ReturnType Function(const TableProxy &) on the isolation thread
