@@ -224,7 +224,7 @@ Result<std::shared_ptr<Buffer>> ExtractBufferOrCopyValues(
     auto nbytes = sizeof(String) * flat_strings->length();
     ARROW_ASSIGN_OR_RAISE(auto allocation, arrow::AllocateBuffer(nbytes, sizeof(String)));
     auto span = allocation->mutable_span_as<String>();
-    assert(span.size() == flat_strings.size());
+    assert(span.size() == decltype(span.size())(flat_strings->length()));
     for (std::size_t i = 0; i < span.size(); ++i) {
       // Strings aren't POD, use in-place new on the buffer elements
       auto sv = flat_strings->GetView(i);
