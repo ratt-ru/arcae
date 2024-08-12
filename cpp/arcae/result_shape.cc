@@ -137,7 +137,7 @@ Status CheckShapeMatchesResult(
     const IPosition & shape,
     const std::optional<IPosition> & result_shape) {
   if(result_shape.has_value()) {
-    if(shape != result_shape.value()) {
+    if(shape.size() != result_shape.value().size() || shape != result_shape.value()) {
       return Status::Invalid(
         "Result shape ", result_shape.value(),
         " does not match the selection shape ", shape,
