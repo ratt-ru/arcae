@@ -24,16 +24,15 @@ arrow::Status ValidateArray(const std::shared_ptr<arrow::Array> & array);
 arrow::Result<std::shared_ptr<arrow::Array>> GetFlatArray(
   std::shared_ptr<arrow::Array> data,
   bool nulls=false);
+// Get the underlying buffer of an Arrow Array
+arrow::Result<std::shared_ptr<arrow::Buffer>> GetResultBuffer(
+  const std::shared_ptr<arrow::Array> & result,
+  std::size_t nbytes);
 arrow::Status CheckElements(std::size_t map_size, std::size_t data_size);
 // Get the Array properties of an Arrow Array
 arrow::Result<ArrayProperties> GetArrayProperties(
   const casacore::TableColumn & column,
   const std::shared_ptr<arrow::Array> & data);
-
-
-arrow::Result<std::shared_ptr<arrow::Buffer>> GetResultBuffer(
-  const std::shared_ptr<arrow::Array> & result,
-  std::size_t nbytes);
 
 
 } // namespace arcae

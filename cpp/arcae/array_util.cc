@@ -48,7 +48,7 @@ GetFlatArray(std::shared_ptr<Array> array, bool nulls) {
       case arrow::Type::FIXED_SIZE_LIST:
       {
         if(!nulls && array_data->null_count > 0) {
-          return arrow::Status::Invalid(
+          return Status::Invalid(
             "Null values were encountered "
             "during array flattening.");
         }
@@ -69,7 +69,7 @@ GetFlatArray(std::shared_ptr<Array> array, bool nulls) {
       case arrow::Type::STRING:
         return arrow::MakeArray(array_data);
       default:
-        return arrow::Status::TypeError(
+        return Status::NotImplemented(
           "Flattening of type ", array->type(),
           " is not supported");
     }
@@ -78,8 +78,8 @@ GetFlatArray(std::shared_ptr<Array> array, bool nulls) {
 
 arrow::Status
 CheckElements(std::size_t map_size, std::size_t data_size) {
-    if(map_size == data_size) return arrow::Status::OK();
-    return arrow::Status::Invalid(
+    if(map_size == data_size) return Status::OK();
+    return Status::Invalid(
       "Number of map elements ", map_size, " does not "
       "match the length of the array ", data_size);
 }
@@ -91,7 +91,7 @@ arrow::Result<ArrayProperties> GetArrayProperties(
   const std::shared_ptr<arrow::Array> & data)
 {
   if(!data) {
-    return arrow::Status::Invalid("data is null");
+    return Status::Invalid("data is null");
   }
 
   // Starting state is a fixed shape array of 1 dimension
@@ -170,7 +170,7 @@ arrow::Result<ArrayProperties> GetArrayProperties(
         done = true;
         break;
       default:
-        return arrow::Status::TypeError(
+        return Status::TypeError(
             "Shape derivation of ",
             tmp_data->type()->ToString(),
             " is not supported");
@@ -187,7 +187,7 @@ arrow::Result<ArrayProperties> GetArrayProperties(
 
   if(is_complex) {
     if(ndim <= 1) {
-      return arrow::Status::Invalid(
+      return Status::Invalid(
         "A list array of paired numbers must be supplied when writing "
         "to complex typed column ", column.columnDesc().name());
     }
@@ -196,7 +196,7 @@ arrow::Result<ArrayProperties> GetArrayProperties(
 
     if(fixed_shape) {
       if(shape.back() != 2) {
-        return arrow::Status::Invalid(
+        return Status::Invalid(
           "A list array of paired numbers must be supplied when writing "
           "to complex typed column ", column.columnDesc().name());
       }
@@ -232,7 +232,6 @@ arrow::Result<ArrayProperties> GetArrayProperties(
 
 // Extracts the data buffer of the underlying result array
 // ensuring it equals nbytes.
-// Otherwise allocates a buffer of nbytes
 Result<std::shared_ptr<Buffer>>
 GetResultBuffer(const std::shared_ptr<Array> & result,
                 std::size_t nbytes) {
@@ -259,24 +258,24 @@ GetResultBuffer(const std::shared_ptr<Array> & result,
       case arrow::Type::INT64:
       case arrow::Type::FLOAT:
       case arrow::Type::DOUBLE: {
-          // The value buffer is in the last position
-          // https://arrow.apache.org/docs/format/Columnar.html#fixed-size-primitive-layout
-          if(tmp->buffers.size() == 0 || !tmp->buffers[tmp->buffers.size() - 1]) {
-            return Status::Invalid("Result array does not contain a buffer");
-          }
-          auto buffer = tmp->buffers[tmp->buffers.size() - 1];
-          if(std::size_t(buffer->size()) != nbytes) {
-            return arrow::Status::Invalid(
-              "Result buffer of ", buffer->size(),
-              " bytes does not contain the"
-              " expected number of bytes ", nbytes);
-          }
-          return buffer;
+        // The value buffer is in the last position
+        // https://arrow.apache.org/docs/format/Columnar.html#fixed-size-primitive-layout
+        if(tmp->buffers.size() == 0 || !tmp->buffers[tmp->buffers.size() - 1]) {
+          return Status::Invalid("Result array does not contain a buffer");
+        }
+        auto buffer = tmp->buffers[tmp->buffers.size() - 1];
+        if(std::size_t(buffer->size()) != nbytes) {
+          return Status::Invalid(
+            "Result buffer of ", buffer->size(),
+            " bytes does not contain the"
+            " expected number of bytes ", nbytes);
+        }
+        return buffer;
       }
       case arrow::Type::STRING:
       default:
         return Status::NotImplemented(
-          "Extracting base array buffer for type ",
+          "Extracting array buffer for type ",
           tmp->type->ToString());
     }
   }
