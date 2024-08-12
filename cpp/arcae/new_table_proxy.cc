@@ -81,9 +81,9 @@ NewTableProxy::GetColumn(
 Result<bool>
 NewTableProxy::PutColumn(
   const std::string & column,
-  const std::shared_ptr<Array> & result,
+  const std::shared_ptr<Array> & data,
   const Selection & selection) const {
-    return WriteImpl(itp_, column, result, selection).MoveResult();
+    return WriteImpl(itp_, column, data, selection).MoveResult();
 }
 
 Result<std::vector<std::string>>

@@ -58,7 +58,7 @@ public:
   // possibly guided by a selection along each index
   arrow::Result<bool> PutColumn(
     const std::string & column,
-    const std::shared_ptr<arrow::Array> & result,
+    const std::shared_ptr<arrow::Array> & data,
     const Selection & selection={}) const;
 
   // Return the names of the columns in this table
