@@ -76,7 +76,7 @@ struct WriteCallback {
     using CT = typename CasaDataTypeTraits<CDT>::CasaType;
 
     // If the chunk is contiguous in memory, we can write
-    // from a CASA Array view over that position in the input
+    // from a CASA Array view over that position in the buffer
     if(chunk.IsContiguous()) {
       return itp->RunAsync([
         column_name = std::move(column),
@@ -205,7 +205,7 @@ struct WriteCallback {
 
 // Attempt to return the underlying buffer of the supplied array
 // Arrow strings are converted to casacore Strings
-// If the Arrow data type of the array doesn't match the
+// Otherwise, if the Arrow data type of the array doesn't match the
 // associated Arrow data type of the column, a cast is performed
 Result<std::shared_ptr<Buffer>> ExtractBufferOrCopyValues(
     const std::shared_ptr<arrow::Array> & flat_array,
