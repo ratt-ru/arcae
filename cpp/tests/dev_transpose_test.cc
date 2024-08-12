@@ -204,7 +204,7 @@ TEST_F(DevTransposeTest, Basic) {
           auto read_fut = Future<casacore::Array<Complex>>::Make();
           if(chunk.nDim() == 1) {
             read_fut = itp->RunAsync([
-              row_slicer = chunk.GetRowSlicer(),
+              row_slicer = chunk.RowSlicer(),
               column = column
             ](const TableProxy & tp) -> Future<casacore::Array<Complex>> {
               std::shared_ptr<void> time_it(nullptr, [start = absl::Now()](...) {
@@ -215,8 +215,8 @@ TEST_F(DevTransposeTest, Basic) {
             });
           } else {
             read_fut = itp->RunAsync([
-              row_slicer = chunk.GetRowSlicer(),
-              section_slicer = chunk.GetSectionSlicer(),
+              row_slicer = chunk.RowSlicer(),
+              section_slicer = chunk.SectionSlicer(),
               column = column
             ](const TableProxy & tp) -> Future<casacore::Array<Complex>> {
               std::shared_ptr<void> time_it(nullptr, [start = absl::Now()](...) {

@@ -47,9 +47,9 @@ TEST(DataPartitionTest, Fixed) {
   EXPECT_THAT(partition.Chunk(0).Mem(1), ::testing::ElementsAre(1, 2));
   EXPECT_THAT(partition.Chunk(0).Disk(2), ::testing::ElementsAre(-1, -1));
   EXPECT_THAT(partition.Chunk(0).Mem(2), ::testing::ElementsAre(2, 5));
-  EXPECT_EQ(partition.Chunk(0).GetRowSlicer(),
+  EXPECT_EQ(partition.Chunk(0).RowSlicer(),
             Slicer(IPosition({-1}), IPosition({-1}), Slicer::endIsLast));
-  EXPECT_EQ(partition.Chunk(0).GetSectionSlicer(),
+  EXPECT_EQ(partition.Chunk(0).SectionSlicer(),
             Slicer(IPosition({0, 0}), IPosition({1, 1}), Slicer::endIsLast));
 
   EXPECT_THAT(partition.Chunk(1).Disk(0), ::testing::ElementsAre(0, 1));
@@ -58,9 +58,9 @@ TEST(DataPartitionTest, Fixed) {
   EXPECT_THAT(partition.Chunk(1).Mem(1), ::testing::ElementsAre(1, 2));
   EXPECT_THAT(partition.Chunk(1).Disk(2), ::testing::ElementsAre(1, 2));
   EXPECT_THAT(partition.Chunk(1).Mem(2), ::testing::ElementsAre(1, 0));
-  EXPECT_EQ(partition.Chunk(1).GetRowSlicer(),
+  EXPECT_EQ(partition.Chunk(1).RowSlicer(),
             Slicer(IPosition({1}), IPosition({2}), Slicer::endIsLast));
-  EXPECT_EQ(partition.data_chunks_[1].GetSectionSlicer(),
+  EXPECT_EQ(partition.data_chunks_[1].SectionSlicer(),
             Slicer(IPosition({0, 0}), IPosition({1, 1}), Slicer::endIsLast));
 
   EXPECT_THAT(partition.Chunk(2).Disk(0), ::testing::ElementsAre(0, 1));
@@ -69,9 +69,9 @@ TEST(DataPartitionTest, Fixed) {
   EXPECT_THAT(partition.Chunk(2).Mem(1), ::testing::ElementsAre(1, 2));
   EXPECT_THAT(partition.Chunk(2).Disk(2), ::testing::ElementsAre(5, 6));
   EXPECT_THAT(partition.Chunk(2).Mem(2), ::testing::ElementsAre(3, 4));
-  EXPECT_EQ(partition.Chunk(2).GetRowSlicer(),
+  EXPECT_EQ(partition.Chunk(2).RowSlicer(),
             Slicer(IPosition({5}), IPosition({6}), Slicer::endIsLast));
-  EXPECT_EQ(partition.Chunk(2).GetSectionSlicer(),
+  EXPECT_EQ(partition.Chunk(2).SectionSlicer(),
             Slicer(IPosition({0, 0}), IPosition({1, 1}), Slicer::endIsLast));
 
   EXPECT_THAT(partition.Chunk(3).Disk(0), ::testing::ElementsAre(0, 1));
@@ -80,9 +80,9 @@ TEST(DataPartitionTest, Fixed) {
   EXPECT_THAT(partition.Chunk(3).Mem(1), ::testing::ElementsAre(0));
   EXPECT_THAT(partition.Chunk(3).Disk(2), ::testing::ElementsAre(-1, -1));
   EXPECT_THAT(partition.Chunk(3).Mem(2), ::testing::ElementsAre(2, 5));
-  EXPECT_EQ(partition.Chunk(3).GetRowSlicer(),
+  EXPECT_EQ(partition.Chunk(3).RowSlicer(),
             Slicer(IPosition({-1}), IPosition({-1}), Slicer::endIsLast));
-  EXPECT_EQ(partition.Chunk(3).GetSectionSlicer(),
+  EXPECT_EQ(partition.Chunk(3).SectionSlicer(),
             Slicer(IPosition({0, 3}), IPosition({1, 3}), Slicer::endIsLast));
 
   EXPECT_THAT(partition.Chunk(4).Disk(0), ::testing::ElementsAre(0, 1));
@@ -91,9 +91,9 @@ TEST(DataPartitionTest, Fixed) {
   EXPECT_THAT(partition.Chunk(4).Mem(1), ::testing::ElementsAre(0));
   EXPECT_THAT(partition.Chunk(4).Disk(2), ::testing::ElementsAre(1, 2));
   EXPECT_THAT(partition.Chunk(4).Mem(2), ::testing::ElementsAre(1, 0));
-  EXPECT_EQ(partition.Chunk(4).GetRowSlicer(),
+  EXPECT_EQ(partition.Chunk(4).RowSlicer(),
             Slicer(IPosition({1}), IPosition({2}), Slicer::endIsLast));
-  EXPECT_EQ(partition.Chunk(4).GetSectionSlicer(),
+  EXPECT_EQ(partition.Chunk(4).SectionSlicer(),
             Slicer(IPosition({0, 3}), IPosition({1, 3}), Slicer::endIsLast));
 
   EXPECT_THAT(partition.Chunk(5).Disk(0), ::testing::ElementsAre(0, 1));
@@ -102,9 +102,9 @@ TEST(DataPartitionTest, Fixed) {
   EXPECT_THAT(partition.Chunk(5).Mem(1), ::testing::ElementsAre(0));
   EXPECT_THAT(partition.Chunk(5).Disk(2), ::testing::ElementsAre(5, 6));
   EXPECT_THAT(partition.Chunk(5).Mem(2), ::testing::ElementsAre(3, 4));
-  EXPECT_EQ(partition.Chunk(5).GetRowSlicer(),
+  EXPECT_EQ(partition.Chunk(5).RowSlicer(),
             Slicer(IPosition({5}), IPosition({6}), Slicer::endIsLast));
-  EXPECT_EQ(partition.Chunk(5).GetSectionSlicer(),
+  EXPECT_EQ(partition.Chunk(5).SectionSlicer(),
             Slicer(IPosition({0, 3}), IPosition({1, 3}), Slicer::endIsLast));
 }
 
@@ -130,9 +130,9 @@ TEST(DataPartitionTest, Variable) {
   EXPECT_THAT(partition.Chunk(0).Mem(1), ::testing::ElementsAre(1, 2));
   EXPECT_THAT(partition.Chunk(0).Disk(2), ::testing::ElementsAre(-1));
   EXPECT_THAT(partition.Chunk(0).Mem(2), ::testing::ElementsAre(0));
-  EXPECT_EQ(partition.Chunk(0).GetRowSlicer(),
+  EXPECT_EQ(partition.Chunk(0).RowSlicer(),
             Slicer(IPosition({-1}), IPosition({-1}), Slicer::endIsLast));
-  EXPECT_EQ(partition.Chunk(0).GetSectionSlicer(),
+  EXPECT_EQ(partition.Chunk(0).SectionSlicer(),
             Slicer(IPosition({0, 0}), IPosition({2, 1}), Slicer::endIsLast));
 
   EXPECT_THAT(partition.Chunk(1).Disk(0), ::testing::ElementsAre(0, 1, 2));
@@ -141,9 +141,9 @@ TEST(DataPartitionTest, Variable) {
   EXPECT_THAT(partition.Chunk(1).Mem(1), ::testing::ElementsAre(0));
   EXPECT_THAT(partition.Chunk(1).Disk(2), ::testing::ElementsAre(-1));
   EXPECT_THAT(partition.Chunk(1).Mem(2), ::testing::ElementsAre(0));
-  EXPECT_EQ(partition.Chunk(1).GetRowSlicer(),
+  EXPECT_EQ(partition.Chunk(1).RowSlicer(),
             Slicer(IPosition({-1}), IPosition({-1}), Slicer::endIsLast));
-  EXPECT_EQ(partition.Chunk(1).GetSectionSlicer(),
+  EXPECT_EQ(partition.Chunk(1).SectionSlicer(),
             Slicer(IPosition({0, 3}), IPosition({2, 3}), Slicer::endIsLast));
 
   EXPECT_THAT(partition.Chunk(2).Disk(0), ::testing::ElementsAre(0));
@@ -152,9 +152,9 @@ TEST(DataPartitionTest, Variable) {
   EXPECT_THAT(partition.Chunk(2).Mem(1), ::testing::ElementsAre(1, 2));
   EXPECT_THAT(partition.Chunk(2).Disk(2), ::testing::ElementsAre(0));
   EXPECT_THAT(partition.Chunk(2).Mem(2), ::testing::ElementsAre(1));
-  EXPECT_EQ(partition.Chunk(2).GetRowSlicer(),
+  EXPECT_EQ(partition.Chunk(2).RowSlicer(),
             Slicer(IPosition({0}), IPosition({0}), Slicer::endIsLast));
-  EXPECT_EQ(partition.Chunk(2).GetSectionSlicer(),
+  EXPECT_EQ(partition.Chunk(2).SectionSlicer(),
             Slicer(IPosition({0, 0}), IPosition({0, 1}), Slicer::endIsLast));
 
   EXPECT_THAT(partition.Chunk(3).Disk(0), ::testing::ElementsAre(0));
@@ -163,9 +163,9 @@ TEST(DataPartitionTest, Variable) {
   EXPECT_THAT(partition.Chunk(3).Mem(1), ::testing::ElementsAre(0));
   EXPECT_THAT(partition.Chunk(3).Disk(2), ::testing::ElementsAre(0));
   EXPECT_THAT(partition.Chunk(3).Mem(2), ::testing::ElementsAre(1));
-  EXPECT_EQ(partition.Chunk(3).GetRowSlicer(),
+  EXPECT_EQ(partition.Chunk(3).RowSlicer(),
             Slicer(IPosition({0}), IPosition({0}), Slicer::endIsLast));
-  EXPECT_EQ(partition.Chunk(3).GetSectionSlicer(),
+  EXPECT_EQ(partition.Chunk(3).SectionSlicer(),
             Slicer(IPosition({0, 3}), IPosition({0, 3}), Slicer::endIsLast));
 }
 
