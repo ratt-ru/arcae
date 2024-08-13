@@ -21,7 +21,6 @@ using ::casacore::JsonOut;
 using ::casacore::TableProxy;
 
 namespace arcae {
-namespace detail {
 namespace {
 
 static constexpr char kCasaDescriptorKey[] = "__casa_descriptor__";
@@ -43,7 +42,7 @@ NewTableProxy::GetTableDescriptor() const {
 Result<std::string>
 NewTableProxy::GetColumnDescriptor(const std::string & column) const {
   return itp_->RunAsync([column = column](TableProxy & tp) -> Result<std::string> {
-    ARROW_RETURN_NOT_OK(ColumnExists(tp, column));
+    ARROW_RETURN_NOT_OK(detail::ColumnExists(tp, column));
     std::ostringstream oss;
     JsonOut column_json(oss);
     column_json.start();
@@ -66,14 +65,14 @@ NewTableProxy::GetLockOptions() const {
 Result<Table>
 NewTableProxy::ToArrow(
     const std::vector<std::string> & columns,
-    const Selection & selection) const {
+    const detail::Selection & selection) const {
   return Status::NotImplemented("ToArrow");
 }
 
 Result<std::shared_ptr<Array>>
 NewTableProxy::GetColumn(
     const std::string & column,
-    const Selection & selection,
+    const detail::Selection & selection,
     const std::shared_ptr<Array> & result) const {
   return ReadImpl(itp_, column, selection, result).MoveResult();
 }
@@ -82,7 +81,7 @@ Result<bool>
 NewTableProxy::PutColumn(
   const std::string & column,
   const std::shared_ptr<Array> & data,
-  const Selection & selection) const {
+  const detail::Selection & selection) const {
     return WriteImpl(itp_, column, data, selection).MoveResult();
 }
 
@@ -111,7 +110,7 @@ NewTableProxy::nRows() const {
 Result<bool>
 NewTableProxy::AddRows(std::size_t nrows) {
   return itp_->RunAsync([nrows = nrows](TableProxy & tp) {
-    MaybeReopenRW(tp);
+    detail::MaybeReopenRW(tp);
     tp.addRow(nrows);
     return true;
   }).MoveResult();
@@ -122,5 +121,4 @@ NewTableProxy::Close() {
   return itp_->Close();
 }
 
-}  // namespace detail
 }  // namespace arcae

@@ -36,7 +36,7 @@ using ::arcae::GetScalarColumn;
 using ::arcae::detail::Index;
 using ::arcae::detail::IndexSpan;
 using ::arcae::detail::IndexType;
-using ::arcae::detail::NewTableProxy;
+using ::arcae::NewTableProxy;
 using ::arcae::detail::SelectionBuilder;
 
 using ::casacore::Array;

@@ -13,7 +13,6 @@
 #include "arcae/type_traits.h"
 
 namespace arcae {
-namespace detail {
 
 class NewTableProxy {
 public:
@@ -22,20 +21,20 @@ public:
     typename Fn,
     typename = std::enable_if<
                   std::is_same_v<
-                    ArrowResultType<Fn>,
+                    detail::ArrowResultType<Fn>,
                     arrow::Result<std::shared_ptr<casacore::TableProxy>>>>>
   static arrow::Result<std::shared_ptr<NewTableProxy>> Make(
       Fn && functor,
       std::shared_ptr<arrow::internal::ThreadPool> io_pool=nullptr) {
     struct enable_make_shared_ntp : public NewTableProxy {};
     std::shared_ptr<NewTableProxy> ntp = std::make_shared<enable_make_shared_ntp>();
-    ARROW_ASSIGN_OR_RAISE(ntp->itp_, IsolatedTableProxy::Make(std::move(functor), io_pool));
+    ARROW_ASSIGN_OR_RAISE(ntp->itp_, detail::IsolatedTableProxy::Make(std::move(functor), io_pool));
     return ntp;
   }
 
   arrow::Result<arrow::Table> ToArrow(
     const std::vector<std::string> & columns={},
-    const Selection & selection={}) const;
+    const detail::Selection & selection={}) const;
 
   // Get the table descriptor as a JSON string
   arrow::Result<std::string> GetTableDescriptor() const;
@@ -51,7 +50,7 @@ public:
   // writing into a provided result array
   arrow::Result<std::shared_ptr<arrow::Array>> GetColumn(
     const std::string & column,
-    const Selection & selection={},
+    const detail::Selection & selection={},
     const std::shared_ptr<arrow::Array> & result=nullptr) const;
 
   // Put data into the column from the given array,
@@ -59,7 +58,7 @@ public:
   arrow::Result<bool> PutColumn(
     const std::string & column,
     const std::shared_ptr<arrow::Array> & data,
-    const Selection & selection={}) const;
+    const detail::Selection & selection={}) const;
 
   // Return the names of the columns in this table
   arrow::Result<std::vector<std::string>> Columns() const;
@@ -76,10 +75,9 @@ public:
   // Close the table
   arrow::Result<bool> Close();
 private:
-  std::shared_ptr<IsolatedTableProxy> itp_;
+  std::shared_ptr<detail::IsolatedTableProxy> itp_;
 };
 
-} // namespace detail
 } // namespace arcae
 
 #endif  // ARCAE_NEW_TABLE_PROXY_H
