@@ -1,6 +1,7 @@
 #include "arcae/read_impl.h"
 
 #include <cstddef>
+#include <iterator>
 #include <memory>
 #include <string>
 
@@ -12,11 +13,14 @@
 #include <arrow/type_fwd.h>
 #include <arrow/array/array_base.h>
 #include <arrow/array/array_nested.h>
+#include <arrow/table.h>
 #include <arrow/util/async_generator.h>
 #include <arrow/util/future.h>
+#include <arrow/util/key_value_metadata.h>
 #include <arrow/util/logging.h>
 #include <arrow/util/thread_pool.h>
 
+#include <casacore/casa/Json.h>
 #include <casacore/casa/Utilities/DataType.h>
 #include <casacore/tables/Tables/ArrayColumn.h>
 #include <casacore/tables/Tables/ScalarColumn.h>
@@ -43,15 +47,18 @@ using ::arrow::PrimitiveArray;
 using ::arrow::MakeVectorGenerator;
 using ::arrow::MakeMappedGenerator;
 using ::arrow::Future;
+using ::arrow::Result;
 using ::arrow::Status;
 using ::arrow::StringBuilder;
-using ::arrow::Result;
 using ::arrow::ShouldSchedule;
+using ::arrow::Table;
 using ::arrow::internal::GetCpuThreadPool;
 
 template <class CT> using CasaArray = ::casacore::Array<CT>;
 using ::casacore::ArrayColumn;
 using ::casacore::DataType;
+using ::casacore::JsonOut;
+using ::casacore::Record;
 using ::casacore::ScalarColumn;
 using ::casacore::TableColumn;
 using ::casacore::TableProxy;
@@ -65,6 +72,9 @@ namespace arcae {
 namespace detail {
 
 namespace {
+
+static constexpr char kArcaeMetadata[] = "__arcae_metadata__";
+static constexpr char kCasaDescriptorKey[] = "__casa_descriptor__";
 
 // Functor implementing dispatch of disk reading functionality
 struct ReadCallback {
@@ -312,7 +322,7 @@ Result<std::shared_ptr<Array>> MakeArray(
 
 } // namespace
 
-arrow::Future<std::shared_ptr<Array>>
+Future<std::shared_ptr<Array>>
 ReadImpl(
     const std::shared_ptr<IsolatedTableProxy> & itp,
     const std::string & column,
@@ -390,6 +400,98 @@ ReadImpl(
   }, {}, CallbackOptions{ShouldSchedule::Always, GetCpuThreadPool()});
 
   return read_fut;
+}
+
+Future<std::shared_ptr<Table>>
+ReadTableImpl(
+    const std::shared_ptr<IsolatedTableProxy> & itp,
+    const std::vector<std::string> & columns,
+    const Selection & selection) {
+
+  if(selection.Size() > 1) {
+    return Status::IndexError(
+      "Selection along secondary indices is "
+      "unsupported when converting to Arrow tables");
+  }
+
+  struct TableMetadata {
+    Record table_desc;
+    std::vector<Record> column_descs;
+    std::vector<std::string> columns;
+  };
+
+  // Read table metadata
+  auto metadata_fut = itp->RunAsync([
+    columns = columns
+  ](TableProxy & tp) mutable -> Result<TableMetadata> {
+    auto table_desc = tp.getTableDescription(true, true);
+
+    if(columns.size() == 0) {
+      auto all_columns = tp.columnNames();
+      columns = decltype(columns)(std::begin(all_columns), std::end(all_columns));
+    }
+
+    std::vector<Record> column_descs;
+    column_descs.reserve(columns.size());
+    for(const auto & column: columns) {
+      ARROW_RETURN_NOT_OK(ColumnExists(tp, column));
+      column_descs.push_back(tp.getColumnDescription(column, true));
+    }
+
+    return TableMetadata{
+      tp.getTableDescription(true, true),
+      std::move(column_descs),
+      std::move(columns)};
+  });
+
+  auto read_columns = metadata_fut.Then([
+    itp = itp,
+    selection = selection
+  ](const TableMetadata & table_metadata) {
+    std::vector<Future<std::shared_ptr<Array>>> read_futures;
+    read_futures.reserve(table_metadata.columns.size());
+    for(const auto & column: table_metadata.columns) {
+      read_futures.push_back(ReadImpl(itp, column, selection, nullptr));
+    }
+    return arrow::All(read_futures);
+  });
+
+  return read_columns.Then([
+    metadata_fut = metadata_fut
+  ](const std::vector<Result<std::shared_ptr<Array>>> & array_results) -> Result<std::shared_ptr<Table>> {
+      if(!metadata_fut.status().ok()) return metadata_fut.status();
+      auto table_metadata = metadata_fut.result().ValueOrDie();
+      const auto & columns = table_metadata.columns;
+      const auto & column_descs = table_metadata.column_descs;
+      assert(columns.size() == array_results.size());
+      auto fields = arrow::FieldVector();
+      auto arrays = arrow::ArrayVector();
+      for(std::size_t i = 0; i < array_results.size(); ++i) {
+        if(!array_results[i].ok()) continue;
+        auto array = array_results[i].ValueOrDie();
+
+        // Attach the CASA column descriptor
+        std::ostringstream oss;
+        JsonOut column_json(oss);
+        column_json.start();
+        column_json.write(kCasaDescriptorKey, column_descs[i]);
+        column_json.end();
+        auto metadata = arrow::KeyValueMetadata::Make({kArcaeMetadata}, {oss.str()});
+
+        auto field = arrow::field(columns[i], array->type(), std::move(metadata));
+        fields.emplace_back(std::move(field));
+        arrays.emplace_back(std::move(array));
+      }
+      // Attach the CASA Table descriptor
+      std::ostringstream oss;
+      JsonOut table_json(oss);
+      table_json.start();
+      table_json.write(kCasaDescriptorKey, table_metadata.table_desc);
+      table_json.end();
+      auto metadata = arrow::KeyValueMetadata::Make({kArcaeMetadata}, {oss.str()});
+      auto schema = arrow::schema(fields, std::move(metadata));
+      return arrow::Table::Make(std::move(schema), std::move(arrays));
+  });
 }
 
 }  // namespace detail

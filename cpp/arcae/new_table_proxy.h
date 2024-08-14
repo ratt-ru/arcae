@@ -32,9 +32,9 @@ public:
     return ntp;
   }
 
-  arrow::Result<arrow::Table> ToArrow(
-    const std::vector<std::string> & columns={},
-    const detail::Selection & selection={}) const;
+  arrow::Result<std::shared_ptr<arrow::Table>> ToArrow(
+    const detail::Selection & selection={},
+    const std::vector<std::string> & columns={}) const;
 
   // Get the table descriptor as a JSON string
   arrow::Result<std::string> GetTableDescriptor() const;

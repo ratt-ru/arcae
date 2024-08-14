@@ -1,5 +1,6 @@
 #include "arcae/new_table_proxy.h"
 
+#include <iterator>
 #include <sstream>
 
 #include <arrow/api.h>
@@ -62,11 +63,11 @@ NewTableProxy::GetLockOptions() const {
   }).MoveResult();
 }
 
-Result<Table>
+Result<std::shared_ptr<Table>>
 NewTableProxy::ToArrow(
-    const std::vector<std::string> & columns,
-    const detail::Selection & selection) const {
-  return Status::NotImplemented("ToArrow");
+    const detail::Selection & selection,
+    const std::vector<std::string> & columns) const {
+  return detail::ReadTableImpl(itp_, columns, selection).MoveResult();
 }
 
 Result<std::shared_ptr<Array>>
