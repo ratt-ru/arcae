@@ -18,7 +18,7 @@ add_library(arcae SHARED
     arcae/table_utils.cc
     arcae/type_traits.cc)
 
-target_compile_options(arcae PRIVATE -g
+target_compile_options(arcae PRIVATE
     $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:
         -Wall -Werror -pedantic>)
 target_link_directories(arcae PUBLIC ${PYARROW_LIBDIRS})
