@@ -229,7 +229,7 @@ GetResultBufferOrAllocate(
   if(result) return GetResultBuffer(result, nbytes);
   ARROW_ASSIGN_OR_RAISE(auto allocation, arrow::AllocateBuffer(nbytes, casa_type_size));
 
-  if(casacore::isNumeric(casa_type)) {
+  if(IsPrimitiveType(casa_type)) {
     return std::shared_ptr<Buffer>(std::move(allocation));
   } else if(casa_type == DataType::TpString) {
     // We need to use placement new and delete for non-POD types
@@ -244,7 +244,7 @@ GetResultBufferOrAllocate(
           delete buffer;
         }));
   }
-  return Status::TypeError("Unhandled casa type", casa_type);
+  return Status::TypeError("Unhandled CASA type", casa_type);
 }
 
 enum ConvertStrategy { FIXED, LIST };
@@ -295,7 +295,7 @@ Result<std::shared_ptr<Array>> MakeArray(
       ARROW_ASSIGN_OR_RAISE(auto offsets, builder.Finish())
       ARROW_ASSIGN_OR_RAISE(result, ListArray::FromArrays(*offsets, *base));
     }
-  } else if(casacore::isNumeric(casa_type)) {
+  } else if(IsPrimitiveType(casa_type)) {
     result = std::make_shared<PrimitiveArray>(arrow_dtype, nelements, buffer);
   } else {
     return Status::TypeError("Unhandled CASA Type ", casa_type);

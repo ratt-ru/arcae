@@ -25,10 +25,14 @@ public:
                     arrow::Result<std::shared_ptr<casacore::TableProxy>>>>>
   static arrow::Result<std::shared_ptr<NewTableProxy>> Make(
       Fn && functor,
-      std::shared_ptr<arrow::internal::ThreadPool> io_pool=nullptr) {
+      const std::shared_ptr<detail::IsolatedTableProxy> itp = nullptr) {
     struct enable_make_shared_ntp : public NewTableProxy {};
     std::shared_ptr<NewTableProxy> ntp = std::make_shared<enable_make_shared_ntp>();
-    ARROW_ASSIGN_OR_RAISE(ntp->itp_, detail::IsolatedTableProxy::Make(std::move(functor), io_pool));
+    if(!itp) {
+      ARROW_ASSIGN_OR_RAISE(ntp->itp_, detail::IsolatedTableProxy::Make(std::move(functor)));
+    } else {
+      ARROW_ASSIGN_OR_RAISE(ntp->itp_, itp->MakeSharedProxy(std::move(functor)));
+    }
     return ntp;
   }
 
@@ -71,6 +75,9 @@ public:
 
   // Add rows to the table
   arrow::Result<bool> AddRows(std::size_t nrows);
+
+  // Get a pointer to the IsolatedTableProxy
+  std::shared_ptr<detail::IsolatedTableProxy> Proxy() const { return itp_; }
 
   // Close the table
   arrow::Result<bool> Close();

@@ -15,7 +15,7 @@
 #include <memory>
 
 #include "arcae/descriptor.h"
-#include "arcae/safe_table_proxy.h"
+#include "arcae/new_table_proxy.h"
 
 #include <arrow/api.h>
 #include <arrow/status.h>
@@ -82,34 +82,34 @@ static constexpr char kWeather[] = "WEATHER";
 
 } // namespace
 
-Result<std::shared_ptr<SafeTableProxy>>
-OpenTable(const std::string &filename, bool readonly,
-          const std::string &json_lockoptions) {
-  return SafeTableProxy::Make(
-      [&filename, &readonly,
-       &json_lockoptions]() -> Result<std::shared_ptr<TableProxy>> {
-        auto lock_record = JsonParser::parse(json_lockoptions).toRecord();
-
-        std::shared_ptr<TableProxy> proxy;
-
-        try {
-          proxy = std::make_shared<TableProxy>(filename, lock_record,
-                                               Table::TableOption::Old);
-
-          if (!readonly) {
-            proxy->reopenRW();
-          }
-        } catch (std::exception &e) {
-          return Status::Invalid(e.what());
-        }
-
+Result<std::shared_ptr<NewTableProxy>>
+OpenTable(
+    const std::string &filename,
+    bool readonly,
+    const std::string &json_lockoptions) {
+  return NewTableProxy::Make([
+      &filename,
+      &readonly,
+      &json_lockoptions
+    ]() -> Result<std::shared_ptr<TableProxy>> {
+      auto lock_record = JsonParser::parse(json_lockoptions).toRecord();
+      try {
+        auto proxy = std::make_shared<TableProxy>(
+                                    filename, lock_record,
+                                    Table::TableOption::Old);
+        if (!readonly) proxy->reopenRW();
         return proxy;
-      });
+      } catch (std::exception &e) {
+        return Status::Invalid(e.what());
+      }
+    });
 }
 
-Result<std::shared_ptr<SafeTableProxy>>
-DefaultMS(const std::string &name, const std::string &subtable,
-          const std::string &json_table_desc, const std::string &json_dminfo) {
+Result<std::shared_ptr<NewTableProxy>>
+DefaultMS(const std::string &name, const
+          std::string &subtable,
+          const std::string &json_table_desc,
+          const std::string &json_dminfo) {
   // Upper case subtable name
   auto usubtable = std::string(subtable.size(), '0');
   std::transform(std::begin(subtable), std::end(subtable),
@@ -128,7 +128,7 @@ DefaultMS(const std::string &name, const std::string &subtable,
       auto setup_new_table,
       DefaultMSFactory(modname, usubtable, json_table_desc, json_dminfo));
 
-  return SafeTableProxy::Make([&]() -> Result<std::shared_ptr<TableProxy>> {
+  return NewTableProxy::Make([&]() -> Result<std::shared_ptr<TableProxy>> {
     if (usubtable.empty() || usubtable == kMain) {
       auto ms = MeasurementSet(setup_new_table);
       // Create the MS default subtables
@@ -176,45 +176,45 @@ DefaultMS(const std::string &name, const std::string &subtable,
 }
 
 // Execute a TAQL query on the supplied tables
-arrow::Result<std::shared_ptr<SafeTableProxy>>
+arrow::Result<std::shared_ptr<NewTableProxy>>
 Taql(const std::string &taql,
-     const std::vector<std::shared_ptr<SafeTableProxy>> &tables) {
+     const std::vector<std::shared_ptr<NewTableProxy>> &tables) {
 
   // Easy case
   if (tables.size() == 0) {
-    return SafeTableProxy::Make(
-        [&]() -> arrow::Result<std::shared_ptr<TableProxy>> {
-          return std::make_shared<TableProxy>(taql, std::vector<TableProxy>{});
-        });
+    return NewTableProxy::Make(
+      [&]() -> arrow::Result<std::shared_ptr<TableProxy>> {
+        return std::make_shared<TableProxy>(taql, std::vector<TableProxy>{});
+      });
   }
 
-  // Check that each SafeTableProxy is using the same io_pool
-  for (const auto &stp : tables) {
-    if (stp->io_pool != tables.front()->io_pool) {
-      return arrow::Status::NotImplemented(
-          "TAQL queries referencing tables created "
-          "in different executors");
+  for(const auto & ntp: tables) {
+    if(ntp->Proxy() != tables.front()->Proxy()) {
+      return Status::Invalid(
+        "Supplied tables don't share the "
+        "same IsolatedTableProxy");
     }
   }
 
+
   // Use the common io_pool
-  return SafeTableProxy::Make(
-      [&]() -> arrow::Result<std::shared_ptr<TableProxy>> {
-        auto proxies = std::vector<TableProxy>{};
-        proxies.reserve(tables.size());
+  return NewTableProxy::Make(
+    [&]() -> arrow::Result<std::shared_ptr<TableProxy>> {
+      auto proxies = std::vector<TableProxy>{};
+      proxies.reserve(tables.size());
 
-        for (const auto &stp : tables) {
-          proxies.push_back(*stp->table_proxy);
-        }
+      for (const auto &ntp : tables) {
+        proxies.push_back(*ntp->Proxy()->Proxy());
+      }
 
-        try {
-          return std::make_shared<TableProxy>(taql, proxies);
-        } catch (const casacore::AipsError &e) {
-          return arrow::Status::UnknownError("Error executing TAQL query: ",
-                                             e.what());
-        }
-      },
-      tables.front()->io_pool);
-}
+      try {
+        return std::make_shared<TableProxy>(taql, proxies);
+      } catch (const casacore::AipsError &e) {
+        return Status::UnknownError("Error executing TAQL query: ",
+                                    e.what());
+      }
+    },
+    tables.front()->Proxy());
+  }
 
 } // namespace arcae

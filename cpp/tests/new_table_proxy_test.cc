@@ -9,11 +9,13 @@
 
 #include <arrow/api.h>
 #include <arrow/array/array_nested.h>
+#include <arrow/compute/cast.h>
 #include <arrow/result.h>
 #include <arrow/util/logging.h>
 #include <arrow/testing/builder.h>
-#include <arrow/type_fwd.h>
 #include <arrow/testing/gtest_util.h>
+#include <arrow/type.h>
+#include <arrow/type_fwd.h>
 
 #include <casacore/casa/Arrays/IPosition.h>
 #include <casacore/casa/BasicSL/Complexfwd.h>
@@ -345,6 +347,16 @@ TEST_P(FixedTableProxyTest, Fixed) {
   }
 }
 
+
+TEST_F(FixedTableProxyTest, Table) {
+  ASSERT_OK_AND_ASSIGN(auto ntp, OpenTable());
+  ASSERT_OK_AND_ASSIGN(auto table, ntp->ToArrow({}, {"MODEL_DATA"}));
+  EXPECT_THAT(table->ColumnNames(), ::testing::ElementsAre("MODEL_DATA"));
+
+  ASSERT_OK_AND_ASSIGN(table, ntp->ToArrow({}, {}));
+}
+
+
 TEST_F(FixedTableProxyTest, NegativeSelection) {
   ASSERT_OK_AND_ASSIGN(auto ntp, OpenTable());
 
@@ -448,6 +460,41 @@ TEST_F(FixedTableProxyTest, AddRows) {
   ASSERT_OK(ntp->AddRows(100));
   ASSERT_OK_AND_ASSIGN(nrow, ntp->nRows());
   EXPECT_EQ(nrow, knrow + 100);
+}
+
+TEST_F(FixedTableProxyTest, CastData) {
+  ASSERT_OK_AND_ASSIGN(auto ntp, OpenTable());
+  std::shared_ptr<arrow::Array> double_array;
+  std::shared_ptr<arrow::Array> flag_array;
+  std::vector<double> double_values(knrow * knchan * kncorr * 2);
+  std::vector<bool> bool_values(knrow * knchan * kncorr);
+  for(std::size_t i = 0; i < knrow * knchan * kncorr; ++i) {
+    double_values[2 * i + 0] = i;
+    double_values[2 * i + 1] = i;
+    bool_values[i] = i % 2;
+  }
+
+  arrow::ArrayFromVector<arrow::DoubleType>(arrow::float64(), double_values, &double_array);
+  ASSERT_OK_AND_ASSIGN(double_array, arrow::FixedSizeListArray::FromArrays(double_array, 2));
+  ASSERT_OK_AND_ASSIGN(double_array, arrow::FixedSizeListArray::FromArrays(double_array, kncorr));
+  ASSERT_OK_AND_ASSIGN(double_array, arrow::FixedSizeListArray::FromArrays(double_array, knchan));
+  EXPECT_EQ(double_array->length(), knrow);
+  ASSERT_OK(double_array->ValidateFull());
+  ASSERT_OK(ntp->PutColumn("MODEL_DATA", double_array));
+
+  ASSERT_OK_AND_ASSIGN(auto result, ntp->GetColumn("MODEL_DATA"));
+  ASSERT_OK_AND_ASSIGN(auto datum, arrow::compute::Cast(result, double_array->type()));
+  EXPECT_TRUE(datum.make_array()->ApproxEquals(double_array));
+
+  arrow::ArrayFromVector<arrow::UInt8Type>(arrow::uint8(), bool_values, &flag_array);
+  ASSERT_OK_AND_ASSIGN(flag_array, arrow::FixedSizeListArray::FromArrays(flag_array, kncorr));
+  ASSERT_OK_AND_ASSIGN(flag_array, arrow::FixedSizeListArray::FromArrays(flag_array, knchan));
+  EXPECT_EQ(flag_array->length(), knrow);
+  ASSERT_OK(ntp->PutColumn("FLAG", flag_array));
+
+  ASSERT_OK_AND_ASSIGN(result, ntp->GetColumn("FLAG"));
+  ASSERT_OK_AND_ASSIGN(datum, arrow::compute::Cast(result, flag_array->type()));
+  EXPECT_TRUE(datum.make_array()->Equals(flag_array));
 }
 
 

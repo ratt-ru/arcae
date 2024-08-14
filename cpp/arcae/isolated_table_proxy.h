@@ -163,31 +163,43 @@ public:
                   std::is_same_v<
                     ArrowResultType<Fn>,
                     arrow::Result<std::shared_ptr<casacore::TableProxy>>>>>
-  static arrow::Result<std::shared_ptr<IsolatedTableProxy>> Make(
-      Fn && functor,
-      std::shared_ptr<arrow::internal::ThreadPool> io_pool=nullptr) {
+  static arrow::Result<std::shared_ptr<IsolatedTableProxy>> Make(Fn && functor) {
     struct enable_make_shared_itp : public IsolatedTableProxy {};
     std::shared_ptr<IsolatedTableProxy> proxy = std::make_shared<enable_make_shared_itp>();
 
-    // Set up the io_pool
-    if(io_pool) {
-      if(io_pool->GetCapacity() != 1) {
-        return arrow::Status::Invalid(
-          "Number of threads in "
-          "supplied thread pool != 1");
-      }
-    } else {
-      ARROW_ASSIGN_OR_RAISE(io_pool, ::arrow::internal::ThreadPool::Make(1));
-    }
+    // Create an I/O pool
+    ARROW_ASSIGN_OR_RAISE(proxy->io_pool_, ::arrow::internal::ThreadPool::Make(1));
 
     // Mark as closed so that if construction fails, we don't try to close it
-    proxy->io_pool_ = io_pool;
     proxy->is_closed_ = true;
     ARROW_ASSIGN_OR_RAISE(proxy->table_proxy_, proxy->RunInPoolSync(std::move(functor)));
     proxy->is_closed_ = false;
 
     return proxy;
   }
+
+  // Construct an IsolatedTableProxy with the supplied function
+  template <
+    typename Fn,
+    typename = std::enable_if<
+                  std::is_same_v<
+                    ArrowResultType<Fn>,
+                    arrow::Result<std::shared_ptr<casacore::TableProxy>>>>>
+  arrow::Result<std::shared_ptr<IsolatedTableProxy>> MakeSharedProxy(Fn && functor) {
+    struct enable_make_shared_itp : public IsolatedTableProxy {};
+    std::shared_ptr<IsolatedTableProxy> proxy = std::make_shared<enable_make_shared_itp>();
+    // Share the IO Pool
+    proxy->io_pool_ = io_pool_;
+
+    // Mark as closed so that if construction fails, we don't try to close it
+    proxy->is_closed_ = true;
+    ARROW_ASSIGN_OR_RAISE(proxy->table_proxy_, proxy->RunInPoolSync(std::move(functor)));
+    proxy->is_closed_ = false;
+
+    return proxy;
+  }
+
+  std::shared_ptr<casacore::TableProxy> Proxy() const { return table_proxy_; }
 
 protected:
   IsolatedTableProxy() = default;

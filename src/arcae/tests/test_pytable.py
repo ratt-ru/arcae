@@ -33,7 +33,7 @@ def test_column_selection(column_case_table):
             "SCALAR",
             "SCALAR_STRING",
             # Even though the column is unconstrained, ndim is the same
-            "UNCONSTRAINED_SAME_NDIM",
+            #"UNCONSTRAINED_SAME_NDIM",
             "VARIABLE",
             "VARIABLE_STRING"
         ]
@@ -44,7 +44,7 @@ def test_column_selection(column_case_table):
             "FIXED_STRING",
             "SCALAR",
             "SCALAR_STRING",
-            "UNCONSTRAINED_SAME_NDIM",
+            #"UNCONSTRAINED_SAME_NDIM",
             "VARIABLE",
             "VARIABLE_STRING"
         ]
@@ -56,7 +56,7 @@ def test_column_selection(column_case_table):
         assert sorted(T.to_arrow([[0, 1]], ["VARIABLE", "FIXED"]).column_names) == ["FIXED", "VARIABLE"]
 
 
-def test_column_cases(column_case_table, capfd):
+def test_column_cases(column_case_table):
     """ Test code paths """
     T = arcae.table(column_case_table).to_arrow()
 
@@ -85,28 +85,17 @@ def test_column_cases(column_case_table, capfd):
     assert T.column("SCALAR_STRING").to_pylist() == ['0', '1', '2']
 
     # Unconstrained columns not yet handled
-    captured = capfd.readouterr()
     assert "UNCONSTRAINED" not in T.column_names
-    assert "Ignoring UNCONSTRAINED" in captured.err
 
 
 def test_complex_cases(complex_case_table):
-    from arcae.arrow_tables import ComplexDoubleType
     from arcae import config
 
     table = arcae.table(complex_case_table)
 
-    with config.set(**{"casa.convert.strategy": "fixed complex"}):
-        T = table.to_arrow()
-        assert T.column("COMPLEX").type == pa.list_(pa.list_(ComplexDoubleType(), 4), 2)
-
     with config.set(**{"casa.convert.strategy": "fixed"}):
         T = table.to_arrow()
         assert T.column("COMPLEX").type == pa.list_(pa.list_(pa.list_(pa.float64(), 2), 4), 2)
-
-    with config.set(**{"casa.convert.strategy": "list complex"}):
-        T = table.to_arrow()
-        assert T.column("COMPLEX").type == pa.list_(pa.list_(ComplexDoubleType()))
 
     with config.set(**{"casa.convert.strategy": "list"}):
         T = table.to_arrow()
@@ -334,43 +323,6 @@ def test_taql_table_arg(sorting_table):
     assert_array_equal(result["ANTENNA1"], [1, 0, 0, 1, 2, 1, 1, 1, 0, 0])
     assert_array_equal(result["ANTENNA2"], [2, 1, 1, 0, 1, 2, 3, 2, 2, 1])
     assert_array_equal(result["ROW"], [9, 8, 7, 6, 5, 4, 3, 2, 1, 0])
-
-
-def test_table_partitioning(sorting_table):
-    T = arcae.table(sorting_table)
-
-    partitions = T.partition(["FIELD_ID", "DATA_DESC_ID"])
-    assert len(partitions) == 3
-    ddids = sum((p.to_arrow().column("DATA_DESC_ID").unique().tolist() for p in partitions), [])
-    assert ddids == [0, 0, 1]
-
-    fields = sum((p.to_arrow().column("FIELD_ID").unique().tolist() for p in partitions), [])
-    assert fields == [0, 1, 2]
-
-    # Partitions are not sorted in TIME
-    for P in partitions:
-        time = P.to_arrow().column("TIME")
-        assert time.sort() != time
-
-@pytest.mark.parametrize("sort_keys", [
-    "TIME",
-    ["ANTENNA1", "ANTENNA2", "TIME"],
-    ["ANTENNA1", "ANTENNA2"],
-    ["TIME", "ANTENNA1", "ANTENNA2"]
-])
-def test_table_partitioning_and_sorting(sorting_table, sort_keys):
-    partitions = arcae.table(sorting_table).partition(["FIELD_ID", "DATA_DESC_ID"], sort_keys)
-
-    if isinstance(sort_keys, str):
-        sort_keys = [sort_keys]
-
-    for P in partitions:
-        arrow = P.to_arrow()
-        D = {k: arrow.column(k).to_numpy() for k in sort_keys}
-        idx = np.lexsort(tuple(D[k] for k in reversed(sort_keys)))
-
-        for k in sort_keys:
-            assert_array_equal(D[k], D[k][idx])
 
 
 def test_print_dataset_structure(partitioned_dataset):

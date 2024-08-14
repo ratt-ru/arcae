@@ -180,6 +180,11 @@ struct SelectionBuilder {
     return *this;
   }
 
+  SelectionBuilder & Add(const IndexSpan & ids) {
+    spans.push_back(ids);
+    return *this;
+  }
+
   // Create a span over an existing index vector
   // The vector will not be copied into the Selection
   // if the vector type is an IndexType
