@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Refactor arcae to use a finer-grained execution model (:pr:`101`)
 * Pin manylinux_2_28 image to manylinux_2_28_x86_64:2024.07.02-0 (:pr:`102`)
 * Restrict Numpy to less than 2.0.0 (:pr:`100`)
 * Avoid stripping debug information (:pr:`96`)
