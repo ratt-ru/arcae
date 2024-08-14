@@ -61,6 +61,9 @@ Result<std::size_t> CasaDataTypeSize(DataType data_type) {
 
 Result<std::shared_ptr<arrow::DataType>> ArrowDataType(DataType data_type) {
   switch(data_type) {
+    case DataType::TpBool:
+      return CasaDataTypeTraits<DataType::TpBool>::ArrowDataType();
+      break;
     case DataType::TpChar:
       return CasaDataTypeTraits<DataType::TpChar>::ArrowDataType();
       break;

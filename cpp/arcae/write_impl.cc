@@ -211,7 +211,7 @@ Result<std::shared_ptr<Buffer>> ExtractBufferOrCopyValues(
     const std::shared_ptr<arrow::Array> & flat_array,
     DataType casa_dtype) {
 
-  if (casacore::isNumeric(casa_dtype))  {
+  if (casacore::isNumeric(casa_dtype) || casa_dtype == DataType::TpBool)  {
     ARROW_ASSIGN_OR_RAISE(auto arrow_dtype, ArrowDataType(casa_dtype));
     if(arrow_dtype == flat_array->type()) return flat_array->data()->buffers[1];
     // Need to cast the supplied data to the type appropriate to the CASA column
