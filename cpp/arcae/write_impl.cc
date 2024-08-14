@@ -24,7 +24,6 @@
 #include <casacore/tables/Tables/TableColumn.h>
 #include <casacore/tables/Tables/TableProxy.h>
 
-#include "arcae/array_util.h"
 #include "arcae/data_partition.h"
 #include "arcae/isolated_table_proxy.h"
 #include "arcae/result_shape.h"
@@ -206,6 +205,45 @@ struct WriteCallback {
     }
   }
 };
+
+Result<std::shared_ptr<Array>>
+GetFlatArray(std::shared_ptr<Array> array, bool nulls = false) {
+  auto array_data = array->data();
+
+  while(true) {
+    switch(array_data->type->id()) {
+      case arrow::Type::LIST:
+      case arrow::Type::LARGE_LIST:
+      case arrow::Type::FIXED_SIZE_LIST:
+      {
+        if(!nulls && array_data->null_count > 0) {
+          return Status::Invalid(
+            "Null values were encountered "
+            "during array flattening.");
+        }
+        array_data = array_data->child_data[0];
+        break;
+      }
+      case arrow::Type::BOOL:
+      case arrow::Type::UINT8:
+      case arrow::Type::UINT16:
+      case arrow::Type::UINT32:
+      case arrow::Type::UINT64:
+      case arrow::Type::INT8:
+      case arrow::Type::INT16:
+      case arrow::Type::INT32:
+      case arrow::Type::INT64:
+      case arrow::Type::FLOAT:
+      case arrow::Type::DOUBLE:
+      case arrow::Type::STRING:
+        return arrow::MakeArray(array_data);
+      default:
+        return Status::NotImplemented(
+          "Flattening of type ", array->type(),
+          " is not supported");
+    }
+  }
+}
 
 // Attempt to return the underlying buffer of the supplied array
 // Arrow strings are converted to casacore Strings

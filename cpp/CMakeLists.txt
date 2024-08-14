@@ -3,7 +3,6 @@ find_package(absl CONFIG REQUIRED)
 pkg_check_modules(casacore REQUIRED IMPORTED_TARGET casacore)
 
 add_library(arcae SHARED
-    arcae/array_util.cc
     arcae/configuration.cc
     arcae/descriptor.cc
     arcae/data_partition.cc
