@@ -231,59 +231,39 @@ TEST_F(DevTransposeTest, Basic) {
           }
 
           return read_fut.Then([
-            spans = chunk.DimensionSpans(),
-            offset = chunk.FlatOffset()
-          ] (const casacore::Array<Complex> & data) -> Array<Complex> {
-            Array<Complex> result(data.shape());
-            const Complex * in_ptr = data.data();
-            Complex * out_ptr = result.data();
-            std::size_t ndim = spans.size();
-            std::ptrdiff_t row_dim = std::ptrdiff_t(ndim) - 1;
+            chunk = chunk
+          ] (const casacore::Array<Complex> & data) mutable -> Array<Complex> {
+            using CT = Complex;
             std::shared_ptr<void> time_it(nullptr, [start = absl::Now()](...) {
               transpose_duration += absl::Now() - start;
             });
+            std::ptrdiff_t ndim = chunk.nDim();
+            std::ptrdiff_t last_dim = ndim - 1;
+            auto spans = chunk.DimensionSpans();
+            auto min_mem = chunk.MinMemIndex();
+            auto chunk_strides = chunk.ChunkStrides();
+            auto buffer_strides = chunk.BufferStrides();
+            const CT * in_ptr = data.data();
+            casacore::Array<Complex> result(data.shape());;
+            CT * out_ptr = result.data();
+            auto pos = chunk.ScratchPositions();
+            for(std::size_t i = 0; i < pos.size(); ++i) pos[i] = 0;
 
-            auto DimSize = [&](auto d) { return spans[d].mem.size(); };
-            auto Mem = [&](auto d, auto i) { return spans[d].mem[i]; };
-
-            // Initialise dimension sizes and minimum memory index
-            // std::array<std::size_t, kMaxDims> dim_size;
-            std::array<IndexType, kMaxDims> min_mem;
-            for(auto d=0; d < ndim; ++d) {
-              min_mem[d] = *std::min_element(std::begin(spans[d].mem), std::end(spans[d].mem));
-            }
-
-            // Initialise strides
-            std::array<std::size_t, kMaxDims> strides{1};
-            for(std::size_t d = 1, product = 1; d < ndim; ++d) {
-              strides[d] = DimSize(d - 1) * product;
-              product *= DimSize(d - 1);
-            }
-
-            // Initialise position array
-            std::array<std::size_t, kMaxDims> pos;
-            pos.fill(0);
-
-            // Iterate over the spans in memory, copying data
-            while(true) {
-              std::size_t in_offset = 0;
-              std::size_t out_offset = 0;
-              for(std::size_t d=0; d < ndim; ++d) {
-                in_offset += (Mem(d, pos[d]) - min_mem[d])*strides[d];
-                out_offset += pos[d] * strides[d];
+            while(true) {  // Iterate over the spans in memory, copying data
+              std::size_t i = 0, o = 0;
+              for(std::ptrdiff_t d = 0; d < ndim; ++d) {
+                i += pos[d] * chunk_strides[d];
+                o += (spans[d].mem[pos[d]] - min_mem[d]) * buffer_strides[d];
               }
-              out_ptr[out_offset] = in_ptr[in_offset];
-
-              // FORTRAN ordering
-              for(std::size_t d=0; d < ndim; ++d) {
-                ++pos[d];
-                if(pos[d] < DimSize(d)) break;
-                pos[d] = 0;
-                if(d == row_dim) return result;
+              // Moves degrade to copies for simple (i.e. numeric) types
+              // but it should make casacore::String more efficient by avoiding copies
+              out_ptr[o] = std::move(in_ptr[i]);
+              for(std::ptrdiff_t d=0; d < ndim; ++d) {     // Iterate in FORTRAN order
+                if(++pos[d] < spans[d].mem.size()) break;  // Iteration doesn't reach dim end
+                pos[d] = 0;                                // OtherwBasic iteration worksise reset, next dim
+                if(d == last_dim) return result;             // The last dim is reset, we're done
               }
             }
-
-            return result;
           }, {}, CallbackOptions{ShouldSchedule::Always, cpu_pool});
         });
 
