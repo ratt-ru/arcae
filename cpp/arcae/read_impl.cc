@@ -102,12 +102,12 @@ struct ReadCallback {
         if(shape.size() == 1) {
           auto column = ScalarColumn<CT>(tp.table(), column_name);
           auto data = CasaVector<CT>(chunk.GetShape(), out_ptr, casacore::SHARE);
-          column.getColumnRange(chunk.RowSlicer(), data);
+          column.getColumnCells(chunk.ReferenceRows(), data);
           return true;
         }
         auto column = ArrayColumn<CT>(tp.table(), column_name);
         auto data = CasaArray<CT>(chunk.GetShape(), out_ptr, casacore::SHARE);
-        column.getColumnRange(chunk.RowSlicer(), chunk.SectionSlicer(), data);
+        column.getColumnCells(chunk.ReferenceRows(), chunk.SectionSlicer(), data);
         return true;
       });
     }
@@ -119,10 +119,10 @@ struct ReadCallback {
     ](const TableProxy & tp) -> Future<CasaArray<CT>> {
       if(chunk.nDim() == 1) {
         auto column = ScalarColumn<CT>(tp.table(), column_name);
-        return column.getColumnRange(chunk.RowSlicer());
+        return column.getColumnCells(chunk.ReferenceRows());
       }
       auto column = ArrayColumn<CT>(tp.table(), column_name);
-      return column.getColumnRange(chunk.RowSlicer(), chunk.SectionSlicer());
+      return column.getColumnCells(chunk.ReferenceRows(), chunk.SectionSlicer());
     });
 
     // Transpose the array into the output buffer

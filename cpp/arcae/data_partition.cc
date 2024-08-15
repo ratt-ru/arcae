@@ -6,30 +6,30 @@
 #include <memory>
 #include <numeric>
 
+#include <casacore/casa/aipsxtype.h>
 #include <casacore/casa/Arrays/IPosition.h>
 #include <casacore/casa/Arrays/Slicer.h>
+#include <casacore/tables/Tables/RefRows.h>
 
 #include <arrow/result.h>
 
 #include "arcae/result_shape.h"
 #include "arcae/selection.h"
-#include "arcae/type_traits.h"
 
-using arrow::Status;
-using arrow::Result;
+using ::arrow::Status;
+using ::arrow::Result;
 
-using casacore::IPosition;
-using casacore::Slicer;
+using ::casacore::IPosition;
+using ::casacore::RefRows;
+using ::casacore::rownr_t;
+using ::casacore::Slicer;
+using ::casacore::Vector;
 
 namespace arcae {
 namespace detail {
 
 namespace {
 
-struct IndexResult {
-  std::vector<IndexType> disk;
-  std::vector<IndexType> mem;
-};
 
 // Given a range of sub-spans in each dimension, determine whether
 // the memory ordering is contiguous. This means there must be a
@@ -57,7 +57,10 @@ bool IsMemoryContiguous(const SpanPair & spans) {
   return true;
 }
 
-
+struct IndexResult {
+  Index disk;
+  Index mem;
+};
 
 // Given a span of disk indices,
 // return the sorted indices, as well as
@@ -65,9 +68,10 @@ bool IsMemoryContiguous(const SpanPair & spans) {
 IndexResult MakeSortedIndices(const IndexSpan & ids) {
   std::vector<IndexType> mem(ids.size(), 0);
   std::iota(mem.begin(), mem.end(), 0);
-  std::sort(mem.begin(), mem.end(), [&ids](auto l, auto r) { return ids[l] < ids[r]; });
+  std::sort(mem.begin(), mem.end(),
+            [&ids](auto l, auto r) { return ids[l] < ids[r]; });
 
-  std::vector<IndexType> disk(ids.size(), 0);
+  Index disk(ids.size(), 0);
   for(std::size_t i = 0; i < ids.size(); ++i) disk[i] = ids[mem[i]];
   return IndexResult{std::move(disk), std::move(mem)};
 }
@@ -76,7 +80,8 @@ IndexResult MakeSortedIndices(const IndexSpan & ids) {
 // associated with contiguous disk id ranges
 Result<std::vector<SpanPair>> MakeSubSpans(
   const IndexSpan & disk_span,
-  const IndexSpan & mem_span) {
+  const IndexSpan & mem_span,
+  bool entire_range) {
     assert(disk_span.size() == mem_span.size());
     std::vector<SpanPair> result;
     std::size_t start = 0;
@@ -101,7 +106,7 @@ Result<std::vector<SpanPair>> MakeSubSpans(
       } else if(disk_span[i] - disk_span[i - 1] == 1) {
         // monotonic range, advance
         continue;
-      } else {
+      } else if(!entire_range) {
         // discontinuity in positive indices
         // create a positive range
         MakeSubSpan(i);
@@ -117,6 +122,7 @@ struct CartesianProductResult {
   std::vector<bool> contiguous;
 };
 
+// Creates a cartesian product of span pairs
 CartesianProductResult
 CartesianProduct(const std::vector<SpanPairs> & dim_spans) {
   // Total number of elements in the cartesian product
@@ -167,7 +173,6 @@ CartesianProduct(const std::vector<SpanPairs> & dim_spans) {
   return {std::move(product), std::move(contiguous)};
 }
 
-// Creates a cartesian product of span pairs
 Result<std::vector<DataChunk>>
 MakeDataChunks(
     std::vector<SpanPairs> && dim_spans,
@@ -266,6 +271,12 @@ DataChunk::RowSlicer() const noexcept {
     IPosition({row_span.disk[0]}),
     IPosition({row_span.disk[row_span.disk.size() - 1]}),
     Slicer::endIsLast);
+}
+
+RefRows
+DataChunk::ReferenceRows() const noexcept {
+  auto s = DimensionSpans()[nDim() - 1].disk;
+  return RefRows(Vector<rownr_t>(s.begin(), s.end()), false, false);
 }
 
 // Get a Section Slicer for the disk span
@@ -424,9 +435,12 @@ Result<DataPartition> DataPartition::Make(
     std::vector<SpanPairs> dim_subspans;
     dim_subspans.reserve(result_shape.nDim());
     const auto & shape = result_shape.GetShape();
-    for(std::size_t dim=0; dim < result_shape.nDim(); ++dim) {
-      auto [disk_span, mem_span] = GetSpanPair(dim, shape[dim]);
-      ARROW_ASSIGN_OR_RAISE(auto spans, MakeSubSpans(disk_span, mem_span));
+    auto row_dim = result_shape.nDim() - 1;
+    for(std::size_t d = 0; d < result_shape.nDim(); ++d) {
+      auto [disk_span, mem_span] = GetSpanPair(d, shape[d]);
+      ARROW_ASSIGN_OR_RAISE(
+        auto spans,
+        MakeSubSpans(disk_span, mem_span, d == row_dim));
       dim_subspans.emplace_back(std::move(spans));
     }
 
@@ -455,7 +469,7 @@ Result<DataPartition> DataPartition::Make(
     // Create span pairs for the secondary dimensions
     for(std::size_t dim=0; dim < row_dim; ++dim) {
       auto [disk_span, mem_span] = GetSpanPair(dim, row_shape[dim]);
-      ARROW_ASSIGN_OR_RAISE(auto spans, MakeSubSpans(disk_span, mem_span));
+      ARROW_ASSIGN_OR_RAISE(auto spans, MakeSubSpans(disk_span, mem_span, false));
       dim_subspans.emplace_back(std::move(spans));
     }
 
