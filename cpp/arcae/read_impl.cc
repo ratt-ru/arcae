@@ -5,6 +5,9 @@
 #include <memory>
 #include <string>
 
+#include <absl/time/clock.h>
+#include <absl/time/time.h>
+
 #include <arrow/api.h>
 #include <arrow/buffer.h>
 #include <arrow/result.h>
@@ -97,6 +100,11 @@ struct ReadCallback {
         chunk = chunk,
         buffer = buffer
       ](const TableProxy & tp) -> Future<bool> {
+        std::shared_ptr<void> time_it(nullptr, [&, start = absl::Now()](...) {
+          ARROW_LOG(INFO) << "Read " << chunk.ToString()
+                          << " contiguous in " << absl::Now() - start << " seconds";
+        });
+
         auto out_ptr = buffer->template mutable_data_as<CT>() + chunk.FlatOffset();
         auto shape = chunk.GetShape();
         if(shape.size() == 1) {
@@ -117,6 +125,11 @@ struct ReadCallback {
       column_name = std::move(column),
       chunk = chunk
     ](const TableProxy & tp) -> Future<CasaArray<CT>> {
+        std::shared_ptr<void> time_it(nullptr, [&, start = absl::Now()](...) {
+          ARROW_LOG(INFO) << "Read " << chunk.ToString()
+                          << " in " << absl::Now() - start << " seconds";
+        });
+
       if(chunk.nDim() == 1) {
         auto column = ScalarColumn<CT>(tp.table(), column_name);
         return column.getColumnCells(chunk.ReferenceRows());
@@ -130,6 +143,11 @@ struct ReadCallback {
       chunk = chunk,
       buffer = buffer
     ](const CasaArray<CT> & data) mutable -> bool {
+        std::shared_ptr<void> time_it(nullptr, [&, start = absl::Now()](...) {
+          ARROW_LOG(INFO) << "Transposed " << chunk.ToString()
+                          << " in " << absl::Now() - start << " seconds";
+        });
+
       std::ptrdiff_t ndim = chunk.nDim();
       std::ptrdiff_t last_dim = ndim - 1;
       auto spans = chunk.DimensionSpans();

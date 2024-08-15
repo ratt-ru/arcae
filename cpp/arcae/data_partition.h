@@ -2,6 +2,7 @@
 #define ARCAE_DATA_PARTITION_H
 
 #include <cassert>
+#include <sstream>
 #include <vector>
 
 #include <absl/types/span.h>
@@ -198,6 +199,28 @@ struct DataChunk {
     std::size_t nbytes = CasaDataTypeSize(CasaDataType()).ValueOrDie();
     return nbytes * nElements();
   }
+
+  std::string ToString() const {
+    std::ostringstream oss;
+    oss << "Chunk(" << GetShape() << ','
+        << CasaDataType() << ',';
+
+    float nbytes = nBytes();
+    float display = nbytes;
+    float increment = 1024;
+
+    for(auto name: {"B", "KB", "MB", "GB"}) {
+      if(nbytes > increment) {
+        increment *= 1024.;
+        display /= 1024.;
+      } else {
+        oss << display << name;
+        break;
+      }
+    }
+    oss << ')';
+    return oss.str();
+  };
 
   // Shape of the chunk
   casacore::IPosition GetShape() const noexcept;
