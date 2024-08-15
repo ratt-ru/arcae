@@ -88,12 +88,12 @@ struct WriteCallback {
         if(shape.size() == 1) {
           auto column = ScalarColumn<CT>(tp.table(), column_name);
           auto vector = CasaVector<CT>(shape, in_ptr, casacore::SHARE);
-          column.putColumnRange(chunk.RowSlicer(), vector);
+          column.putColumnCells(chunk.ReferenceRows(), vector);
           return true;
         }
         auto column = ArrayColumn<CT>(tp.table(), column_name);
         auto array = CasaArray<CT>(shape, in_ptr, casacore::SHARE);
-        column.putColumnRange(chunk.RowSlicer(), chunk.SectionSlicer(), array);
+        column.putColumnCells(chunk.ReferenceRows(), chunk.SectionSlicer(), array);
         return true;
       });
     }
@@ -143,11 +143,11 @@ struct WriteCallback {
       ](const CasaArray<CT> & data, const TableProxy & tp) -> bool {
         if(chunk.nDim() == 1) {
           auto column = ScalarColumn<CT>(tp.table(), column_name);
-          column.putColumnRange(chunk.RowSlicer(), data);
+          column.putColumnCells(chunk.ReferenceRows(), data);
           return true;
         }
         auto column = ArrayColumn<CT>(tp.table(), column_name);
-        column.putColumnRange(chunk.RowSlicer(), chunk.SectionSlicer(), data);
+        column.putColumnCells(chunk.ReferenceRows(), chunk.SectionSlicer(), data);
         return true;
       });
   }

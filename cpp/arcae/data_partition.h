@@ -10,9 +10,11 @@
 
 #include <casacore/casa/Arrays/IPosition.h>
 #include <casacore/casa/Utilities/DataType.h>
+#include <casacore/tables/Tables/RefRows.h>
 
 #include "arcae/result_shape.h"
 #include "arcae/selection.h"
+#include "arcae/type_traits.h"
 
 namespace arcae {
 namespace detail {
@@ -180,6 +182,9 @@ struct DataChunk {
   // Get a Row Slicer for the disk span
   casacore::Slicer RowSlicer() const noexcept;
 
+  // Get Reference Rows for the disk span
+  casacore::RefRows ReferenceRows() const noexcept;
+
   // Get a Section Slicer for the disk span
   casacore::Slicer SectionSlicer() const noexcept;
 
@@ -188,6 +193,11 @@ struct DataChunk {
 
   // Number of elements in the chunk
   std::size_t nElements() const noexcept;
+
+  std::size_t nBytes() const {
+    std::size_t nbytes = CasaDataTypeSize(CasaDataType()).ValueOrDie();
+    return nbytes * nElements();
+  }
 
   // Shape of the chunk
   casacore::IPosition GetShape() const noexcept;
