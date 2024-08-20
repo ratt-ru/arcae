@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Pin cython to less than 3.0.10 (:pr:`106`)
 * Use casacore::RefRows for indexing the row dimension (:pr:`105`)
 * Refactor arcae to use a finer-grained execution model (:pr:`101`)
 * Pin manylinux_2_28 image to manylinux_2_28_x86_64:2024.07.02-0 (:pr:`102`)
