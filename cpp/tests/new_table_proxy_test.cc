@@ -535,6 +535,16 @@ TEST_F(FixedTableProxyTest, ColumnAndRowGet) {
     "VAR_STRING_DATA"));
 }
 
+// Test name getting
+TEST_F(FixedTableProxyTest, Name) {
+  ASSERT_OK_AND_ASSIGN(auto ntp, OpenTable());
+  ASSERT_OK_AND_ASSIGN(auto name, ntp->Name());
+  EXPECT_TRUE(table_name_.size() <= name.size());
+  std::size_t d = name.size() - table_name_.size();
+  for(std::size_t i = 0; i < table_name_.size(); ++i) {
+    EXPECT_EQ(table_name_[i], name[d + i]);
+  }
+}
 
 class VariableProxyTest : public ::testing::TestWithParam<Parametrization> {
   protected:

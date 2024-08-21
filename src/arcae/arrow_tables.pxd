@@ -66,6 +66,7 @@ cdef extern from "arcae/new_table_proxy.h" namespace "arcae" nogil:
             const string & column,
             const shared_ptr[CArray] & data,
             const CSelection & selection)
+        CResult[string] Name " NewTableProxy::Name"()
         CResult[string] GetTableDescriptor " NewTableProxy::GetTableDescriptor"()
         CResult[string] GetColumnDescriptor "NewTableProxy::GetColumnDescriptor"(const string & column)
         CResult[string] GetLockOptions "NewTableProxy::GetLockOptions"()
