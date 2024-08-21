@@ -33,7 +33,7 @@ def test_column_selection(column_case_table):
             "SCALAR",
             "SCALAR_STRING",
             # Even though the column is unconstrained, ndim is the same
-            #"UNCONSTRAINED_SAME_NDIM",
+            "UNCONSTRAINED_SAME_NDIM",
             "VARIABLE",
             "VARIABLE_STRING"
         ]
@@ -44,7 +44,7 @@ def test_column_selection(column_case_table):
             "FIXED_STRING",
             "SCALAR",
             "SCALAR_STRING",
-            #"UNCONSTRAINED_SAME_NDIM",
+            "UNCONSTRAINED_SAME_NDIM",
             "VARIABLE",
             "VARIABLE_STRING"
         ]

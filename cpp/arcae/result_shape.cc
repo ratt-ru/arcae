@@ -519,14 +519,6 @@ ResultShapeData::MakeRead(
     if(result_data.IsFixed()) result_shape = result_data.GetShape();
   }
 
-  // The number of dimensions varies per row
-  // This case is not handled
-  if (column_desc.ndim() == -1) {
-    return Status::NotImplemented(
-      "Column ", column_name,
-      " has varying dimensions");
-  }
-
   // Fixed shape, easy case
   if (column_desc.isFixedShape()) {
     auto shape = column_desc.shape();
@@ -566,9 +558,8 @@ ResultShapeData::MakeRead(
     }
   }
 
-  // Should have been caught above, but check again
-  // The number of dimensions varies per row
-  // This case is not handled
+  // The number of dimensions varies per row,
+  // in practice. This case is not handled
   if (ndim == -1) {
     return Status::NotImplemented(
       "Column ", column_name,
@@ -610,18 +601,13 @@ ResultShapeData::MakeWrite(
   if (!data) return Status::Invalid("data array is null");
   auto column_desc = column.columnDesc();
   auto column_name = column_desc.name();
+  auto column_ndim = column_desc.ndim();
   ARROW_RETURN_NOT_OK(CheckRowNumberLimit(column_name, column.nrow()));
-
-  // Varying dimensions in each row are not supported
-  if (column_desc.ndim() < 0) {
-    return Status::NotImplemented(
-      "Writing to unconstrained dimension column ",
-      column_desc.name());
-  }
 
   ARROW_ASSIGN_OR_RAISE(auto shape_data, GetResultShapeData(column_desc, data));
 
-  if (shape_data.nDim() != std::size_t(column_desc.ndim()) + 1) {
+  if(column_ndim != -1 &&
+      shape_data.nDim() != std::size_t(column_ndim) + 1) {
     return Status::Invalid(
       "Number of data dimensions ", shape_data.nDim(),
       " does not match number of column dimensions ",
