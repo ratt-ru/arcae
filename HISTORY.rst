@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Remove FFTW3 and casacore apps from the casacore build (:pr:`110``)
 * Add table name method (:pr:`109`)
 * Re-implement partial support for selection over unconstrained columns
   that, in practice, have the same rank (:pr:`108`)
