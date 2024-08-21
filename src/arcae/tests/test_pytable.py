@@ -244,6 +244,11 @@ def test_partial_read(sorting_table):
         assert full.take(list(range(start, start + nrow))) == T.to_arrow([slice(start, start+nrow)])
         start += nrow
 
+def test_table_name(sorting_table):
+    T = arcae.table(sorting_table)
+    assert T.name() == sorting_table
+
+
 def test_table_taql(sorting_table):
     """ Tests that basic taql queries work """
     with arcae.table(sorting_table) as T:

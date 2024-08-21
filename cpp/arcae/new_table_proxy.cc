@@ -86,6 +86,13 @@ NewTableProxy::PutColumn(
     return WriteImpl(itp_, column, data, selection).MoveResult();
 }
 
+Result<std::string>
+NewTableProxy::Name() const {
+  return itp_->RunAsync([](const TableProxy & tp) -> std::string {
+    return tp.table().tableName();
+  }).MoveResult();
+}
+
 Result<std::vector<std::string>>
 NewTableProxy::Columns() const {
   return itp_->RunAsync([](const TableProxy & tp) -> std::vector<std::string> {

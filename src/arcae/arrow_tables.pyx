@@ -173,6 +173,11 @@ cdef class Table:
 
         return pyarrow_wrap_table(ctable)
 
+    def name(self) -> str:
+        """Returns the directory containing the table"""
+        cname = GetResultValue(self.c_table.get().Name())
+        return frombytes(cname)
+
     def getcol(self, column: str, index: Optional[FullIndex] = None, result: Optional[np.ndarray] = None) -> np.ndarray:
         cdef:
             string cpp_column = tobytes(column)

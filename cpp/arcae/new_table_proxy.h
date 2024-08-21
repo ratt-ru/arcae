@@ -64,6 +64,9 @@ public:
     const std::shared_ptr<arrow::Array> & data,
     const detail::Selection & selection={}) const;
 
+  // Return the URL of this table
+  arrow::Result<std::string> Name() const;
+
   // Return the names of the columns in this table
   arrow::Result<std::vector<std::string>> Columns() const;
 
