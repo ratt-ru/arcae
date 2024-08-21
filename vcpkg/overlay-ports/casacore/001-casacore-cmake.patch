@@ -1,5 +1,5 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 7e48b3ff2..45a781bce 100644
+index 7e48b3ff2..d63376d78 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -196,13 +196,13 @@ if (NOT CMAKE_BUILD_TYPE)
@@ -22,7 +22,26 @@ index 7e48b3ff2..45a781bce 100644
  
  # Ensure clang is not complaining about unused arguments.
  if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-@@ -547,8 +547,41 @@ endforeach (module)
+@@ -391,11 +391,13 @@ if (HDF5_FOUND)
+     add_definitions(-DHAVE_HDF5)
+ endif (HDF5_FOUND)
+ 
+-include_directories (${FFTW3_INCLUDE_DIRS})
+-add_definitions(-DHAVE_FFTW3)
+-if (NOT FFTW3_DISABLE_THREADS)
+-    add_definitions(-DHAVE_FFTW3_THREADS)
+-endif (NOT FFTW3_DISABLE_THREADS)
++if (BUILD_FFTW3)
++    include_directories (${FFTW3_INCLUDE_DIRS})
++    add_definitions(-DHAVE_FFTW3)
++    if (NOT FFTW3_DISABLE_THREADS)
++        add_definitions(-DHAVE_FFTW3_THREADS)
++    endif (NOT FFTW3_DISABLE_THREADS)
++endif (BUILD_FFTW3)
+ 
+ if (DL_FOUND)
+     add_definitions(-DHAVE_DL)
+@@ -547,8 +549,41 @@ endforeach (module)
  
  # Install pkg-config support file
  CONFIGURE_FILE("casacore.pc.in" "casacore.pc" @ONLY)
@@ -78,7 +97,7 @@ index 000000000..8c9ad12aa
 +
 +check_required_components(@PROJECT_NAME@)
 diff --git a/casa/CMakeLists.txt b/casa/CMakeLists.txt
-index 5e8c1bd97..880d501b3 100644
+index 5e8c1bd97..bcf97e90b 100644
 --- a/casa/CMakeLists.txt
 +++ b/casa/CMakeLists.txt
 @@ -15,7 +15,9 @@ set (
@@ -92,7 +111,7 @@ index 5e8c1bd97..880d501b3 100644
  foreach (src ${parser_inputs})
      if (BISON_VERSION VERSION_LESS 3.0)
          BISON_TARGET (${src} Json/${src}.yy ${CMAKE_CURRENT_BINARY_DIR}/${src}.ycc COMPILE_FLAGS "-y -p ${src}")
-@@ -256,18 +258,15 @@ endif (READLINE_FOUND)
+@@ -256,18 +258,13 @@ endif (READLINE_FOUND)
  
  find_library(libm m)
  
@@ -103,11 +122,11 @@ index 5e8c1bd97..880d501b3 100644
 -dl
 -${CASACORE_ARCH_LIBS}
 -)
+-
+-add_subdirectory (apps)
 +target_link_libraries (casa_casa
 +    PUBLIC ${de_libraries} ${libm} dl ${CASACORE_ARCH_LIBS}
 +    PRIVATE ZLIB::ZLIB)
- 
- add_subdirectory (apps)
  
  install (
  TARGETS casa_casa
@@ -342,22 +361,22 @@ index 23c16aee7..6d3a28aaa 100644
  LIBRARY DESTINATION lib${LIB_SUFFIX}
  ARCHIVE DESTINATION lib${LIB_SUFFIX}
 diff --git a/fits/CMakeLists.txt b/fits/CMakeLists.txt
-index 2104c5612..5b14174c2 100644
+index 2104c5612..485e49cb3 100644
 --- a/fits/CMakeLists.txt
 +++ b/fits/CMakeLists.txt
-@@ -24,7 +24,10 @@ FITS/blockio.cc
+@@ -24,14 +24,16 @@ FITS/blockio.cc
  FITS/FITSReader.cc
  )
  
 -target_link_libraries (casa_fits casa_measures ${CFITSIO_LIBRARIES} ${CASACORE_ARCH_LIBS})
+-
+-add_subdirectory (apps)
 +find_package(ZLIB REQUIRED)
 +target_link_libraries (casa_fits
 +    PUBLIC casa_measures ${CFITSIO_LIBRARIES} ${CASACORE_ARCH_LIBS}
 +    PRIVATE ZLIB::ZLIB)
  
- add_subdirectory (apps)
- 
-@@ -32,6 +35,7 @@ add_subdirectory (apps)
+ #the tests
  add_subdirectory (FITS/test ${EXCL_ALL})
  
  install (TARGETS casa_fits
@@ -376,11 +395,15 @@ index 578ee92d7..c4f075d51 100644
 +target_link_libraries (fits2table PUBLIC casa_fits ${CASACORE_ARCH_LIBS} PRIVATE ZLIB::ZLIB)
  install(TARGETS fits2table DESTINATION bin)
 diff --git a/images/CMakeLists.txt b/images/CMakeLists.txt
-index 85af2b8fc..d496e9953 100644
+index 85af2b8fc..6ec9a522d 100644
 --- a/images/CMakeLists.txt
 +++ b/images/CMakeLists.txt
-@@ -75,6 +75,7 @@ add_subdirectory (apps)
+@@ -71,10 +71,9 @@ casa_lattices
+ ${CASACORE_ARCH_LIBS}
+ )
  
+-add_subdirectory (apps)
+-
  install (
  TARGETS casa_images
 +EXPORT casacore
@@ -412,11 +435,15 @@ index c3266bcf8..ed4314751 100644
  LIBRARY DESTINATION lib${LIB_SUFFIX}
  ARCHIVE DESTINATION lib${LIB_SUFFIX}
 diff --git a/measures/CMakeLists.txt b/measures/CMakeLists.txt
-index 63ca4817a..0d39da69c 100644
+index 63ca4817a..c8d25c852 100644
 --- a/measures/CMakeLists.txt
 +++ b/measures/CMakeLists.txt
-@@ -75,6 +75,7 @@ add_subdirectory (apps)
+@@ -71,10 +71,9 @@ TableMeasures/TableQuantumDesc.cc
  
+ target_link_libraries (casa_measures casa_tables casa_scimath ${CASACORE_ARCH_LIBS})
+ 
+-add_subdirectory (apps)
+-
  install (
  TARGETS casa_measures
 +EXPORT casacore
@@ -436,7 +463,7 @@ index 0703a5d1d..46f26840f 100644
  LIBRARY DESTINATION lib${LIB_SUFFIX}
  ARCHIVE DESTINATION lib${LIB_SUFFIX}
 diff --git a/ms/CMakeLists.txt b/ms/CMakeLists.txt
-index f7fcfa053..dcad9e7c1 100644
+index f7fcfa053..d2681e7b3 100644
 --- a/ms/CMakeLists.txt
 +++ b/ms/CMakeLists.txt
 @@ -1,5 +1,5 @@
@@ -446,20 +473,27 @@ index f7fcfa053..dcad9e7c1 100644
  #
  
  set (
-@@ -168,6 +168,7 @@ ${CASACORE_ARCH_LIBS}
- add_subdirectory (apps)
+@@ -165,9 +165,8 @@ casa_ms casa_measures
+ ${CASACORE_ARCH_LIBS}
+ )
  
+-add_subdirectory (apps)
+-
  install (TARGETS casa_ms
 +EXPORT casacore
  RUNTIME DESTINATION bin
  LIBRARY DESTINATION lib${LIB_SUFFIX}
  ARCHIVE DESTINATION lib${LIB_SUFFIX}
 diff --git a/msfits/CMakeLists.txt b/msfits/CMakeLists.txt
-index 28f1884a2..85a312ad0 100644
+index 28f1884a2..2c4f7f0dc 100644
 --- a/msfits/CMakeLists.txt
 +++ b/msfits/CMakeLists.txt
-@@ -30,6 +30,7 @@ add_subdirectory (apps)
+@@ -26,10 +26,9 @@ MSFits/SDWeatherHandler.cc
  
+ target_link_libraries (casa_msfits casa_ms casa_fits ${CASACORE_ARCH_LIBS})
+ 
+-add_subdirectory (apps)
+-
  install (
  TARGETS casa_msfits
 +EXPORT casacore
@@ -539,12 +573,15 @@ index 69bd4d757..8e6aa8d8a 100644
  ARCHIVE DESTINATION lib${LIB_SUFFIX}
  LIBRARY PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
 diff --git a/tables/CMakeLists.txt b/tables/CMakeLists.txt
-index 9c012552d..7a66af6a2 100644
+index 9c012552d..8d88ffe3f 100644
 --- a/tables/CMakeLists.txt
 +++ b/tables/CMakeLists.txt
-@@ -228,6 +228,7 @@ endif(MPI_FOUND)
- add_subdirectory (apps)
+@@ -225,9 +225,8 @@ if(MPI_FOUND)
+     endif(ADIOS2_FOUND)
+ endif(MPI_FOUND)
  
+-add_subdirectory (apps)
+-
  install (TARGETS casa_tables
 +EXPORT casacore
  RUNTIME DESTINATION bin

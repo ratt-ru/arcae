@@ -19,9 +19,10 @@ vcpkg_check_features(
         tablelocking        ENABLE_TABLELOCKING
         deprecated          BUILD_DEPRECATED
         dysco               BUILD_DYSCO
-        threads             USE_THREADS
+        mutex               USE_THREADS
         readline            USE_READLINE
         adios2              USE_ADIOS2
+        fftw3               BUILD_FFTW3
         hdf5                USE_HDF5
         mpi                 USE_MPI
         openmp              USE_OPENMP
@@ -49,6 +50,7 @@ vcpkg_cmake_configure(
     SOURCE_PATH "${src}"
     OPTIONS
         ${FEATURE_OPTIONS}
+        -DBUILD_FFTW3=${BUILD_FFTW3}
         -DBUILD_PYTHON=OFF
         -DBUILD_TESTING=OFF
         -DCMAKE_CXX_STANDARD=17

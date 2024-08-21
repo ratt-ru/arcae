@@ -8,12 +8,6 @@
     "blas",
     "boost-filesystem",
     "cfitsio",
-    {
-      "name": "fftw3",
-      "features": [
-        "threads"
-      ]
-    },
     "gsl",
     "lapack",
     {
@@ -29,11 +23,10 @@
   ],
   "default-features": [
     "dysco",
-    "openmp",
     "readline",
     "stacktrace",
-    "tablelocking",
-    "threads"
+    "threads",
+    "tablelocking"
   ],
   "features": {
     "adios2": {
@@ -48,6 +41,17 @@
     },
     "dysco": {
       "description": "Enable DYSCO Storage Manager support"
+    },
+    "fftw3": {
+      "description": "Enable FFTW3 support",
+      "dependencies": [
+        {
+          "name": "fftw3",
+          "features": [
+            "threads"
+          ]
+        }
+      ]
     },
     "hdf5": {
       "description": "Enable HDF5 support",
@@ -83,11 +87,8 @@
     "tablelocking": {
       "description": "Enable table locking"
     },
-    "threads": {
-      "description": "Enable threading support",
-      "dependencies": [
-        "pthreads"
-      ]
+    "mutex": {
+      "description": "Enable mutexes in critical locations"
     }
   }
 }
