@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Add table name method (:pr:`109`)
 * Re-implement partial support for selection over unconstrained columns
   that, in practice, have the same rank (:pr:`108`)
 * Unpin manylinux_2_28_x86_64 image (:pr:`107`)
