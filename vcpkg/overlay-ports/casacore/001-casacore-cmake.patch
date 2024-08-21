@@ -1,5 +1,5 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 7e48b3ff2..d63376d78 100644
+index 7e48b3ff2..ac35437ef 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -196,13 +196,13 @@ if (NOT CMAKE_BUILD_TYPE)
@@ -22,7 +22,19 @@ index 7e48b3ff2..d63376d78 100644
  
  # Ensure clang is not complaining about unused arguments.
  if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-@@ -391,11 +391,13 @@ if (HDF5_FOUND)
+@@ -345,11 +345,6 @@ endif (_usebison STREQUAL YES)
+ if (_uselapack STREQUAL YES)
+     find_package (BLAS REQUIRED)
+     find_package (LAPACK REQUIRED)
+-    if (FFTW3_DISABLE_THREADS)
+-        find_package (FFTW3 COMPONENTS single double REQUIRED)
+-    else()
+-        find_package (FFTW3 COMPONENTS single double threads REQUIRED)
+-    endif (FFTW3_DISABLE_THREADS)
+ endif (_uselapack STREQUAL YES)
+ if (_usefits STREQUAL YES)
+     find_package (CFITSIO 3.030 REQUIRED) # Should pad to three decimal digits
+@@ -391,11 +386,15 @@ if (HDF5_FOUND)
      add_definitions(-DHAVE_HDF5)
  endif (HDF5_FOUND)
  
@@ -37,11 +49,13 @@ index 7e48b3ff2..d63376d78 100644
 +    if (NOT FFTW3_DISABLE_THREADS)
 +        add_definitions(-DHAVE_FFTW3_THREADS)
 +    endif (NOT FFTW3_DISABLE_THREADS)
++else()
++    remove_definitions((-DHAVE_FFTW3 -DHAVE_FFTW3_THREADS))
 +endif (BUILD_FFTW3)
  
  if (DL_FOUND)
      add_definitions(-DHAVE_DL)
-@@ -547,8 +549,41 @@ endforeach (module)
+@@ -547,8 +546,41 @@ endforeach (module)
  
  # Install pkg-config support file
  CONFIGURE_FILE("casacore.pc.in" "casacore.pc" @ONLY)

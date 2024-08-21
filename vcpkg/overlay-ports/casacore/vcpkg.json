@@ -25,7 +25,7 @@
     "dysco",
     "readline",
     "stacktrace",
-    "threads",
+    "mutex",
     "tablelocking"
   ],
   "features": {
