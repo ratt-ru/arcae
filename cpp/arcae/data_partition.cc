@@ -320,7 +320,7 @@ DataChunk::IsEmpty() const noexcept {
   for(const auto & span: DimensionSpans()) {
     for(auto i: span.disk) { if (i < 0) return true; }
   }
-  return false;
+  return nElements() == 0;
 }
 
 // Commented out debugging function

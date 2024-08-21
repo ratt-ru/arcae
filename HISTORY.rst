@@ -4,6 +4,8 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Re-implement partial support for selection over unconstrained columns
+  that, in practice, have the same rank (:pr:`108`)
 * Unpin manylinux_2_28_x86_64 image (:pr:`107`)
 * Pin cython to less than 3.0.10 (:pr:`106`)
 * Use casacore::RefRows for indexing the row dimension (:pr:`105`)
