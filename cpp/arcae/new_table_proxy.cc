@@ -29,7 +29,7 @@ static constexpr char kCasaDescriptorKey[] = "__casa_descriptor__";
 }  // namespace
 
 Result<std::string>
-NewTableProxy::GetTableDescriptor() const {
+NewTableProxy::GetTableDescriptor() const noexcept {
   return itp_->RunAsync([](TableProxy & tp) -> std::string {
     std::ostringstream oss;
     JsonOut table_json(oss);
@@ -41,7 +41,7 @@ NewTableProxy::GetTableDescriptor() const {
 }
 
 Result<std::string>
-NewTableProxy::GetColumnDescriptor(const std::string & column) const {
+NewTableProxy::GetColumnDescriptor(const std::string & column) const noexcept {
   return itp_->RunAsync([column = column](TableProxy & tp) -> Result<std::string> {
     ARROW_RETURN_NOT_OK(detail::ColumnExists(tp, column));
     std::ostringstream oss;
@@ -54,7 +54,7 @@ NewTableProxy::GetColumnDescriptor(const std::string & column) const {
 }
 
 Result<std::string>
-NewTableProxy::GetLockOptions() const {
+NewTableProxy::GetLockOptions() const noexcept {
   return itp_->RunAsync([](TableProxy & tp) {
     std::ostringstream oss;
     JsonOut lock_json(oss);
@@ -66,7 +66,7 @@ NewTableProxy::GetLockOptions() const {
 Result<std::shared_ptr<Table>>
 NewTableProxy::ToArrow(
     const detail::Selection & selection,
-    const std::vector<std::string> & columns) const {
+    const std::vector<std::string> & columns) const noexcept {
   return detail::ReadTableImpl(itp_, columns, selection).MoveResult();
 }
 
@@ -74,7 +74,7 @@ Result<std::shared_ptr<Array>>
 NewTableProxy::GetColumn(
     const std::string & column,
     const detail::Selection & selection,
-    const std::shared_ptr<Array> & result) const {
+    const std::shared_ptr<Array> & result) const noexcept {
   return ReadImpl(itp_, column, selection, result).MoveResult();
 }
 
@@ -82,19 +82,19 @@ Result<bool>
 NewTableProxy::PutColumn(
   const std::string & column,
   const std::shared_ptr<Array> & data,
-  const detail::Selection & selection) const {
+  const detail::Selection & selection) const noexcept {
     return WriteImpl(itp_, column, data, selection).MoveResult();
 }
 
 Result<std::string>
-NewTableProxy::Name() const {
+NewTableProxy::Name() const noexcept {
   return itp_->RunAsync([](const TableProxy & tp) -> std::string {
     return tp.table().tableName();
   }).MoveResult();
 }
 
 Result<std::vector<std::string>>
-NewTableProxy::Columns() const {
+NewTableProxy::Columns() const noexcept {
   return itp_->RunAsync([](const TableProxy & tp) -> std::vector<std::string> {
     const auto & columns = tp.table().tableDesc().columnNames();
     return std::vector<std::string>(std::begin(columns), std::end(columns));
@@ -102,21 +102,21 @@ NewTableProxy::Columns() const {
 }
 
 Result<std::size_t>
-NewTableProxy::nColumns() const {
+NewTableProxy::nColumns() const noexcept {
   return itp_->RunAsync([](const TableProxy & tp) -> std::size_t {
     return tp.table().tableDesc().ncolumn();
   }).MoveResult();
 }
 
 Result<std::size_t>
-NewTableProxy::nRows() const {
+NewTableProxy::nRows() const noexcept {
   return itp_->RunAsync([](const TableProxy & tp) -> std::size_t {
     return tp.table().nrow();
   }).MoveResult();
 }
 
 Result<bool>
-NewTableProxy::AddRows(std::size_t nrows) {
+NewTableProxy::AddRows(std::size_t nrows) noexcept {
   return itp_->RunAsync([nrows = nrows](TableProxy & tp) {
     detail::MaybeReopenRW(tp);
     tp.addRow(nrows);
@@ -125,7 +125,7 @@ NewTableProxy::AddRows(std::size_t nrows) {
 }
 
 Result<bool>
-NewTableProxy::Close() {
+NewTableProxy::Close() noexcept {
   return itp_->Close();
 }
 

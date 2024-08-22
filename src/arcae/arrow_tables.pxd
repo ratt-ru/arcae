@@ -53,39 +53,39 @@ cdef extern from "arcae/descriptor.h" namespace "arcae" nogil:
 cdef extern from "arcae/new_table_proxy.h" namespace "arcae" nogil:
     cdef cppclass CCasaTable" arcae::NewTableProxy":
         @staticmethod
-        CResult[bool] Close" NewTableProxy::Close"()
+        CResult[bool] Close" NewTableProxy::Close"() noexcept
 
         CResult[shared_ptr[CTable]] ToArrow " NewTableProxy::ToArrow"(
             const CSelection & selection,
-            const vector[string] & columns)
+            const vector[string] & columns) noexcept
         CResult[shared_ptr[CArray]] GetColumn " NewTableProxy::GetColumn"(
             const string & column,
             const CSelection & selection,
-            shared_ptr[CArray] result)
+            shared_ptr[CArray] result) noexcept
         CResult[bool] PutColumn " NewTableProxy::PutColumn"(
             const string & column,
             const shared_ptr[CArray] & data,
-            const CSelection & selection)
-        CResult[string] Name " NewTableProxy::Name"()
-        CResult[string] GetTableDescriptor " NewTableProxy::GetTableDescriptor"()
-        CResult[string] GetColumnDescriptor "NewTableProxy::GetColumnDescriptor"(const string & column)
-        CResult[string] GetLockOptions "NewTableProxy::GetLockOptions"()
-        CResult[unsigned int] nRows " NewTableProxy::nRows"()
-        CResult[unsigned int] nColumns " NewTableProxy::nColumns"()
-        CResult[vector[string]] Columns " NewTableProxy::Columns"()
-        CResult[bool] AddRows " NewTableProxy::AddRows"(unsigned int nrows)
+            const CSelection & selection) noexcept
+        CResult[string] Name " NewTableProxy::Name"() noexcept
+        CResult[string] GetTableDescriptor " NewTableProxy::GetTableDescriptor"() noexcept
+        CResult[string] GetColumnDescriptor "NewTableProxy::GetColumnDescriptor"(const string & column) noexcept
+        CResult[string] GetLockOptions "NewTableProxy::GetLockOptions"() noexcept
+        CResult[unsigned int] nRows " NewTableProxy::nRows"() noexcept
+        CResult[unsigned int] nColumns " NewTableProxy::nColumns"() noexcept
+        CResult[vector[string]] Columns " NewTableProxy::Columns"() noexcept
+        CResult[bool] AddRows " NewTableProxy::AddRows"(unsigned int nrows) noexcept
 
 
 cdef extern from "arcae/table_factory.h" namespace "arcae" nogil:
     cdef CResult[shared_ptr[CCasaTable]] COpenTable" arcae::OpenTable"(
                                                     const string & filename,
                                                     bool readonly,
-                                                    const string & json_lockoptions)
+                                                    const string & json_lockoptions) noexcept
     cdef CResult[shared_ptr[CCasaTable]] CDefaultMS" arcae::DefaultMS"(
                                                     const string & name,
                                                     const string & subtable,
                                                     const string & json_table_desc,
-                                                    const string & json_dminfo)
+                                                    const string & json_dminfo) noexcept
     cdef CResult[shared_ptr[CCasaTable]] CTaql" arcae::Taql"(
                                                     const string & taql,
-                                                    const vector[shared_ptr[CCasaTable]] & tables)
+                                                    const vector[shared_ptr[CCasaTable]] & tables) noexcept
