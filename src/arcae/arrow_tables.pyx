@@ -46,7 +46,11 @@ DimIndex = Union[slice, list, np.ndarray]
 FullIndex = Union[list[DimIndex], tuple[DimIndex]]
 
 def ms_descriptor(table: str, complete: bool = False) -> dict:
-    table_desc = GetResultValue(CMSDescriptor(tobytes(table), complete))
+    cdef string ctable = tobytes(table)
+
+    with nogil:
+        table_desc = GetResultValue(CMSDescriptor(ctable, complete))
+
     return json.loads(frombytes(table_desc))
 
 cdef CSelection build_selection(index: FullIndex = None):
