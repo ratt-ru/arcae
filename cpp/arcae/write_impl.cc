@@ -71,7 +71,7 @@ struct WriteCallback {
 
   // Write data, dependent on chunk characteristics and CASA data type
   template <DataType CDT>
-  inline Future<bool> DoWrite(const DataChunk & chunk) const {
+  Future<bool> DoWrite(const DataChunk & chunk) const {
     using CT = typename CasaDataTypeTraits<CDT>::CasaType;
 
     // If the chunk is contiguous in memory, we can write
