@@ -38,16 +38,16 @@ public:
 
   arrow::Result<std::shared_ptr<arrow::Table>> ToArrow(
     const detail::Selection & selection={},
-    const std::vector<std::string> & columns={}) const noexcept;
+    const std::vector<std::string> & columns={}) const;
 
   // Get the table descriptor as a JSON string
-  arrow::Result<std::string> GetTableDescriptor() const noexcept;
+  arrow::Result<std::string> GetTableDescriptor() const;
 
   // Get the column descriptor as a JSON string
-  arrow::Result<std::string> GetColumnDescriptor(const std::string & column) const noexcept;
+  arrow::Result<std::string> GetColumnDescriptor(const std::string & column) const;
 
   // Get the table locking options as a JSON string
-  arrow::Result<std::string> GetLockOptions() const noexcept;
+  arrow::Result<std::string> GetLockOptions() const;
 
   // Get data from the column, possibly guided by
   // a selection along each index, and possibly
@@ -55,35 +55,35 @@ public:
   arrow::Result<std::shared_ptr<arrow::Array>> GetColumn(
     const std::string & column,
     const detail::Selection & selection={},
-    const std::shared_ptr<arrow::Array> & result=nullptr) const noexcept;
+    const std::shared_ptr<arrow::Array> & result=nullptr) const;
 
   // Put data into the column from the given array,
   // possibly guided by a selection along each index
   arrow::Result<bool> PutColumn(
     const std::string & column,
     const std::shared_ptr<arrow::Array> & data,
-    const detail::Selection & selection={}) const noexcept;
+    const detail::Selection & selection={}) const;
 
   // Return the URL of this table
-  arrow::Result<std::string> Name() const noexcept;
+  arrow::Result<std::string> Name() const;
 
   // Return the names of the columns in this table
-  arrow::Result<std::vector<std::string>> Columns() const noexcept;
+  arrow::Result<std::vector<std::string>> Columns() const;
 
   // Return the number of columns in this table
-  arrow::Result<std::size_t> nColumns() const noexcept;
+  arrow::Result<std::size_t> nColumns() const;
 
   // Return the number of rows in this table
-  arrow::Result<std::size_t> nRows() const noexcept;
+  arrow::Result<std::size_t> nRows() const;
 
   // Add rows to the table
-  arrow::Result<bool> AddRows(std::size_t nrows) noexcept;
+  arrow::Result<bool> AddRows(std::size_t nrows);
 
   // Get a pointer to the IsolatedTableProxy
-  std::shared_ptr<detail::IsolatedTableProxy> Proxy() const noexcept { return itp_; }
+  std::shared_ptr<detail::IsolatedTableProxy> Proxy() const { return itp_; }
 
   // Close the table
-  arrow::Result<bool> Close() noexcept;
+  arrow::Result<bool> Close();
 private:
   std::shared_ptr<detail::IsolatedTableProxy> itp_;
 };
