@@ -116,21 +116,28 @@ cdef class Table:
 
     @staticmethod
     def from_taql(taql: str, tables: Optional[Union[Sequence[Table], Table]] = None) -> Table:
-      cdef Table table = Table.__new__(Table)
-      cdef vector[shared_ptr[CCasaTable]] c_tables
+        cdef:
+            Table table = Table.__new__(Table)
+            vector[shared_ptr[CCasaTable]] ctables
+            string ctaql = tobytes(taql)
 
-      if tables is not None:
-        if isinstance(tables, Table):
-            c_tables.push_back((<Table?> tables).c_table)
-        else:
-            for t in tables:
-                c_tables.push_back((<Table?> t).c_table)
+        if tables is not None:
+            if isinstance(tables, Table):
+                ctables.push_back((<Table?> tables).c_table)
+            else:
+                for t in tables:
+                    ctables.push_back((<Table?> t).c_table)
 
-      table.c_table = GetResultValue(CTaql(tobytes(taql), c_tables))
-      return table
+
+        with nogil:
+            table.c_table = GetResultValue(CTaql(ctaql, ctables))
+
+        return table
 
     @staticmethod
     def from_filename(filename: str, readonly: bool = True, lockoptions: Union[str, dict] = "auto") -> Table:
+        cdef string cfilename = tobytes(filename)
+
         cdef Table table = Table.__new__(Table)
         if isinstance(lockoptions, str):
             lockoptions = f"{{\"option\": \"{lockoptions}\"}}"
@@ -139,7 +146,10 @@ cdef class Table:
         else:
             raise TypeError(f"Invalid lockoptions {lockoptions}")
 
-        table.c_table = GetResultValue(COpenTable(tobytes(filename), readonly, tobytes(lockoptions)))
+        clockoptions: string = tobytes(lockoptions)
+
+        with nogil:
+            table.c_table = GetResultValue(COpenTable(cfilename, readonly, clockoptions))
         return table
 
     @staticmethod
@@ -149,13 +159,21 @@ cdef class Table:
         table_desc: Optional[dict] = None,
         dminfo: Optional[dict] = None
     ) -> Table:
-        cdef Table table = Table.__new__(Table)
+        cdef:
+            Table table = Table.__new__(Table)
+            string cfilename = tobytes(filename)
+            string csubtable = tobytes(subtable)
         json_table_desc = json.dumps(table_desc) if table_desc else "{}"
         json_dminfo = json.dumps(dminfo) if dminfo else "{}"
-        table.c_table = GetResultValue(CDefaultMS(tobytes(filename),
-                                                   tobytes(subtable),
-                                                   tobytes(json_table_desc),
-                                                   tobytes(json_dminfo)))
+
+        cjson_table_desc: string = tobytes(json_table_desc)
+        cjson_dm_info: string = tobytes(json_dminfo)
+
+        with nogil:
+            table.c_table = GetResultValue(CDefaultMS(cfilename,
+                                                      csubtable,
+                                                      cjson_table_desc,
+                                                      cjson_dm_info))
         return table
 
     def to_arrow(self, index: Optional[FullIndex] = None, columns: Union[list[str], str] = None):
@@ -169,13 +187,15 @@ cdef class Table:
         if columns:
             cpp_columns = [tobytes(c) for c in columns]
 
-        ctable = GetResultValue(self.c_table.get().ToArrow(selection, cpp_columns))
+        with nogil:
+            ctable = GetResultValue(self.c_table.get().ToArrow(selection, cpp_columns))
 
         return pyarrow_wrap_table(ctable)
 
     def name(self) -> str:
         """Returns the directory containing the table"""
-        cname = GetResultValue(self.c_table.get().Name())
+        with nogil:
+            cname = GetResultValue(self.c_table.get().Name())
         return frombytes(cname)
 
     def getcol(self, column: str, index: Optional[FullIndex] = None, result: Optional[np.ndarray] = None) -> np.ndarray:
@@ -188,7 +208,9 @@ cdef class Table:
             pa_result = self._numpy_to_arrow(result)
             cpp_result = pyarrow_unwrap_array(pa_result)
 
-        carray = GetResultValue(self.c_table.get().GetColumn(cpp_column, selection, cpp_result))
+        with nogil:
+            carray = GetResultValue(self.c_table.get().GetColumn(cpp_column, selection, cpp_result))
+
         py_column = pyarrow_wrap_array(carray)
         return self._arrow_to_numpy(column, py_column)
 
@@ -198,7 +220,8 @@ cdef class Table:
             CSelection selection = build_selection(index)
             shared_ptr[CArray] carray = pyarrow_unwrap_array(self._numpy_to_arrow(data))
 
-        return GetResultValue(self.c_table.get().PutColumn(cpp_column, carray, selection))
+        with nogil:
+            GetResultValue(self.c_table.get().PutColumn(cpp_column, carray, selection))
 
     def _numpy_to_arrow(self, data: np.ndarray) -> pa.array:
         """ Covert numpy array into a nested FixedSizeListArrays """
@@ -265,30 +288,47 @@ cdef class Table:
         raise TypeError(f"Unhandled column type {array.type}")
 
     def lockoptions(self):
-        return json.loads(GetResultValue(self.c_table.get().GetLockOptions()))
+        with nogil:
+            lock_opts = GetResultValue(self.c_table.get().GetLockOptions())
+
+        return json.loads(lock_opts)
 
     def nrow(self):
-        return GetResultValue(self.c_table.get().nRows())
+        with nogil:
+            nrow = GetResultValue(self.c_table.get().nRows())
+
+        return nrow
 
     def ncolumns(self):
-        return GetResultValue(self.c_table.get().nColumns())
+        with nogil:
+            ncolumns = GetResultValue(self.c_table.get().nColumns())
+
+        return ncolumns
 
     def close(self):
-        return GetResultValue(self.c_table.get().Close())
+        with nogil:
+            GetResultValue(self.c_table.get().Close())
 
     def columns(self):
-        return [frombytes(s) for s in GetResultValue(self.c_table.get().Columns())]
+        with nogil:
+            columns = GetResultValue(self.c_table.get().Columns())
+        return [frombytes(s) for s in columns]
 
     def getcoldesc(self, column: str):
-        col_desc = GetResultValue(self.c_table.get().GetColumnDescriptor(tobytes(column)))
+        cdef string ccolumn = tobytes(column)
+        with nogil:
+            col_desc = GetResultValue(self.c_table.get().GetColumnDescriptor(ccolumn))
         return json.loads(frombytes(col_desc)).popitem()[1]
 
     def tabledesc(self):
-        table_desc = GetResultValue(self.c_table.get().GetTableDescriptor())
+        with nogil:
+            table_desc = GetResultValue(self.c_table.get().GetTableDescriptor())
         return json.loads(frombytes(table_desc)).popitem()[1]
 
     def addrows(self, nrows: int):
-        return  GetResultValue(self.c_table.get().AddRows(nrows))
+        cdef int cnrows = nrows
+        with nogil:
+            GetResultValue(self.c_table.get().AddRows(cnrows))
 
 class Configuration(MutableMapping):
     def __getitem__(self, key: str):
