@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Drop the Global Interpreter Lock (:pr:`111`)
 * Remove FFTW3 and casacore apps from the casacore build (:pr:`110``)
 * Add table name method (:pr:`109`)
 * Re-implement partial support for selection over unconstrained columns
