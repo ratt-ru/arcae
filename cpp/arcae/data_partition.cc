@@ -242,9 +242,12 @@ MakeDataChunks(
 
     // Compute minimum element
     for(std::size_t d = 0; d < ndim; ++d) {
-      shared->min_mem_index_[offset + d] = *std::min_element(
-        std::begin(dim_span[d].mem),
-        std::end(dim_span[d].mem));
+      shared->min_mem_index_[offset + d] = [&]() -> std::size_t {
+        if(dim_span[d].mem.size() == 0) return 0;
+        return *std::min_element(
+          std::begin(dim_span[d].mem),
+          std::end(dim_span[d].mem));
+      }();
     }
 
     // Compute flat offsets

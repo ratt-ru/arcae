@@ -80,6 +80,39 @@ struct Parametrization {
   std::array<std::size_t, kNDim> remove = {0, 0, 0};
 };
 
+
+class ZeroRowTableProxyTest: public ::testing::Test {
+  protected:
+    std::string table_name_;
+
+    void SetUp() override {
+      auto * test_info = ::testing::UnitTest::GetInstance()->current_test_info();
+      table_name_ = test_info->name() + "-"s + arcae::hexuuid(4) + ".table"s;
+      auto table_desc = TableDesc(MS::requiredTableDesc());
+      auto data_shape = IPosition({kncorr, knchan});
+      auto data_column_desc = ArrayColumnDesc<Complex>("DATA", data_shape, ColumnDesc::FixedShape);
+      table_desc.addColumn(data_column_desc);
+      auto setup_new_table = SetupNewTable(table_name_, table_desc, Table::New);
+      auto ms = MS(setup_new_table, 0);
+      ms.createDefaultSubtables(Table::New);
+    }
+
+    arrow::Result<std::shared_ptr<NewTableProxy>> OpenTable() {
+      return NewTableProxy::Make([name = table_name_]() {
+        auto lock = TableLock(TableLock::LockOption::AutoLocking);
+        auto lockoptions = Record();
+        lockoptions.define("option", "nolock");
+        lockoptions.define("internal", lock.interval());
+        lockoptions.define("maxwait", casacore::Int(lock.maxWait()));
+        return std::make_shared<TableProxy>(name, lockoptions, Table::Old);
+      });
+    }
+
+    void TearDown() override {
+      std::filesystem::remove_all(table_name_);
+    }
+};
+
 class FixedTableProxyTest : public ::testing::TestWithParam<Parametrization> {
   protected:
     std::string table_name_;
@@ -196,14 +229,13 @@ class FixedTableProxyTest : public ::testing::TestWithParam<Parametrization> {
 
 
     arrow::Result<std::shared_ptr<NewTableProxy>> OpenTable() {
-      return NewTableProxy::Make(
-        [name = table_name_]() {
-          auto lock = TableLock(TableLock::LockOption::AutoLocking);
-          auto lockoptions = Record();
-          lockoptions.define("option", "nolock");
-          lockoptions.define("internal", lock.interval());
-          lockoptions.define("maxwait", casacore::Int(lock.maxWait()));
-          return std::make_shared<TableProxy>(name, lockoptions, Table::Old);
+      return NewTableProxy::Make([name = table_name_]() {
+        auto lock = TableLock(TableLock::LockOption::AutoLocking);
+        auto lockoptions = Record();
+        lockoptions.define("option", "nolock");
+        lockoptions.define("internal", lock.interval());
+        lockoptions.define("maxwait", casacore::Int(lock.maxWait()));
+        return std::make_shared<TableProxy>(name, lockoptions, Table::Old);
       });
     }
 
@@ -354,6 +386,15 @@ TEST_F(FixedTableProxyTest, Table) {
   EXPECT_THAT(table->ColumnNames(), ::testing::ElementsAre("MODEL_DATA"));
 
   ASSERT_OK_AND_ASSIGN(table, ntp->ToArrow({}, {}));
+}
+
+
+TEST_F(ZeroRowTableProxyTest, ZeroRowCase) {
+  ASSERT_OK_AND_ASSIGN(auto ntp, OpenTable());
+  ASSERT_OK_AND_ASSIGN(auto data, ntp->GetColumn("DATA"));
+  ASSERT_OK_AND_ASSIGN(auto time, ntp->GetColumn("TIME"));
+  EXPECT_EQ(time->length(), 0);
+  EXPECT_EQ(data->length(), 0);
 }
 
 
