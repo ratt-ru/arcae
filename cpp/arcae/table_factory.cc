@@ -14,9 +14,6 @@
 #include <algorithm>
 #include <memory>
 
-#include "arcae/descriptor.h"
-#include "arcae/new_table_proxy.h"
-
 #include <arrow/api.h>
 #include <arrow/status.h>
 
@@ -28,6 +25,9 @@
 #include <casacore/tables/Tables.h>
 #include <casacore/tables/Tables/SetupNewTab.h>
 #include <casacore/tables/Tables/TableProxy.h>
+
+#include "arcae/descriptor.h"
+#include "arcae/new_table_proxy.h"
 
 using namespace std::literals;
 
@@ -85,6 +85,7 @@ static constexpr char kWeather[] = "WEATHER";
 Result<std::shared_ptr<NewTableProxy>>
 OpenTable(
     const std::string &filename,
+    std::size_t ninstances,
     bool readonly,
     const std::string &json_lockoptions) {
   return NewTableProxy::Make([
@@ -102,7 +103,8 @@ OpenTable(
       } catch (std::exception &e) {
         return Status::Invalid(e.what());
       }
-    });
+    },
+    ninstances);
 }
 
 Result<std::shared_ptr<NewTableProxy>>
@@ -176,45 +178,24 @@ DefaultMS(const std::string &name, const
 }
 
 // Execute a TAQL query on the supplied tables
-arrow::Result<std::shared_ptr<NewTableProxy>>
-Taql(const std::string &taql,
-     const std::vector<std::shared_ptr<NewTableProxy>> &tables) {
-
+Result<std::shared_ptr<NewTableProxy>>
+Taql(const std::string &taql, const std::vector<std::shared_ptr<NewTableProxy>> &tables) {
   // Easy case
   if (tables.size() == 0) {
-    return NewTableProxy::Make(
-      [&]() -> arrow::Result<std::shared_ptr<TableProxy>> {
-        return std::make_shared<TableProxy>(taql, std::vector<TableProxy>{});
-      });
+    return NewTableProxy::Make([
+      taql = taql
+    ]() -> Result<std::shared_ptr<TableProxy>> {
+      return std::make_shared<TableProxy>(taql, std::vector<TableProxy>{});
+    });
+  } else if (tables.size() == 1) {
+    return tables[0]->Spawn([
+      taql = taql
+    ](const TableProxy & tp) -> Result<std::shared_ptr<TableProxy>> {
+      return std::make_shared<TableProxy>(taql, std::vector<TableProxy>{tp});
+    });
   }
 
-  for(const auto & ntp: tables) {
-    if(ntp->Proxy() != tables.front()->Proxy()) {
-      return Status::Invalid(
-        "Supplied tables don't share the "
-        "same IsolatedTableProxy");
-    }
-  }
-
-
-  // Use the common io_pool
-  return NewTableProxy::Make(
-    [&]() -> arrow::Result<std::shared_ptr<TableProxy>> {
-      auto proxies = std::vector<TableProxy>{};
-      proxies.reserve(tables.size());
-
-      for (const auto &ntp : tables) {
-        proxies.push_back(*ntp->Proxy()->Proxy());
-      }
-
-      try {
-        return std::make_shared<TableProxy>(taql, proxies);
-      } catch (const casacore::AipsError &e) {
-        return Status::UnknownError("Error executing TAQL query: ",
-                                    e.what());
-      }
-    },
-    tables.front()->Proxy());
-  }
+  return Status::NotImplemented("Taql queries with more than one table argument");
+}
 
 } // namespace arcae

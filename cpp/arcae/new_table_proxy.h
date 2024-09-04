@@ -2,6 +2,7 @@
 #define ARCAE_NEW_TABLE_PROXY_H
 
 #include <memory>
+#include <type_traits>
 
 #include <arrow/util/thread_pool.h>
 #include <arrow/result.h>
@@ -24,15 +25,24 @@ public:
                     detail::ArrowResultType<Fn>,
                     arrow::Result<std::shared_ptr<casacore::TableProxy>>>>>
   static arrow::Result<std::shared_ptr<NewTableProxy>> Make(
-      Fn && functor,
-      const std::shared_ptr<detail::IsolatedTableProxy> itp = nullptr) {
+      Fn && functor, std::size_t ninstances = 1) {
     struct enable_make_shared_ntp : public NewTableProxy {};
     std::shared_ptr<NewTableProxy> ntp = std::make_shared<enable_make_shared_ntp>();
-    if(!itp) {
-      ARROW_ASSIGN_OR_RAISE(ntp->itp_, detail::IsolatedTableProxy::Make(std::move(functor)));
-    } else {
-      ARROW_ASSIGN_OR_RAISE(ntp->itp_, itp->MakeSharedProxy(std::move(functor)));
-    }
+    ARROW_ASSIGN_OR_RAISE(ntp->itp_, detail::IsolatedTableProxy::Make(std::move(functor), ninstances));
+    return ntp;
+  }
+
+  // Spawn a NewTableProxy on the underlying IsolatedTableProxy
+  template <
+    typename Fn,
+    typename = std::enable_if<
+                  std::is_same_v<
+                    detail::ArrowResultType<Fn, const casacore::TableProxy &>,
+                    arrow::Result<std::shared_ptr<casacore::TableProxy>>>>>
+  arrow::Result<std::shared_ptr<NewTableProxy>> Spawn(Fn && functor) {
+    struct enable_make_shared_ntp : public NewTableProxy {};
+    std::shared_ptr<NewTableProxy> ntp = std::make_shared<enable_make_shared_ntp>();
+    ARROW_ASSIGN_OR_RAISE(ntp->itp_, itp_->Spawn(std::forward<Fn>(functor)));
     return ntp;
   }
 

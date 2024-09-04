@@ -139,8 +139,10 @@ cdef class Table:
         return table
 
     @staticmethod
-    def from_filename(filename: str, readonly: bool = True, lockoptions: Union[str, dict] = "auto") -> Table:
-        cdef string cfilename = tobytes(filename)
+    def from_filename(filename: str, ninstances: int = 1, readonly: bool = True, lockoptions: Union[str, dict] = "auto") -> Table:
+        cdef:
+            string cfilename = tobytes(filename)
+            size_t cninstances = ninstances
 
         cdef Table table = Table.__new__(Table)
         if isinstance(lockoptions, str):
@@ -153,7 +155,7 @@ cdef class Table:
         clockoptions: string = tobytes(lockoptions)
 
         with nogil:
-            table.c_table = GetResultValue(COpenTable(cfilename, readonly, clockoptions))
+            table.c_table = GetResultValue(COpenTable(cfilename, cninstances, readonly, clockoptions))
         return table
 
     @staticmethod

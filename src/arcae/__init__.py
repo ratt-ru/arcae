@@ -23,8 +23,8 @@ if PYTHON_CASACORE_FOUND and not COEXIST_WITH_PYTHON_CASACORE:
         "continue regardless.")
 
 
-def table(filename: str, readonly: bool = True, lockoptions: Union[str, dict] = "auto") -> "Table":
+def table(filename: str, ninstances: int = 1, readonly: bool = True, lockoptions: Union[str, dict] = "auto") -> "Table":
     # Defer cython module import, to avoid conflicts between arcae casacore libraries
     # and python-casacore casacore libraries
     from arcae.lib.arrow_tables import Table
-    return Table.from_filename(filename, readonly, lockoptions)
+    return Table.from_filename(filename, ninstances, readonly, lockoptions)

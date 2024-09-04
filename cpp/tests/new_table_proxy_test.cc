@@ -57,6 +57,10 @@ using ::casacore::IPosition;
 
 using namespace std::string_literals;
 
+namespace {
+
+static constexpr std::size_t knInstances = 4;
+
 static constexpr std::size_t knrow = 10;
 static constexpr std::size_t knchan = 16;
 static constexpr std::size_t kncorr = 4;
@@ -67,8 +71,6 @@ static constexpr std::size_t kElements = knrow*knchan*kncorr;
 
 // Default value in result arrays
 static constexpr float kDefaultRealValue = -10.0f;
-
-namespace {
 
 // Structure parametrizing a test case
 struct Parametrization {
@@ -228,16 +230,19 @@ class FixedTableProxyTest : public ::testing::TestWithParam<Parametrization> {
     }
 
 
-    arrow::Result<std::shared_ptr<NewTableProxy>> OpenTable() {
-      return NewTableProxy::Make([name = table_name_]() {
+    arrow::Result<std::shared_ptr<NewTableProxy>> OpenTable(std::size_t instances = 1, bool readonly = true) {
+      return NewTableProxy::Make([&, name = table_name_]() {
         auto lock = TableLock(TableLock::LockOption::AutoLocking);
         auto lockoptions = Record();
         lockoptions.define("option", "nolock");
         lockoptions.define("internal", lock.interval());
         lockoptions.define("maxwait", casacore::Int(lock.maxWait()));
-        return std::make_shared<TableProxy>(name, lockoptions, Table::Old);
-      });
+        auto tp = std::make_shared<TableProxy>(name, lockoptions, Table::Old);
+        if(!readonly) tp->reopenRW();
+        return tp;
+      }, instances);
     }
+
 
     void TearDown() override {
       std::filesystem::remove_all(table_name_);
@@ -256,7 +261,7 @@ INSTANTIATE_TEST_SUITE_P(
     Parametrization{{true, true, true}, {false, false, false}, {1, 3, 5}}));
 
 TEST_P(FixedTableProxyTest, Fixed) {
-  ASSERT_OK_AND_ASSIGN(auto ntp, OpenTable());
+  ASSERT_OK_AND_ASSIGN(auto wntp, OpenTable(1, false));
   const auto & params = GetParam();
   auto builder = SelectionBuilder().Order('F');
 
@@ -312,11 +317,13 @@ TEST_P(FixedTableProxyTest, Fixed) {
 
   ASSERT_OK_AND_ASSIGN(auto write_data, MakeComplexArray(rows, chans, corrs));
   ASSERT_OK_AND_ASSIGN(auto write_str, MakeStringArray(rows, chans, corrs));
-  ASSERT_OK(ntp->PutColumn("MODEL_DATA", write_data, selection));
-  ASSERT_OK(ntp->PutColumn("VAR_DATA", write_data, selection));
-  ASSERT_OK(ntp->PutColumn("STRING_DATA", write_str, selection));
-  ASSERT_OK(ntp->PutColumn("VAR_STRING_DATA", write_str, selection));
+  ASSERT_OK(wntp->PutColumn("MODEL_DATA", write_data, selection));
+  ASSERT_OK(wntp->PutColumn("VAR_DATA", write_data, selection));
+  ASSERT_OK(wntp->PutColumn("STRING_DATA", write_str, selection));
+  ASSERT_OK(wntp->PutColumn("VAR_STRING_DATA", write_str, selection));
+  ASSERT_OK(wntp->Close());
 
+  ASSERT_OK_AND_ASSIGN(auto ntp, OpenTable(knInstances));
   ASSERT_OK_AND_ASSIGN(auto data, ntp->GetColumn("MODEL_DATA", selection));
   ASSERT_OK_AND_ASSIGN(auto var_data, ntp->GetColumn("VAR_DATA", selection));
   ASSERT_OK_AND_ASSIGN(auto str_data, ntp->GetColumn("STRING_DATA", selection));
