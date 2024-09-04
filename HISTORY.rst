@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Code formatting nits (:pr:`114`)
 * Multiplex CASA Table I/O over multiple table instances (:pr:`113`)
 * Handle arrays and tables with no rows (:pr:`112`)
 * Drop the Global Interpreter Lock (:pr:`111`)
