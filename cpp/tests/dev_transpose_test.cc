@@ -288,7 +288,7 @@ TEST_F(DevTransposeTest, Basic) {
   ARROW_LOG(INFO) << "Extract shape data in " << read_shape_duration;
   ARROW_LOG(INFO) << "Partition shape in " << partition_duration;
   ARROW_LOG(INFO) << "  Requires a sort of " << knrow << " indices in " << sort_duration;
-  ARROW_LOG(INFO) << "Read " << float(bytes_read) / (1024.*1024.) << "MB of contiguous data in " << read_duration;
+  ARROW_LOG(INFO) << "Read " << float(bytes_read) / (1024.*1024.) << "MB of data in " << read_duration;
   ARROW_LOG(INFO) << "Transposed data in " << transpose_duration;
 
   ARROW_LOG(INFO) << "Total " << read_shape_duration + partition_duration + read_duration + transpose_duration;
