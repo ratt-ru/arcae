@@ -32,7 +32,7 @@ IsolatedTableProxy::GetInstance() const {
   using NumTasksType = decltype(ProxyAndPool::io_pool_->GetNumTasks());
   std::size_t instance = 0;
   NumTasksType num_tasks = std::numeric_limits<NumTasksType>::max();
-  assert(proxy_pools_ && proxy_pools_.size() > 0);
+  assert(proxy_pools_.size() > 0);
 
   for(std::size_t i = 0; i < proxy_pools_.size(); ++i) {
     const auto & pool = proxy_pools_[i].io_pool_;
