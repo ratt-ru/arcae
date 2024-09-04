@@ -28,18 +28,18 @@ from pyarrow.lib cimport (
 
 from pyarrow.lib import (tobytes, frombytes)
 
-from arcae.arrow_tables cimport (CCasaTable,
-                                 CConfiguration,
-                                 CMSDescriptor,
-                                 CServiceLocator,
-                                 COpenTable,
-                                 CDefaultMS,
-                                 CSelection,
-                                 CSelectionBuilder,
-                                 CTaql,
-                                 IndexType,
-                                 Span,
-                                 UINT_MAX)
+from arcae.lib.arrow_tables cimport (
+    CCasaTable,
+    CConfiguration,
+    CMSDescriptor,
+    CServiceLocator,
+    COpenTable,
+    CDefaultMS,
+    CSelection,
+    CSelectionBuilder,
+    CTaql,
+    IndexType,
+    UINT_MAX)
 
 
 DimIndex = Union[slice, list, np.ndarray]
