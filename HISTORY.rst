@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Disable OpenBLAS threading (:pr:`117`)
 * Move Cython source to lib directory (:pr:`116`)
 * Upgrade to pyarrow 16.1.0 (:pr:`115`)
 * Code formatting nits (:pr:`114`)
