@@ -57,7 +57,7 @@ add_compile_options("-D_GLIBCXX_USE_CXX11_ABI=1")
 add_subdirectory(cpp)
 
 if(SKBUILD)
-    add_subdirectory(src/arcae)
+    add_subdirectory(src/arcae/lib)
 else()
     message(WARNING "scikit-build not available, Cython extensions not built")
 endif()
