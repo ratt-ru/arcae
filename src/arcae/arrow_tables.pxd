@@ -79,6 +79,7 @@ cdef extern from "arcae/new_table_proxy.h" namespace "arcae" nogil:
 cdef extern from "arcae/table_factory.h" namespace "arcae" nogil:
     cdef CResult[shared_ptr[CCasaTable]] COpenTable" arcae::OpenTable"(
                                                     const string & filename,
+                                                    size_t ninstances,
                                                     bool readonly,
                                                     const string & json_lockoptions)
     cdef CResult[shared_ptr[CCasaTable]] CDefaultMS" arcae::DefaultMS"(

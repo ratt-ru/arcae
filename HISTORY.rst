@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Multiplex CASA Table I/O over multiple table instances (:pr:`113`)
 * Handle arrays and tables with no rows (:pr:`112`)
 * Drop the Global Interpreter Lock (:pr:`111`)
 * Remove FFTW3 and casacore apps from the casacore build (:pr:`110``)
