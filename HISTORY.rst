@@ -2,7 +2,7 @@
 History
 =======
 
-X.Y.Z (YYYY-MM-DD)
+0.2.4 (2024-09-05)
 ------------------
 * Disable OpenBLAS threading (:pr:`117`)
 * Move Cython source to lib directory (:pr:`116`)
