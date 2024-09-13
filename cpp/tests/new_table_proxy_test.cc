@@ -399,25 +399,46 @@ TEST_F(FixedTableProxyTest, Table) {
 TEST_F(FixedTableProxyTest, AddColumns) {
   ASSERT_OK_AND_ASSIGN(auto ntp, OpenTable());
 
+  // TODO: Embed knrow, knchan and kncorr in the shape and tileshapes
   auto column_desc = R"""(
-  "FLAG": {
-    "_c_order": True,
-    "comment": "FLAG column",
-    "dataManagerGroup": "StandardStMan",
-    "dataManagerType": "StandardStMan",
-    "keywords": {},
-    "maxlen": 0,
-    "ndim": 2,
-    "option": 0,
-    # 'shape': ...,  # Variably shaped
-    "valueType": "BOOLEAN"
+  {
+    "ACK": {
+      "dataManagerGroup": "ACKBAR_GROUP",
+      "dataManagerType": "TiledColumnStMan",
+      "ndim": 2,
+      "shape": [16, 4],
+      "valueType": "BOOLEAN"
+    },
+    "BAR": {
+      "dataManagerGroup": "ACKBAR_GROUP",
+      "dataManagerType": "TiledColumnStMan",
+      "ndim": 2,
+      "shape": [16, 4],
+      "valueType": "COMPLEX"
+    }
   }
   )""";
 
-  ASSERT_OK(ntp->AddColumns(column_desc));
-  ASSERT_OK_AND_ASSIGN(auto columns, ntp->Columns());
-  EXPECT_THAT(columns, ::testing::Contains("FLAG"));
 
+  std::string dminfo = R"""(
+  {
+    "*1": {
+      "NAME": "ACKBAR_GROUP",
+      "TYPE": "TiledColumnStMan",
+      "SPEC": {"DEFAULTTILESHAPE": [16, 4, 10]},
+      "COLUMNS": ["ACK", "BAR"]
+    }
+  }
+  )""";
+
+  ASSERT_OK(ntp->AddColumns(column_desc, dminfo));
+  ASSERT_OK_AND_ASSIGN(auto columns, ntp->Columns());
+  EXPECT_THAT(columns, ::testing::Contains("ACK"));
+  EXPECT_THAT(columns, ::testing::Contains("BAR"));
+  ASSERT_OK_AND_ASSIGN(dminfo, ntp->GetDataManagerInfo());
+  EXPECT_TRUE(dminfo.find(R"("NAME": "ACKBAR_GROUP")") != std::string::npos);
+  EXPECT_TRUE(dminfo.find(R"("COLUMNS": ["ACK")") != std::string::npos) << dminfo;
+  EXPECT_TRUE(dminfo.find(R"("BAR"])") != std::string::npos) << dminfo;
 }
 
 
