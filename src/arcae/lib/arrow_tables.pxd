@@ -69,11 +69,15 @@ cdef extern from "arcae/new_table_proxy.h" namespace "arcae" nogil:
         CResult[string] Name " NewTableProxy::Name"()
         CResult[string] GetTableDescriptor " NewTableProxy::GetTableDescriptor"()
         CResult[string] GetColumnDescriptor "NewTableProxy::GetColumnDescriptor"(const string & column)
+        CResult[string] GetDataManagerInfo "NewTableProxy::GetDataManagerInfo"()
         CResult[string] GetLockOptions "NewTableProxy::GetLockOptions"()
         CResult[unsigned int] nRows " NewTableProxy::nRows"()
         CResult[unsigned int] nColumns " NewTableProxy::nColumns"()
         CResult[vector[string]] Columns " NewTableProxy::Columns"()
         CResult[bool] AddRows " NewTableProxy::AddRows"(unsigned int nrows)
+        CResult[bool] AddColumns " NewTableProxy::AddColumns"(
+            const string & json_columndescs,
+            const string & json_dminfo)
 
 
 cdef extern from "arcae/table_factory.h" namespace "arcae" nogil:

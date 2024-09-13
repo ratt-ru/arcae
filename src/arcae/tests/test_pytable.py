@@ -25,6 +25,70 @@ def test_parquet_write(tmp_path, tau_ms, table_suffix, table_name):
     pq.write_table(T, str(tmp_path / f"{table_name}.parquet"))
 
 
+def test_descriptors(column_case_table):
+    with arcae.table(column_case_table) as T:
+        td = T.tabledesc()
+
+        for column in T.columns():
+            assert td[column] == T.getcoldesc(column)
+
+        dminfo = T.getdminfo()
+        dminfo["*1"].pop("SPEC")  # Varies
+        assert dminfo == {
+            "*1": {"COLUMNS": [
+                        "FIXED",
+                        "FIXED_STRING",
+                        "SCALAR",
+                        "SCALAR_STRING",
+                        "UNCONSTRAINED",
+                        "UNCONSTRAINED_SAME_NDIM",
+                        "VARIABLE",
+                        "VARIABLE_STRING"],
+            'NAME': "StandardStMan",
+            'SEQNR': 0,
+            "TYPE": "StandardStMan"}}
+
+
+def test_add_columns(column_case_table):
+    with arcae.table(column_case_table) as T:
+        shape = [16, 4]
+        tile_shape = tuple(reversed(shape)) + (T.nrow(),)
+
+
+        # Add ACK and BAR to the ACKBAR_GROUP at the same time succeeds
+        desc = {
+            "ACK": {
+                "dataManagerGroup": "ACKBAR_GROUP",
+                "dataManagerType": "TiledColumnStMan",
+                "ndim": len(shape),
+                "shape": shape,
+                "valueType": "BOOLEAN",
+            },
+            "BAR": {
+                "dataManagerGroup": "ACKBAR_GROUP",
+                "dataManagerType": "TiledColumnStMan",
+                "ndim": len(shape),
+                "shape": shape,
+                "valueType": "COMPLEX",
+            },
+        }
+
+        dminfo = {
+            "*1": {
+                "NAME": "ACKBAR_GROUP",
+                "TYPE": "TiledColumnStMan",
+                "SPEC": {"DEFAULTTILESHAPE": tile_shape},
+                "COLUMNS": ["ACK", "BAR"],
+            }
+        }
+
+        T.addcols(desc, dminfo)
+        groups = {g["NAME"]: g for g in T.getdminfo().values()}
+        assert set(["ACKBAR_GROUP", "StandardStMan"]) == set(groups.keys())
+        assert set(groups["ACKBAR_GROUP"]["COLUMNS"]) == set(["ACK", "BAR"])
+        assert {"ACK", "BAR"}.issubset(T.columns())
+
+
 def test_column_selection(column_case_table):
     with arcae.table(column_case_table) as T:
         assert sorted(T.to_arrow().column_names) == [

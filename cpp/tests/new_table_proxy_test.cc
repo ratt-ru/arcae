@@ -1,3 +1,4 @@
+#include "gmock/gmock.h"
 #include <algorithm>
 #include <cassert>
 #include <cstddef>
@@ -393,6 +394,30 @@ TEST_F(FixedTableProxyTest, Table) {
   EXPECT_THAT(table->ColumnNames(), ::testing::ElementsAre("MODEL_DATA"));
 
   ASSERT_OK_AND_ASSIGN(table, ntp->ToArrow({}, {}));
+}
+
+TEST_F(FixedTableProxyTest, AddColumns) {
+  ASSERT_OK_AND_ASSIGN(auto ntp, OpenTable());
+
+  auto column_desc = R"""(
+  "FLAG": {
+    "_c_order": True,
+    "comment": "FLAG column",
+    "dataManagerGroup": "StandardStMan",
+    "dataManagerType": "StandardStMan",
+    "keywords": {},
+    "maxlen": 0,
+    "ndim": 2,
+    "option": 0,
+    # 'shape': ...,  # Variably shaped
+    "valueType": "BOOLEAN"
+  }
+  )""";
+
+  ASSERT_OK(ntp->AddColumns(column_desc));
+  ASSERT_OK_AND_ASSIGN(auto columns, ntp->Columns());
+  EXPECT_THAT(columns, ::testing::Contains("FLAG"));
+
 }
 
 

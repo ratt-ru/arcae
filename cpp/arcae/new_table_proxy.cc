@@ -1,5 +1,6 @@
 #include "arcae/new_table_proxy.h"
 
+#include <casacore/casa/Containers/Record.h>
 #include <iterator>
 #include <sstream>
 
@@ -7,6 +8,9 @@
 #include <arrow/status.h>
 
 #include <casacore/casa/Json.h>
+#include <casacore/casa/Json/JsonKVMap.h>
+#include <casacore/casa/Json/JsonParser.h>
+
 #include <casacore/tables/Tables/TableProxy.h>
 
 #include "arcae/read_impl.h"
@@ -19,12 +23,15 @@ using ::arrow::Status;
 using ::arrow::Table;
 
 using ::casacore::JsonOut;
+using ::casacore::JsonParser;
+using ::casacore::Record;
 using ::casacore::TableProxy;
 
 namespace arcae {
 namespace {
 
 static constexpr char kCasaDescriptorKey[] = "__casa_descriptor__";
+static constexpr char kCasaDataManagerInfoKey[] = "__dminfo__";
 
 }  // namespace
 
@@ -33,9 +40,7 @@ NewTableProxy::GetTableDescriptor() const {
   return itp_->RunAsync([](TableProxy & tp) -> std::string {
     std::ostringstream oss;
     JsonOut table_json(oss);
-    table_json.start();
-    table_json.write(kCasaDescriptorKey, tp.getTableDescription(true, true));
-    table_json.end();
+    table_json.put(tp.getTableDescription(true, true));
     return oss.str();
   }).MoveResult();
 }
@@ -52,6 +57,17 @@ NewTableProxy::GetColumnDescriptor(const std::string & column) const {
     return oss.str();
   }).MoveResult();
 }
+
+Result<std::string>
+NewTableProxy::GetDataManagerInfo() const {
+  return itp_->RunAsync([](TableProxy & tp) {
+    std::ostringstream oss;
+    JsonOut dm_json(oss);
+    dm_json.put(tp.getDataManagerInfo());
+    return oss.str();
+  }).MoveResult();
+}
+
 
 Result<std::string>
 NewTableProxy::GetLockOptions() const {
@@ -122,6 +138,23 @@ NewTableProxy::AddRows(std::size_t nrows) {
     tp.addRow(nrows);
     return true;
   }).MoveResult();
+}
+
+Result<bool>
+NewTableProxy::AddColumns(
+    const std::string & json_columndescs,
+    const std::string & json_dminfo) {
+  return itp_->RunAsync([
+    json_columndescs = json_columndescs,
+    json_dminfo = json_dminfo
+  ](TableProxy & tp) {
+    detail::MaybeReopenRW(tp);
+    Record columndescs = JsonParser::parse(json_columndescs).toRecord();
+    Record dminfo = JsonParser::parse(json_dminfo).toRecord();
+    tp.addColumns(columndescs, dminfo, false);
+    return true;
+  }).MoveResult();
+
 }
 
 Result<bool>
