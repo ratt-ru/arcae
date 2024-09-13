@@ -329,12 +329,32 @@ cdef class Table:
     def tabledesc(self):
         with nogil:
             table_desc = GetResultValue(self.c_table.get().GetTableDescriptor())
-        return json.loads(frombytes(table_desc)).popitem()[1]
+        return json.loads(frombytes(table_desc))
+
+    def getdminfo(self, column: str | None = None):
+        with nogil:
+            cdminfo = GetResultValue(self.c_table.get().GetDataManagerInfo())
+
+        dminfo = json.loads(frombytes(cdminfo))
+
+        if column is None:
+            return dminfo
+
+        return dminfo[column]
 
     def addrows(self, nrows: int):
         cdef int cnrows = nrows
         with nogil:
             GetResultValue(self.c_table.get().AddRows(cnrows))
+
+    def addcols(self, columndescs: dict, dminfo: dict | None):
+        cdef:
+            string cjson_columndescs = tobytes(json.dumps(columndescs))
+            string cjson_dminfo = tobytes(json.dumps(dminfo) if dminfo else "{}")
+
+        with nogil:
+            GetResultValue(self.c_table.get().AddColumns(cjson_columndescs, cjson_dminfo))
+
 
 class Configuration(MutableMapping):
     def __getitem__(self, key: str):

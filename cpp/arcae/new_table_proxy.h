@@ -59,6 +59,9 @@ public:
   // Get the table locking options as a JSON string
   arrow::Result<std::string> GetLockOptions() const;
 
+  // Get the table data manager information as a JSON string
+  arrow::Result<std::string> GetDataManagerInfo() const;
+
   // Get data from the column, possibly guided by
   // a selection along each index, and possibly
   // writing into a provided result array
@@ -88,6 +91,11 @@ public:
 
   // Add rows to the table
   arrow::Result<bool> AddRows(std::size_t nrows);
+
+  // Add a column to the table
+  arrow::Result<bool> AddColumns(
+    const std::string & json_columndescs,
+    const std::string & json_dminfo={});
 
   // Get a pointer to the IsolatedTableProxy
   std::shared_ptr<detail::IsolatedTableProxy> Proxy() const { return itp_; }

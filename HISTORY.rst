@@ -2,6 +2,10 @@
 History
 =======
 
+X.Y.Z (YYYY-MM-DD)
+------------------
+* Support adding columns (:pr:`120`)
+
 0.2.4 (2024-09-05)
 ------------------
 * Disable OpenBLAS threading (:pr:`117`)
