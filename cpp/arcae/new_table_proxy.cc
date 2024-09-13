@@ -1,6 +1,5 @@
 #include "arcae/new_table_proxy.h"
 
-#include <casacore/casa/Containers/Record.h>
 #include <iterator>
 #include <sstream>
 
@@ -11,6 +10,7 @@
 #include <casacore/casa/Json/JsonKVMap.h>
 #include <casacore/casa/Json/JsonParser.h>
 
+#include <casacore/casa/Containers/Record.h>
 #include <casacore/tables/Tables/TableProxy.h>
 
 #include "arcae/read_impl.h"
@@ -19,7 +19,6 @@
 
 using ::arrow::Array;
 using ::arrow::Result;
-using ::arrow::Status;
 using ::arrow::Table;
 
 using ::casacore::JsonOut;
@@ -28,12 +27,6 @@ using ::casacore::Record;
 using ::casacore::TableProxy;
 
 namespace arcae {
-namespace {
-
-static constexpr char kCasaDescriptorKey[] = "__casa_descriptor__";
-static constexpr char kCasaDataManagerInfoKey[] = "__dminfo__";
-
-}  // namespace
 
 Result<std::string>
 NewTableProxy::GetTableDescriptor() const {
