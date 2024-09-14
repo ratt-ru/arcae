@@ -4,7 +4,7 @@
 from collections.abc import MutableMapping, Sequence
 import cython
 import json
-from typing import Optional, Union
+from typing import Any, Dict, Optional, Union
 
 from libcpp cimport bool
 from libcpp.memory cimport shared_ptr
@@ -14,8 +14,6 @@ from libcpp.vector cimport vector
 
 import numpy as np
 import pyarrow as pa
-
-cimport numpy as cnp
 
 from pyarrow.includes.common cimport *
 from pyarrow.includes.libarrow cimport *
@@ -38,12 +36,12 @@ from arcae.lib.arrow_tables cimport (
     CSelection,
     CSelectionBuilder,
     CTaql,
-    IndexType,
-    UINT_MAX)
+    IndexType)
 
 
 DimIndex = Union[slice, list, np.ndarray]
 FullIndex = Union[list[DimIndex], tuple[DimIndex]]
+
 
 def ms_descriptor(table: str, complete: bool = False) -> dict:
     cdef string ctable = tobytes(table)
@@ -53,14 +51,16 @@ def ms_descriptor(table: str, complete: bool = False) -> dict:
 
     return json.loads(frombytes(table_desc))
 
+
 cdef CSelection build_selection(index: FullIndex = None):
-    cdef CSelectionBuilder builder = CSelectionBuilder().Order(b'C')
+    cdef CSelectionBuilder builder = CSelectionBuilder().Order(b"C")
 
     if index is None:
         return builder.Build()
     elif not isinstance(index, (tuple, list)):
-        raise TypeError(f"index must be a tuple of "
-                        f"(None, slices or numpy arrays), or None")
+        raise TypeError(
+            "index must be a tuple of "
+            "(None, slices or numpy arrays), or None")
 
     for d, dim_index in enumerate(index):
         if dim_index is None:
@@ -119,7 +119,10 @@ cdef class Table:
         self.close()
 
     @staticmethod
-    def from_taql(taql: str, tables: Optional[Union[Sequence[Table], Table]] = None) -> Table:
+    def from_taql(
+        taql: str,
+        tables: Optional[Union[Sequence[Table], Table]] = None
+    ) -> Table:
         cdef:
             Table table = Table.__new__(Table)
             vector[shared_ptr[CCasaTable]] ctables
@@ -132,30 +135,36 @@ cdef class Table:
                 for t in tables:
                     ctables.push_back((<Table?> t).c_table)
 
-
         with nogil:
             table.c_table = GetResultValue(CTaql(ctaql, ctables))
 
         return table
 
     @staticmethod
-    def from_filename(filename: str, ninstances: int = 1, readonly: bool = True, lockoptions: Union[str, dict] = "auto") -> Table:
+    def from_filename(
+        filename: str,
+        ninstances: int = 1,
+        readonly: bool = True,
+        lockoptions: Union[str, dict] = "auto"
+    ) -> Table:
         cdef:
             string cfilename = tobytes(filename)
             size_t cninstances = ninstances
+            Table table = Table.__new__(Table)
 
-        cdef Table table = Table.__new__(Table)
         if isinstance(lockoptions, str):
             lockoptions = f"{{\"option\": \"{lockoptions}\"}}"
         elif isinstance(lockoptions, dict):
             lockoptions = json.dumps(lockoptions)
         else:
-            raise TypeError(f"Invalid lockoptions {lockoptions}")
+            raise TypeError(f"Invalid lockoptions type {lockoptions}")
 
         clockoptions: string = tobytes(lockoptions)
 
         with nogil:
-            table.c_table = GetResultValue(COpenTable(cfilename, cninstances, readonly, clockoptions))
+            table.c_table = GetResultValue(
+                COpenTable(cfilename, cninstances, readonly, clockoptions)
+            )
         return table
 
     @staticmethod
@@ -182,7 +191,11 @@ cdef class Table:
                                                       cjson_dm_info))
         return table
 
-    def to_arrow(self, index: Optional[FullIndex] = None, columns: Union[list[str], str] = None):
+    def to_arrow(
+        self,
+        index: Optional[FullIndex] = None,
+        columns: Union[list[str], str] = None
+    ) -> pa.Table:
         cdef:
             vector[string] cpp_columns
             CSelection selection = build_selection(index)
@@ -204,7 +217,12 @@ cdef class Table:
             cname = GetResultValue(self.c_table.get().Name())
         return frombytes(cname)
 
-    def getcol(self, column: str, index: Optional[FullIndex] = None, result: Optional[np.ndarray] = None) -> np.ndarray:
+    def getcol(
+        self,
+        column: str,
+        index: Optional[FullIndex] = None,
+        result: Optional[np.ndarray] = None
+    ) -> np.ndarray:
         cdef:
             string cpp_column = tobytes(column)
             CSelection selection = build_selection(index)
@@ -215,12 +233,19 @@ cdef class Table:
             cpp_result = pyarrow_unwrap_array(pa_result)
 
         with nogil:
-            carray = GetResultValue(self.c_table.get().GetColumn(cpp_column, selection, cpp_result))
+            carray = GetResultValue(
+                self.c_table.get().GetColumn(cpp_column, selection, cpp_result)
+            )
 
         py_column = pyarrow_wrap_array(carray)
         return self._arrow_to_numpy(column, py_column)
 
-    def putcol(self, column: str, data: np.ndarray, index: Optional[FullIndex] = None):
+    def putcol(
+        self,
+        column: str,
+        data: np.ndarray,
+        index: Optional[FullIndex] = None
+    ):
         cdef:
             string cpp_column = tobytes(column)
             CSelection selection = build_selection(index)
@@ -248,11 +273,16 @@ cdef class Table:
 
         return pa_array
 
-
-    def _arrow_to_numpy(self, column: str, array: pa.array):
+    def _arrow_to_numpy(
+        self,
+        column: str,
+        array: pa.array
+    ) -> np.ndarray:
         """ Attempt to convert an arrow array to a numpy array """
         if isinstance(array, (pa.ListArray, pa.LargeListArray)):
-            raise TypeError(f"Can't convert variably shaped column {column} to numpy array")
+            raise TypeError(
+                f"Can't convert variably shaped "
+                f"column {column} to numpy array")
 
         if isinstance(array, pa.NumericArray):
             return array.to_numpy(zero_copy_only=True)
@@ -293,19 +323,19 @@ cdef class Table:
 
         raise TypeError(f"Unhandled column type {array.type}")
 
-    def lockoptions(self):
+    def lockoptions(self) -> Dict[str, Any]:
         with nogil:
             lock_opts = GetResultValue(self.c_table.get().GetLockOptions())
 
         return json.loads(lock_opts)
 
-    def nrow(self):
+    def nrow(self) -> int:
         with nogil:
             nrow = GetResultValue(self.c_table.get().nRows())
 
         return nrow
 
-    def ncolumns(self):
+    def ncolumns(self) -> int:
         with nogil:
             ncolumns = GetResultValue(self.c_table.get().nColumns())
 
@@ -315,23 +345,23 @@ cdef class Table:
         with nogil:
             GetResultValue(self.c_table.get().Close())
 
-    def columns(self):
+    def columns(self) -> List[str]:
         with nogil:
             columns = GetResultValue(self.c_table.get().Columns())
         return [frombytes(s) for s in columns]
 
-    def getcoldesc(self, column: str):
+    def getcoldesc(self, column: str) -> Dict[str, Any]:
         cdef string ccolumn = tobytes(column)
         with nogil:
             col_desc = GetResultValue(self.c_table.get().GetColumnDescriptor(ccolumn))
         return json.loads(frombytes(col_desc)).popitem()[1]
 
-    def tabledesc(self):
+    def tabledesc(self) -> Dict[str, Any]:
         with nogil:
             table_desc = GetResultValue(self.c_table.get().GetTableDescriptor())
         return json.loads(frombytes(table_desc))
 
-    def getdminfo(self, column: str | None = None):
+    def getdminfo(self, column: str | None = None) -> Dict[str, Any]:
         with nogil:
             cdminfo = GetResultValue(self.c_table.get().GetDataManagerInfo())
 
@@ -353,7 +383,9 @@ cdef class Table:
             string cjson_dminfo = tobytes(json.dumps(dminfo) if dminfo else "{}")
 
         with nogil:
-            GetResultValue(self.c_table.get().AddColumns(cjson_columndescs, cjson_dminfo))
+            GetResultValue(
+                self.c_table.get().AddColumns(cjson_columndescs, cjson_dminfo)
+            )
 
 
 class Configuration(MutableMapping):
