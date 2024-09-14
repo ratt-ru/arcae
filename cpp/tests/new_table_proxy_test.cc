@@ -1,10 +1,10 @@
-#include "gmock/gmock.h"
 #include <algorithm>
 #include <cassert>
 #include <cstddef>
 #include <filesystem>
 #include <limits>
 #include <memory>
+#include <random>
 #include <string>
 #include <sys/types.h>
 
@@ -72,6 +72,8 @@ static constexpr std::size_t kElements = knrow*knchan*kncorr;
 
 // Default value in result arrays
 static constexpr float kDefaultRealValue = -10.0f;
+
+std::mt19937 kRng = std::mt19937{};
 
 // Structure parametrizing a test case
 struct Parametrization {
@@ -280,7 +282,7 @@ TEST_P(FixedTableProxyTest, Fixed) {
     } else {
       // Maybe shuffle the indices
       if(params.randomise[d]) {
-        std::random_shuffle(std::begin(indices[d]), std::end(indices[d]));
+        std::shuffle(std::begin(indices[d]), std::end(indices[d]), kRng);
       }
       // Maybe remove a number of values from the selection
       if(params.remove[d] > 0) {
@@ -777,7 +779,7 @@ TEST_P(VariableProxyTest, Variable) {
 
       // Shuffle the selection along this dimension
       if(params.randomise[d]) {
-        std::random_shuffle(std::begin(indices[d]), std::end(indices[d]));
+        std::shuffle(std::begin(indices[d]), std::end(indices[d]), kRng);
       }
 
       // Maybe remove a number of values from the selection

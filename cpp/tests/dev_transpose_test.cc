@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <filesystem>
+#include <random>
 
 #include <casacore/casa/Arrays/Array.h>
 #include <casacore/casa/Arrays/IPosition.h>
@@ -104,6 +105,8 @@ absl::Duration transpose_duration;
 
 std::int64_t bytes_read = 0;
 
+std::mt19937 kRng = std::mt19937{};
+
 class DevTransposeTest : public ::testing::Test {
   protected:
     std::string table_name_;
@@ -164,7 +167,7 @@ TEST_F(DevTransposeTest, Basic) {
     Index dim_index(data_shape[dim], 0);
     std::iota(std::begin(dim_index), std::end(dim_index), 0);
     // Shuffle the row dimension
-    if(dim == data_shape.size() - 1) std::random_shuffle(std::begin(dim_index), std::end(dim_index));
+    if(dim == data_shape.size() - 1) std::shuffle(std::begin(dim_index), std::end(dim_index), kRng);
     builder.Add(std::move(dim_index));
   }
   auto selection = builder.Build();
@@ -279,7 +282,7 @@ TEST_F(DevTransposeTest, Basic) {
   {
     std::vector<IndexType> indices(knrow, 0);
     std::iota(indices.begin(), indices.end(), 0);
-    std::random_shuffle(indices.begin(), indices.end());
+    std::shuffle(indices.begin(), indices.end(), kRng);
     auto start = absl::Now();
     std::sort(indices.begin(), indices.end());
     sort_duration = absl::Now() - start;
