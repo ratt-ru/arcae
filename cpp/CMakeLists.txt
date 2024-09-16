@@ -28,6 +28,6 @@ set_target_properties(arcae PROPERTIES
 
 install(TARGETS arcae LIBRARY DESTINATION arcae/lib)
 
-if(NOT SKBUILD AND BUILD_TESTING)
+if(BUILD_TESTING)
     add_subdirectory(tests)
 endif()
