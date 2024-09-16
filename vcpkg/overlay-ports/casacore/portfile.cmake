@@ -3,8 +3,8 @@ include(vcpkg_find_fortran)
 vcpkg_from_github(
     OUT_SOURCE_PATH src
     REPO "casacore/casacore"
-    REF "v3.5.0"
-    SHA512 5ec72450dc60b833864416850e08a4a0903f02b9917e0218aafcef15475dedce88318ea526f44e27b214acad14d31542fed7ea2462d6b9590d178c1085466db4
+    REF "v3.6.1"
+    SHA512 2189d67650ffc9c4b6ca9d32e7ca90e2556e518c79f4df36d1fc75a0e4ad551e3b214226a8d13879a7e061a2b7bc53eb4ef5266f656c33d057d4b25ec8958a3e
     PATCHES
         001-casacore-cmake.patch
 )
@@ -53,6 +53,7 @@ vcpkg_cmake_configure(
         -DBUILD_FFTW3=${BUILD_FFTW3}
         -DBUILD_PYTHON=OFF
         -DBUILD_TESTING=OFF
+        -DUSE_PCH=OFF
         -DCMAKE_CXX_STANDARD=17
         ${fortran_args}
 )
