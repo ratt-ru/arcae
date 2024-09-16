@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Upgrade to casacore 3.6.1 (:pr:`124`)
 * Build against NumPy 2 (:pr:`122`)
 * Add pre-commit hooks, install formatters and linters (:pr:`121`)
 * Support adding columns (:pr:`120`)
