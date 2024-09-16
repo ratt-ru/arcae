@@ -1,5 +1,5 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 41def1e5f..0f214b1f1 100644
+index 41def1e5f..6577e743b 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -198,9 +198,13 @@ if (NOT CMAKE_BUILD_TYPE)
@@ -52,15 +52,7 @@ index 41def1e5f..0f214b1f1 100644
  
  if (DL_FOUND)
      add_definitions(-DHAVE_DL)
-@@ -424,7 +427,6 @@ if(USE_MPI)
-     add_definitions(-DHAVE_MPI)
- 
-     set(ENABLE_TABLELOCKING OFF)
--    set(CASACORE_MPI_LIBRARY ${MPI_C_LIBRARIES})
-     message (STATUS "ENABLE_TABLELOCKING is turned off as required by MPI")
- endif(USE_MPI)
- 
-@@ -548,8 +550,41 @@ endforeach (module)
+@@ -548,8 +551,41 @@ endforeach (module)
  
  # Install pkg-config support file
  CONFIGURE_FILE("casacore.pc.in" "casacore.pc" @ONLY)
@@ -104,15 +96,6 @@ index 41def1e5f..0f214b1f1 100644
  
  # Show summary.
  message (STATUS "CMAKE_SYSTEM .......... = ${CMAKE_SYSTEM}")
-@@ -576,7 +611,7 @@ message (STATUS "LAPACK library? ....... = ${LAPACK_LIBRARIES}")
- message (STATUS "WCS library? .......... = ${WCSLIB_LIBRARIES}")
- message (STATUS "SOFA library? ......... = ${SOFA_LIBRARIES}")
- message (STATUS "CFitsio library? ...... = ${CFITSIO_LIBRARIES}")
--message (STATUS "ADIOS2 library? ....... = ${CASACORE_ADIOS_LIBRARY}")
-+message (STATUS "ADIOS2 library? ....... = ${ADIOS2_LIBRARIES}")
- message (STATUS "HDF5 library? ......... = ${HDF5_hdf5_LIBRARY}")
- message (STATUS "FFTW3 library? ........ = ${FFTW3_LIBRARIES}")
- 
 diff --git a/Config.cmake.in b/Config.cmake.in
 new file mode 100644
 index 000000000..8c9ad12aa
@@ -398,22 +381,23 @@ index 701bf31bc..c7e220167 100644
  LIBRARY DESTINATION lib${LIB_SUFFIX}
  ARCHIVE DESTINATION lib${LIB_SUFFIX}
 diff --git a/fits/CMakeLists.txt b/fits/CMakeLists.txt
-index 0cb33bb02..4b06f7f7b 100644
+index 0cb33bb02..7ca993c3e 100644
 --- a/fits/CMakeLists.txt
 +++ b/fits/CMakeLists.txt
-@@ -30,14 +30,17 @@ FITS.h
+@@ -30,7 +30,11 @@ FITS.h
  
  init_pch_support(casa_fits ${top_level_headers})
  
 -target_link_libraries (casa_fits casa_measures ${CFITSIO_LIBRARIES} ${CASACORE_ARCH_LIBS})
 +find_package(ZLIB REQUIRED)
- 
--add_subdirectory (apps)
++
 +target_link_libraries (casa_fits
 +    PUBLIC casa_measures ${CFITSIO_LIBRARIES} ${CASACORE_ARCH_LIBS}
 +    PRIVATE ZLIB::ZLIB)
  
- #the tests
+ add_subdirectory (apps)
+ 
+@@ -38,6 +42,7 @@ add_subdirectory (apps)
  add_subdirectory (FITS/test ${EXCL_ALL})
  
  install (TARGETS casa_fits
@@ -433,15 +417,11 @@ index e5a36d696..0d72c4c57 100644
 +target_link_libraries (fits2table PUBLIC casa_fits ${CASACORE_ARCH_LIBS} PRIVATE ZLIB::ZLIB)
  install(TARGETS fits2table DESTINATION bin)
 diff --git a/images/CMakeLists.txt b/images/CMakeLists.txt
-index abb9b2d9b..a0f84787d 100644
+index abb9b2d9b..cfe29e2b5 100644
 --- a/images/CMakeLists.txt
 +++ b/images/CMakeLists.txt
-@@ -78,10 +78,9 @@ casa_lattices
- ${CASACORE_ARCH_LIBS}
- )
+@@ -82,6 +82,7 @@ add_subdirectory (apps)
  
--add_subdirectory (apps)
--
  install (
  TARGETS casa_images
 +EXPORT casacore
@@ -516,15 +496,11 @@ index 5602283c3..0219de46b 100644
  LIBRARY DESTINATION lib${LIB_SUFFIX}
  ARCHIVE DESTINATION lib${LIB_SUFFIX}
 diff --git a/msfits/CMakeLists.txt b/msfits/CMakeLists.txt
-index b8340e009..95af50d9e 100644
+index b8340e009..2acad1bb7 100644
 --- a/msfits/CMakeLists.txt
 +++ b/msfits/CMakeLists.txt
-@@ -32,10 +32,9 @@ init_pch_support(casa_msfits ${top_level_headers})
+@@ -36,6 +36,7 @@ add_subdirectory (apps)
  
- target_link_libraries (casa_msfits casa_ms casa_fits ${CASACORE_ARCH_LIBS})
- 
--add_subdirectory (apps)
--
  install (
  TARGETS casa_msfits
 +EXPORT casacore
@@ -604,17 +580,15 @@ index 69bd4d757..8e6aa8d8a 100644
  ARCHIVE DESTINATION lib${LIB_SUFFIX}
  LIBRARY PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
 diff --git a/tables/CMakeLists.txt b/tables/CMakeLists.txt
-index 0983b83ff..0ae376c7d 100644
+index 0983b83ff..1e0f04812 100644
 --- a/tables/CMakeLists.txt
 +++ b/tables/CMakeLists.txt
-@@ -237,12 +237,16 @@ TaQL.h
+@@ -237,12 +237,18 @@ TaQL.h
  )
  
  init_pch_support(casa_tables ${top_level_headers})
 -
 -target_link_libraries (casa_tables casa_casa ${CASACORE_ARCH_LIBS} ${DYSCOSTMAN_LIBRARIES} ${CASACORE_ADIOS_LIBRARY} ${CASACORE_MPI_LIBRARY})
--
--add_subdirectory (apps)
 +target_link_libraries (casa_tables casa_casa ${CASACORE_ARCH_LIBS} ${DYSCOSTMAN_LIBRARIES})
 +if(MPI_FOUND)
 +    target_link_libraries(casa_tables ${MPI_C_LIBRARIES})
@@ -622,6 +596,8 @@ index 0983b83ff..0ae376c7d 100644
 +        target_link_libraries(casa_tables adios2::adios2)
 +    endif(ADIOS2_FOUND)
 +endif(MPI_FOUND)
+ 
+ add_subdirectory (apps)
  
  install (TARGETS casa_tables
 +EXPORT casacore
