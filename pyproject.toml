@@ -14,7 +14,7 @@ classifiers = [
 ]
 dependencies = [
     "appdirs",
-    "numpy < 2.0.0",
+    "numpy >= 2.0.0",
     "pyarrow == 16.1.0"
 ]
 
@@ -44,7 +44,7 @@ Repository = "https://github.com/ratt-ru/arcae"
 requires = [
     "cython>=3.0.2, < 3.0.10",
     "scikit-build-core",
-    "numpy < 2.0.0",
+    "numpy >= 2.0.0",
     "pyarrow == 16.1.0"]
 build-backend = "scikit_build_core.build"
 
