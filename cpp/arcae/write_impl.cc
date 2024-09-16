@@ -5,14 +5,14 @@
 #include <string>
 
 #include <arrow/api.h>
+#include <arrow/array/array_base.h>
+#include <arrow/array/array_nested.h>
 #include <arrow/buffer.h>
 #include <arrow/compute/cast.h>
 #include <arrow/result.h>
 #include <arrow/status.h>
 #include <arrow/type.h>
 #include <arrow/type_fwd.h>
-#include <arrow/array/array_base.h>
-#include <arrow/array/array_nested.h>
 #include <arrow/util/async_generator.h>
 #include <arrow/util/future.h>
 #include <arrow/util/logging.h>
@@ -35,22 +35,24 @@ using ::arrow::Array;
 using ::arrow::Buffer;
 using ::arrow::CallbackOptions;
 using ::arrow::CollectAsyncGenerator;
-using ::arrow::MakeVectorGenerator;
-using ::arrow::MakeMappedGenerator;
 using ::arrow::Future;
-using ::arrow::Status;
+using ::arrow::MakeMappedGenerator;
+using ::arrow::MakeVectorGenerator;
 using ::arrow::Result;
 using ::arrow::ShouldSchedule;
+using ::arrow::Status;
 using ::arrow::internal::GetCpuThreadPool;
 
-template <class CT> using CasaArray = ::casacore::Array<CT>;
+template <class CT>
+using CasaArray = ::casacore::Array<CT>;
 using ::casacore::ArrayColumn;
 using ::casacore::DataType;
 using ::casacore::ScalarColumn;
 using ::casacore::TableColumn;
 using ::casacore::TableProxy;
 using CasaTable = ::casacore::Table;
-template <class CT> using CasaVector = ::casacore::Vector<CT>;
+template <class CT>
+using CasaVector = ::casacore::Vector<CT>;
 using ::casacore::String;
 
 using ::arcae::detail::DataChunk;
@@ -71,21 +73,18 @@ struct WriteCallback {
 
   // Write data, dependent on chunk characteristics and CASA data type
   template <DataType CDT>
-  Future<bool> DoWrite(const DataChunk & chunk) const {
+  Future<bool> DoWrite(const DataChunk& chunk) const {
     using CT = typename CasaDataTypeTraits<CDT>::CasaType;
 
     // If the chunk is contiguous in memory, we can write
     // from a CASA Array view over that position in the buffer
-    if(chunk.IsContiguous()) {
-      return itp->RunAsync([
-        column_name = std::move(column),
-        chunk = chunk,
-        buffer = buffer
-      ](const TableProxy & tp) -> bool {
-        CT * in_ptr = const_cast<CT *>(buffer->template data_as<CT>());
+    if (chunk.IsContiguous()) {
+      return itp->RunAsync([column_name = std::move(column), chunk = chunk,
+                            buffer = buffer](const TableProxy& tp) -> bool {
+        CT* in_ptr = const_cast<CT*>(buffer->template data_as<CT>());
         in_ptr += chunk.FlatOffset();
         auto shape = chunk.GetShape();
-        if(shape.size() == 1) {
+        if (shape.size() == 1) {
           auto column = ScalarColumn<CT>(tp.table(), column_name);
           auto vector = CasaVector<CT>(shape, in_ptr, casacore::SHARE);
           column.putColumnCells(chunk.ReferenceRows(), vector);
@@ -99,65 +98,63 @@ struct WriteCallback {
     }
 
     // Transpose the array into the output buffer
-    auto transpose_fut = arrow::DeferNotOk(
-      GetCpuThreadPool()->Submit([
-        chunk = chunk,
-        buffer = buffer
-      ]() mutable -> CasaArray<CT> {
-        std::ptrdiff_t ndim = chunk.nDim();
-        std::ptrdiff_t last_dim = ndim - 1;
-        auto spans = chunk.DimensionSpans();
-        auto min_mem = chunk.MinMemIndex();
-        auto chunk_strides = chunk.ChunkStrides();
-        auto buffer_strides = chunk.BufferStrides();
-        assert(buffer->template mutable_data_as<CT>() != nullptr);
-        CT * in_ptr = const_cast<CT *>(buffer->template data_as<CT>());
-        in_ptr += chunk.FlatOffset();
-        assert(chunk.GetShape().product() > 0);
-        auto array = CasaArray<CT>(chunk.GetShape());
-        CT * out_ptr = array.data();
-        auto pos = chunk.ScratchPositions();
-        for(std::size_t i = 0; i < pos.size(); ++i) pos[i] = 0;
+    auto transpose_fut = arrow::DeferNotOk(GetCpuThreadPool()->Submit(
+        [chunk = chunk, buffer = buffer]() mutable -> CasaArray<CT> {
+          std::ptrdiff_t ndim = chunk.nDim();
+          std::ptrdiff_t last_dim = ndim - 1;
+          auto spans = chunk.DimensionSpans();
+          auto min_mem = chunk.MinMemIndex();
+          auto chunk_strides = chunk.ChunkStrides();
+          auto buffer_strides = chunk.BufferStrides();
+          assert(buffer->template mutable_data_as<CT>() != nullptr);
+          CT* in_ptr = const_cast<CT*>(buffer->template data_as<CT>());
+          in_ptr += chunk.FlatOffset();
+          assert(chunk.GetShape().product() > 0);
+          auto array = CasaArray<CT>(chunk.GetShape());
+          CT* out_ptr = array.data();
+          auto pos = chunk.ScratchPositions();
+          for (std::size_t i = 0; i < pos.size(); ++i) pos[i] = 0;
 
-        // Iterate over the spans in memory, copying data
-        while(true) {
-          std::size_t i = 0, o = 0;
-          for(std::ptrdiff_t d = 0; d < ndim; ++d) {
-            i += (spans[d].mem[pos[d]] - min_mem[d]) * buffer_strides[d];
-            o += pos[d] * chunk_strides[d];
+          // Iterate over the spans in memory, copying data
+          while (true) {
+            std::size_t i = 0, o = 0;
+            for (std::ptrdiff_t d = 0; d < ndim; ++d) {
+              i += (spans[d].mem[pos[d]] - min_mem[d]) * buffer_strides[d];
+              o += pos[d] * chunk_strides[d];
+            }
+            // Moves degrade to copies for simple (i.e. numeric) types
+            // but it should make casacore::String more efficient by avoiding copies
+            out_ptr[o] = std::move(in_ptr[i]);
+            for (std::ptrdiff_t d = 0; d < ndim; ++d) {  // Iterate in FORTRAN order
+              if (++pos[d] < spans[d].mem.size())
+                break;     // Iteration doesn't reach dim end
+              pos[d] = 0;  // OtherwBasic iteration worksise reset, next dim
+              if (d == last_dim) return array;  // The last dim is reset, we're done
+            }
           }
-          // Moves degrade to copies for simple (i.e. numeric) types
-          // but it should make casacore::String more efficient by avoiding copies
-          out_ptr[o] = std::move(in_ptr[i]);
-          for(std::ptrdiff_t d=0; d < ndim; ++d) {     // Iterate in FORTRAN order
-            if(++pos[d] < spans[d].mem.size()) break;  // Iteration doesn't reach dim end
-            pos[d] = 0;                                // OtherwBasic iteration worksise reset, next dim
-            if(d == last_dim) return array;            // The last dim is reset, we're done
-          }
-        }
-      }));
+        }));
 
-      return itp->Then(transpose_fut, [
-        column_name = std::move(column),
-        chunk = chunk
-      ](const CasaArray<CT> & data, const TableProxy & tp) -> bool {
-        if(chunk.nDim() == 1) {
-          auto column = ScalarColumn<CT>(tp.table(), column_name);
-          column.putColumnCells(chunk.ReferenceRows(), data);
-          return true;
-        }
-        auto column = ArrayColumn<CT>(tp.table(), column_name);
-        column.putColumnCells(chunk.ReferenceRows(), chunk.SectionSlicer(), data);
-        return true;
-      });
+    return itp->Then(transpose_fut,
+                     [column_name = std::move(column), chunk = chunk](
+                         const CasaArray<CT>& data, const TableProxy& tp) -> bool {
+                       if (chunk.nDim() == 1) {
+                         auto column = ScalarColumn<CT>(tp.table(), column_name);
+                         column.putColumnCells(chunk.ReferenceRows(), data);
+                         return true;
+                       }
+                       auto column = ArrayColumn<CT>(tp.table(), column_name);
+                       column.putColumnCells(chunk.ReferenceRows(), chunk.SectionSlicer(),
+                                             data);
+                       return true;
+                     });
   }
 
   // Write a chunk of data from the encapsulated buffer
   // returning true on success
-  Future<bool> operator()(const DataChunk & chunk) const {
-    if(!chunk) return Status::Invalid("Invalid chunk");
-    if(chunk.IsEmpty()) return true;
-    switch(chunk.CasaDataType()) {
+  Future<bool> operator()(const DataChunk& chunk) const {
+    if (!chunk) return Status::Invalid("Invalid chunk");
+    if (chunk.IsEmpty()) return true;
+    switch (chunk.CasaDataType()) {
       case DataType::TpBool:
         return DoWrite<DataType::TpBool>(chunk);
         break;
@@ -198,28 +195,25 @@ struct WriteCallback {
         return DoWrite<DataType::TpString>(chunk);
         break;
       default:
-        return Status::NotImplemented(
-          "Column ", column,
-          " with data type ",
-          chunk.CasaDataType());
+        return Status::NotImplemented("Column ", column, " with data type ",
+                                      chunk.CasaDataType());
     }
   }
 };
 
-Result<std::shared_ptr<Array>>
-GetFlatArray(std::shared_ptr<Array> array, bool nulls = false) {
+Result<std::shared_ptr<Array>> GetFlatArray(std::shared_ptr<Array> array,
+                                            bool nulls = false) {
   auto array_data = array->data();
 
-  while(true) {
-    switch(array_data->type->id()) {
+  while (true) {
+    switch (array_data->type->id()) {
       case arrow::Type::LIST:
       case arrow::Type::LARGE_LIST:
-      case arrow::Type::FIXED_SIZE_LIST:
-      {
-        if(!nulls && array_data->null_count > 0) {
+      case arrow::Type::FIXED_SIZE_LIST: {
+        if (!nulls && array_data->null_count > 0) {
           return Status::Invalid(
-            "Null values were encountered "
-            "during array flattening.");
+              "Null values were encountered "
+              "during array flattening.");
         }
         array_data = array_data->child_data[0];
         break;
@@ -238,9 +232,8 @@ GetFlatArray(std::shared_ptr<Array> array, bool nulls = false) {
       case arrow::Type::STRING:
         return arrow::MakeArray(array_data);
       default:
-        return Status::NotImplemented(
-          "Flattening of type ", array->type(),
-          " is not supported");
+        return Status::NotImplemented("Flattening of type ", array->type(),
+                                      " is not supported");
     }
   }
 }
@@ -250,19 +243,17 @@ GetFlatArray(std::shared_ptr<Array> array, bool nulls = false) {
 // Otherwise, if the Arrow data type of the array doesn't match the
 // associated Arrow data type of the column, a cast is performed
 Result<std::shared_ptr<Buffer>> ExtractBufferOrCopyValues(
-    const std::shared_ptr<arrow::Array> & flat_array,
-    DataType casa_dtype) {
-
-  if (IsPrimitiveType(casa_dtype))  {
+    const std::shared_ptr<arrow::Array>& flat_array, DataType casa_dtype) {
+  if (IsPrimitiveType(casa_dtype)) {
     ARROW_ASSIGN_OR_RAISE(auto arrow_dtype, ArrowDataType(casa_dtype));
-    if(arrow_dtype->Equals(flat_array->type())) return flat_array->data()->buffers[1];
+    if (arrow_dtype->Equals(flat_array->type())) return flat_array->data()->buffers[1];
     // Need to cast the supplied data to the type appropriate to the CASA column
     ARROW_ASSIGN_OR_RAISE(auto datum, arrow::compute::Cast(flat_array, arrow_dtype));
     return datum.make_array()->data()->buffers[1];
   } else if (casa_dtype == DataType::TpString) {
     // We need to copy arrow strings to casacore strings.
     auto flat_strings = std::dynamic_pointer_cast<arrow::StringArray>(flat_array);
-    if(!flat_strings) return Status::Invalid("Cast to StringArray");
+    if (!flat_strings) return Status::Invalid("Cast to StringArray");
     auto nbytes = sizeof(String) * flat_strings->length();
     ARROW_ASSIGN_OR_RAISE(auto allocation, arrow::AllocateBuffer(nbytes, sizeof(String)));
     auto span = allocation->mutable_span_as<String>();
@@ -274,11 +265,9 @@ Result<std::shared_ptr<Buffer>> ExtractBufferOrCopyValues(
     }
 
     // and in-place delete when releasing the buffer
-    return std::shared_ptr<Buffer>(
-      std::unique_ptr<Buffer, void(*)(Buffer*)>(
-        allocation.release(),
-        [](Buffer * buffer) {
-          for(auto & s: buffer->mutable_span_as<String>()) s.String::~String();
+    return std::shared_ptr<Buffer>(std::unique_ptr<Buffer, void (*)(Buffer*)>(
+        allocation.release(), [](Buffer* buffer) {
+          for (auto& s : buffer->mutable_span_as<String>()) s.String::~String();
           delete buffer;
         }));
   }
@@ -286,15 +275,12 @@ Result<std::shared_ptr<Buffer>> ExtractBufferOrCopyValues(
   return Status::TypeError("Unhandled CASA type", casa_dtype);
 }
 
-} // namespace
+}  // namespace
 
-Future<bool>
-WriteImpl(
-    const std::shared_ptr<IsolatedTableProxy> & itp,
-    const std::string & column,
-    const std::shared_ptr<arrow::Array> & data,
-    const Selection & selection) {
-
+Future<bool> WriteImpl(const std::shared_ptr<IsolatedTableProxy>& itp,
+                       const std::string& column,
+                       const std::shared_ptr<arrow::Array>& data,
+                       const Selection& selection) {
   // Get the shape of the input data, given the supplied selection
   // and the given result array
   struct ShapeResult {
@@ -302,21 +288,15 @@ WriteImpl(
     std::shared_ptr<Selection> selection;
   };
 
-  auto shape_fut = itp->RunAsync([
-    column = column,
-    selection = selection,
-    data = data
-  ](TableProxy & tp) mutable -> Result<ShapeResult>  {
-    if(!tp.isWritable()) tp.reopenRW();
+  auto shape_fut = itp->RunAsync([column = column, selection = selection, data = data](
+                                     TableProxy& tp) mutable -> Result<ShapeResult> {
+    if (!tp.isWritable()) tp.reopenRW();
     ARROW_RETURN_NOT_OK(ColumnExists(tp.table(), column));
     auto table_column = TableColumn(tp.table(), column);
-    ARROW_ASSIGN_OR_RAISE(
-      auto shape_data,
-      ResultShapeData::MakeWrite(table_column, data, selection));
-    return ShapeResult{
-      std::make_shared<ResultShapeData>(std::move(shape_data)),
-      std::make_shared<Selection>(std::move(selection))
-    };
+    ARROW_ASSIGN_OR_RAISE(auto shape_data,
+                          ResultShapeData::MakeWrite(table_column, data, selection));
+    return ShapeResult{std::make_shared<ResultShapeData>(std::move(shape_data)),
+                       std::make_shared<Selection>(std::move(selection))};
   });
 
   // Partition the resulting shape into contiguous chunks
@@ -326,31 +306,26 @@ WriteImpl(
     std::shared_ptr<ResultShapeData> shape;
   };
   auto part_fut = shape_fut.Then(
-    [](const ShapeResult & result) mutable -> Result<PartitionResult> {
-      ARROW_ASSIGN_OR_RAISE(
-        auto partition,
-        DataPartition::Make(*result.selection, *result.shape));
-      return PartitionResult{
-        std::make_shared<DataPartition>(std::move(partition)),
-        std::move(result.shape)
-      };
-    }, {}, CallbackOptions{ShouldSchedule::Always, GetCpuThreadPool()});
+      [](const ShapeResult& result) mutable -> Result<PartitionResult> {
+        ARROW_ASSIGN_OR_RAISE(auto partition,
+                              DataPartition::Make(*result.selection, *result.shape));
+        return PartitionResult{std::make_shared<DataPartition>(std::move(partition)),
+                               std::move(result.shape)};
+      },
+      {}, CallbackOptions{ShouldSchedule::Always, GetCpuThreadPool()});
 
   // Write each contiguous chunk of data on disk independently
   // then create an output array
-  auto write_fut = part_fut.Then([
-    column = column,
-    itp = itp,
-    data = data
-  ](const PartitionResult & result) mutable -> Future<bool> {
+  auto write_fut = part_fut.Then([column = column, itp = itp,
+                                  data = data](const PartitionResult& result) mutable
+                                 -> Future<bool> {
     auto casa_dtype = result.partition->GetDataType();
     auto nelements = result.partition->nElements();
-    if(casacore::isComplex(casa_dtype)) nelements *= 2;
+    if (casacore::isComplex(casa_dtype)) nelements *= 2;
     ARROW_ASSIGN_OR_RAISE(auto flat_array, GetFlatArray(data));
-    if(decltype(nelements)(flat_array->length()) != nelements) {
-      return Status::Invalid(
-        "Partition elements ", nelements,
-        " don't match flat array elements ", flat_array->length());
+    if (decltype(nelements)(flat_array->length()) != nelements) {
+      return Status::Invalid("Partition elements ", nelements,
+                             " don't match flat array elements ", flat_array->length());
     }
 
     ARROW_ASSIGN_OR_RAISE(auto buffer, ExtractBufferOrCopyValues(flat_array, casa_dtype));
@@ -359,15 +334,18 @@ WriteImpl(
     // Map WriteCallback over all data chunks
     auto data_chunk_gen = MakeVectorGenerator(std::move(result.partition->data_chunks_));
     auto copy_and_write_gen = MakeMappedGenerator(
-      std::move(data_chunk_gen),
-      WriteCallback{std::move(column), itp, buffer});
+        std::move(data_chunk_gen), WriteCallback{std::move(column), itp, buffer});
 
     // Collect the write results
     auto collect = CollectAsyncGenerator(std::move(copy_and_write_gen));
-    return collect.Then([](const std::vector<bool> & result) -> Future<bool> {
-      for(auto b: result) { if(!b) return Status::Invalid("Write failed"); }
-      return true;
-    }, {}, CallbackOptions{ShouldSchedule::Always, GetCpuThreadPool()});
+    return collect.Then(
+        [](const std::vector<bool>& result) -> Future<bool> {
+          for (auto b : result) {
+            if (!b) return Status::Invalid("Write failed");
+          }
+          return true;
+        },
+        {}, CallbackOptions{ShouldSchedule::Always, GetCpuThreadPool()});
   });
 
   return write_fut;

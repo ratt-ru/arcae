@@ -24,8 +24,7 @@ applications = [
     "rich",
 ]
 dev = [
-    "black == 22.1.0",
-    "flake8 == 4.0.1",
+    "pre-commit",
     "tbump"
 ]
 test = [

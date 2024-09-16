@@ -1,26 +1,28 @@
 import os
 
-
 import numpy as np
-from numpy.testing import assert_array_equal, assert_array_almost_equal
 import pyarrow as pa
 import pyarrow.dataset as pad
 import pyarrow.parquet as pq
-
 import pytest
+from numpy.testing import assert_array_almost_equal, assert_array_equal
 
 import arcae
 from arcae.lib.arrow_tables import Table
 
-@pytest.mark.parametrize("table_suffix, table_name", [
-    ("", "MAIN"),
-    ("::ANTENNA", "ANTENNA"),
-    ("::FEED", "FEED"),
-    ("::POLARIZATION", "POLARIZATION"),
-    ("::SPECTRAL_WINDOW", "SPECTRAL_WINDOW"),
-])
+
+@pytest.mark.parametrize(
+    "table_suffix, table_name",
+    [
+        ("", "MAIN"),
+        ("::ANTENNA", "ANTENNA"),
+        ("::FEED", "FEED"),
+        ("::POLARIZATION", "POLARIZATION"),
+        ("::SPECTRAL_WINDOW", "SPECTRAL_WINDOW"),
+    ],
+)
 def test_parquet_write(tmp_path, tau_ms, table_suffix, table_name):
-    """ Test conversion of a representative MS and some of its subtables to parquet format """
+    """Test conversion of a representative MS and some of its subtables to parquet format"""
     T = arcae.table(f"{tau_ms}{table_suffix}").to_arrow()
     pq.write_table(T, str(tmp_path / f"{table_name}.parquet"))
 
@@ -35,25 +37,28 @@ def test_descriptors(column_case_table):
         dminfo = T.getdminfo()
         dminfo["*1"].pop("SPEC")  # Varies
         assert dminfo == {
-            "*1": {"COLUMNS": [
-                        "FIXED",
-                        "FIXED_STRING",
-                        "SCALAR",
-                        "SCALAR_STRING",
-                        "UNCONSTRAINED",
-                        "UNCONSTRAINED_SAME_NDIM",
-                        "VARIABLE",
-                        "VARIABLE_STRING"],
-            'NAME': "StandardStMan",
-            'SEQNR': 0,
-            "TYPE": "StandardStMan"}}
+            "*1": {
+                "COLUMNS": [
+                    "FIXED",
+                    "FIXED_STRING",
+                    "SCALAR",
+                    "SCALAR_STRING",
+                    "UNCONSTRAINED",
+                    "UNCONSTRAINED_SAME_NDIM",
+                    "VARIABLE",
+                    "VARIABLE_STRING",
+                ],
+                "NAME": "StandardStMan",
+                "SEQNR": 0,
+                "TYPE": "StandardStMan",
+            }
+        }
 
 
 def test_add_columns(column_case_table):
     with arcae.table(column_case_table) as T:
         shape = [16, 4]
         tile_shape = tuple(reversed(shape)) + (T.nrow(),)
-
 
         # Add ACK and BAR to the ACKBAR_GROUP at the same time succeeds
         desc = {
@@ -99,7 +104,7 @@ def test_column_selection(column_case_table):
             # Even though the column is unconstrained, ndim is the same
             "UNCONSTRAINED_SAME_NDIM",
             "VARIABLE",
-            "VARIABLE_STRING"
+            "VARIABLE_STRING",
         ]
 
     with arcae.table(column_case_table) as T:
@@ -110,43 +115,54 @@ def test_column_selection(column_case_table):
             "SCALAR_STRING",
             "UNCONSTRAINED_SAME_NDIM",
             "VARIABLE",
-            "VARIABLE_STRING"
+            "VARIABLE_STRING",
         ]
 
     with arcae.table(column_case_table) as T:
         assert sorted(T.to_arrow([[0, 1]], "VARIABLE").column_names) == ["VARIABLE"]
 
     with arcae.table(column_case_table) as T:
-        assert sorted(T.to_arrow([[0, 1]], ["VARIABLE", "FIXED"]).column_names) == ["FIXED", "VARIABLE"]
+        assert sorted(T.to_arrow([[0, 1]], ["VARIABLE", "FIXED"]).column_names) == [
+            "FIXED",
+            "VARIABLE",
+        ]
 
 
 def test_column_cases(column_case_table):
-    """ Test code paths """
+    """Test code paths"""
     T = arcae.table(column_case_table).to_arrow()
 
     assert T.column("VARIABLE").to_pylist() == [
         [[[0, 0]], [[0, 0]], [[0, 0]]],
         [[[1, 1], [1, 1]], [[1, 1], [1, 1]], [[1, 1], [1, 1]]],
-        [[[2, 2], [2, 2], [2, 2]], [[2, 2], [2, 2], [2, 2]], [[2, 2], [2, 2], [2, 2]]]]
+        [[[2, 2], [2, 2], [2, 2]], [[2, 2], [2, 2], [2, 2]], [[2, 2], [2, 2], [2, 2]]],
+    ]
 
     assert T.column("FIXED").to_pylist() == [
         [[0, 0, 0, 0], [0, 0, 0, 0]],
         [[1, 1, 1, 1], [1, 1, 1, 1]],
-        [[2, 2, 2, 2], [2, 2, 2, 2]]]
+        [[2, 2, 2, 2], [2, 2, 2, 2]],
+    ]
 
     assert T.column("SCALAR").to_pylist() == [0, 1, 2]
 
     assert T.column("VARIABLE_STRING").to_pylist() == [
-        [[['0', '0']], [['0', '0']], [['0', '0']]],
-        [[['1', '1'], ['1', '1']], [['1', '1'], ['1', '1']], [['1', '1'], ['1', '1']]],
-        [[['2', '2'], ['2', '2'], ['2', '2']], [['2', '2'], ['2', '2'], ['2', '2']], [['2', '2'], ['2', '2'], ['2', '2']]]]
+        [[["0", "0"]], [["0", "0"]], [["0", "0"]]],
+        [[["1", "1"], ["1", "1"]], [["1", "1"], ["1", "1"]], [["1", "1"], ["1", "1"]]],
+        [
+            [["2", "2"], ["2", "2"], ["2", "2"]],
+            [["2", "2"], ["2", "2"], ["2", "2"]],
+            [["2", "2"], ["2", "2"], ["2", "2"]],
+        ],
+    ]
 
     assert T.column("FIXED_STRING").to_pylist() == [
-        [['0', '0', '0', '0'], ['0', '0', '0', '0']],
-        [['1', '1', '1', '1'], ['1', '1', '1', '1']],
-        [['2', '2', '2', '2'], ['2', '2', '2', '2']]]
+        [["0", "0", "0", "0"], ["0", "0", "0", "0"]],
+        [["1", "1", "1", "1"], ["1", "1", "1", "1"]],
+        [["2", "2", "2", "2"], ["2", "2", "2", "2"]],
+    ]
 
-    assert T.column("SCALAR_STRING").to_pylist() == ['0', '1', '2']
+    assert T.column("SCALAR_STRING").to_pylist() == ["0", "1", "2"]
 
     # Unconstrained columns not yet handled
     assert "UNCONSTRAINED" not in T.column_names
@@ -159,7 +175,9 @@ def test_complex_cases(complex_case_table):
 
     with config.set(**{"casa.convert.strategy": "fixed"}):
         T = table.to_arrow()
-        assert T.column("COMPLEX").type == pa.list_(pa.list_(pa.list_(pa.float64(), 2), 4), 2)
+        assert T.column("COMPLEX").type == pa.list_(
+            pa.list_(pa.list_(pa.float64(), 2), 4), 2
+        )
 
     with config.set(**{"casa.convert.strategy": "list"}):
         T = table.to_arrow()
@@ -167,9 +185,8 @@ def test_complex_cases(complex_case_table):
 
 
 def test_unordered_select_roundtrip(tmp_path):
-    """ Tests writing and reading using indexing """
-    from arcae.lib.arrow_tables import ms_descriptor
-    from arcae.lib.arrow_tables import Table
+    """Tests writing and reading using indexing"""
+    from arcae.lib.arrow_tables import Table, ms_descriptor
 
     ms = str(tmp_path / "unorded_select.ms")
     table_desc = ms_descriptor("MAIN", complete=False)
@@ -189,40 +206,48 @@ def test_unordered_select_roundtrip(tmp_path):
     with Table.ms_from_descriptor(ms, table_desc=table_desc) as T:
         T.addrows(3)
         zeros = np.zeros((3, 3, 3), dtype=np.float32)
-        T.putcol("DATA", np.arange(3*3*3, dtype=np.float32).reshape(3, 3, 3))
+        T.putcol("DATA", np.arange(3 * 3 * 3, dtype=np.float32).reshape(3, 3, 3))
 
-        assert_array_equal(T.getcol("DATA"), [
-            [[0, 1, 2], [3, 4, 5], [6, 7, 8]],
-            [[9, 10, 11], [12, 13, 14], [15, 16, 17]],
-            [[18, 19, 20], [21, 22, 23], [24, 25, 26]],
-        ])
+        assert_array_equal(
+            T.getcol("DATA"),
+            [
+                [[0, 1, 2], [3, 4, 5], [6, 7, 8]],
+                [[9, 10, 11], [12, 13, 14], [15, 16, 17]],
+                [[18, 19, 20], [21, 22, 23], [24, 25, 26]],
+            ],
+        )
 
         index = (np.array([2, 0]), np.array([2, 0]), np.array([2, 0]))
-        expected = np.array([
-            [[26, 24], [20, 18]],
-            [[8, 6], [2, 0]]], np.float32)
+        expected = np.array([[[26, 24], [20, 18]], [[8, 6], [2, 0]]], np.float32)
         assert_array_equal(T.getcol("DATA", index=index), expected)
 
         T.putcol("DATA", zeros)
         assert_array_equal(T.getcol("DATA"), 0)
 
         T.putcol("DATA", expected, index=index)
-        assert_array_equal(T.getcol("DATA"), [
-            [[0, 0, 2], [0, 0, 0], [6, 0, 8]],
-            [[0, 0, 0], [0, 0, 0], [0, 0, 0]],
-            [[18, 0, 20], [0, 0, 0], [24, 0, 26]],
-        ])
+        assert_array_equal(
+            T.getcol("DATA"),
+            [
+                [[0, 0, 2], [0, 0, 0], [6, 0, 8]],
+                [[0, 0, 0], [0, 0, 0], [0, 0, 0]],
+                [[18, 0, 20], [0, 0, 0], [24, 0, 26]],
+            ],
+        )
 
         T.putcol("DATA", zeros)
         assert_array_equal(T.getcol("DATA"), 0)
 
-        index = (np.array([0, 2]),)*3
+        index = (np.array([0, 2]),) * 3
         T.putcol("DATA", expected, index=index)
-        assert_array_equal(T.getcol("DATA"), [
-            [[26, 0, 24], [0, 0, 0], [20, 0, 18]],
-            [[0, 0, 0], [0, 0, 0], [0, 0, 0]],
-            [[8, 0, 6], [0, 0, 0], [2, 0, 0]],
-        ])
+        assert_array_equal(
+            T.getcol("DATA"),
+            [
+                [[26, 0, 24], [0, 0, 0], [20, 0, 18]],
+                [[0, 0, 0], [0, 0, 0], [0, 0, 0]],
+                [[8, 0, 6], [0, 0, 0], [2, 0, 0]],
+            ],
+        )
+
 
 def test_getcol(getcol_table):
     T = arcae.table(getcol_table, readonly=False)
@@ -238,45 +263,59 @@ def test_getcol(getcol_table):
 
     index = (None, None, np.array([0, -1, -1, 2], np.int64))
     result = np.zeros((3, 2, 4), dtype=np.complex128)
-    assert_array_equal(T.getcol("COMPLEX_DATA", index=index, result=result), [
-        [[0, 0, 0, 0], [0, 0, 0, 0]],
-        [[1 + 1j, 0, 0, 1 + 1j], [1 + 1j, 0, 0, 1 + 1j]],
-        [[2 + 2j, 0, 0, 2 + 2j], [2 + 2j, 0, 0, 2 + 2j]]])
-
-    assert_array_equal(T.getcol("FLOAT_DATA"), [
-        [[0, 0, 0, 0], [0, 0, 0, 0]],
-        [[1, 1, 1, 1], [1, 1, 1, 1]],
-        [[2, 2, 2, 2], [2, 2, 2, 2]]])
-
-    assert_array_equal(T.getcol("FLOAT_DATA",
-        (slice(0, 2), slice(0, 2))), [
+    assert_array_equal(
+        T.getcol("COMPLEX_DATA", index=index, result=result),
+        [
             [[0, 0, 0, 0], [0, 0, 0, 0]],
-            [[1, 1, 1, 1], [1, 1, 1, 1]]])
+            [[1 + 1j, 0, 0, 1 + 1j], [1 + 1j, 0, 0, 1 + 1j]],
+            [[2 + 2j, 0, 0, 2 + 2j], [2 + 2j, 0, 0, 2 + 2j]],
+        ],
+    )
 
-    assert_array_equal(T.getcol("FLOAT_DATA",
-            (np.array([0, 1]), np.array([0, 1]), np.array([0, 1]))), [
-                [[0, 0], [0, 0]],
-                [[1, 1], [1, 1]]])
+    assert_array_equal(
+        T.getcol("FLOAT_DATA"),
+        [
+            [[0, 0, 0, 0], [0, 0, 0, 0]],
+            [[1, 1, 1, 1], [1, 1, 1, 1]],
+            [[2, 2, 2, 2], [2, 2, 2, 2]],
+        ],
+    )
+
+    assert_array_equal(
+        T.getcol("FLOAT_DATA", (slice(0, 2), slice(0, 2))),
+        [[[0, 0, 0, 0], [0, 0, 0, 0]], [[1, 1, 1, 1], [1, 1, 1, 1]]],
+    )
+
+    assert_array_equal(
+        T.getcol("FLOAT_DATA", (np.array([0, 1]), np.array([0, 1]), np.array([0, 1]))),
+        [[[0, 0], [0, 0]], [[1, 1], [1, 1]]],
+    )
 
     # Test partial round-trip
     index = (np.array([0, 1]), np.array([0, 1]), np.array([0, 1]))
-    float_data = np.array([
-        [[2, 3], [4, 5]],
-        [[9, 8], [7, 6]]], np.float32)
+    float_data = np.array([[[2, 3], [4, 5]], [[9, 8], [7, 6]]], np.float32)
 
     T.putcol("FLOAT_DATA", float_data + 1, index)
     assert_array_equal(T.getcol("FLOAT_DATA", index), float_data + 1)
 
     # Test complete round-trips
-    float_data = np.array([
-        [[3, 2, 1, 0], [3, 2, 1, 0]],
-        [[0, 1, 2, 3], [0, 1, 2, 3]],
-        [[2, 2, 2, 2], [2, 2, 2, 2]]], np.float32)
+    float_data = np.array(
+        [
+            [[3, 2, 1, 0], [3, 2, 1, 0]],
+            [[0, 1, 2, 3], [0, 1, 2, 3]],
+            [[2, 2, 2, 2], [2, 2, 2, 2]],
+        ],
+        np.float32,
+    )
 
-    complex_data = np.array([
-        [[3 + 3j, 2 + 2j, 1 + 1j, 0 + 0j], [3 + 3j, 2 + 2j, 1 + 1j, 0 + 0j]],
-        [[0 + 0j, 1 + 1j, 2 + 2j, 3 + 3j], [0 + 0j, 1 + 1j, 2 + 2j, 3 + 3j]],
-        [[2 + 2j, 2 + 2j, 2 + 2j, 2 + 2j], [2 + 2j, 2 + 2j, 2 + 2j, 2 + 2j]]], np.complex128)
+    complex_data = np.array(
+        [
+            [[3 + 3j, 2 + 2j, 1 + 1j, 0 + 0j], [3 + 3j, 2 + 2j, 1 + 1j, 0 + 0j]],
+            [[0 + 0j, 1 + 1j, 2 + 2j, 3 + 3j], [0 + 0j, 1 + 1j, 2 + 2j, 3 + 3j]],
+            [[2 + 2j, 2 + 2j, 2 + 2j, 2 + 2j], [2 + 2j, 2 + 2j, 2 + 2j, 2 + 2j]],
+        ],
+        np.complex128,
+    )
 
     T.putcol("FLOAT_DATA", float_data + 1)
     assert_array_equal(T.getcol("FLOAT_DATA"), float_data + 1)
@@ -296,7 +335,7 @@ def test_getcol(getcol_table):
 
 
 def test_partial_read(sorting_table):
-    """ Tests that partial reads work """
+    """Tests that partial reads work"""
     T = arcae.table(sorting_table)
     full = T.to_arrow()
     nrows = [1, 2, 3, 4]
@@ -305,8 +344,11 @@ def test_partial_read(sorting_table):
     start = 0
 
     for nrow in nrows:
-        assert full.take(list(range(start, start + nrow))) == T.to_arrow([slice(start, start+nrow)])
+        assert full.take(list(range(start, start + nrow))) == T.to_arrow(
+            [slice(start, start + nrow)]
+        )
         start += nrow
+
 
 def test_table_name(sorting_table):
     T = arcae.table(sorting_table)
@@ -314,24 +356,41 @@ def test_table_name(sorting_table):
 
 
 def test_table_taql(sorting_table):
-    """ Tests that basic taql queries work """
+    """Tests that basic taql queries work"""
     with arcae.table(sorting_table) as T:
         AT = T.to_arrow()
 
-    with Table.from_taql(f"SELECT * FROM {sorting_table} ORDER BY TIME, ANTENNA1, ANTENNA2") as Q:
-        assert AT.sort_by([
-            ("TIME", "ascending"),
-            ("ANTENNA1", "ascending"),
-            ("ANTENNA2", "ascending")]) == Q.to_arrow()
+    with Table.from_taql(
+        f"SELECT * FROM {sorting_table} ORDER BY TIME, ANTENNA1, ANTENNA2"
+    ) as Q:
+        assert (
+            AT.sort_by(
+                [
+                    ("TIME", "ascending"),
+                    ("ANTENNA1", "ascending"),
+                    ("ANTENNA2", "ascending"),
+                ]
+            )
+            == Q.to_arrow()
+        )
 
-    with Table.from_taql(f"SELECT * FROM {sorting_table} ORDER BY ANTENNA1, ANTENNA2, TIME") as Q:
-        assert AT.sort_by([
-            ("ANTENNA1", "ascending"),
-            ("ANTENNA2", "ascending"),
-            ("TIME", "ascending")]) == Q.to_arrow()
+    with Table.from_taql(
+        f"SELECT * FROM {sorting_table} ORDER BY ANTENNA1, ANTENNA2, TIME"
+    ) as Q:
+        assert (
+            AT.sort_by(
+                [
+                    ("ANTENNA1", "ascending"),
+                    ("ANTENNA2", "ascending"),
+                    ("TIME", "ascending"),
+                ]
+            )
+            == Q.to_arrow()
+        )
+
 
 def test_complex_taql(sorting_table):
-    """ Test a relatively complex taql query """
+    """Test a relatively complex taql query"""
 
     query = f"""
     SELECT
@@ -355,12 +414,13 @@ def test_complex_taql(sorting_table):
             ("TIME", "list"),
             ("FIELD_ID", "list"),
             ("ROW", "list"),
-            ("SCAN_NUMBER", "list")
+            ("SCAN_NUMBER", "list"),
         ]
         AT = AT.append_column("ROW", pa.array(np.arange(len(AT))))
         AT = AT.group_by(group_cols).aggregate(agg_cols)
-        new_names = [c[:-len("_list")] if c.endswith("_list")
-                     else c for c in AT.column_names]
+        new_names = [
+            c[: -len("_list")] if c.endswith("_list") else c for c in AT.column_names
+        ]
         AT = AT.rename_columns(new_names)
 
     with Table.from_taql(query) as T:
@@ -372,7 +432,7 @@ def test_complex_taql(sorting_table):
 
 def test_taql_table_arg(sorting_table):
     with arcae.table(sorting_table) as T:
-        query = f"""
+        query = """
         SELECT
             TIME,
             ANTENNA1,
@@ -395,7 +455,7 @@ def test_taql_table_arg(sorting_table):
 
 
 def test_print_dataset_structure(partitioned_dataset):
-    """ Print the directory stucture of the partitioned dataset """
+    """Print the directory stucture of the partitioned dataset"""
     partitioned_dataset = str(partitioned_dataset)
 
     print("\nDATASET TREE\n")
@@ -410,10 +470,14 @@ def test_print_dataset_structure(partitioned_dataset):
 
 
 def test_dataset_predicates(partitioned_dataset):
-    """ Illustrate native arrow dataset predicates """
+    """Illustrate native arrow dataset predicates"""
     partitioned_dataset = pad.dataset(partitioned_dataset)
-    predicate = ((pad.field("ANTENNA1") >= 0) & (pad.field("ANTENNA1") < 2) &
-                 (pad.field("ANTENNA2") >= 2) & (pad.field("ANTENNA2") <= 3))
+    predicate = (
+        (pad.field("ANTENNA1") >= 0)
+        & (pad.field("ANTENNA1") < 2)
+        & (pad.field("ANTENNA2") >= 2)
+        & (pad.field("ANTENNA2") <= 3)
+    )
 
     T = partitioned_dataset.to_table(filter=predicate)
     antenna1 = T.column("ANTENNA1").to_numpy()
@@ -422,15 +486,18 @@ def test_dataset_predicates(partitioned_dataset):
     assert antenna1.size > 0 and np.all((antenna1 >= 0) & (antenna1 < 2))
     assert antenna2.size > 0 and np.all((antenna2 >= 2) & (antenna2 <= 3))
 
+
 def test_duckdb(partitioned_dataset):
-    """ Illustrate integation between dataset and duckdb"""
+    """Illustrate integation between dataset and duckdb"""
     partitioned_dataset = pad.dataset(partitioned_dataset)
     duckdb = pytest.importorskip("duckdb")
     con = duckdb.connect()
 
-    query = con.execute(f"SELECT TIME, ANTENNA1, ANTENNA2, DATA FROM partitioned_dataset "
-                        f"WHERE ANTENNA1 >= 0 AND ANTENNA1 < 2 AND "
-                        f"ANTENNA2 >= 2 AND ANTENNA2 <=3")
+    query = con.execute(
+        "SELECT TIME, ANTENNA1, ANTENNA2, DATA FROM partitioned_dataset "
+        "WHERE ANTENNA1 >= 0 AND ANTENNA1 < 2 AND "
+        "ANTENNA2 >= 2 AND ANTENNA2 <=3"
+    )
     rbr = query.fetch_record_batch()
 
     chunks = []
@@ -451,6 +518,7 @@ def test_duckdb(partitioned_dataset):
 
 def test_config():
     from arcae.lib.arrow_tables import Configuration
+
     global_config = Configuration()
 
     assert global_config["validation-level"] == "full"
@@ -471,7 +539,11 @@ def test_config():
     assert global_config.get("foo") is None
     assert global_config.get("foo", "bar") == "bar"
 
-    assert list(global_config.items()) == [("blah", "foo"), ("qux", "bar"), ("validation-level", "full")]
+    assert list(global_config.items()) == [
+        ("blah", "foo"),
+        ("qux", "bar"),
+        ("validation-level", "full"),
+    ]
 
     try:
         global_config["foo"] = 1
@@ -485,8 +557,9 @@ def test_config():
 
 
 def test_config_context_mgr():
-    from arcae.lib.arrow_tables import Configuration
     from arcae import config
+    from arcae.lib.arrow_tables import Configuration
+
     global_config = Configuration()
     assert list(global_config.items()) == [("validation-level", "full")]
 

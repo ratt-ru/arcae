@@ -11,8 +11,8 @@
 
 #include <absl/types/span.h>
 
-#include <arrow/status.h>
 #include <arrow/result.h>
+#include <arrow/status.h>
 
 #include "arcae/type_traits.h"
 
@@ -32,13 +32,14 @@ struct SelectionBuilder;
 // Class describing a FORTRAN-ordered selection
 // over multiple dimensions
 class Selection {
-public:
-  Selection() : indices_(std::make_shared<std::vector<Index>>()),
-                spans_(std::make_shared<std::vector<IndexSpan>>()) {};
-  Selection(const Selection & rhs) = default;
-  Selection(Selection && rhs) = default;
-  Selection & operator=(const Selection & rhs) = default;
-  Selection & operator=(Selection && rhs) = default;
+ public:
+  Selection()
+      : indices_(std::make_shared<std::vector<Index>>()),
+        spans_(std::make_shared<std::vector<IndexSpan>>()) {};
+  Selection(const Selection& rhs) = default;
+  Selection(Selection&& rhs) = default;
+  Selection& operator=(const Selection& rhs) = default;
+  Selection& operator=(Selection&& rhs) = default;
 
   // Number of dimensions in the selection
   std::size_t Size() const noexcept { return spans_->size(); }
@@ -54,15 +55,15 @@ public:
 
   // Return true if the selection exists
   explicit inline operator bool() const noexcept {
-    if(Size() == 0) return false;
-    for(std::size_t i=0; i < Size(); ++i) {
-      if(spans_->operator[](i).empty()) return false;
+    if (Size() == 0) return false;
+    for (std::size_t i = 0; i < Size(); ++i) {
+      if (spans_->operator[](i).empty()) return false;
     }
     return true;
   }
 
   // Return the selection indices for a specified dimension
-  const IndexSpan & operator[](std::size_t dim) const noexcept {
+  const IndexSpan& operator[](std::size_t dim) const noexcept {
     assert(dim < Size());
     return spans_->operator[](dim);
   }
@@ -73,17 +74,16 @@ public:
   }
 
   // Return the selection indices for the row dimension
-  const IndexSpan & GetRowSpan() const noexcept {
+  const IndexSpan& GetRowSpan() const noexcept {
     assert(Size() > 0);
     return spans_->operator[](Size() - 1);
   }
-
 
   // Return the Span referenced by the C-ORDERED index
   arrow::Result<IndexSpan> CSpan(std::size_t cdim) const noexcept {
     auto size = std::ptrdiff_t(Size());
     auto sdim = size - std::ptrdiff_t(cdim) - 1;
-    if(sdim >= 0 && sdim < size && !spans_->operator[](sdim).empty()) {
+    if (sdim >= 0 && sdim < size && !spans_->operator[](sdim).empty()) {
       return spans_->operator[](sdim);
     }
     return arrow::Status::IndexError("Selection doesn't exist for dimension ", cdim);
@@ -99,18 +99,18 @@ public:
   arrow::Result<IndexSpan> FSpan(std::size_t fdim, std::size_t ndim) const noexcept {
     auto size = std::ptrdiff_t(Size());
     auto sdim = std::ptrdiff_t(fdim) - std::ptrdiff_t(ndim) + size;
-    if(sdim >= 0 && sdim < size && !spans_->operator[](sdim).empty()) {
+    if (sdim >= 0 && sdim < size && !spans_->operator[](sdim).empty()) {
       return spans_->operator[](sdim);
     }
     return arrow::Status::IndexError("Selection doesn't exist for dimension ", fdim);
   }
 
-private:
+ private:
   friend SelectionBuilder;
 
-  Selection(std::vector<Index> && indices, std::vector<IndexSpan> && spans) :
-    indices_(std::make_shared<std::vector<Index>>(std::move(indices))),
-    spans_(std::make_shared<std::vector<IndexSpan>>(std::move(spans))) {}
+  Selection(std::vector<Index>&& indices, std::vector<IndexSpan>&& spans)
+      : indices_(std::make_shared<std::vector<Index>>(std::move(indices))),
+        spans_(std::make_shared<std::vector<IndexSpan>>(std::move(spans))) {}
 
   std::shared_ptr<std::vector<Index>> indices_;
   std::shared_ptr<std::vector<IndexSpan>> spans_;
@@ -128,25 +128,25 @@ struct SelectionBuilder {
 
   // Build the selection
   Selection Build() {
-    if(order == SelectionOrder::C_ORDER) {
+    if (order == SelectionOrder::C_ORDER) {
       std::reverse(std::begin(spans), std::end(spans));
     }
     return Selection{std::move(indices), std::move(spans)};
   }
 
   // ProcessArgs base case
-  SelectionBuilder & ProcessArgs() { return *this; }
+  SelectionBuilder& ProcessArgs() { return *this; }
 
   // Process head of the argument pack
   template <typename T, typename... Args>
-  SelectionBuilder & ProcessArgs(T && head, Args && ... args) {
+  SelectionBuilder& ProcessArgs(T&& head, Args&&... args) {
     Add(std::forward<T>(head));
     return ProcessArgs(std::forward<Args>(args)...);
   }
 
   // Create a Selection from an Argument Pack in C order
   template <typename... Args>
-  static Selection FromArgs(Args && ... args) {
+  static Selection FromArgs(Args&&... args) {
     SelectionBuilder builder;
     builder.ProcessArgs(std::forward<Args>(args)...);
     // Template argument pack gets processed in F order
@@ -158,29 +158,29 @@ struct SelectionBuilder {
   template <typename T>
   static Selection FromInit(std::initializer_list<std::initializer_list<T>> init_list) {
     SelectionBuilder builder;
-    for(const auto & il: init_list) builder.Add(il);
+    for (const auto& il : init_list) builder.Add(il);
     return builder.Build();
   }
 
   // Sets the ordering of the resultant selection to C or FORTRAN ordered
-  SelectionBuilder & Order(char order) {
+  SelectionBuilder& Order(char order) {
     this->order = order == 'F' ? SelectionOrder::F_ORDER : SelectionOrder::C_ORDER;
     return *this;
   }
 
-  SelectionBuilder & AddEmpty() {
+  SelectionBuilder& AddEmpty() {
     spans.emplace_back(IndexSpan{});
     return *this;
   }
 
   // Base case, which reminds the developer of the vector<T> expectation
   template <typename T>
-  SelectionBuilder & Add(T ids) {
+  SelectionBuilder& Add(T ids) {
     static_assert(always_false<T>, "ids must be a vector of integral types");
     return *this;
   }
 
-  SelectionBuilder & Add(const IndexSpan & ids) {
+  SelectionBuilder& Add(const IndexSpan& ids) {
     spans.push_back(ids);
     return *this;
   }
@@ -189,10 +189,10 @@ struct SelectionBuilder {
   // The vector will not be copied into the Selection
   // if the vector type is an IndexType
   template <typename T>
-  SelectionBuilder & Add(const std::vector<T> & ids) {
-    if constexpr(std::is_same_v<T, IndexType>) {
+  SelectionBuilder& Add(const std::vector<T>& ids) {
+    if constexpr (std::is_same_v<T, IndexType>) {
       spans.emplace_back(IndexSpan(ids));
-    } else if constexpr(std::is_integral_v<T>) {
+    } else if constexpr (std::is_integral_v<T>) {
       indices.emplace_back(Index(std::begin(ids), std::end(ids)));
       spans.emplace_back(IndexSpan(indices.back()));
     } else {
@@ -204,11 +204,11 @@ struct SelectionBuilder {
   // Creates a span over the supplied index vector,
   // which is included in the encapsulated Selection indices
   template <typename T>
-  SelectionBuilder & Add(std::vector<T> && ids) {
-    if constexpr(std::is_same_v<T, IndexType>) {
+  SelectionBuilder& Add(std::vector<T>&& ids) {
+    if constexpr (std::is_same_v<T, IndexType>) {
       indices.emplace_back(std::move(ids));
       spans.emplace_back(IndexSpan(indices.back()));
-    } else if constexpr(std::is_integral_v<T>) {
+    } else if constexpr (std::is_integral_v<T>) {
       indices.emplace_back(Index(std::begin(ids), std::end(ids)));
       spans.emplace_back(IndexSpan(indices.back()));
     } else {
@@ -221,8 +221,8 @@ struct SelectionBuilder {
   // encapsulated Selection indices and then creates
   // a span over the copy
   template <typename T>
-  SelectionBuilder & Add(const std::initializer_list<T> & ids) {
-    if constexpr(std::is_same_v<T, IndexType> || std::is_integral_v<T>) {
+  SelectionBuilder& Add(const std::initializer_list<T>& ids) {
+    if constexpr (std::is_same_v<T, IndexType> || std::is_integral_v<T>) {
       return Add(Index(std::begin(ids), std::end(ids)));
     } else {
       static_assert(always_false<T>, "ids must contain integral types");
@@ -231,7 +231,7 @@ struct SelectionBuilder {
   }
 };
 
-} // namespace detail
-} // namespace arcae
+}  // namespace detail
+}  // namespace arcae
 
-#endif // #define ARCAE_SELECTION_H
+#endif  // #define ARCAE_SELECTION_H

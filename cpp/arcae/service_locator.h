@@ -9,15 +9,15 @@
 namespace arcae {
 
 class ServiceLocator {
-private:
+ private:
   static std::mutex mutex_;
   static std::unique_ptr<Configuration> configuration_service_;
 
-public:
+ public:
   static void SetConfigurationService(std::unique_ptr<Configuration> service);
-  static Configuration & configuration();
+  static Configuration& configuration();
 };
 
-} // namespace arcae
+}  // namespace arcae
 
 #endif

@@ -48,7 +48,8 @@ cdef extern from "arcae/configuration.h" namespace "arcae" nogil:
         size_t Size" Configuration::Size"()
 
 cdef extern from "arcae/descriptor.h" namespace "arcae" nogil:
-    cdef CResult[string] CMSDescriptor" arcae::MSDescriptor"(const string & table, bool complete)
+    cdef CResult[string] CMSDescriptor" arcae::MSDescriptor"(
+        const string & table, bool complete)
 
 cdef extern from "arcae/new_table_proxy.h" namespace "arcae" nogil:
     cdef cppclass CCasaTable" arcae::NewTableProxy":
@@ -68,7 +69,8 @@ cdef extern from "arcae/new_table_proxy.h" namespace "arcae" nogil:
             const CSelection & selection)
         CResult[string] Name " NewTableProxy::Name"()
         CResult[string] GetTableDescriptor " NewTableProxy::GetTableDescriptor"()
-        CResult[string] GetColumnDescriptor "NewTableProxy::GetColumnDescriptor"(const string & column)
+        CResult[string] GetColumnDescriptor "NewTableProxy::GetColumnDescriptor"(
+            const string & column)
         CResult[string] GetDataManagerInfo "NewTableProxy::GetDataManagerInfo"()
         CResult[string] GetLockOptions "NewTableProxy::GetLockOptions"()
         CResult[unsigned int] nRows " NewTableProxy::nRows"()
@@ -82,15 +84,15 @@ cdef extern from "arcae/new_table_proxy.h" namespace "arcae" nogil:
 
 cdef extern from "arcae/table_factory.h" namespace "arcae" nogil:
     cdef CResult[shared_ptr[CCasaTable]] COpenTable" arcae::OpenTable"(
-                                                    const string & filename,
-                                                    size_t ninstances,
-                                                    bool readonly,
-                                                    const string & json_lockoptions)
+            const string & filename,
+            size_t ninstances,
+            bool readonly,
+            const string & json_lockoptions)
     cdef CResult[shared_ptr[CCasaTable]] CDefaultMS" arcae::DefaultMS"(
-                                                    const string & name,
-                                                    const string & subtable,
-                                                    const string & json_table_desc,
-                                                    const string & json_dminfo)
+            const string & name,
+            const string & subtable,
+            const string & json_table_desc,
+            const string & json_dminfo)
     cdef CResult[shared_ptr[CCasaTable]] CTaql" arcae::Taql"(
-                                                    const string & taql,
-                                                    const vector[shared_ptr[CCasaTable]] & tables)
+            const string & taql,
+            const vector[shared_ptr[CCasaTable]] & tables)

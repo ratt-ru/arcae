@@ -3,48 +3,50 @@
 
 #include <type_traits>
 
-#include <arrow/util/functional.h>
-#include <arrow/util/future.h>
 #include <arrow/result.h>
 #include <arrow/status.h>
 #include <arrow/type.h>
+#include <arrow/util/functional.h>
+#include <arrow/util/future.h>
 
-#include <casacore/casa/aipstype.h>
-#include <casacore/casa/aipsxtype.h>
 #include <casacore/casa/BasicSL/Complexfwd.h>
 #include <casacore/casa/Utilities/DataType.h>
+#include <casacore/casa/aipstype.h>
+#include <casacore/casa/aipsxtype.h>
 
 namespace arcae {
 namespace detail {
 
 // Helper class for use with static_assert
-template <class...> constexpr std::false_type always_false{};
+template <class...>
+constexpr std::false_type always_false{};
 
 // Coerce the return value of Fn(Args...) into an arrow::Result
-template <typename Fn, typename ... Args>
-using ArrowResultType = typename arrow::EnsureResult<std::invoke_result_t<Fn, Args...>>::type;
+template <typename Fn, typename... Args>
+using ArrowResultType =
+    typename arrow::EnsureResult<std::invoke_result_t<Fn, Args...>>::type;
 
 // Coerce the return value of Fn(Args...) into an arrow::Future
-template <typename Fn, typename ... Args>
-using ArrowFutureType = typename arrow::EnsureFuture<std::invoke_result_t<Fn, Args...>>::type;
+template <typename Fn, typename... Args>
+using ArrowFutureType =
+    typename arrow::EnsureFuture<std::invoke_result_t<Fn, Args...>>::type;
 
 // Get the size of a CASA Data Type
-arrow::Result<std::size_t>
-CasaDataTypeSize(casacore::DataType data_type);
+arrow::Result<std::size_t> CasaDataTypeSize(casacore::DataType data_type);
 
 // Get the primitive arrow Data type associated with a CASA Data Type
-arrow::Result<std::shared_ptr<arrow::DataType>>
-ArrowDataType(casacore::DataType data_type);
+arrow::Result<std::shared_ptr<arrow::DataType>> ArrowDataType(
+    casacore::DataType data_type);
 
 // From https://stackoverflow.com/a/35300172/1611416
 // Supports initialisation of aggregate structures in std::make_shared<T>
 //
 //   struct Data { std::string a; int b; float c; };
 //   std::make_shared<AggregateAdapter<Data>>{"hello", 1, 10.0f};
-template<class T>
+template <class T>
 struct AggregateAdapter : public T {
-    template<class... Args>
-    AggregateAdapter(Args&&... args) : T{ std::forward<Args>(args)... } {}
+  template <class... Args>
+  AggregateAdapter(Args&&... args) : T{std::forward<Args>(args)...} {}
 };
 
 template <casacore::DataType CDT>
@@ -162,4 +164,4 @@ struct CasaDataTypeTraits<casacore::DataType::TpString> {
 }  // namespace detail
 }  // namespace arcae
 
-#endif // ARCAE_TYPE_TRAITS_H
+#endif  // ARCAE_TYPE_TRAITS_H

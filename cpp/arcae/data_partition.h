@@ -134,15 +134,11 @@ struct DataChunk {
   // Get the Casa Data Type associated with the chunk
   casacore::DataType CasaDataType() const { return shared_->CasaDataType(); }
 
-// Return the disk span at the specified dimension
-  const IndexSpan & Disk(std::size_t dim) const {
-    return DimensionSpans()[dim].disk;
-  }
+  // Return the disk span at the specified dimension
+  const IndexSpan& Disk(std::size_t dim) const { return DimensionSpans()[dim].disk; }
 
- // Return the memory span at the specified dimension
-  const IndexSpan & Mem(std::size_t dim) const {
-    return DimensionSpans()[dim].mem;
-  }
+  // Return the memory span at the specified dimension
+  const IndexSpan& Mem(std::size_t dim) const { return DimensionSpans()[dim].mem; }
   // Obtain the disk and memory index spans for this chunk
   absl::Span<const SpanPair> DimensionSpans() const {
     return shared_->DimensionSpans(chunk_id_);
@@ -159,9 +155,7 @@ struct DataChunk {
   }
 
   // Obtain the initial starting offset within the output buffer
-  std::size_t FlatOffset() const {
-    return shared_->FlatOffset(chunk_id_);
-  }
+  std::size_t FlatOffset() const { return shared_->FlatOffset(chunk_id_); }
 
   // Obtain the strides for the location in the output buffer
   // associated with this chunk
@@ -175,9 +169,7 @@ struct DataChunk {
   }
 
   // Is the chunk contiguous?
-  bool IsContiguous() const {
-    return shared_->IsContiguous(chunk_id_);
-  }
+  bool IsContiguous() const { return shared_->IsContiguous(chunk_id_); }
 
   // Get a Row Slicer for the disk span
   casacore::Slicer RowSlicer() const noexcept;
@@ -209,18 +201,15 @@ struct DataChunk {
 // A partition of the data into a series
 // of chunks that can be independently processed
 struct DataPartition {
-  static arrow::Result<DataPartition> Make(
-    const Selection & selection,
-    const ResultShapeData & result_shape);
+  static arrow::Result<DataPartition> Make(const Selection& selection,
+                                           const ResultShapeData& result_shape);
 
   std::vector<DataChunk> data_chunks_;
   casacore::DataType casa_dtype_;
   std::vector<Index> id_cache_;
 
   // Consume chunks in the partition
-  std::vector<DataChunk> && TakeChunks() noexcept {
-    return std::move(data_chunks_);
-  }
+  std::vector<DataChunk>&& TakeChunks() noexcept { return std::move(data_chunks_); }
 
   // Get the casa data type associated with the data partition;
   casacore::DataType GetDataType() const noexcept { return casa_dtype_; }
@@ -230,30 +219,23 @@ struct DataPartition {
 
   // Return the number of elements in the partition
   std::size_t nElements() const noexcept {
-    return std::accumulate(
-      std::begin(data_chunks_),
-      std::end(data_chunks_),
-      std::size_t(0),
-      [](auto i, auto v) { return i + v.nElements(); });
+    return std::accumulate(std::begin(data_chunks_), std::end(data_chunks_),
+                           std::size_t(0),
+                           [](auto i, auto v) { return i + v.nElements(); });
   }
 
   // Return the DataChunk at index
-  const DataChunk & Chunk(std::size_t index) const noexcept {
-    return data_chunks_[index];
-  }
+  const DataChunk& Chunk(std::size_t index) const noexcept { return data_chunks_[index]; }
 };
 
 }  // namespace detail
 }  // namespace arcae
 
-
 // Define arrow IterationTraits for DataChunk
 template <>
 struct arrow::IterationTraits<arcae::detail::DataChunk> {
   static arcae::detail::DataChunk End() { return {}; }
-  static bool IsEnd(const arcae::detail::DataChunk& val) {
-    return !val;
-  }
+  static bool IsEnd(const arcae::detail::DataChunk& val) { return !val; }
 };
 
-#endif // ARCAE_DATA_PARTITION_H
+#endif  // ARCAE_DATA_PARTITION_H

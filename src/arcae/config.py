@@ -2,9 +2,11 @@ from contextlib import contextmanager
 
 _DELETE_MARKER = object()
 
+
 @contextmanager
 def set(**kw):
     from arcae.lib.arrow_tables import Configuration
+
     config = Configuration()
     saved = {}
 
@@ -23,6 +25,3 @@ def set(**kw):
             del config[k]
         else:
             config[k] = v
-
-
-

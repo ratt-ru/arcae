@@ -11,9 +11,9 @@
 
 #include <absl/types/span.h>
 
-#include <casacore/tables/Tables/TableColumn.h>
 #include <casacore/casa/Arrays/IPosition.h>
 #include <casacore/casa/Utilities/DataType.h>
+#include <casacore/tables/Tables/TableColumn.h>
 
 #include "arcae/selection.h"
 
@@ -21,7 +21,6 @@ namespace arcae {
 namespace detail {
 
 using RowShapes = std::vector<casacore::IPosition>;
-
 
 // Holds information about the shape of:
 //
@@ -51,14 +50,14 @@ struct ResultShapeData {
   std::optional<RowShapes> row_shapes_;
 
   // Return the Column Name
-  const std::string & GetName() const noexcept { return column_name_; }
+  const std::string& GetName() const noexcept { return column_name_; }
 
   // Return the Number of Dimensions in the Column
   std::size_t nDim() const noexcept { return ndim_; }
 
   // Number of Rows in the Shape
   std::size_t nRows() const noexcept {
-    if(IsFixed()) return shape_->last();
+    if (IsFixed()) return shape_->last();
     assert(row_shapes_);
     return row_shapes_->size();
   }
@@ -67,21 +66,21 @@ struct ResultShapeData {
   std::size_t MaxDimensionSize() const noexcept;
 
   // Obtain the flat offset at the specified
-  std::size_t FlatOffset(const absl::Span<const IndexType> & index) const noexcept;
+  std::size_t FlatOffset(const absl::Span<const IndexType>& index) const noexcept;
 
   // Is the result shape fixed?
   bool IsFixed() const noexcept { return shape_.has_value(); }
 
   // Return the shape if it is fixed
   // Requires IsFixed() == true.
-  const casacore::IPosition & GetShape() const noexcept {
+  const casacore::IPosition& GetShape() const noexcept {
     assert(IsFixed());
     return shape_.value();
   }
 
   // Return the shape of the row
   // Requires IsFixed() == false.
-  const casacore::IPosition & GetRowShape(std::size_t row) const noexcept {
+  const casacore::IPosition& GetRowShape(std::size_t row) const noexcept {
     assert(!IsFixed());
     assert(row_shapes_);
     assert(row < row_shapes_->size());
@@ -95,22 +94,21 @@ struct ResultShapeData {
   std::size_t nElements() const noexcept;
 
   // Get ListArray offsets
-  arrow::Result<std::vector<std::shared_ptr<arrow::Int32Array>>> GetOffsets() const noexcept;
+  arrow::Result<std::vector<std::shared_ptr<arrow::Int32Array>>> GetOffsets()
+      const noexcept;
 
   // Create a ResultShapeData instance suitable for reading
   static arrow::Result<ResultShapeData> MakeRead(
-      const casacore::TableColumn & column,
-      const Selection & selection=Selection(),
-      const std::shared_ptr<arrow::Array> & result=nullptr);
+      const casacore::TableColumn& column, const Selection& selection = Selection(),
+      const std::shared_ptr<arrow::Array>& result = nullptr);
 
   // Create a ResultShapeData instance suitable for writing
   static arrow::Result<ResultShapeData> MakeWrite(
-    const casacore::TableColumn & column,
-    const std::shared_ptr<arrow::Array> & data,
-    const Selection & selection=Selection());
+      const casacore::TableColumn& column, const std::shared_ptr<arrow::Array>& data,
+      const Selection& selection = Selection());
 };
 
-} // namespace detail
-} // namespace arcae
+}  // namespace detail
+}  // namespace arcae
 
-#endif // ARCAE_RESULT_SHAPE_H
+#endif  // ARCAE_RESULT_SHAPE_H

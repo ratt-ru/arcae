@@ -10,18 +10,16 @@
 
 namespace arcae {
 
-arrow::Result<std::shared_ptr<NewTableProxy>>
-OpenTable(const std::string &filename,
-          std::size_t ninstances = 1,
-          bool readonly = true,
-          const std::string &json_lockoptions = R"({"option": "auto"})");
-arrow::Result<std::shared_ptr<NewTableProxy>>
-DefaultMS(const std::string &name, const std::string &subtable = "MAIN",
-          const std::string &json_table_desc = "{}",
-          const std::string &json_dminfo = "{}");
-arrow::Result<std::shared_ptr<NewTableProxy>>
-Taql(const std::string &taql, const std::vector<std::shared_ptr<NewTableProxy>> &tables = {});
+arrow::Result<std::shared_ptr<NewTableProxy>> OpenTable(
+    const std::string& filename, std::size_t ninstances = 1, bool readonly = true,
+    const std::string& json_lockoptions = R"({"option": "auto"})");
+arrow::Result<std::shared_ptr<NewTableProxy>> DefaultMS(
+    const std::string& name, const std::string& subtable = "MAIN",
+    const std::string& json_table_desc = "{}", const std::string& json_dminfo = "{}");
+arrow::Result<std::shared_ptr<NewTableProxy>> Taql(
+    const std::string& taql,
+    const std::vector<std::shared_ptr<NewTableProxy>>& tables = {});
 
-} // namespace arcae
+}  // namespace arcae
 
-#endif // ARCAE_TABLE_FACTORY_H
+#endif  // ARCAE_TABLE_FACTORY_H

@@ -12,12 +12,10 @@
 namespace arcae {
 namespace detail {
 
-arrow::Future<bool>
-WriteImpl(
-  const std::shared_ptr<IsolatedTableProxy> & itp,
-  const std::string & column,
-  const std::shared_ptr<arrow::Array> & data,
-  const Selection & selection=Selection());
+arrow::Future<bool> WriteImpl(const std::shared_ptr<IsolatedTableProxy>& itp,
+                              const std::string& column,
+                              const std::shared_ptr<arrow::Array>& data,
+                              const Selection& selection = Selection());
 
 }  // namespace detail
 }  // namespace arcae

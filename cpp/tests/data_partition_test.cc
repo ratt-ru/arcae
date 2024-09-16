@@ -4,20 +4,20 @@
 #include <casacore/casa/Arrays/Slicer.h>
 #include <casacore/casa/Utilities/DataType.h>
 
-#include "arcae/result_shape.h"
 #include "arcae/data_partition.h"
+#include "arcae/result_shape.h"
 #include "arcae/selection.h"
 
-#include <gtest/gtest.h>
 #include <gmock/gmock.h>
+#include <gtest/gtest.h>
 
 #include <arrow/testing/gtest_util.h>
 
-using ::arcae::detail::IndexType;
-using ::arcae::detail::SpanPairs;
 using ::arcae::detail::DataPartition;
+using ::arcae::detail::IndexType;
 using ::arcae::detail::ResultShapeData;
 using ::arcae::detail::SelectionBuilder;
+using ::arcae::detail::SpanPairs;
 
 using ::casacore::DataType;
 using ::casacore::IPosition;
@@ -26,17 +26,14 @@ using ::casacore::Slicer;
 namespace {
 
 TEST(DataPartitionTest, Fixed) {
-  auto result_shape = ResultShapeData{
-    "DATA",
-    IPosition{2, 3, 4}, 3,
-    DataType::TpComplex,
-    std::nullopt};
+  auto result_shape =
+      ResultShapeData{"DATA", IPosition{2, 3, 4}, 3, DataType::TpComplex, std::nullopt};
 
   auto selection = SelectionBuilder()
-                      .Order('F')                 // 1 range in dim 0
-                      .Add({3, 0, 1})             // 2 ranges in dim 1
-                      .Add({2, 1, -1, 5, 6, -1})  // 3 ranges in dim 2
-                      .Build();                   // 1 x 2 x 3
+                       .Order('F')                 // 1 range in dim 0
+                       .Add({3, 0, 1})             // 2 ranges in dim 1
+                       .Add({2, 1, -1, 5, 6, -1})  // 3 ranges in dim 2
+                       .Build();                   // 1 x 2 x 3
 
   ASSERT_OK_AND_ASSIGN(auto partition, DataPartition::Make(selection, result_shape));
   EXPECT_EQ(partition.nChunks(), 4);
@@ -87,17 +84,15 @@ TEST(DataPartitionTest, Fixed) {
 }
 
 TEST(DataPartitionTest, Variable) {
-  auto result_shape = ResultShapeData{
-    "DATA",
-    std::nullopt, 3,
-    DataType::TpComplex,
-    std::vector<IPosition>{IPosition({3, 4}), IPosition({1, 4})}};
+  auto result_shape =
+      ResultShapeData{"DATA", std::nullopt, 3, DataType::TpComplex,
+                      std::vector<IPosition>{IPosition({3, 4}), IPosition({1, 4})}};
 
   auto selection = SelectionBuilder()
-                      .Order('F')      // 1 range in dim 0 (varies per row)
-                      .Add({3, 0, 1})  // 2 ranges in dim 1
-                      .Add({-1, 0})    // 2 rows
-                      .Build();
+                       .Order('F')      // 1 range in dim 0 (varies per row)
+                       .Add({3, 0, 1})  // 2 ranges in dim 1
+                       .Add({-1, 0})    // 2 rows
+                       .Build();
 
   ASSERT_OK_AND_ASSIGN(auto partition, DataPartition::Make(selection, result_shape));
   EXPECT_EQ(partition.nChunks(), 4);  // 1x1x1 + 1x2x2
