@@ -25,20 +25,18 @@ TEST(SelectionTests, InitializerLists) {
 
 TEST(SelectionTests, ArgumentPacks) {
   auto vec = std::vector<int64_t>{1, 2, 3};
-  auto sel = SelectionBuilder::FromArgs(
-    std::vector<int>{0, 1, 2},
-    std::vector<uint32_t>{1, 2, 3},
-    std::vector<int64_t>{1, 2, 3, 4},
-    vec);
+  auto sel = SelectionBuilder::FromArgs(std::vector<int>{0, 1, 2},
+                                        std::vector<uint32_t>{1, 2, 3},
+                                        std::vector<int64_t>{1, 2, 3, 4}, vec);
 
   EXPECT_EQ(sel.nIndices(), 3);
   EXPECT_EQ(sel.Size(), 4);
 
-  int sums []  = {3, 6, 10, 6};
-  int sizes [] = {3, 3, 4, 3};
+  int sums[] = {3, 6, 10, 6};
+  int sizes[] = {3, 3, 4, 3};
   EXPECT_EQ(sizeof(sums) / sizeof(int), sel.Size());
 
-  for(int i=0; i < sel.Size(); ++i) {
+  for (int i = 0; i < sel.Size(); ++i) {
     auto data = sel[i].data();
     auto size = sel[i].size();
     EXPECT_EQ(size, sizes[i]);
@@ -47,10 +45,7 @@ TEST(SelectionTests, ArgumentPacks) {
 }
 
 TEST(SelectionTests, Builder) {
-  auto sel = SelectionBuilder()
-                .Add({0, 1, 2})
-                .Add(std::vector<long>{1, 2, 3, 4})
-                .Build();
+  auto sel = SelectionBuilder().Add({0, 1, 2}).Add(std::vector<long>{1, 2, 3, 4}).Build();
   EXPECT_EQ(sel.nIndices(), 2);
   EXPECT_EQ(sel.Size(), 2);
 
@@ -68,10 +63,10 @@ TEST(SelectionTests, Builder) {
 
 TEST(SelectionTests, BuilderFortranOrder) {
   auto sel = SelectionBuilder()
-                .Add({0, 1, 2})
-                .Add(std::vector<long>{1, 2, 3, 4})
-                .Order('F')
-                .Build();
+                 .Add({0, 1, 2})
+                 .Add(std::vector<long>{1, 2, 3, 4})
+                 .Order('F')
+                 .Build();
   EXPECT_EQ(sel.nIndices(), 2);
   EXPECT_EQ(sel.Size(), 2);
 

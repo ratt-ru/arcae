@@ -1,7 +1,7 @@
 #include "arcae/type_traits.h"
 
-#include <arrow/status.h>
 #include <arrow/result.h>
+#include <arrow/status.h>
 #include <arrow/type.h>
 
 #include <casacore/casa/Utilities/DataType.h>
@@ -14,7 +14,7 @@ namespace arcae {
 namespace detail {
 
 Result<std::size_t> CasaDataTypeSize(DataType data_type) {
-  switch(data_type) {
+  switch (data_type) {
     case DataType::TpBool:
       return sizeof(CasaDataTypeTraits<DataType::TpBool>::CasaType);
       break;
@@ -60,7 +60,7 @@ Result<std::size_t> CasaDataTypeSize(DataType data_type) {
 }
 
 Result<std::shared_ptr<arrow::DataType>> ArrowDataType(DataType data_type) {
-  switch(data_type) {
+  switch (data_type) {
     case DataType::TpBool:
       return CasaDataTypeTraits<DataType::TpBool>::ArrowDataType();
       break;
@@ -101,8 +101,7 @@ Result<std::shared_ptr<arrow::DataType>> ArrowDataType(DataType data_type) {
       return CasaDataTypeTraits<DataType::TpString>::ArrowDataType();
       break;
     default:
-      return Status::TypeError(
-        "No arrow type for CASA type ", data_type);
+      return Status::TypeError("No arrow type for CASA type ", data_type);
       break;
   }
 }

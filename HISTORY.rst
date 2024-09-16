@@ -4,6 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
+* Add pre-commit hooks, install formatters and linters (:pr:`121`)
 * Support adding columns (:pr:`120`)
 
 0.2.4 (2024-09-05)

@@ -1,16 +1,18 @@
 import multiprocessing as mp
 import os
-from pathlib import Path
-from hashlib import sha256
-
-import requests
 import tarfile
+from hashlib import sha256
+from pathlib import Path
+
 import pytest
+import requests
 
 TAU_MS = "HLTau_B6cont.calavg.tav300s"
 TAU_MS_TAR = f"{TAU_MS}.tar.xz"
 TAU_MS_TAR_HASH = "fc2ce9261817dfd88bbdd244c8e9e58ae0362173938df6ef2a587b1823147f70"
-DATA_URL = f"https://ratt-public-data.s3.af-south-1.amazonaws.com/test-data/{TAU_MS_TAR}"
+DATA_URL = (
+    f"https://ratt-public-data.s3.af-south-1.amazonaws.com/test-data/{TAU_MS_TAR}"
+)
 DATA_CHUNK_SIZE = 2**20
 
 
@@ -20,6 +22,7 @@ def fully_validate_arrays():
 
     with config.set(**{"validation-level": "full"}):
         yield
+
 
 def download_tau_ms(tau_ms_tar):
     if tau_ms_tar.exists():
@@ -35,7 +38,8 @@ def download_tau_ms(tau_ms_tar):
             tau_ms_tar.unlink(missing_ok=True)
             raise ValueError(
                 f"SHA256 digest mismatch for {tau_ms_tar}. "
-                f"{digest.hexdigest()} != {TAU_MS_TAR_HASH}")
+                f"{digest.hexdigest()} != {TAU_MS_TAR_HASH}"
+            )
     else:
         response = requests.get(DATA_URL, stream=True)
 
@@ -49,11 +53,14 @@ def download_tau_ms(tau_ms_tar):
             if digest.hexdigest() != TAU_MS_TAR_HASH:
                 raise ValueError(
                     f"SHA256 digest mismatch for {DATA_URL}. "
-                    f"{digest.hexdigest()} != {TAU_MS_TAR_HASH}")
+                    f"{digest.hexdigest()} != {TAU_MS_TAR_HASH}"
+                )
+
 
 @pytest.fixture(scope="session")
 def tau_ms_tar():
     from appdirs import user_cache_dir
+
     cache_dir = Path(user_cache_dir("arcae")) / "test-data"
     cache_dir.mkdir(parents=True, exist_ok=True)
     tau_ms_tar = cache_dir / TAU_MS_TAR
@@ -74,25 +81,31 @@ def tau_ms(tau_ms_tar, tmp_path_factory):
 
 @pytest.fixture(scope="session")
 def partitioned_dataset(tau_ms, tmp_path_factory):
-    import arcae
     import pyarrow as pa
     import pyarrow.dataset as pad
+
+    import arcae
 
     dsdir = tmp_path_factory.mktemp("partition-dataset")
 
     AT = arcae.table(tau_ms).to_arrow()
     partition_fields = [AT.schema.field(c) for c in ("FIELD_ID", "DATA_DESC_ID")]
     partition = pad.partitioning(pa.schema(partition_fields), flavor="hive")
-    pad.write_dataset(AT, dsdir, partitioning=partition,
-                      max_rows_per_group=25000,
-                      max_rows_per_file=25000,
-                      format="parquet")
+    pad.write_dataset(
+        AT,
+        dsdir,
+        partitioning=partition,
+        max_rows_per_group=25000,
+        max_rows_per_file=25000,
+        format="parquet",
+    )
 
     return dsdir
 
 
 def generate_sorting_table(path):
     import pyrap.tables as pt
+
     table_name = os.path.join(str(path), "test.ms")
 
     create_table_query = f"""
@@ -134,13 +147,14 @@ def generate_sorting_table(path):
 
 @pytest.fixture
 def sorting_table(tmp_path_factory):
-    return casa_table_at_path(generate_sorting_table,
-                              tmp_path_factory.mktemp("column_cases"))
+    return casa_table_at_path(
+        generate_sorting_table, tmp_path_factory.mktemp("column_cases")
+    )
 
 
 def generate_column_cases_table(path):
-    import pyrap.tables as pt
     import numpy as np
+    import pyrap.tables as pt
 
     # Table descriptor
     table_desc = [
@@ -255,7 +269,7 @@ def generate_column_cases_table(path):
                 "valueType": "int",
             },
             "name": "UNCONSTRAINED_SAME_NDIM",
-        }
+        },
     ]
 
     table_desc = pt.maketabdesc(table_desc)
@@ -293,8 +307,10 @@ def casa_table_at_path(factory, *args):
 
 @pytest.fixture
 def column_case_table(tmp_path_factory):
-    return casa_table_at_path(generate_column_cases_table,
-                              tmp_path_factory.mktemp("column_cases"))
+    return casa_table_at_path(
+        generate_column_cases_table, tmp_path_factory.mktemp("column_cases")
+    )
+
 
 def generate_complex_case_table(path):
     import numpy as np
@@ -315,7 +331,8 @@ def generate_complex_case_table(path):
                 "valueType": "dcomplex",
             },
             "name": "COMPLEX",
-        }]
+        }
+    ]
 
     table_desc = pt.maketabdesc(table_desc)
     table_name = os.path.join(path, "test.table")
@@ -327,10 +344,12 @@ def generate_complex_case_table(path):
 
     return table_name
 
+
 @pytest.fixture
 def complex_case_table(tmp_path_factory):
-    return casa_table_at_path(generate_complex_case_table,
-                              tmp_path_factory.mktemp("complex_cases"))
+    return casa_table_at_path(
+        generate_complex_case_table, tmp_path_factory.mktemp("complex_cases")
+    )
 
 
 def generate_getcol_table(path):
@@ -408,8 +427,8 @@ def generate_getcol_table(path):
                 "valueType": "string",
             },
             "name": "NESTED_STRING",
-        }
-        ]
+        },
+    ]
 
     table_desc = pt.maketabdesc(table_desc)
     table_name = os.path.join(path, "test.table")
@@ -417,7 +436,7 @@ def generate_getcol_table(path):
 
     with pt.table(table_name, table_desc, nrow=nrow, ack=False) as T:
         for i in range(nrow):
-            T.putcell("COMPLEX_DATA", i, np.full((2, 4), i + i*1j))
+            T.putcell("COMPLEX_DATA", i, np.full((2, 4), i + i * 1j))
             T.putcell("FLOAT_DATA", i, np.full((2, 4), i))
             T.putcell("VARDATA", i, np.full((i + 1, i + 1), i))
             T.putcell("TIME", i, i)
@@ -430,14 +449,16 @@ def generate_getcol_table(path):
 
 @pytest.fixture
 def getcol_table(tmp_path_factory):
-    return casa_table_at_path(generate_getcol_table,
-                              tmp_path_factory.mktemp("getcol_cases"))
+    return casa_table_at_path(
+        generate_getcol_table, tmp_path_factory.mktemp("getcol_cases")
+    )
 
 
 STEP = 1024
-NROW = 100*STEP
+NROW = 100 * STEP
 NCHAN = 1024
 NCORR = 4
+
 
 def generate_ramp_ms(path, dims):
     import numpy as np
@@ -469,7 +490,7 @@ def generate_ramp_ms(path, dims):
                 "valueType": "double",
             },
             "name": "TIME",
-        }
+        },
     ]
 
     table_desc = pt.maketabdesc(table_desc)
@@ -489,12 +510,9 @@ def generate_ramp_ms(path, dims):
 
     return table_name
 
-@pytest.fixture(
-        scope="session",
-        params=[
-            {"row": NROW, "chan": NCHAN, "corr": NCORR}
-        ])
+
+@pytest.fixture(scope="session", params=[{"row": NROW, "chan": NCHAN, "corr": NCORR}])
 def ramp_ms(request, tmp_path_factory):
-    return casa_table_at_path(generate_ramp_ms,
-                              tmp_path_factory.mktemp("generate_ramp_ms"),
-                              request.param)
+    return casa_table_at_path(
+        generate_ramp_ms, tmp_path_factory.mktemp("generate_ramp_ms"), request.param
+    )

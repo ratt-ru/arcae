@@ -80,42 +80,33 @@ static constexpr char kState[] = "STATE";
 static constexpr char kSyscal[] = "SYSCAL";
 static constexpr char kWeather[] = "WEATHER";
 
-} // namespace
+}  // namespace
 
-Result<std::shared_ptr<NewTableProxy>>
-OpenTable(
-    const std::string &filename,
-    std::size_t ninstances,
-    bool readonly,
-    const std::string &json_lockoptions) {
-  return NewTableProxy::Make([
-      &filename,
-      &readonly,
-      &json_lockoptions
-    ]() -> Result<std::shared_ptr<TableProxy>> {
-      auto lock_record = JsonParser::parse(json_lockoptions).toRecord();
-      try {
-        auto proxy = std::make_shared<TableProxy>(
-                                    filename, lock_record,
-                                    Table::TableOption::Old);
-        if (!readonly) proxy->reopenRW();
-        return proxy;
-      } catch (std::exception &e) {
-        return Status::Invalid(e.what());
-      }
-    },
-    ninstances);
+Result<std::shared_ptr<NewTableProxy>> OpenTable(const std::string& filename,
+                                                 std::size_t ninstances, bool readonly,
+                                                 const std::string& json_lockoptions) {
+  return NewTableProxy::Make(
+      [&filename, &readonly, &json_lockoptions]() -> Result<std::shared_ptr<TableProxy>> {
+        auto lock_record = JsonParser::parse(json_lockoptions).toRecord();
+        try {
+          auto proxy = std::make_shared<TableProxy>(filename, lock_record,
+                                                    Table::TableOption::Old);
+          if (!readonly) proxy->reopenRW();
+          return proxy;
+        } catch (std::exception& e) {
+          return Status::Invalid(e.what());
+        }
+      },
+      ninstances);
 }
 
-Result<std::shared_ptr<NewTableProxy>>
-DefaultMS(const std::string &name, const
-          std::string &subtable,
-          const std::string &json_table_desc,
-          const std::string &json_dminfo) {
+Result<std::shared_ptr<NewTableProxy>> DefaultMS(const std::string& name,
+                                                 const std::string& subtable,
+                                                 const std::string& json_table_desc,
+                                                 const std::string& json_dminfo) {
   // Upper case subtable name
   auto usubtable = std::string(subtable.size(), '0');
-  std::transform(std::begin(subtable), std::end(subtable),
-                 std::begin(usubtable),
+  std::transform(std::begin(subtable), std::end(subtable), std::begin(usubtable),
                  [](unsigned char c) { return std::toupper(c); });
 
   auto modname = name.empty() ? "measurementset.ms"s : name;
@@ -178,24 +169,21 @@ DefaultMS(const std::string &name, const
 }
 
 // Execute a TAQL query on the supplied tables
-Result<std::shared_ptr<NewTableProxy>>
-Taql(const std::string &taql, const std::vector<std::shared_ptr<NewTableProxy>> &tables) {
+Result<std::shared_ptr<NewTableProxy>> Taql(
+    const std::string& taql, const std::vector<std::shared_ptr<NewTableProxy>>& tables) {
   // Easy case
   if (tables.size() == 0) {
-    return NewTableProxy::Make([
-      taql = taql
-    ]() -> Result<std::shared_ptr<TableProxy>> {
+    return NewTableProxy::Make([taql = taql]() -> Result<std::shared_ptr<TableProxy>> {
       return std::make_shared<TableProxy>(taql, std::vector<TableProxy>{});
     });
   } else if (tables.size() == 1) {
-    return tables[0]->Spawn([
-      taql = taql
-    ](const TableProxy & tp) -> Result<std::shared_ptr<TableProxy>> {
-      return std::make_shared<TableProxy>(taql, std::vector<TableProxy>{tp});
-    });
+    return tables[0]->Spawn(
+        [taql = taql](const TableProxy& tp) -> Result<std::shared_ptr<TableProxy>> {
+          return std::make_shared<TableProxy>(taql, std::vector<TableProxy>{tp});
+        });
   }
 
   return Status::NotImplemented("Taql queries with more than one table argument");
 }
 
-} // namespace arcae
+}  // namespace arcae

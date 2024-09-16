@@ -115,8 +115,8 @@ TableDesc MainMSDesc(bool complete) {
   using KEnum = typename MeasurementSet::PredefinedKeywords;
 
   // Add remaining columns
-  for (int i = CEnum::NUMBER_REQUIRED_COLUMNS + 1;
-       i <= CEnum::NUMBER_PREDEFINED_COLUMNS; ++i) {
+  for (int i = CEnum::NUMBER_REQUIRED_COLUMNS + 1; i <= CEnum::NUMBER_PREDEFINED_COLUMNS;
+       ++i) {
     MeasurementSet::addColumnToDesc(td, static_cast<CEnum>(i));
   }
 
@@ -129,7 +129,8 @@ TableDesc MainMSDesc(bool complete) {
   return td;
 }
 
-template <typename SubTable> TableDesc MSSubtableDesc(bool complete) {
+template <typename SubTable>
+TableDesc MSSubtableDesc(bool complete) {
   if (!complete) {
     return SubTable::requiredTableDesc();
   }
@@ -140,8 +141,8 @@ template <typename SubTable> TableDesc MSSubtableDesc(bool complete) {
   TableDesc td = SubTable::requiredTableDesc();
 
   // Add remaining columns
-  for (int i = CEnum::NUMBER_REQUIRED_COLUMNS + 1;
-       i <= CEnum::NUMBER_PREDEFINED_COLUMNS; ++i) {
+  for (int i = CEnum::NUMBER_REQUIRED_COLUMNS + 1; i <= CEnum::NUMBER_PREDEFINED_COLUMNS;
+       ++i) {
     SubTable::addColumnToDesc(td, static_cast<CEnum>(i));
   }
 
@@ -152,7 +153,7 @@ template <typename SubTable> TableDesc MSSubtableDesc(bool complete) {
   return td;
 }
 
-std::string RecordToJson(const Record &record) {
+std::string RecordToJson(const Record& record) {
   std::ostringstream json_oss;
   auto record_json = JsonOut(json_oss);
   record_json.start();
@@ -169,7 +170,7 @@ std::string RecordToJson(const Record &record) {
 // If "" or "MAIN", the table descriptions for a Measurement Set
 // will be supplied, otherwise table should be some valid
 // MeasurementSet subtable
-Result<TableDesc> MSTableDescriptor(const String &table, bool complete) {
+Result<TableDesc> MSTableDescriptor(const String& table, bool complete) {
   String table_ = table;
 
   // Upper case things to be sure
@@ -217,13 +218,13 @@ Result<TableDesc> MSTableDescriptor(const String &table, bool complete) {
 }
 
 // Merge required and user supplied Table Descriptions
-TableDesc MergeRequiredAndUserTableDescs(const TableDesc &required_td,
-                                         const TableDesc &user_td) {
+TableDesc MergeRequiredAndUserTableDescs(const TableDesc& required_td,
+                                         const TableDesc& user_td) {
   TableDesc result = required_td;
 
   // Overwrite required columns with user columns
   for (casacore::uInt i = 0; i < user_td.ncolumn(); ++i) {
-    const String &name = user_td[i].name();
+    const String& name = user_td[i].name();
 
     // Remove if present in required
     if (result.isColumn(name)) {
@@ -250,21 +251,20 @@ TableDesc MergeRequiredAndUserTableDescs(const TableDesc &required_td,
     Vector<String> idColumnNames;
 
     // Get the user hypercolumn
-    casacore::uInt ndims = user_td.hypercolumnDesc(
-        user_hc[i], dataColumnNames, coordColumnNames, idColumnNames);
+    casacore::uInt ndims = user_td.hypercolumnDesc(user_hc[i], dataColumnNames,
+                                                   coordColumnNames, idColumnNames);
     // Place it in result
-    result.defineHypercolumn(user_hc[i], ndims, dataColumnNames,
-                             coordColumnNames, idColumnNames);
+    result.defineHypercolumn(user_hc[i], ndims, dataColumnNames, coordColumnNames,
+                             idColumnNames);
   }
 
   // Overwrite required keywords with user keywords
-  result.rwKeywordSet().merge(user_td.keywordSet(),
-                              RecordInterface::OverwriteDuplicates);
+  result.rwKeywordSet().merge(user_td.keywordSet(), RecordInterface::OverwriteDuplicates);
 
   return result;
 }
 
-} // namespace
+}  // namespace
 
 // Get the table descriptions for the given table.
 // If "" or "MAIN", the table descriptions for a Measurement Set
@@ -272,15 +272,15 @@ TableDesc MergeRequiredAndUserTableDescs(const TableDesc &required_td,
 // MeasurementSet subtable.
 // If complete is true, the full descriptor is returned, otherwise
 // only the required descriptor is returned
-Result<std::string> MSDescriptor(const std::string &table, bool complete) {
+Result<std::string> MSDescriptor(const std::string& table, bool complete) {
   ARROW_ASSIGN_OR_RAISE(auto table_desc, MSTableDescriptor(table, complete));
   return RecordToJson(TableProxy::getTableDesc(table_desc, true));
 }
 
-Result<SetupNewTable> DefaultMSFactory(const std::string &name,
-                                       const std::string &subtable,
-                                       const std::string &json_table_desc,
-                                       const std::string &json_dminfo) {
+Result<SetupNewTable> DefaultMSFactory(const std::string& name,
+                                       const std::string& subtable,
+                                       const std::string& json_table_desc,
+                                       const std::string& json_dminfo) {
   String msg;
   TableDesc user_td;
   auto table_desc = JsonParser::parse(json_table_desc).toRecord();
@@ -305,6 +305,6 @@ Result<SetupNewTable> DefaultMSFactory(const std::string &name,
   return setup;
 }
 
-} // namespace arcae
+}  // namespace arcae
 
-#endif // ARCAE_DESCRIPTOR_H
+#endif  // ARCAE_DESCRIPTOR_H

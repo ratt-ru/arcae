@@ -12,7 +12,6 @@ add_library(arcae SHARED
     arcae/write_impl.cc
     arcae/result_shape.cc
     arcae/service_locator.cc
-    arcae/selection.cc
     arcae/table_factory.cc
     arcae/table_utils.cc
     arcae/type_traits.cc)
@@ -29,6 +28,6 @@ set_target_properties(arcae PROPERTIES
 
 install(TARGETS arcae LIBRARY DESTINATION arcae/lib)
 
-if(BUILD_TESTING)
+if(NOT SKBUILD AND BUILD_TESTING)
     add_subdirectory(tests)
 endif()

@@ -1,0 +1,45 @@
+# See https://pre-commit.com for more information
+# See https://pre-commit.com/hooks.html for more hooks
+repos:
+-   repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+    -   id: trailing-whitespace
+        exclude: '.*\.patch$'
+    -   id: end-of-file-fixer
+    -   id: check-yaml
+    -   id: check-added-large-files
+-   repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.3.7
+    hooks:
+    -   id: ruff
+        # Handle imports, see
+        # https://github.com/astral-sh/ruff/issues/8232
+        # https://github.com/astral-sh/ruff/issues/10882
+        args: [ --fix, --extend-select, I ]
+        files: ^src/arcae
+        exclude: ^src/arcae/lib
+    -   id: ruff-format
+        name: ruff format
+-   repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.9.0
+    hooks:
+    -   id: mypy
+        name: mypy
+        additional_dependencies: [types-requests]
+-   repo: https://github.com/MarcoGorelli/cython-lint
+    rev: v0.16.2
+    hooks:
+    -   id: cython-lint
+        files: '^src/arcae/lib'
+    -   id: double-quote-cython-strings
+-   repo: https://github.com/pre-commit/mirrors-clang-format
+    rev: v18.1.8
+    hooks:
+    - id: clang-format
+      types_or:
+        - c++
+        # - json
+        # - proto
+      files: >-
+        ^cpp/

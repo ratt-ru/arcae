@@ -1,10 +1,11 @@
 import concurrent.futures as cf
-import numpy as np
-from numpy.testing import assert_array_equal
 import threading
 
-import arcae
+import numpy as np
 import pytest
+from numpy.testing import assert_array_equal
+
+import arcae
 
 try:
     import pytest_benchmark
@@ -25,11 +26,16 @@ except ImportError:
 COMPARE = False
 THREADS = 8
 STEP = 10
-MS_PARAMS = {"row": 100*STEP, "chan": 1024, "corr": 4}
+MS_PARAMS = {"row": 100 * STEP, "chan": 1024, "corr": 4}
+
 
 @pytest.mark.skipif(not pytest_benchmark, reason="pytest-benchmark not installed")
-@pytest.mark.parametrize("ramp_ms", [MS_PARAMS], indirect=True,
-                         ids=lambda c: f"ramp_ms: {','.join(f'{k}={v}' for k, v in c.items())}")
+@pytest.mark.parametrize(
+    "ramp_ms",
+    [MS_PARAMS],
+    indirect=True,
+    ids=lambda c: f"ramp_ms: {','.join(f'{k}={v}' for k, v in c.items())}",
+)
 def test_singlefile_multithread_read(ramp_ms, benchmark):
     def read_single(T, startrow, nrow):
         data = T.getcol("COMPLEX_DATA", startrow=startrow, nrow=nrow)
@@ -56,10 +62,13 @@ def test_singlefile_multithread_read(ramp_ms, benchmark):
 
 
 @pytest.mark.skipif(not pytest_benchmark, reason="pytest-benchmark not installed")
-@pytest.mark.parametrize("ramp_ms", [MS_PARAMS], indirect=True,
-                         ids=lambda c: f"ramp_ms: {','.join(f'{k}={v}' for k, v in c.items())}")
+@pytest.mark.parametrize(
+    "ramp_ms",
+    [MS_PARAMS],
+    indirect=True,
+    ids=lambda c: f"ramp_ms: {','.join(f'{k}={v}' for k, v in c.items())}",
+)
 def test_multifile_multithreaded_read(ramp_ms, benchmark):
-
     local = threading.local()
 
     def read_multiple(ms, startrow, nrow):
@@ -79,7 +88,6 @@ def test_multifile_multithreaded_read(ramp_ms, benchmark):
         if COMPARE:
             expected = np.arange(startrow, startrow + nrow)[:, None, None]
             assert_array_equal(data, np.broadcast_to(expected, data.shape))
-
 
     def test_(nrow):
         futures = []

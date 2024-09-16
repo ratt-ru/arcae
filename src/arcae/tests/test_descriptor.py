@@ -1,7 +1,6 @@
 from numpy.testing import assert_array_equal
 
-from arcae.lib.arrow_tables import Table
-from arcae.lib.arrow_tables import ms_descriptor
+from arcae.lib.arrow_tables import Table, ms_descriptor
 
 
 def test_descriptor_basic():
@@ -22,9 +21,10 @@ def test_ms_addrows(tmp_path_factory):
         assert_array_equal(AT.column("ANTENNA1"), 0)
         assert_array_equal(AT.column("ANTENNA2"), 0)
 
+
 def test_ms_and_weather_subtable(tmp_path_factory):
     ms = tmp_path_factory.mktemp("test") / "test.ms"
-    with Table.ms_from_descriptor(str(ms)) as T:
+    with Table.ms_from_descriptor(str(ms)):
         assert (ms / "table.dat").exists()
         assert not (ms / "WEATHER").exists()
 
