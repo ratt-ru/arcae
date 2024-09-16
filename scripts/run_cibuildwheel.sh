@@ -54,6 +54,11 @@ VCPKG_INSTALLED_DIR=$VCPKG_INSTALLED_DIR \
 VCPKG_TARGET_TRIPLET=$VCPKG_TARGET_TRIPLET \
 LD_LIBRARY_PATH=$VCPKG_INSTALLED_DIR/$VCPKG_TARGET_TRIPLET/lib"
 export CIBW_REPAIR_WHEEL_COMMAND_LINUX="auditwheel repair -w {dest_dir} {wheel} --exclude libarrow_python.so --exclude libarrow.so.1601"
+# export CIBW_DEBUG_KEEP_CONTAINER=TRUE
+# export CIBW_DEBUG_TRACEBACK=TRUE
+# Use the following commands to inspect the stopped container:
+# $ docker commit <container_id> cibw-debug
+# $ docker run -it --rm cibw-debug /bin/bash
 export CIBW_TEST_SKIP="*"
 export CIBW_TEST_EXTRAS=
 export CIBW_TEST_COMMAND="python -c 'from arcae.lib.arrow_tables import Table'"
