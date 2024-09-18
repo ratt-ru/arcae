@@ -4,7 +4,7 @@
 from collections.abc import MutableMapping, Sequence
 import cython
 import json
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, List, Union
 
 from libcpp cimport bool
 from libcpp.memory cimport shared_ptr
@@ -43,7 +43,7 @@ DimIndex = Union[slice, list, np.ndarray]
 FullIndex = Union[list[DimIndex], tuple[DimIndex]]
 
 
-def ms_descriptor(table: str, complete: bool = False) -> dict:
+def ms_descriptor(table: str, complete: bool = False) -> Dict:
     cdef string ctable = tobytes(table)
 
     with nogil:
@@ -121,7 +121,7 @@ cdef class Table:
     @staticmethod
     def from_taql(
         taql: str,
-        tables: Optional[Union[Sequence[Table], Table]] = None
+        tables: Union[Sequence[Table], Table] | None = None
     ) -> Table:
         cdef:
             Table table = Table.__new__(Table)
@@ -171,8 +171,8 @@ cdef class Table:
     def ms_from_descriptor(
         filename: str,
         subtable: str = "MAIN",
-        table_desc: Optional[dict] = None,
-        dminfo: Optional[dict] = None
+        table_desc: Dict | None = None,
+        dminfo: Dict | None = None
     ) -> Table:
         cdef:
             Table table = Table.__new__(Table)
@@ -193,7 +193,7 @@ cdef class Table:
 
     def to_arrow(
         self,
-        index: Optional[FullIndex] = None,
+        index: FullIndex | None = None,
         columns: Union[list[str], str] = None
     ) -> pa.Table:
         cdef:
@@ -220,8 +220,8 @@ cdef class Table:
     def getcol(
         self,
         column: str,
-        index: Optional[FullIndex] = None,
-        result: Optional[np.ndarray] = None
+        index: FullIndex | None = None,
+        result: np.ndarray | None = None
     ) -> np.ndarray:
         cdef:
             string cpp_column = tobytes(column)
@@ -244,7 +244,7 @@ cdef class Table:
         self,
         column: str,
         data: np.ndarray,
-        index: Optional[FullIndex] = None
+        index: FullIndex | None = None
     ):
         cdef:
             string cpp_column = tobytes(column)
@@ -377,7 +377,7 @@ cdef class Table:
         with nogil:
             GetResultValue(self.c_table.get().AddRows(cnrows))
 
-    def addcols(self, columndescs: dict, dminfo: dict | None):
+    def addcols(self, columndescs: Dict, dminfo: Dict | None):
         cdef:
             string cjson_columndescs = tobytes(json.dumps(columndescs))
             string cjson_dminfo = tobytes(json.dumps(dminfo) if dminfo else "{}")
@@ -426,7 +426,7 @@ class Configuration(MutableMapping):
 
         return iter([frombytes(k) for k in keys])
 
-    def __len__(self):
+    def __len__(self) -> int:
         with nogil:
             config: cython.pointer(CConfiguration) = &CServiceLocator.configuration()
 
