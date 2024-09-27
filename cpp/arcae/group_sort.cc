@@ -158,14 +158,15 @@ Result<std::shared_ptr<GroupSortData>> MergeGroups(
     std::int32_t ant2(std::int64_t r) const { return group->ant2()[r]; }
 
     bool operator<(const MergeData& rhs) const {
+      // To obtain a descending sort, we reverse the comparison
       for (std::size_t g = 0; g < group->nGroups(); ++g) {
         auto lhs_group = group->group(g)[r];
         auto rhs_group = rhs.group->group(g)[rhs.r];
-        if (lhs_group != rhs_group) return lhs_group < rhs_group;
+        if (lhs_group != rhs_group) return lhs_group > rhs_group;
       }
-      if (time(r) != rhs.time(rhs.r)) return time(r) < rhs.time(rhs.r);
-      if (ant1(r) != rhs.ant1(rhs.r)) return ant1(r) < rhs.ant1(rhs.r);
-      return ant2(r) < rhs.ant2(rhs.r);
+      if (time(r) != rhs.time(rhs.r)) return time(r) > rhs.time(rhs.r);
+      if (ant1(r) != rhs.ant1(rhs.r)) return ant1(r) > rhs.ant1(rhs.r);
+      return ant2(r) > rhs.ant2(rhs.r);
     }
   };
 
@@ -173,15 +174,10 @@ Result<std::shared_ptr<GroupSortData>> MergeGroups(
   // TOOD: Check for consistency across data here
   auto ngroups = group_data[0]->nGroups();
   for (const auto& g : group_data) nrows += g->nRows();
-  std::priority_queue<MergeData> queue;
 
   std::vector<std::shared_ptr<Buffer>> group_buffers(ngroups);
   std::vector<std::shared_ptr<Int32Array>> group_arrays(ngroups);
   std::vector<arrow::util::span<std::int32_t>> group_spans(ngroups);
-
-  for (std::size_t gd = 0; gd < group_data.size(); ++gd) {
-    queue.emplace(MergeData{gd, group_data[gd].get(), 0});
-  }
 
   for (std::size_t g = 0; g < ngroups; ++g) {
     ARROW_ASSIGN_OR_RAISE(group_buffers[g], AllocateBuffer(nrows * sizeof(std::int32_t)));
@@ -204,6 +200,13 @@ Result<std::shared_ptr<GroupSortData>> MergeGroups(
   auto rows_span = rows_buffer->mutable_span_as<std::int64_t>();
 
   std::int64_t row = 0;
+  std::priority_queue<MergeData> queue;
+
+  for (std::size_t gd = 0; gd < group_data.size(); ++gd) {
+    if (group_data[gd]->nRows() > 0) {
+      queue.emplace(MergeData{gd, group_data[gd].get(), 0});
+    }
+  }
 
   while (!queue.empty()) {
     auto [gd, dummy, gr] = queue.top();
