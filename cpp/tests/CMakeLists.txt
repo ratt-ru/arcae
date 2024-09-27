@@ -31,6 +31,10 @@ add_executable(dev_transpose_test dev_transpose_test.cc)
 target_link_libraries(dev_transpose_test PRIVATE GTest::gtest_main arcae absl::time absl::str_format test_utils)
 add_test(dev_transpose_test dev_transpose_test)
 
+add_executable(group_sort_test group_sort_test.cc)
+target_link_libraries(group_sort_test PRIVATE GTest::gtest_main arcae test_utils)
+add_test(group_sort_test group_sort_test)
+
 add_executable(new_table_proxy_test new_table_proxy_test.cc)
 target_link_libraries(new_table_proxy_test PRIVATE GTest::gtest_main arcae test_utils)
 add_test(new_table_proxy_test new_table_proxy_test)
@@ -38,6 +42,7 @@ add_test(new_table_proxy_test new_table_proxy_test)
 set_tests_properties(result_shape_test
                      data_partition_test
                      dev_transpose_test
+                     group_sort_test
                      isolated_table_proxy_test
                      new_table_proxy_test
                      parallel_write_test

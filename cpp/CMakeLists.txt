@@ -6,6 +6,7 @@ add_library(arcae SHARED
     arcae/configuration.cc
     arcae/descriptor.cc
     arcae/data_partition.cc
+    arcae/group_sort.cc
     arcae/isolated_table_proxy.cc
     arcae/new_table_proxy.cc
     arcae/read_impl.cc
