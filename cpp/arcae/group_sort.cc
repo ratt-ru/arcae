@@ -26,6 +26,7 @@ using ::arrow::Int64Array;
 using ::arrow::Result;
 using ::arrow::Status;
 using ::arrow::Table;
+using ::arrow::util::span;
 
 using ::arcae::detail::AggregateAdapter;
 
@@ -106,7 +107,7 @@ Result<std::shared_ptr<GroupSortData>> GroupSortData::Sort() const {
   // Allocate output buffers
   std::vector<std::shared_ptr<Buffer>> group_buffers(groups.size());
   std::vector<std::shared_ptr<Int32Array>> group_arrays(groups.size());
-  std::vector<arrow::util::span<std::int32_t>> group_spans(groups.size());
+  std::vector<span<std::int32_t>> group_spans(groups.size());
   for (std::size_t g = 0; g < groups.size(); ++g) {
     ARROW_ASSIGN_OR_RAISE(group_buffers[g], AllocateBuffer(nrow * sizeof(std::int32_t)));
     group_arrays[g] = std::make_shared<Int32Array>(nrow, group_buffers[g]);
@@ -210,7 +211,7 @@ Result<std::shared_ptr<GroupSortData>> MergeGroups(
 
   std::vector<std::shared_ptr<Buffer>> group_buffers(ngroups);
   std::vector<std::shared_ptr<Int32Array>> group_arrays(ngroups);
-  std::vector<arrow::util::span<std::int32_t>> group_spans(ngroups);
+  std::vector<span<std::int32_t>> group_spans(ngroups);
 
   for (std::size_t g = 0; g < ngroups; ++g) {
     ARROW_ASSIGN_OR_RAISE(group_buffers[g], AllocateBuffer(nrows * sizeof(std::int32_t)));
@@ -235,12 +236,14 @@ Result<std::shared_ptr<GroupSortData>> MergeGroups(
   std::int64_t row = 0;
   std::priority_queue<MergeData> queue;
 
+  // Initialize the queue
   for (std::size_t gd = 0; gd < group_data.size(); ++gd) {
     if (group_data[gd]->nRows() > 0) {
       queue.emplace(MergeData{group_data[gd].get(), 0});
     }
   }
 
+  // Perform the k-way merge
   while (!queue.empty()) {
     auto [top_group, gr] = queue.top();
     queue.pop();
