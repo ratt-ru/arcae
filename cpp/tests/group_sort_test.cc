@@ -24,13 +24,8 @@ TEST(GroupSortTest, TestSort) {
                        ArrayFromJSON(arrow::int32(), "[1, 1, 1, 2, 2, 2, 3, 3, 3]"));
   ASSERT_OK_AND_ASSIGN(auto group2,
                        ArrayFromJSON(arrow::int32(), "[1, 1, 1, 2, 2, 2, 3, 3, 3]"));
-  ASSERT_OK_AND_ASSIGN(auto group3,
-                       ArrayFromJSON(arrow::int32(), "[1, 1, 1, 2, 2, 2, 3, 3, 3]"));
-
   groups.push_back(group1);
   groups.push_back(group2);
-  groups.push_back(group3);
-
   ASSERT_OK_AND_ASSIGN(auto time,
                        ArrayFromJSON(arrow::float64(), "[1, 2, 3, 4, 5, 6, 7, 8, 9]"));
   ASSERT_OK_AND_ASSIGN(auto ant1,
@@ -42,7 +37,7 @@ TEST(GroupSortTest, TestSort) {
 
   ASSERT_OK_AND_ASSIGN(auto base, GroupSortData::Make(groups, time, ant1, ant2, rows));
   ASSERT_OK_AND_ASSIGN(auto sorted, base->Sort());
-  ASSERT_OK_AND_ASSIGN(auto merged, MergeGroups({sorted, sorted}));
+  ASSERT_OK_AND_ASSIGN(auto merged, MergeGroups({sorted, sorted, sorted, sorted}));
 }
 
 }  // namespace

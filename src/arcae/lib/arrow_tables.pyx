@@ -29,6 +29,7 @@ from pyarrow.lib import (tobytes, frombytes)
 from arcae.lib.arrow_tables cimport (
     CCasaTable,
     CConfiguration,
+    CGroupSortData,
     CMSDescriptor,
     CServiceLocator,
     COpenTable,
@@ -36,6 +37,7 @@ from arcae.lib.arrow_tables cimport (
     CSelection,
     CSelectionBuilder,
     CTaql,
+    MergeGroups,
     IndexType)
 
 
@@ -431,3 +433,65 @@ class Configuration(MutableMapping):
             config: cython.pointer(CConfiguration) = &CServiceLocator.configuration()
 
         return config.Size()
+
+
+cdef class GroupSortData:
+    cdef shared_ptr[CGroupSortData] c_data
+
+    def __init__(
+        self,
+        groups: Sequence[pa.array],
+        time: pa.array,
+        ant1: pa.array,
+        ant2: pa.array,
+        rows: pa.array
+    ):
+        cdef:
+            vector[shared_ptr[CArray]] c_groups
+            shared_ptr[CArray] c_time = pyarrow_unwrap_array(time)
+            shared_ptr[CArray] c_ant1 = pyarrow_unwrap_array(ant1)
+            shared_ptr[CArray] c_ant2 = pyarrow_unwrap_array(ant2)
+            shared_ptr[CArray] c_rows = pyarrow_unwrap_array(rows)
+
+        for g in groups:
+            c_groups.push_back(pyarrow_unwrap_array(g))
+
+        with nogil:
+            self.c_data = GetResultValue(
+                CGroupSortData.Make(c_groups, c_time, c_ant1, c_ant2, c_rows)
+            )
+
+    def sort(self) -> GroupSortData:
+        cdef shared_ptr[CGroupSortData] c_gsd
+        cdef GroupSortData gsd
+
+        with nogil:
+            c_gsd = GetResultValue(self.c_data.get().Sort())
+
+        gsd = GroupSortData.__new__(GroupSortData)
+        gsd.c_data = c_gsd
+        return gsd
+
+    def to_arrow(self) -> pa.Table:
+        cdef shared_ptr[CTable] table
+
+        with nogil:
+            table = self.c_data.get().ToTable()
+
+        return pyarrow_wrap_table(table)
+
+
+def merge_groups(groups: Sequence[GroupSortData]) -> GroupSortData:
+    cdef vector[shared_ptr[CGroupSortData]] c_groups
+    cdef shared_ptr[CGroupSortData] c_merged
+    cdef GroupSortData gsd
+
+    for g in groups:
+        c_groups.push_back((<GroupSortData?> g).c_data)
+
+    with nogil:
+        c_merged = GetResultValue(MergeGroups(c_groups))
+
+    gsd = GroupSortData.__new__(GroupSortData)
+    gsd.c_data = c_merged
+    return gsd

@@ -5,6 +5,7 @@
 #include <memory>
 #include <numeric>
 #include <queue>
+#include <string>
 #include <vector>
 
 #include "arcae/type_traits.h"
@@ -19,10 +20,12 @@ using ::arrow::AllocateBuffer;
 using ::arrow::Array;
 using ::arrow::Buffer;
 using ::arrow::DoubleArray;
+using ::arrow::Field;
 using ::arrow::Int32Array;
 using ::arrow::Int64Array;
 using ::arrow::Result;
 using ::arrow::Status;
+using ::arrow::Table;
 
 using ::arcae::detail::AggregateAdapter;
 
@@ -142,6 +145,32 @@ Result<std::shared_ptr<GroupSortData>> GroupSortData::Sort() const {
       std::make_shared<Int64Array>(nrow, std::move(rows_buffer)));
 }
 
+std::shared_ptr<Table> GroupSortData::ToTable() const {
+  std::vector<std::shared_ptr<Array>> arrays;
+  std::vector<std::shared_ptr<Field>> fields;
+
+  // Groups + TIME, ANTENNA1. ANTENNA2, ROW
+  auto narrays = groups_.size() + 4;
+  arrays.reserve(narrays);
+  fields.reserve(narrays);
+
+  for (std::size_t g = 0; g < groups_.size(); ++g) {
+    fields.push_back(field("GROUP_" + std::to_string(g), arrow::int32()));
+    arrays.push_back(groups_[g]);
+  }
+  fields.push_back(field("TIME", arrow::float64()));
+  fields.push_back(field("ANTENNA1", arrow::int32()));
+  fields.push_back(field("ANTENNA2", arrow::int32()));
+  fields.push_back(field("ROW", arrow::int64()));
+
+  arrays.push_back(time_);
+  arrays.push_back(ant1_);
+  arrays.push_back(ant2_);
+  arrays.push_back(rows_);
+
+  return Table::Make(schema(std::move(fields)), std::move(arrays));
+}
+
 Result<std::shared_ptr<GroupSortData>> MergeGroups(
     const std::vector<std::shared_ptr<GroupSortData>>& group_data) {
   if (group_data.empty())
@@ -149,25 +178,29 @@ Result<std::shared_ptr<GroupSortData>> MergeGroups(
         GroupSortData::GroupsType{}, nullptr, nullptr, nullptr, nullptr);
 
   struct MergeData {
-    std::size_t gd;
-    GroupSortData* group;
+    GroupSortData* group_;
     std::int64_t r;
 
-    double time(std::int64_t r) const { return group->time()[r]; }
-    std::int32_t ant1(std::int64_t r) const { return group->ant1()[r]; }
-    std::int32_t ant2(std::int64_t r) const { return group->ant2()[r]; }
-
-    bool operator<(const MergeData& rhs) const {
-      // To obtain a descending sort, we reverse the comparison
-      for (std::size_t g = 0; g < group->nGroups(); ++g) {
-        auto lhs_group = group->group(g)[r];
-        auto rhs_group = rhs.group->group(g)[rhs.r];
-        if (lhs_group != rhs_group) return lhs_group > rhs_group;
-      }
-      if (time(r) != rhs.time(rhs.r)) return time(r) > rhs.time(rhs.r);
-      if (ant1(r) != rhs.ant1(rhs.r)) return ant1(r) > rhs.ant1(rhs.r);
-      return ant2(r) > rhs.ant2(rhs.r);
+    inline std::int32_t group(std::size_t g, std::int64_t r) const {
+      return group_->group(g, r);
     }
+    inline double time(std::int64_t r) const { return group_->time(r); }
+    inline std::int32_t ant1(std::int64_t r) const { return group_->ant1(r); }
+    inline std::int32_t ant2(std::int64_t r) const { return group_->ant2(r); }
+
+    bool compare(const MergeData& rhs) const {
+      for (std::size_t g = 0; g < group_->nGroups(); ++g) {
+        auto lhs_group = group(g, r);
+        auto rhs_group = rhs.group(g, rhs.r);
+        if (lhs_group != rhs_group) return lhs_group < rhs_group;
+      }
+      if (time(r) != rhs.time(rhs.r)) return time(r) < rhs.time(rhs.r);
+      if (ant1(r) != rhs.ant1(rhs.r)) return ant1(r) < rhs.ant1(rhs.r);
+      return ant2(r) < rhs.ant2(rhs.r);
+    }
+
+    // To obtain a descending sort, we reverse the comparison
+    inline bool operator<(const MergeData& rhs) const { return !compare(rhs); }
   };
 
   std::int64_t nrows = 0;
@@ -204,27 +237,26 @@ Result<std::shared_ptr<GroupSortData>> MergeGroups(
 
   for (std::size_t gd = 0; gd < group_data.size(); ++gd) {
     if (group_data[gd]->nRows() > 0) {
-      queue.emplace(MergeData{gd, group_data[gd].get(), 0});
+      queue.emplace(MergeData{group_data[gd].get(), 0});
     }
   }
 
   while (!queue.empty()) {
-    auto [gd, dummy, gr] = queue.top();
-    const auto& top_group = group_data[gd];
+    auto [top_group, gr] = queue.top();
     queue.pop();
 
     for (std::size_t g = 0; g < ngroups; ++g) {
-      group_spans[g][row] = top_group->group(g)[gr];
+      group_spans[g][row] = top_group->group(g, gr);
     }
 
-    time_span[row] = top_group->time()[gr];
-    ant1_span[row] = top_group->ant1()[gr];
-    ant2_span[row] = top_group->ant2()[gr];
-    rows_span[row] = top_group->rows()[gr];
+    time_span[row] = top_group->time(gr);
+    ant1_span[row] = top_group->ant1(gr);
+    ant2_span[row] = top_group->ant2(gr);
+    rows_span[row] = top_group->rows(gr);
     ++row;
 
     if (gr + 1 < top_group->nRows()) {
-      queue.emplace(MergeData{gd, top_group.get(), gr + 1});
+      queue.emplace(MergeData{top_group, gr + 1});
     }
   }
 

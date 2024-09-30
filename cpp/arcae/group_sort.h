@@ -19,11 +19,13 @@ struct GroupSortData {
   std::shared_ptr<arrow::Int32Array> ant2_;
   std::shared_ptr<arrow::Int64Array> rows_;
 
-  const std::int32_t* group(int g) const { return groups_[g]->raw_values(); }
-  const double* time() const { return time_->raw_values(); }
-  const std::int32_t* ant1() const { return ant1_->raw_values(); }
-  const std::int32_t* ant2() const { return ant2_->raw_values(); }
-  const std::int64_t* rows() const { return rows_->raw_values(); }
+  inline std::int32_t group(std::size_t group, std::size_t row) const {
+    return groups_[group]->raw_values()[row];
+  }
+  inline double time(std::size_t row) const { return time_->raw_values()[row]; }
+  inline std::int32_t ant1(std::size_t row) const { return ant1_->raw_values()[row]; }
+  inline std::int32_t ant2(std::size_t row) const { return ant2_->raw_values()[row]; }
+  inline std::int64_t rows(std::size_t row) const { return rows_->raw_values()[row]; }
 
   // Create the GroupSortData from grouping and sorting arrays
   static arrow::Result<std::shared_ptr<GroupSortData>> Make(
@@ -32,6 +34,9 @@ struct GroupSortData {
       const std::shared_ptr<arrow::Array>& ant1,
       const std::shared_ptr<arrow::Array>& ant2,
       const std::shared_ptr<arrow::Array>& rows);
+
+  // Convert to an Arrow Table
+  std::shared_ptr<arrow::Table> ToTable() const;
 
   // Number of group columns
   std::size_t nGroups() const { return groups_.size(); }
