@@ -26,7 +26,7 @@ def test_sorting():
         }
     )
 
-    gsd = PartitionSortData(
+    psd = PartitionSortData(
         [
             data["GROUP_0"].combine_chunks(),
             data["GROUP_1"].combine_chunks(),
@@ -37,7 +37,7 @@ def test_sorting():
         data["ROW"].combine_chunks(),
     )
 
-    assert gsd.sort().to_arrow().equals(data.sort_by(SORT_KEYS))
+    assert psd.sort().to_arrow().equals(data.sort_by(SORT_KEYS))
 
 
 @pytest.mark.parametrize("seed", [42])
@@ -62,12 +62,12 @@ def test_merging(n, chunks, seed):
         }
     )
 
-    gsds = []
+    psds = []
 
     # Split test data into PartitionSortData and sort
     for start in range(0, n, chunks):
         batch = data.slice(start, chunks)
-        gsd = PartitionSortData(
+        psd = PartitionSortData(
             [
                 batch["GROUP_0"].combine_chunks(),
                 batch["GROUP_1"].combine_chunks(),
@@ -78,7 +78,7 @@ def test_merging(n, chunks, seed):
             batch["ROW"].combine_chunks(),
         )
 
-        gsds.append(gsd.sort())
+        psds.append(psd.sort())
 
     # Test that merging matches sorted data
-    assert merge_partitions(gsds).to_arrow().equals(data.sort_by(SORT_KEYS))
+    assert merge_partitions(psds).to_arrow().equals(data.sort_by(SORT_KEYS))
