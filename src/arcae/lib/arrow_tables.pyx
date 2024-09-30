@@ -462,14 +462,11 @@ cdef class PartitionSortData:
             )
 
     def sort(self) -> PartitionSortData:
-        cdef shared_ptr[CPartitionSortData] c_psd
-        cdef PartitionSortData psd
+        cdef PartitionSortData psd = PartitionSortData.__new__(PartitionSortData)
 
         with nogil:
-            c_psd = GetResultValue(self.c_data.get().Sort())
+            psd.c_data = GetResultValue(self.c_data.get().Sort())
 
-        psd = PartitionSortData.__new__(PartitionSortData)
-        psd.c_data = c_psd
         return psd
 
     def to_arrow(self) -> pa.Table:
@@ -483,15 +480,12 @@ cdef class PartitionSortData:
 
 def merge_partitions(partitions: Sequence[PartitionSortData]) -> PartitionSortData:
     cdef vector[shared_ptr[CPartitionSortData]] c_partitions
-    cdef shared_ptr[CPartitionSortData] c_merged
-    cdef PartitionSortData psd
+    cdef PartitionSortData psd = PartitionSortData.__new__(PartitionSortData)
 
-    for o in partitions:
-        c_partitions.push_back((<PartitionSortData?> o).c_data)
+    for p in partitions:
+        c_partitions.push_back((<PartitionSortData?> p).c_data)
 
     with nogil:
-        c_merged = GetResultValue(MergePartitions(c_partitions))
+        psd.c_data = GetResultValue(MergePartitions(c_partitions))
 
-    psd = PartitionSortData.__new__(PartitionSortData)
-    psd.c_data = c_merged
     return psd
