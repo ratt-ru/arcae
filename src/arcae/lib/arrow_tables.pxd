@@ -51,23 +51,23 @@ cdef extern from "arcae/descriptor.h" namespace "arcae" nogil:
     cdef CResult[string] CMSDescriptor" arcae::MSDescriptor"(
         const string & table, bool complete)
 
-cdef extern from "arcae/group_sort.h" namespace "arcae" nogil:
-    cdef cppclass CGroupSortData" arcae::GroupSortData":
+cdef extern from "arcae/partition_sort.h" namespace "arcae" nogil:
+    cdef cppclass CPartitionSortData" arcae::PartitionSortData":
         @staticmethod
-        CResult[shared_ptr[CGroupSortData]] Make" GroupSortData::Make"(
+        CResult[shared_ptr[CPartitionSortData]] Make" PartitionSortData::Make"(
             const vector[shared_ptr[CArray]] & columns,
             const shared_ptr[CArray] & time,
             const shared_ptr[CArray] & ant1,
             const shared_ptr[CArray] & ant2,
             const shared_ptr[CArray] & rows)
 
-        size_t nGroups" GroupSortData::nGroups"()
-        size_t nRows" GroupSortData::nRows"()
-        CResult[shared_ptr[CGroupSortData]] Sort" GroupSortData::Sort"()
-        shared_ptr[CTable] ToTable" GroupSortData::ToTable"()
+        size_t nGroups" PartitionSortData::nGroups"()
+        size_t nRows" PartitionSortData::nRows"()
+        CResult[shared_ptr[CPartitionSortData]] Sort" PartitionSortData::Sort"()
+        shared_ptr[CTable] ToTable" PartitionSortData::ToTable"()
 
-    CResult[shared_ptr[CGroupSortData]] MergeGroups" MergeGroups"(
-        const vector[shared_ptr[CGroupSortData]] & group_data)
+    CResult[shared_ptr[CPartitionSortData]] MergePartitions" MergePartitions"(
+        const vector[shared_ptr[CPartitionSortData]] & partitions)
 
 
 cdef extern from "arcae/new_table_proxy.h" namespace "arcae" nogil:

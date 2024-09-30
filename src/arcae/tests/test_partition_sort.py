@@ -2,7 +2,7 @@ import numpy as np
 import pyarrow as pa
 import pytest
 
-from arcae.lib.arrow_tables import GroupSortData, merge_groups
+from arcae.lib.arrow_tables import PartitionSortData, merge_partitions
 
 SORT_KEYS = [
     ("GROUP_0", "ascending"),
@@ -26,7 +26,7 @@ def test_sorting():
         }
     )
 
-    gsd = GroupSortData(
+    gsd = PartitionSortData(
         [
             data["GROUP_0"].combine_chunks(),
             data["GROUP_1"].combine_chunks(),
@@ -64,10 +64,10 @@ def test_merging(n, chunks, seed):
 
     gsds = []
 
-    # Split test data into GroupSortData and sort
+    # Split test data into PartitionSortData and sort
     for start in range(0, n, chunks):
         batch = data.slice(start, chunks)
-        gsd = GroupSortData(
+        gsd = PartitionSortData(
             [
                 batch["GROUP_0"].combine_chunks(),
                 batch["GROUP_1"].combine_chunks(),
@@ -81,4 +81,4 @@ def test_merging(n, chunks, seed):
         gsds.append(gsd.sort())
 
     # Test that merging matches sorted data
-    assert merge_groups(gsds).to_arrow().equals(data.sort_by(SORT_KEYS))
+    assert merge_partitions(gsds).to_arrow().equals(data.sort_by(SORT_KEYS))

@@ -1,4 +1,4 @@
-#include "arcae/group_sort.h"
+#include "arcae/partition_sort.h"
 
 #include <memory>
 
@@ -12,8 +12,8 @@
 
 using ::arrow::ipc::internal::json::ArrayFromJSON;
 
-using ::arcae::GroupSortData;
-using ::arcae::MergeGroups;
+using ::arcae::MergePartitions;
+using ::arcae::PartitionSortData;
 
 namespace {
 
@@ -35,9 +35,10 @@ TEST(GroupSortTest, TestSort) {
   ASSERT_OK_AND_ASSIGN(auto rows,
                        ArrayFromJSON(arrow::int64(), "[1, 2, 3, 4, 5, 6, 7, 8, 9]"));
 
-  ASSERT_OK_AND_ASSIGN(auto base, GroupSortData::Make(groups, time, ant1, ant2, rows));
+  ASSERT_OK_AND_ASSIGN(auto base,
+                       PartitionSortData::Make(groups, time, ant1, ant2, rows));
   ASSERT_OK_AND_ASSIGN(auto sorted, base->Sort());
-  ASSERT_OK_AND_ASSIGN(auto merged, MergeGroups({sorted, sorted, sorted, sorted}));
+  ASSERT_OK_AND_ASSIGN(auto merged, MergePartitions({sorted, sorted, sorted, sorted}));
 }
 
 }  // namespace

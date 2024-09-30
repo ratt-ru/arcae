@@ -1,4 +1,4 @@
-#include "group_sort.h"
+#include "arcae/partition_sort.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -34,13 +34,13 @@ namespace arcae {
 
 namespace {
 
-static constexpr char kArrayIsNull[] = "GroupSortData array is null";
-static constexpr char kLengthMismatch[] = "GroupSortData length mismatch";
-static constexpr char kHasNulls[] = "GroupSortData has nulls";
+static constexpr char kArrayIsNull[] = "PartitionSortData array is null";
+static constexpr char kLengthMismatch[] = "PartitionSortData length mismatch";
+static constexpr char kHasNulls[] = "PartitionSortData has nulls";
 
 }  // namespace
 
-Result<std::shared_ptr<GroupSortData>> GroupSortData::Make(
+Result<std::shared_ptr<PartitionSortData>> PartitionSortData::Make(
     const std::vector<std::shared_ptr<Array>>& groups, const std::shared_ptr<Array>& time,
     const std::shared_ptr<Array>& ant1, const std::shared_ptr<Array>& ant2,
     const std::shared_ptr<Array>& rows) {
@@ -73,14 +73,14 @@ Result<std::shared_ptr<GroupSortData>> GroupSortData::Make(
     groups_int32.push_back(std::dynamic_pointer_cast<arrow::Int32Array>(group));
   }
 
-  return std::make_shared<AggregateAdapter<GroupSortData>>(
+  return std::make_shared<AggregateAdapter<PartitionSortData>>(
       std::move(groups_int32), std::dynamic_pointer_cast<DoubleArray>(time),
       std::dynamic_pointer_cast<Int32Array>(ant1),
       std::dynamic_pointer_cast<Int32Array>(ant2),
       std::dynamic_pointer_cast<Int64Array>(rows));
 }
 
-Result<std::shared_ptr<GroupSortData>> GroupSortData::Sort() const {
+Result<std::shared_ptr<PartitionSortData>> PartitionSortData::Sort() const {
   std::vector<const int*> groups;
   groups.reserve(groups_.size());
   for (const auto& g : groups_) groups.push_back(g->raw_values());
@@ -138,7 +138,7 @@ Result<std::shared_ptr<GroupSortData>> GroupSortData::Sort() const {
   DoCopy(ant2_span, ant2);
   DoCopy(rows_span, rows);
 
-  return std::make_shared<AggregateAdapter<GroupSortData>>(
+  return std::make_shared<AggregateAdapter<PartitionSortData>>(
       std::move(group_arrays),
       std::make_shared<DoubleArray>(nrow, std::move(time_buffer)),
       std::make_shared<Int32Array>(nrow, std::move(ant1_buffer)),
@@ -146,7 +146,7 @@ Result<std::shared_ptr<GroupSortData>> GroupSortData::Sort() const {
       std::make_shared<Int64Array>(nrow, std::move(rows_buffer)));
 }
 
-std::shared_ptr<Table> GroupSortData::ToTable() const {
+std::shared_ptr<Table> PartitionSortData::ToTable() const {
   std::vector<std::shared_ptr<Array>> arrays;
   std::vector<std::shared_ptr<Field>> fields;
 
@@ -172,14 +172,14 @@ std::shared_ptr<Table> GroupSortData::ToTable() const {
   return Table::Make(schema(std::move(fields)), std::move(arrays));
 }
 
-Result<std::shared_ptr<GroupSortData>> MergeGroups(
-    const std::vector<std::shared_ptr<GroupSortData>>& group_data) {
+Result<std::shared_ptr<PartitionSortData>> MergePartitions(
+    const std::vector<std::shared_ptr<PartitionSortData>>& group_data) {
   if (group_data.empty())
-    return std::make_shared<AggregateAdapter<GroupSortData>>(
-        GroupSortData::GroupsType{}, nullptr, nullptr, nullptr, nullptr);
+    return std::make_shared<AggregateAdapter<PartitionSortData>>(
+        PartitionSortData::GroupsType{}, nullptr, nullptr, nullptr, nullptr);
 
   struct MergeData {
-    GroupSortData* group_;
+    PartitionSortData* group_;
     std::int64_t r;
 
     inline std::int32_t group(std::size_t g, std::int64_t r) const {
@@ -263,7 +263,7 @@ Result<std::shared_ptr<GroupSortData>> MergeGroups(
     }
   }
 
-  return std::make_shared<AggregateAdapter<GroupSortData>>(
+  return std::make_shared<AggregateAdapter<PartitionSortData>>(
       std::move(group_arrays),
       std::make_shared<DoubleArray>(nrows, std::move(time_buffer)),
       std::make_shared<Int32Array>(nrows, std::move(ant1_buffer)),

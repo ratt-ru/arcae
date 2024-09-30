@@ -29,7 +29,7 @@ from pyarrow.lib import (tobytes, frombytes)
 from arcae.lib.arrow_tables cimport (
     CCasaTable,
     CConfiguration,
-    CGroupSortData,
+    CPartitionSortData,
     CMSDescriptor,
     CServiceLocator,
     COpenTable,
@@ -37,7 +37,7 @@ from arcae.lib.arrow_tables cimport (
     CSelection,
     CSelectionBuilder,
     CTaql,
-    MergeGroups,
+    MergePartitions,
     IndexType)
 
 
@@ -435,8 +435,8 @@ class Configuration(MutableMapping):
         return config.Size()
 
 
-cdef class GroupSortData:
-    cdef shared_ptr[CGroupSortData] c_data
+cdef class PartitionSortData:
+    cdef shared_ptr[CPartitionSortData] c_data
 
     def __init__(
         self,
@@ -458,19 +458,19 @@ cdef class GroupSortData:
 
         with nogil:
             self.c_data = GetResultValue(
-                CGroupSortData.Make(c_groups, c_time, c_ant1, c_ant2, c_rows)
+                CPartitionSortData.Make(c_groups, c_time, c_ant1, c_ant2, c_rows)
             )
 
-    def sort(self) -> GroupSortData:
-        cdef shared_ptr[CGroupSortData] c_gsd
-        cdef GroupSortData gsd
+    def sort(self) -> PartitionSortData:
+        cdef shared_ptr[CPartitionSortData] c_psd
+        cdef PartitionSortData psd
 
         with nogil:
-            c_gsd = GetResultValue(self.c_data.get().Sort())
+            c_psd = GetResultValue(self.c_data.get().Sort())
 
-        gsd = GroupSortData.__new__(GroupSortData)
-        gsd.c_data = c_gsd
-        return gsd
+        psd = PartitionSortData.__new__(PartitionSortData)
+        psd.c_data = c_psd
+        return psd
 
     def to_arrow(self) -> pa.Table:
         cdef shared_ptr[CTable] table
@@ -481,17 +481,17 @@ cdef class GroupSortData:
         return pyarrow_wrap_table(table)
 
 
-def merge_groups(groups: Sequence[GroupSortData]) -> GroupSortData:
-    cdef vector[shared_ptr[CGroupSortData]] c_groups
-    cdef shared_ptr[CGroupSortData] c_merged
-    cdef GroupSortData gsd
+def merge_partitions(partitions: Sequence[PartitionSortData]) -> PartitionSortData:
+    cdef vector[shared_ptr[CPartitionSortData]] c_partitions
+    cdef shared_ptr[CPartitionSortData] c_merged
+    cdef PartitionSortData psd
 
-    for g in groups:
-        c_groups.push_back((<GroupSortData?> g).c_data)
+    for o in partitions:
+        c_partitions.push_back((<PartitionSortData?> o).c_data)
 
     with nogil:
-        c_merged = GetResultValue(MergeGroups(c_groups))
+        c_merged = GetResultValue(MergePartitions(c_partitions))
 
-    gsd = GroupSortData.__new__(GroupSortData)
-    gsd.c_data = c_merged
-    return gsd
+    psd = PartitionSortData.__new__(PartitionSortData)
+    psd.c_data = c_merged
+    return psd

@@ -11,7 +11,15 @@
 
 namespace arcae {
 
-struct GroupSortData {
+// Structure for storing data to sort the rows of a Measurement Set
+// partition by a number of grouping columns (e.g. DATA_DESC_ID, FIELD_ID),
+// as well as TIME, ANTENNA1 and ANTENNA2.
+//
+// The sorting functionality could be provided by an arrow Table.
+// However, arrow's Table merging functionality is not publicly exposed,
+// so PartitionSortData is used to provide a structure that can be
+// used in a k-way merge.
+struct PartitionSortData {
   using GroupsType = std::vector<std::shared_ptr<arrow::Int32Array>>;
   GroupsType groups_;
   std::shared_ptr<arrow::DoubleArray> time_;
@@ -27,8 +35,8 @@ struct GroupSortData {
   inline std::int32_t ant2(std::size_t row) const { return ant2_->raw_values()[row]; }
   inline std::int64_t rows(std::size_t row) const { return rows_->raw_values()[row]; }
 
-  // Create the GroupSortData from grouping and sorting arrays
-  static arrow::Result<std::shared_ptr<GroupSortData>> Make(
+  // Create the PartitionSortata from grouping and sorting arrays
+  static arrow::Result<std::shared_ptr<PartitionSortData>> Make(
       const std::vector<std::shared_ptr<arrow::Array>>& groups,
       const std::shared_ptr<arrow::Array>& time,
       const std::shared_ptr<arrow::Array>& ant1,
@@ -44,12 +52,18 @@ struct GroupSortData {
   // Number of rows in the group
   std::int64_t nRows() const { return rows_->length(); }
 
-  // Sort the Group
-  arrow::Result<std::shared_ptr<GroupSortData>> Sort() const;
+  // Sort the Group in the following order (ascending)
+  // 1. Each GROUP column
+  // 2. TIME
+  // 3. ANTENNA1
+  // 4. ANTENNA2
+  arrow::Result<std::shared_ptr<PartitionSortData>> Sort() const;
 };
 
-arrow::Result<std::shared_ptr<GroupSortData>> MergeGroups(
-    const std::vector<std::shared_ptr<GroupSortData>>& group_data);
+// Do a k-way merge of the given partitions
+// which should have been sorted by a called to PartitionSortData::Sort()
+arrow::Result<std::shared_ptr<PartitionSortData>> MergePartitions(
+    const std::vector<std::shared_ptr<PartitionSortData>>& partitions);
 
 }  // namespace arcae
 
