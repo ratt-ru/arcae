@@ -52,7 +52,7 @@ struct PartitionSortData {
   // Number of rows in the group
   std::int64_t nRows() const { return rows_->length(); }
 
-  // Sort the Group in the following order (ascending)
+  // Sort the Partition in the following order (ascending)
   // 1. Each GROUP column
   // 2. TIME
   // 3. ANTENNA1
