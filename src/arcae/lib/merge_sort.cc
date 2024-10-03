@@ -19,6 +19,7 @@ namespace arcae {
   VISIT(NPY_FLOAT64, double)
 
 
+namespace {
 struct PartitionData {
   std::vector<void *> data_;
   std::vector<int> dtypes_;
@@ -26,6 +27,36 @@ struct PartitionData {
 
   std::size_t num_arrays() const { return data_.size(); }
 };
+
+// Priority queue element, pointing at a partition
+// and a row within that partition
+struct MergeData {
+  std::size_t row;
+  PartitionData * partition;
+
+  bool operator<(const MergeData & rhs) const {
+    for (std::size_t a = 0; a < rhs.partition->num_arrays(); ++a) {
+      #define VISIT(NPY_TYPE, C_TYPE)                                          \
+        case NPY_TYPE: {                                                       \
+          auto lhs_data = reinterpret_cast<C_TYPE *>(partition->data_[a]);     \
+          auto rhs_data = reinterpret_cast<C_TYPE *>(rhs.partition->data_[a]); \
+          auto lhs_value = lhs_data[row];                                      \
+          auto rhs_value = rhs_data[rhs.row];                                  \
+          if (lhs_value != rhs_value) return lhs_value > rhs_value;            \
+          break;                                                               \
+        }
+
+      switch(partition->dtypes_[a]) {
+        VISIT_SORTABLE_TYPES(VISIT)
+      }
+
+      #undef VISIT
+    }
+    return false;
+  }
+};
+
+}  // namespace
 
 static int PartitionMerge(const std::vector<std::vector<PyArrayObject*>> & array_partitions,
                 std::vector<PyArrayObject*> * merged_arrays) {
@@ -66,6 +97,10 @@ static int PartitionMerge(const std::vector<std::vector<PyArrayObject*>> & array
     partitions[g] = PartitionData{std::move(data), std::move(dtypes), nrow};
   }
 
+  #define VISIT(NPY_TYPE, C_TYPE) \
+    case NPY_TYPE:                \
+      break;
+
   // Sanity check partition data
   for (std::size_t g = 1; g < partitions.size(); ++g) {
     if (partitions[g].data_.size() != partitions[0].data_.size()) {
@@ -79,19 +114,15 @@ static int PartitionMerge(const std::vector<std::vector<PyArrayObject*>> & array
         return -1;
       }
 
-      #define VISIT(NPY_TYPE, C_TYPE) \
-        case NPY_TYPE:                \
-          break;
-
       switch (partitions[g].dtypes_[a]) {
         VISIT_SORTABLE_TYPES(VISIT)
         default:
           PyErr_SetString(PyExc_ValueError, "Unsupported array type");
           return -1;
       }
-
-      #undef VISIT
     }
+
+    #undef VISIT
   }
 
   // Allocate output arrays
@@ -116,65 +147,35 @@ static int PartitionMerge(const std::vector<std::vector<PyArrayObject*>> & array
   // Drop the global interpreter lock while merging
   Py_BEGIN_ALLOW_THREADS
 
-  // Priority queue element, pointing at a partition
-  // and a row within that partition
-  struct MergeData {
-    std::size_t row;
-    PartitionData * partition;
-
-    bool operator<(const MergeData & rhs) const {
-      for (std::size_t a = 0; a < rhs.partition->num_arrays(); ++a) {
-        #define VISIT(NPY_TYPE, C_TYPE)                                          \
-          case NPY_TYPE: {                                                       \
-            auto lhs_data = reinterpret_cast<C_TYPE *>(partition->data_[a]);     \
-            auto rhs_data = reinterpret_cast<C_TYPE *>(rhs.partition->data_[a]); \
-            auto lhs_value = lhs_data[row];                                      \
-            auto rhs_value = rhs_data[rhs.row];                                  \
-            if (lhs_value != rhs_value) return lhs_value > rhs_value;            \
-            break;                                                               \
-          }
-
-        switch(partition->dtypes_[a]) {
-          VISIT_SORTABLE_TYPES(VISIT)
-        }
-
-        #undef VISIT
-      }
-      return false;
-    }
-  };
-
   // Create and initialize a priority queue
   std::priority_queue<MergeData> queue;
   for (std::size_t p = 0; p < partitions.size(); ++p) {
     queue.push(MergeData{0, &partitions[p]});
   }
 
+  #define VISIT(NPY_TYPE, C_TYPE)                                    \
+    case NPY_TYPE: {                                                 \
+      auto out = reinterpret_cast<C_TYPE *>(out_data[a]);            \
+      auto in = reinterpret_cast<C_TYPE *>(top_partition->data_[a]); \
+      out[row] = in[prow];                                           \
+      break;                                                         \
+    }
+
   // Perform the k-way merge
   for (std::size_t row = 0; !queue.empty(); ++row) {
     auto [prow, top_partition] = queue.top();
     queue.pop();
-
     for (std::size_t a = 0; a < narrays; ++a) {
-      #define VISIT(NPY_TYPE, C_TYPE)                                    \
-        case NPY_TYPE: {                                                 \
-          auto out = reinterpret_cast<C_TYPE *>(out_data[a]);            \
-          auto in = reinterpret_cast<C_TYPE *>(top_partition->data_[a]); \
-          out[row] = in[prow];                                           \
-          break;                                                         \
-        }
-
       switch(partitions[0].dtypes_[a]) {
         VISIT_SORTABLE_TYPES(VISIT)
       }
-
-      #undef VISIT
     }
-
     if (prow + 1 < top_partition->nrow_) {
       queue.push(MergeData{prow + 1, top_partition});
     }
   }
+
+  #undef VISIT
 
   // Release the global interpreter lock
   Py_END_ALLOW_THREADS
