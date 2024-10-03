@@ -4,7 +4,7 @@ History
 
 X.Y.Z (YYYY-MM-DD)
 ------------------
-* Add partition sorting and merging utilities (:pr:`127`)
+* Support C++ merging of sorted NumPy partitions (:pr:`127`)
 * Deprecate Python 3.9 support (:pr:`125`)
 * Upgrade to casacore 3.6.1 (:pr:`124`)
 * Build against NumPy 2 (:pr:`122`)
