@@ -35,23 +35,23 @@ struct MergeData {
   PartitionData * partition;
 
   bool operator<(const MergeData & rhs) const {
-    for (std::size_t a = 0; a < rhs.partition->num_arrays(); ++a) {
-      #define VISIT(NPY_TYPE, C_TYPE)                                          \
-        case NPY_TYPE: {                                                       \
-          auto lhs_data = reinterpret_cast<C_TYPE *>(partition->data_[a]);     \
-          auto rhs_data = reinterpret_cast<C_TYPE *>(rhs.partition->data_[a]); \
-          auto lhs_value = lhs_data[row];                                      \
-          auto rhs_value = rhs_data[rhs.row];                                  \
-          if (lhs_value != rhs_value) return lhs_value > rhs_value;            \
-          break;                                                               \
-        }
+    // Note the use of operator> so that the priority queue is a min-heap
+    #define VISIT(NPY_TYPE, C_TYPE)                                          \
+      case NPY_TYPE: {                                                       \
+        auto lhs_data = reinterpret_cast<C_TYPE *>(partition->data_[a]);     \
+        auto rhs_data = reinterpret_cast<C_TYPE *>(rhs.partition->data_[a]); \
+        auto lhs_value = lhs_data[row];                                      \
+        auto rhs_value = rhs_data[rhs.row];                                  \
+        if (lhs_value != rhs_value) return lhs_value > rhs_value;            \
+        break;                                                               \
+      }
 
+    for (std::size_t a = 0; a < rhs.partition->num_arrays(); ++a) {
       switch(partition->dtypes_[a]) {
         VISIT_SORTABLE_TYPES(VISIT)
       }
-
-      #undef VISIT
     }
+    #undef VISIT
     return false;
   }
 };
