@@ -32,11 +32,13 @@ TEST(GroupSortTest, TestSort) {
                        ArrayFromJSON(arrow::int32(), "[1, 1, 1, 2, 2, 2, 3, 3, 3]"));
   ASSERT_OK_AND_ASSIGN(auto ant2,
                        ArrayFromJSON(arrow::int32(), "[1, 1, 1, 2, 2, 2, 3, 3, 3]"));
+  ASSERT_OK_AND_ASSIGN(auto interval,
+                       ArrayFromJSON(arrow::float64(), "[1, 1, 1, 1, 1, 1, 1, 1, 1]"));
   ASSERT_OK_AND_ASSIGN(auto rows,
                        ArrayFromJSON(arrow::int64(), "[1, 2, 3, 4, 5, 6, 7, 8, 9]"));
 
   ASSERT_OK_AND_ASSIGN(auto base,
-                       PartitionSortData::Make(groups, time, ant1, ant2, rows));
+                       PartitionSortData::Make(groups, time, ant1, ant2, interval, rows));
   ASSERT_OK_AND_ASSIGN(auto sorted, base->Sort());
   ASSERT_OK_AND_ASSIGN(auto merged, MergePartitions({sorted, sorted, sorted, sorted}));
 }

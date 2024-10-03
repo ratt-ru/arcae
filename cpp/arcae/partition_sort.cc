@@ -43,22 +43,26 @@ static constexpr char kHasNulls[] = "PartitionSortData has nulls";
 Result<std::shared_ptr<PartitionSortData>> PartitionSortData::Make(
     const std::vector<std::shared_ptr<Array>>& groups, const std::shared_ptr<Array>& time,
     const std::shared_ptr<Array>& ant1, const std::shared_ptr<Array>& ant2,
-    const std::shared_ptr<Array>& rows) {
-  if (time == nullptr || ant1 == nullptr || ant2 == nullptr || rows == nullptr)
+    const std::shared_ptr<Array>& interval, const std::shared_ptr<Array>& rows) {
+  if (time == nullptr || ant1 == nullptr || ant2 == nullptr || interval == nullptr ||
+      rows == nullptr)
     return Status::Invalid(kArrayIsNull);
   if (time->length() != ant1->length() || time->length() != ant2->length() ||
-      time->length() != rows->length())
+      time->length() != interval->length() || time->length() != rows->length())
     return Status::Invalid(kLengthMismatch);
 
   if (time->type() != arrow::float64())
     return Status::Invalid("time column was not float64");
   if (ant1->type() != arrow::int32()) return Status::Invalid("ant1 column was not int32");
   if (ant2->type() != arrow::int32()) return Status::Invalid("ant2 column was not int32");
+  if (interval->type() != arrow::float64())
+    return Status::Invalid("interval column was not float64");
   if (rows->type() != arrow::int64()) return Status::Invalid("row column was not int64");
 
   if (time->data()->MayHaveNulls()) return Status::Invalid(kHasNulls);
   if (ant1->data()->MayHaveNulls()) return Status::Invalid(kHasNulls);
   if (ant2->data()->MayHaveNulls()) return Status::Invalid(kHasNulls);
+  if (interval->data()->MayHaveNulls()) return Status::Invalid(kHasNulls);
   if (rows->data()->MayHaveNulls()) return Status::Invalid(kHasNulls);
 
   std::vector<std::shared_ptr<Int32Array>> groups_int32;
@@ -77,6 +81,7 @@ Result<std::shared_ptr<PartitionSortData>> PartitionSortData::Make(
       std::move(groups_int32), std::dynamic_pointer_cast<DoubleArray>(time),
       std::dynamic_pointer_cast<Int32Array>(ant1),
       std::dynamic_pointer_cast<Int32Array>(ant2),
+      std::dynamic_pointer_cast<DoubleArray>(interval),
       std::dynamic_pointer_cast<Int64Array>(rows));
 }
 
@@ -87,6 +92,7 @@ Result<std::shared_ptr<PartitionSortData>> PartitionSortData::Sort() const {
   auto time = time_->raw_values();
   auto ant1 = ant1_->raw_values();
   auto ant2 = ant2_->raw_values();
+  auto interval = interval_->raw_values();
   auto rows = rows_->raw_values();
   auto nrow = time_->length();
 
@@ -120,12 +126,15 @@ Result<std::shared_ptr<PartitionSortData>> PartitionSortData::Sort() const {
                         AllocateBuffer(nrow * sizeof(std::int32_t)));
   ARROW_ASSIGN_OR_RAISE(std::shared_ptr<Buffer> ant2_buffer,
                         AllocateBuffer(nrow * sizeof(std::int32_t)));
+  ARROW_ASSIGN_OR_RAISE(std::shared_ptr<Buffer> interval_buffer,
+                        AllocateBuffer(nrow * sizeof(double)));
   ARROW_ASSIGN_OR_RAISE(std::shared_ptr<Buffer> rows_buffer,
                         AllocateBuffer(nrow * sizeof(std::int64_t)));
 
   auto time_span = time_buffer->mutable_span_as<double>();
   auto ant1_span = ant1_buffer->mutable_span_as<std::int32_t>();
   auto ant2_span = ant2_buffer->mutable_span_as<std::int32_t>();
+  auto interval_span = interval_buffer->mutable_span_as<double>();
   auto rows_span = rows_buffer->mutable_span_as<std::int64_t>();
 
   auto DoCopy = [&index, &nrow](auto out, auto in) {
@@ -136,6 +145,7 @@ Result<std::shared_ptr<PartitionSortData>> PartitionSortData::Sort() const {
   DoCopy(time_span, time);
   DoCopy(ant1_span, ant1);
   DoCopy(ant2_span, ant2);
+  DoCopy(interval_span, interval);
   DoCopy(rows_span, rows);
 
   return std::make_shared<AggregateAdapter<PartitionSortData>>(
@@ -143,6 +153,7 @@ Result<std::shared_ptr<PartitionSortData>> PartitionSortData::Sort() const {
       std::make_shared<DoubleArray>(nrow, std::move(time_buffer)),
       std::make_shared<Int32Array>(nrow, std::move(ant1_buffer)),
       std::make_shared<Int32Array>(nrow, std::move(ant2_buffer)),
+      std::make_shared<DoubleArray>(nrow, std::move(interval_buffer)),
       std::make_shared<Int64Array>(nrow, std::move(rows_buffer)));
 }
 
@@ -162,11 +173,13 @@ std::shared_ptr<Table> PartitionSortData::ToTable() const {
   fields.push_back(field("TIME", arrow::float64()));
   fields.push_back(field("ANTENNA1", arrow::int32()));
   fields.push_back(field("ANTENNA2", arrow::int32()));
+  fields.push_back(field("INTERVAL", arrow::float64()));
   fields.push_back(field("ROW", arrow::int64()));
 
   arrays.push_back(time_);
   arrays.push_back(ant1_);
   arrays.push_back(ant2_);
+  arrays.push_back(interval_);
   arrays.push_back(rows_);
 
   return Table::Make(schema(std::move(fields)), std::move(arrays));
@@ -225,12 +238,15 @@ Result<std::shared_ptr<PartitionSortData>> MergePartitions(
                         AllocateBuffer(nrows * sizeof(std::int32_t)));
   ARROW_ASSIGN_OR_RAISE(std::shared_ptr<Buffer> ant2_buffer,
                         AllocateBuffer(nrows * sizeof(std::int32_t)));
+  ARROW_ASSIGN_OR_RAISE(std::shared_ptr<Buffer> interval_buffer,
+                        AllocateBuffer(nrows * sizeof(double)));
   ARROW_ASSIGN_OR_RAISE(std::shared_ptr<Buffer> rows_buffer,
                         AllocateBuffer(nrows * sizeof(std::int64_t)));
 
   auto time_span = time_buffer->mutable_span_as<double>();
   auto ant1_span = ant1_buffer->mutable_span_as<std::int32_t>();
   auto ant2_span = ant2_buffer->mutable_span_as<std::int32_t>();
+  auto interval_span = interval_buffer->mutable_span_as<double>();
   auto rows_span = rows_buffer->mutable_span_as<std::int64_t>();
 
   std::int64_t row = 0;
@@ -255,6 +271,7 @@ Result<std::shared_ptr<PartitionSortData>> MergePartitions(
     time_span[row] = top_group->time(gr);
     ant1_span[row] = top_group->ant1(gr);
     ant2_span[row] = top_group->ant2(gr);
+    interval_span[row] = top_group->interval(gr);
     rows_span[row] = top_group->rows(gr);
     ++row;
 
@@ -268,6 +285,7 @@ Result<std::shared_ptr<PartitionSortData>> MergePartitions(
       std::make_shared<DoubleArray>(nrows, std::move(time_buffer)),
       std::make_shared<Int32Array>(nrows, std::move(ant1_buffer)),
       std::make_shared<Int32Array>(nrows, std::move(ant2_buffer)),
+      std::make_shared<DoubleArray>(nrows, std::move(interval_buffer)),
       std::make_shared<Int64Array>(nrows, std::move(rows_buffer)));
 }
 

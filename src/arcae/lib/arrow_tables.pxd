@@ -59,6 +59,7 @@ cdef extern from "arcae/partition_sort.h" namespace "arcae" nogil:
             const shared_ptr[CArray] & time,
             const shared_ptr[CArray] & ant1,
             const shared_ptr[CArray] & ant2,
+            const shared_ptr[CArray] & interval,
             const shared_ptr[CArray] & rows)
 
         size_t nGroups" PartitionSortData::nGroups"()

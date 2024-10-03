@@ -25,12 +25,14 @@ struct PartitionSortData {
   std::shared_ptr<arrow::DoubleArray> time_;
   std::shared_ptr<arrow::Int32Array> ant1_;
   std::shared_ptr<arrow::Int32Array> ant2_;
+  std::shared_ptr<arrow::DoubleArray> interval_;
   std::shared_ptr<arrow::Int64Array> rows_;
 
   inline std::int32_t group(std::size_t group, std::size_t row) const {
     return groups_[group]->raw_values()[row];
   }
   inline double time(std::size_t row) const { return time_->raw_values()[row]; }
+  inline double interval(std::size_t row) const { return interval_->raw_values()[row]; }
   inline std::int32_t ant1(std::size_t row) const { return ant1_->raw_values()[row]; }
   inline std::int32_t ant2(std::size_t row) const { return ant2_->raw_values()[row]; }
   inline std::int64_t rows(std::size_t row) const { return rows_->raw_values()[row]; }
@@ -41,6 +43,7 @@ struct PartitionSortData {
       const std::shared_ptr<arrow::Array>& time,
       const std::shared_ptr<arrow::Array>& ant1,
       const std::shared_ptr<arrow::Array>& ant2,
+      const std::shared_ptr<arrow::Array>& interval,
       const std::shared_ptr<arrow::Array>& rows);
 
   // Convert to an Arrow Table

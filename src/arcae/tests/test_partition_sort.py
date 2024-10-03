@@ -10,7 +10,6 @@ SORT_KEYS = [
     ("TIME", "ascending"),
     ("ANTENNA1", "ascending"),
     ("ANTENNA2", "ascending"),
-    ("ROW", "ascending"),
 ]
 
 
@@ -22,6 +21,7 @@ def test_sorting():
             "TIME": pa.array([3, 2, 1, 0], pa.float64()),
             "ANTENNA1": pa.array([0, 0, 0, 0], pa.int32()),
             "ANTENNA2": pa.array([1, 1, 1, 1], pa.int32()),
+            "INTERVAL": pa.array([1, 1, 1, 1], pa.float64()),
             "ROW": pa.array([0, 1, 2, 3], pa.int64()),
         }
     )
@@ -34,6 +34,7 @@ def test_sorting():
         data["TIME"].combine_chunks(),
         data["ANTENNA1"].combine_chunks(),
         data["ANTENNA2"].combine_chunks(),
+        data["INTERVAL"].combine_chunks(),
         data["ROW"].combine_chunks(),
     )
 
@@ -47,6 +48,7 @@ def test_merging(n, chunks, seed):
     group_0 = rng.integers(0, 10, n)
     group_1 = rng.integers(0, 10, n)
     time = rng.random(n)
+    interval = rng.random(n)
     ant1 = rng.integers(0, 10, n)
     ant2 = rng.integers(0, 10, n)
     row = rng.integers(0, 10, n)
@@ -58,6 +60,7 @@ def test_merging(n, chunks, seed):
             "TIME": pa.array(time, pa.float64()),
             "ANTENNA1": pa.array(ant1, pa.int32()),
             "ANTENNA2": pa.array(ant2, pa.int32()),
+            "INTERVAL": pa.array(interval, pa.float64()),
             "ROW": pa.array(row, pa.int64()),
         }
     )
@@ -75,6 +78,7 @@ def test_merging(n, chunks, seed):
             batch["TIME"].combine_chunks(),
             batch["ANTENNA1"].combine_chunks(),
             batch["ANTENNA2"].combine_chunks(),
+            batch["INTERVAL"].combine_chunks(),
             batch["ROW"].combine_chunks(),
         )
 

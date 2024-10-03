@@ -444,6 +444,7 @@ cdef class PartitionSortData:
         time: pa.array,
         ant1: pa.array,
         ant2: pa.array,
+        interval: pa.array,
         rows: pa.array
     ):
         cdef:
@@ -451,6 +452,7 @@ cdef class PartitionSortData:
             shared_ptr[CArray] c_time = pyarrow_unwrap_array(time)
             shared_ptr[CArray] c_ant1 = pyarrow_unwrap_array(ant1)
             shared_ptr[CArray] c_ant2 = pyarrow_unwrap_array(ant2)
+            shared_ptr[CArray] c_interval = pyarrow_unwrap_array(interval)
             shared_ptr[CArray] c_rows = pyarrow_unwrap_array(rows)
 
         for g in groups:
@@ -458,7 +460,7 @@ cdef class PartitionSortData:
 
         with nogil:
             self.c_data = GetResultValue(
-                CPartitionSortData.Make(c_groups, c_time, c_ant1, c_ant2, c_rows)
+                CPartitionSortData.Make(c_groups, c_time, c_ant1, c_ant2, c_interval, c_rows)
             )
 
     def sort(self) -> PartitionSortData:
