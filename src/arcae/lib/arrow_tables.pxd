@@ -9,6 +9,8 @@ from libcpp.memory import shared_ptr
 from pyarrow.includes.common cimport *
 from pyarrow.includes.libarrow cimport *
 
+cimport numpy as cnp
+
 cdef extern from "<climits>" nogil:
     cdef unsigned int UINT_MAX
 
@@ -50,6 +52,7 @@ cdef extern from "arcae/configuration.h" namespace "arcae" nogil:
 cdef extern from "arcae/descriptor.h" namespace "arcae" nogil:
     cdef CResult[string] CMSDescriptor" arcae::MSDescriptor"(
         const string & table, bool complete)
+
 
 cdef extern from "arcae/new_table_proxy.h" namespace "arcae" nogil:
     cdef cppclass CCasaTable" arcae::NewTableProxy":
@@ -96,3 +99,8 @@ cdef extern from "arcae/table_factory.h" namespace "arcae" nogil:
     cdef CResult[shared_ptr[CCasaTable]] CTaql" arcae::Taql"(
             const string & taql,
             const vector[shared_ptr[CCasaTable]] & tables)
+
+cdef extern from "merge_sort.cc" namespace "arcae" nogil:
+    int PartitionMerge(
+        const vector[vector[cnp.PyArrayObject *]] & array_partitions,
+        vector[cnp.PyArrayObject*] * merged_arrays) except *

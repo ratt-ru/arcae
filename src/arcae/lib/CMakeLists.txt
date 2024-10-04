@@ -22,6 +22,7 @@ target_link_directories(arrow_tables PUBLIC ${PYARROW_LIBDIRS})
 target_include_directories(arrow_tables PUBLIC
                             PkgConfig::casacore
                             absl::span
+                            ${CMAKE_CURRENT_SOURCE_DIR}
                             ${PYARROW_INCLUDE}
                             ${NUMPY_INCLUDE}
                             ${CMAKE_SOURCE_DIR}/cpp)

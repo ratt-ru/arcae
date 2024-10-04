@@ -1,6 +1,7 @@
 # distutils: language = c++
 # cython: language_level = 3
 
+
 from collections.abc import MutableMapping, Sequence
 import cython
 import json
@@ -14,6 +15,8 @@ from libcpp.vector cimport vector
 
 import numpy as np
 import pyarrow as pa
+
+cimport numpy as cnp
 
 from pyarrow.includes.common cimport *
 from pyarrow.includes.libarrow cimport *
@@ -36,11 +39,15 @@ from arcae.lib.arrow_tables cimport (
     CSelection,
     CSelectionBuilder,
     CTaql,
+    PartitionMerge,
     IndexType)
 
 
 DimIndex = Union[slice, list, np.ndarray]
 FullIndex = Union[list[DimIndex], tuple[DimIndex]]
+
+
+cnp.import_array()
 
 
 def ms_descriptor(table: str, complete: bool = False) -> Dict:
@@ -431,3 +438,23 @@ class Configuration(MutableMapping):
             config: cython.pointer(CConfiguration) = &CServiceLocator.configuration()
 
         return config.Size()
+
+
+def merge_np_partitions(
+    partitions: List[Dict[str, np.ndarray]]
+) -> Dict[str, np.ndarray]:
+    cdef vector[vector[cnp.PyArrayObject*]] partition_arrays
+    cdef vector[cnp.PyArrayObject*] arrays
+
+    if len(partitions) == 0:
+        return {}
+
+    for partition in partitions:
+        for _, array in partition.items():
+            arrays.push_back(<cnp.PyArrayObject*> array)
+        partition_arrays.push_back(move(arrays))
+
+    # Rely on the C++ implementation to drop the GIL
+    PartitionMerge(partition_arrays, &arrays)
+    values = [<cnp.ndarray> array for array in arrays]
+    return dict(zip(partitions[0].keys(), values))
