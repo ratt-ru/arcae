@@ -2,7 +2,7 @@
 History
 =======
 
-X.Y.Z (YYYY-MM-DD)
+0.2.5 (04-10-2024)
 ------------------
 * Support C++ merging of sorted NumPy partitions (:pr:`127`)
 * Deprecate Python 3.9 support (:pr:`125`)
@@ -11,7 +11,7 @@ X.Y.Z (YYYY-MM-DD)
 * Add pre-commit hooks, install formatters and linters (:pr:`121`)
 * Support adding columns (:pr:`120`)
 
-0.2.4 (2024-09-05)
+0.2.4 (05-09-2024)
 ------------------
 * Disable OpenBLAS threading (:pr:`117`)
 * Move Cython source to lib directory (:pr:`116`)
@@ -37,7 +37,7 @@ X.Y.Z (YYYY-MM-DD)
 * Upgrade to pyarrow 16.0.0 (:pr:`92`)
 * Handle slice(None) in getcol index (:pr:`91`)
 
-0.2.3 (2024-18-04)
+0.2.3 (04-08-2024)
 ------------------
 * Remove unused utility code (:pr:`90`)
 * Upgrade to pyarrow 15.0.2 (:pr:`89`)
@@ -54,7 +54,7 @@ X.Y.Z (YYYY-MM-DD)
 * Make export application dependencies optional (:pr:`80`)
 * Fix ENV access within cmake files (:pr:`79`)
 
-0.2.2 (2023-11-10)
+0.2.2 (10-11-2023)
 ------------------
 * Upgrade to pyarrow 14.0.1 (:pr:`77`)
 * Remove WITH_SOABI workaround (:pr:`75`)
@@ -64,12 +64,12 @@ X.Y.Z (YYYY-MM-DD)
   unconstrained columns (ndim==-1) whose rows have the same rank (:pr:`74`)
 * Guard against python-casacore imports (:pr:`73`)
 
-0.2.1 (2023-10-24)
+0.2.1 (24-10-2023)
 ------------------
 * Table Query Language Support (:pr:`71`)
 * Set skip-existing=true when uploading distributables to TestPyPI (:pr:`68`)
 
-0.2.0 (2023-10-19)
+0.2.0 (19-10-2023)
 ------------------
 * Support multiple table objects reading from the same underlying table in multiple threads (:pr:`67`)
 * Don't hold the GIL when calling GetResultValue (:pr:`66`)
@@ -90,6 +90,6 @@ X.Y.Z (YYYY-MM-DD)
 * Convert SAFE_TABLE_FUNCTOR from macro to template function (:pr:`45`)
 * Fix `export CIBW_TEST_SKIP` (:pr:`42`)
 
-0.1.0 (2023-06-30)
+0.1.0 (30-06-2023)
 ------------------
 * First release
