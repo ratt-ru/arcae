@@ -67,8 +67,15 @@ struct IndexResult {
 IndexResult MakeSortedIndices(const IndexSpan& ids) {
   std::vector<IndexType> mem(ids.size(), 0);
   std::iota(mem.begin(), mem.end(), 0);
-  std::sort(mem.begin(), mem.end(), [&ids](auto l, auto r) { return ids[l] < ids[r]; });
 
+  // Avoid O(N log N) sort with O(n) check
+  if (std::is_sorted(std::begin(ids), std::end(ids))) {
+    Index disk(ids.size(), 0);
+    std::copy(std::begin(ids), std::end(ids), std::begin(disk));
+    return IndexResult{std::move(disk), std::move(mem)};
+  }
+
+  std::sort(mem.begin(), mem.end(), [&ids](auto l, auto r) { return ids[l] < ids[r]; });
   Index disk(ids.size(), 0);
   for (std::size_t i = 0; i < ids.size(); ++i) disk[i] = ids[mem[i]];
   return IndexResult{std::move(disk), std::move(mem)};
