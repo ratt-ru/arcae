@@ -2,6 +2,10 @@
 History
 =======
 
+X.Y.Z (DD-MM-YYYY)
+------------------
+* Avoid sorting sorted indices (:pr:`129`)
+
 0.2.5 (04-10-2024)
 ------------------
 * Support C++ merging of sorted NumPy partitions (:pr:`127`)
