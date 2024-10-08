@@ -4,7 +4,7 @@ History
 
 X.Y.Z (DD-MM-YYYY)
 ------------------
-* Avoid sorting sorted indices (:pr:`129`)
+* Avoid sorting sorted indices (:pr:`129`, :pr:`130`)
 
 0.2.5 (04-10-2024)
 ------------------
