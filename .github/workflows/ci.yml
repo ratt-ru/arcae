@@ -20,12 +20,12 @@ env:
     source "${HOME}/conda/etc/profile.d/conda.sh"
     source "${HOME}/conda/etc/profile.d/mamba.sh"
     conda activate
-    micromamba create -n arcae-build -c conda-forge compilers llvm-openmp python
+    mamba create -n arcae-build -c conda-forge compilers llvm-openmp python
   CIBW_BEFORE_BUILD_MACOS: |
     source "${HOME}/conda/etc/profile.d/conda.sh"
     source "${HOME}/conda/etc/profile.d/mamba.sh"
     conda activate
-    micromamba activate arcae-build
+    mamba activate arcae-build
   CIBW_MANYLINUX_X86_64_IMAGE: quay.io/pypa/manylinux_2_28_x86_64
   CIBW_TEST_EXTRAS_LINUX: applications,test
   CIBW_TEST_COMMAND_LINUX: py.test -s -vvv --pyargs arcae
