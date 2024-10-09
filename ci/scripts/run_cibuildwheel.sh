@@ -23,8 +23,14 @@ if [[ $(uname) == "Darwin" ]]; then
   # export CXXFLAGS="$CXXFLAGS -I$PREFIX/include"
   # export LDFLAGS="$LDFLAGS -Wl,-rpath,$PREFIX/lib -L$PREFIX/lib -lomp"
 
-  conda create -n arcae-build llvm-openmp compilers python
-  conda init
+
+  curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh"
+
+  # Install miniforge
+  MINIFORGE_PATH=$HOME/miniforge
+  bash Miniforge3-$(uname)-$(uname -m).sh -b -p $MINIFORGE_PATH
+  source "${MINIFORGE_PATH}/etc/profile.d/conda.sh"
+  conda create -n arcae-build -c conda-forge compilers llvm-openmp python
   conda activate arcae-build
 fi
 

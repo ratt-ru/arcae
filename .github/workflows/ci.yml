@@ -149,18 +149,6 @@ jobs:
             LD_LIBRARY_PATH=${{ env.VCPKG_INSTALLED_DIR }}/${{ matrix.triplet }}/lib
         run: echo "CIBW_ENVIRONMENT_COMMON=$COMMON_ENV" >> $GITHUB_ENV
 
-      - name: Install conda for macos
-        if: ${{ matrix.os_short == 'macos' }}
-        run: |
-          set -ex
-          curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh"
-
-          # Install miniforge
-          MINIFORGE_PATH=$HOME/miniforge
-          bash Miniforge3-$(uname)-$(uname -m).sh -b -p $MINIFORGE_PATH
-          echo "$MINIFORGE_PATH/bin" >> $GITHUB_PATH
-          echo "CONDA_HOME=$MINIFORGE_PATH" >> $GITHUB_ENV
-
       - name: Run cibuildwheel
         env:
           CIBW_BUILD: ${{ matrix.cpython }}-${{ matrix.extra_build }}
