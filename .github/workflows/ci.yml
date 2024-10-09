@@ -15,7 +15,6 @@ env:
   CIBW_BEFORE_ALL_LINUX: yum install -y zip flex bison gcc-gfortran
   # Install conda-forge compilers and llvm-openmp
   CIBW_BEFORE_ALL_MACOS: |
-    xcode-select --install
     curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh"
     bash Miniforge3-$(uname)-$(uname -m).sh
     mambda create -n arcae-build -c conda-forge compilers llvm-openmp python
