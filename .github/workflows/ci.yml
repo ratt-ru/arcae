@@ -22,7 +22,6 @@ env:
     source "${HOME}/conda/etc/profile.d/conda.sh"
     conda create -n arcae-build -c conda-forge compilers llvm-openmp python
     conda activate arcae-build
-    echo "MACOSX_DEPLOYMENT_TARGET=$MACOSX_DEPLOYMENT_TARGET"
   CIBW_MANYLINUX_X86_64_IMAGE: quay.io/pypa/manylinux_2_28_x86_64
   CIBW_TEST_EXTRAS_LINUX: applications,test
   CIBW_TEST_COMMAND_LINUX: py.test -s -vvv --pyargs arcae
@@ -175,9 +174,7 @@ jobs:
           CIBW_BUILD: ${{ matrix.cpython }}-${{ matrix.extra_build }}*
           CIBW_ARCHS: ${{ matrix.arch }}
           CIBW_ENVIRONMENT_LINUX: ${{ env.CIBW_ENVIRONMENT_COMMON }}
-          CIBW_ENVIRONMENT_MACOS: >
-            ${{ env.CIBW_ENVIRONMENT_COMMON }}
-            MACOSX_DEPLOYMENT_TARGET=12.0
+          CIBW_ENVIRONMENT_MACOS: ${{ env.CIBW_ENVIRONMENT_COMMON }}
           CIBW_REPAIR_WHEEL_COMMAND_LINUX: >
             auditwheel repair
             -w {dest_dir} {wheel}
