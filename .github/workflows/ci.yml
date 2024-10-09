@@ -17,21 +17,11 @@ env:
   CIBW_BEFORE_ALL_MACOS: |
     curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh"
     bash Miniforge3-$(uname)-$(uname -m).sh -b -p "$HOME/conda"
-    source "${HOME}/conda/etc/profile.d/conda.sh"
     source "${HOME}/conda/etc/profile.d/mamba.sh"
-    conda activate
     mamba create -n arcae-build -c conda-forge compilers llvm-openmp python
   CIBW_BEFORE_BUILD_MACOS: |
-    source "${HOME}/conda/etc/profile.d/conda.sh"
     source "${HOME}/conda/etc/profile.d/mamba.sh"
-    conda activate
     mamba activate arcae-build
-  CIBW_BEFORE_TEST_MACOS: |
-    mamba init --reverse
-    CONDA_BASE_ENVIRONMENT=$(mamba info --base)
-    rm -rf ${CONDA_BASE_ENVIRONMENT}
-    rm -f "${HOME}/.condarc"
-    rm -fr ${HOME}/.conda
   CIBW_MANYLINUX_X86_64_IMAGE: quay.io/pypa/manylinux_2_28_x86_64
   CIBW_TEST_EXTRAS_LINUX: applications,test
   CIBW_TEST_COMMAND_LINUX: py.test -s -vvv --pyargs arcae
