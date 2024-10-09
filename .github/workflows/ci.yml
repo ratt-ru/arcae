@@ -16,7 +16,7 @@ env:
   # Install conda-forge compilers and llvm-openmp
   CIBW_BEFORE_ALL_MACOS: |
     curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh"
-    bash Miniforge3-$(uname)-$(uname -m).sh
+    bash Miniforge3-$(uname)-$(uname -m).sh -b
     mambda create -n arcae-build -c conda-forge compilers llvm-openmp python
   CIBW_BEFORE_BUILD_MACOS: |
     mamba activate arcae-build
