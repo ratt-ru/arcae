@@ -5,7 +5,6 @@ set -x
 
 # OpenMP is not present on macOS by default
 if [[ $(uname) == "Darwin" ]]; then
-  export MACOSX_DEPLOYMENT_TARGET=12.0
   # if [[ "$CIBW_BUILD" == *-macosx_arm64 ]]; then
   #   OPENMP_URL="https://anaconda.org/conda-forge/llvm-openmp/11.1.0/download/osx-arm64/llvm-openmp-11.1.0-hf3c4609_1.tar.bz2"
   # else
@@ -22,6 +21,12 @@ if [[ $(uname) == "Darwin" ]]; then
   # export CFLAGS="$CFLAGS -I$PREFIX/include"
   # export CXXFLAGS="$CXXFLAGS -I$PREFIX/include"
   # export LDFLAGS="$LDFLAGS -Wl,-rpath,$PREFIX/lib -L$PREFIX/lib -lomp"
+
+  if [[ "$CIBW_BUILD" == *-macosx_arm64 ]]; then
+    export MACOSX_DEPLOYMENT_TARGET=14.0
+  else
+    export MACOSX_DEPLOYMENT_TARGET=12.0
+  fi
 
 
   curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh"
