@@ -167,6 +167,7 @@ jobs:
           CIBW_BUILD_FRONTEND: build
           CIBW_ARCHS: ${{ matrix.arch }}
           CIBW_BEFORE_ALL_LINUX: yum install -y zip flex bison gcc-gfortran
+          CIBW_BEFORE_ALL_MACOS: brew unlink gcc
           CIBW_ENVIRONMENT: ${{ env.CIBW_ENVIRONMENT_COMMON }}
           CIBW_MANYLINUX_X86_64_IMAGE: quay.io/pypa/manylinux_2_28_x86_64
           CIBW_TEST_EXTRAS_LINUX: applications,test
