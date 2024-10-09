@@ -193,7 +193,9 @@ jobs:
               -w {dest_dir} \
               -v {wheel} \
               --exclude libarrow_python.dylib \
-              --exclude libarrow.1601.dylib
+              --exclude libarrow.1601.dylib \
+              --ignore-missing-dependencies
+
       - name: Upload wheel artifacts
         uses: actions/upload-artifact@v4
         with:
