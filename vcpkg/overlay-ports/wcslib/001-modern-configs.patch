@@ -1,17 +1,17 @@
-diff -ur wcslib-8-c6c19faa88.clean/config/config.guess wcslib-8-c6c19faa88.clean.copy/config/config.guess
---- wcslib-8-c6c19faa88.clean/config/config.guess	2018-07-28 14:36:02.000000000 +0200
-+++ wcslib-8-c6c19faa88.clean.copy/config/config.guess	2024-10-09 19:34:47.741584690 +0200
+diff --git a/config/config.guess b/config/config.guess
+--- a/config/config.guess	2018-07-28 14:36:02.000000000 +0200
++++ b/config/config.guess	2024-10-09 19:34:47.741584690 +0200
 @@ -1,12 +1,14 @@
  #! /bin/sh
  # Attempt to guess a canonical system name.
 -#   Copyright 1992-2018 Free Software Foundation, Inc.
 +#   Copyright 1992-2024 Free Software Foundation, Inc.
- 
+
 -timestamp='2018-07-18'
 +# shellcheck disable=SC2006,SC2268 # see below for rationale
 +
 +timestamp='2024-07-27'
- 
+
  # This file is free software; you can redistribute it and/or modify it
  # under the terms of the GNU General Public License as published by
 -# the Free Software Foundation; either version 3 of the License, or
@@ -27,8 +27,8 @@ diff -ur wcslib-8-c6c19faa88.clean/config/config.guess wcslib-8-c6c19faa88.clean
 +# https://git.savannah.gnu.org/cgit/config.git/plain/config.guess
  #
  # Please send patches to <config-patches@gnu.org>.
- 
- 
+
+
 +# The "shellcheck disable" line above the timestamp inhibits complaints
 +# about features and limitations of the classic Bourne shell that were
 +# superseded or lifted in POSIX.  However, this script identifies a wide
@@ -38,35 +38,35 @@ diff -ur wcslib-8-c6c19faa88.clean/config/config.guess wcslib-8-c6c19faa88.clean
 +
 +
  me=`echo "$0" | sed -e 's,.*/,,'`
- 
+
  usage="\
  Usage: $0 [OPTION]
- 
+
 -Output the configuration name of the system \`$me' is run on.
 +Output the configuration name of the system '$me' is run on.
- 
+
  Options:
    -h, --help         print this help, then exit
 @@ -50,13 +60,13 @@
  GNU config.guess ($timestamp)
- 
+
  Originally written by Per Bothner.
 -Copyright 1992-2018 Free Software Foundation, Inc.
 +Copyright 1992-2024 Free Software Foundation, Inc.
- 
+
  This is free software; see the source for copying conditions.  There is NO
  warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE."
- 
+
  help="
 -Try \`$me --help' for more information."
 +Try '$me --help' for more information."
- 
+
  # Parse command line
  while test $# -gt 0 ; do
 @@ -84,24 +94,28 @@
    exit 1
  fi
- 
+
 +# Just in case it came from the environment.
 +GUESS=
 +
@@ -74,20 +74,20 @@ diff -ur wcslib-8-c6c19faa88.clean/config/config.guess wcslib-8-c6c19faa88.clean
  # compiler to aid in system detection is discouraged as it requires
  # temporary files to be created and, as you can see below, it is a
  # headache to deal with in a portable fashion.
- 
+
 -# Historically, `CC_FOR_BUILD' used to be named `HOST_CC'. We still
 -# use `HOST_CC' if defined, but it is deprecated.
 +# Historically, 'CC_FOR_BUILD' used to be named 'HOST_CC'. We still
 +# use 'HOST_CC' if defined, but it is deprecated.
- 
+
  # Portable tmp directory creation inspired by the Autoconf team.
- 
+
  tmp=
  # shellcheck disable=SC2172
 -trap 'test -z "$tmp" || rm -fr "$tmp"' 1 2 13 15
 -trap 'exitcode=$?; test -z "$tmp" || rm -fr "$tmp"; exit $exitcode' 0
 +trap 'test -z "$tmp" || rm -fr "$tmp"' 0 1 2 13 15
- 
+
  set_cc_for_build() {
 +    # prevent multiple calls if $tmp is already set
 +    test "$tmp" && return 0
@@ -110,20 +110,20 @@ diff -ur wcslib-8-c6c19faa88.clean/config/config.guess wcslib-8-c6c19faa88.clean
  		   fi
  	       done
 @@ -126,46 +140,63 @@
- 
+
  # This is needed to find uname on a Pyramid OSx when run in the BSD universe.
  # (ghazi@noc.rutgers.edu 1994-08-24)
 -if (test -f /.attbin/uname) >/dev/null 2>&1 ; then
 +if test -f /.attbin/uname ; then
  	PATH=$PATH:/.attbin ; export PATH
  fi
- 
+
  UNAME_MACHINE=`(uname -m) 2>/dev/null` || UNAME_MACHINE=unknown
  UNAME_RELEASE=`(uname -r) 2>/dev/null` || UNAME_RELEASE=unknown
 -UNAME_SYSTEM=`(uname -s) 2>/dev/null`  || UNAME_SYSTEM=unknown
 +UNAME_SYSTEM=`(uname -s) 2>/dev/null` || UNAME_SYSTEM=unknown
  UNAME_VERSION=`(uname -v) 2>/dev/null` || UNAME_VERSION=unknown
- 
+
 -case "$UNAME_SYSTEM" in
 +case $UNAME_SYSTEM in
  Linux|GNU|GNU/*)
@@ -131,7 +131,7 @@ diff -ur wcslib-8-c6c19faa88.clean/config/config.guess wcslib-8-c6c19faa88.clean
 -	# We could probably try harder.
 -	LIBC=gnu
 +	LIBC=unknown
- 
+
  	set_cc_for_build
  	cat <<-EOF > "$dummy.c"
 +	#if defined(__ANDROID__)
@@ -159,7 +159,7 @@ diff -ur wcslib-8-c6c19faa88.clean/config/config.guess wcslib-8-c6c19faa88.clean
 -	eval "`$CC_FOR_BUILD -E "$dummy.c" 2>/dev/null | grep '^LIBC' | sed 's, ,,g'`"
 +	cc_set_libc=`$CC_FOR_BUILD -E "$dummy.c" 2>/dev/null | grep '^LIBC' | sed 's, ,,g'`
 +	eval "$cc_set_libc"
- 
+
 -	# If ldd exists, use it to detect musl libc.
 -	if command -v ldd >/dev/null && \
 -		ldd --version 2>&1 | grep -q ^musl
@@ -179,9 +179,9 @@ diff -ur wcslib-8-c6c19faa88.clean/config/config.guess wcslib-8-c6c19faa88.clean
  	fi
  	;;
  esac
- 
+
  # Note: order is significant - the case branches are not exclusive.
- 
+
 -case "$UNAME_MACHINE:$UNAME_SYSTEM:$UNAME_RELEASE:$UNAME_VERSION" in
 +case $UNAME_MACHINE:$UNAME_SYSTEM:$UNAME_RELEASE:$UNAME_VERSION in
      *:NetBSD:*:*)
@@ -705,7 +705,7 @@ diff -ur wcslib-8-c6c19faa88.clean/config/config.guess wcslib-8-c6c19faa88.clean
  		set_cc_for_build
  		sed 's/^		//' << EOF > "$dummy.c"
  		#include <sys/systemcfg.h>
- 
+
 -		main()
 +		int
 +		main ()
@@ -815,11 +815,11 @@ diff -ur wcslib-8-c6c19faa88.clean/config/config.guess wcslib-8-c6c19faa88.clean
 +		if test "$HP_ARCH" = ""; then
  		    set_cc_for_build
  		    sed 's/^		//' << EOF > "$dummy.c"
- 
+
 @@ -665,7 +719,8 @@
  		#include <stdlib.h>
  		#include <unistd.h>
- 
+
 -		int main ()
 +		int
 +		main ()
@@ -834,7 +834,7 @@ diff -ur wcslib-8-c6c19faa88.clean/config/config.guess wcslib-8-c6c19faa88.clean
 +	if test "$HP_ARCH" = hppa2.0w
  	then
  	    set_cc_for_build
- 
+
 @@ -717,12 +772,12 @@
  		HP_ARCH=hppa64
  	    fi
@@ -1994,7 +1994,7 @@ diff -ur wcslib-8-c6c19faa88.clean/config/config.guess wcslib-8-c6c19faa88.clean
 +	GUESS=$UNAME_MACHINE-unknown-ironclad
 +	;;
  esac
- 
+
 +# Do we have a guess based on uname results?
 +if test "x$GUESS" != x; then
 +    echo "$GUESS"
@@ -2140,7 +2140,7 @@ diff -ur wcslib-8-c6c19faa88.clean/config/config.guess wcslib-8-c6c19faa88.clean
 +test -d /usr/apollo && { echo "$ISP-apollo-$SYSTYPE"; exit; }
 +
  echo "$0: unable to guess system type" >&2
- 
+
 -case "$UNAME_MACHINE:$UNAME_SYSTEM" in
 +case $UNAME_MACHINE:$UNAME_SYSTEM in
      mips:Linux | mips64:Linux)
@@ -2149,7 +2149,7 @@ diff -ur wcslib-8-c6c19faa88.clean/config/config.guess wcslib-8-c6c19faa88.clean
 @@ -1445,9 +1765,17 @@
  operating system you are using. If your script is old, overwrite *all*
  copies of config.guess and config.sub with the latest versions from:
- 
+
 -  https://git.savannah.gnu.org/gitweb/?p=config.git;a=blob_plain;f=config.guess
 +  https://git.savannah.gnu.org/cgit/config.git/plain/config.guess
  and
@@ -2163,7 +2163,7 @@ diff -ur wcslib-8-c6c19faa88.clean/config/config.guess wcslib-8-c6c19faa88.clean
 +script_age=`expr "$thisyear" - "$our_year"`
 +if test "$script_age" -lt 3 ; then
 +   cat >&2 <<EOF
- 
+
  If $0 has already been updated, send the following data and any
  information you think might be pertinent to config-patches@gnu.org to
 @@ -1475,6 +1803,7 @@
@@ -2171,23 +2171,23 @@ diff -ur wcslib-8-c6c19faa88.clean/config/config.guess wcslib-8-c6c19faa88.clean
  UNAME_VERSION = "$UNAME_VERSION"
  EOF
 +fi
- 
+
  exit 1
- 
-diff -ur wcslib-8-c6c19faa88.clean/config/config.sub wcslib-8-c6c19faa88.clean.copy/config/config.sub
---- wcslib-8-c6c19faa88.clean/config/config.sub	2018-07-28 14:37:33.000000000 +0200
-+++ wcslib-8-c6c19faa88.clean.copy/config/config.sub	2024-10-09 19:34:58.024822695 +0200
+
+diff --git a/config/config.sub b/config/config.sub
+--- a/config/config.sub	2018-07-28 14:37:33.000000000 +0200
++++ b/config/config.sub	2024-10-09 19:34:58.024822695 +0200
 @@ -1,12 +1,14 @@
  #! /bin/sh
  # Configuration validation subroutine script.
 -#   Copyright 1992-2018 Free Software Foundation, Inc.
 +#   Copyright 1992-2024 Free Software Foundation, Inc.
- 
+
 -timestamp='2018-07-25'
 +# shellcheck disable=SC2006,SC2268,SC2162 # see below for rationale
 +
 +timestamp='2024-05-27'
- 
+
  # This file is free software; you can redistribute it and/or modify it
  # under the terms of the GNU General Public License as published by
 -# the Free Software Foundation; either version 3 of the License, or
@@ -2197,17 +2197,17 @@ diff -ur wcslib-8-c6c19faa88.clean/config/config.sub wcslib-8-c6c19faa88.clean.c
  # This program is distributed in the hope that it will be useful, but
 @@ -33,7 +35,7 @@
  # Otherwise, we print the canonical config type on stdout and succeed.
- 
+
  # You can get the latest version of this script from:
 -# https://git.savannah.gnu.org/gitweb/?p=config.git;a=blob_plain;f=config.sub
 +# https://git.savannah.gnu.org/cgit/config.git/plain/config.sub
- 
+
  # This file is supposed to be the same for all GNU packages
  # and recognize all the CPU types, system types and aliases
 @@ -50,6 +52,13 @@
  #	CPU_TYPE-MANUFACTURER-KERNEL-OPERATING_SYSTEM
  # It is wrong to echo any other type of specification.
- 
+
 +# The "shellcheck disable" line above the timestamp inhibits complaints
 +# about features and limitations of the classic Bourne shell that were
 +# superseded or lifted in POSIX.  However, this script identifies a wide
@@ -2216,22 +2216,22 @@ diff -ur wcslib-8-c6c19faa88.clean/config/config.sub wcslib-8-c6c19faa88.clean.c
 +# have a pre-POSIX /bin/sh.
 +
  me=`echo "$0" | sed -e 's,.*/,,'`
- 
+
  usage="\
 @@ -67,13 +76,13 @@
  version="\
  GNU config.sub ($timestamp)
- 
+
 -Copyright 1992-2018 Free Software Foundation, Inc.
 +Copyright 1992-2024 Free Software Foundation, Inc.
- 
+
  This is free software; see the source for copying conditions.  There is NO
  warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE."
- 
+
  help="
 -Try \`$me --help' for more information."
 +Try '$me --help' for more information."
- 
+
  # Parse command line
  while test $# -gt 0 ; do
 @@ -89,7 +98,7 @@
@@ -2241,11 +2241,11 @@ diff -ur wcslib-8-c6c19faa88.clean/config/config.sub wcslib-8-c6c19faa88.clean.c
 -       echo "$me: invalid option $1$help"
 +       echo "$me: invalid option $1$help" >&2
         exit 1 ;;
- 
+
      *local*)
 @@ -111,67 +120,157 @@
  esac
- 
+
  # Split fields of configuration type
 -IFS="-" read -r field1 field2 field3 field4 <<EOF
 +saved_IFS=$IFS
@@ -2253,7 +2253,7 @@ diff -ur wcslib-8-c6c19faa88.clean/config/config.sub wcslib-8-c6c19faa88.clean.c
  $1
  EOF
 +IFS=$saved_IFS
- 
+
  # Separate into logical components for further validation
  case $1 in
  	*-*-*-*-*)
@@ -2970,7 +2970,7 @@ diff -ur wcslib-8-c6c19faa88.clean/config/config.sub wcslib-8-c6c19faa88.clean.c
  		esac
  		;;
  esac
- 
+
 -# Decode aliases for certain CPU-COMPANY combinations.
 +# Decode 1-component or ad-hoc basic machines
  case $basic_machine in
@@ -3114,7 +3114,7 @@ diff -ur wcslib-8-c6c19faa88.clean/config/config.sub wcslib-8-c6c19faa88.clean.c
 +		cpu=powerpc
 +		vendor=apple
  		;;
- 
+
 -	# We use `pc' rather than `unknown'
 -	# because (1) that's what they normally are, and
 -	# (2) the word "unknown" tends to confuse beginning users.
@@ -4286,7 +4286,7 @@ diff -ur wcslib-8-c6c19faa88.clean/config/config.sub wcslib-8-c6c19faa88.clean.c
 +		esac
  		;;
  esac
- 
+
  # Here we canonicalize certain aliases for manufacturers.
 -case $basic_machine in
 -	*-digital*)
@@ -4303,9 +4303,9 @@ diff -ur wcslib-8-c6c19faa88.clean/config/config.sub wcslib-8-c6c19faa88.clean.c
  	*)
  		;;
 @@ -1284,8 +1491,53 @@
- 
+
  # Decode manufacturer-specific aliases for certain operating systems.
- 
+
 -if [ x$os != x ]
 +if test x"$basic_os" != x
  then
@@ -4587,12 +4587,12 @@ diff -ur wcslib-8-c6c19faa88.clean/config/config.sub wcslib-8-c6c19faa88.clean.c
  esac
 +
  else
- 
+
  # Here we handle the default operating systems that come with various machines.
 @@ -1539,42 +1744,54 @@
  # will signal an error saying that MANUFACTURER isn't an operating
  # system, and we'll never get to this point.
- 
+
 -case $basic_machine in
 +kernel=
 +obj=
@@ -4750,7 +4750,7 @@ diff -ur wcslib-8-c6c19faa88.clean/config/config.sub wcslib-8-c6c19faa88.clean.c
  esac
 +
  fi
- 
+
 +# Now, validate our (potentially fixed-up) individual pieces (OS, OBJ).
 +
 +case $os in
@@ -5173,9 +5173,9 @@ diff -ur wcslib-8-c6c19faa88.clean/config/config.sub wcslib-8-c6c19faa88.clean.c
 -		basic_machine=`echo "$basic_machine" | sed "s/unknown/$vendor/"`
  		;;
  esac
- 
+
 -echo "$basic_machine-$os"
 +echo "$cpu-$vendor${kernel:+-$kernel}${os:+-$os}${obj:+-$obj}"
  exit
- 
+
  # Local variables:
