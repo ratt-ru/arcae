@@ -13,14 +13,14 @@ on:
 env:
   CIBW_BUILD_FRONTEND: build
   CIBW_BEFORE_ALL_LINUX: yum install -y zip flex bison gcc-gfortran
-  # Need to reinstall gcc in order to get gfortran
+  # Install conda-forge compilers and llvm-openmp
   CIBW_BEFORE_ALL_MACOS: |
-    brew install python llvm
-    brew reinstall gcc
+    xcode-select --install
+    curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh"
+    bash Miniforge3-$(uname)-$(uname -m).sh
+    mambda create -n arcae-build -c conda-forge compilers llvm-openmp python
   CIBW_BEFORE_BUILD_MACOS: |
-    export PATH="/opt/homebrew/opt/llvm/bin:$PATH"
-    export LDFLAGS="-L/opt/homebrew/opt/llvm/lib"
-    export CPPFLAGS="-I/opt/homebrew/opt/llvm/include"
+    mamba activate arcae-build
   CIBW_MANYLINUX_X86_64_IMAGE: quay.io/pypa/manylinux_2_28_x86_64
   CIBW_TEST_EXTRAS_LINUX: applications,test
   CIBW_TEST_COMMAND_LINUX: py.test -s -vvv --pyargs arcae
