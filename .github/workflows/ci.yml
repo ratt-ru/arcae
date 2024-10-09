@@ -22,6 +22,7 @@ env:
     source "${HOME}/conda/etc/profile.d/conda.sh"
     conda create -n arcae-build -c conda-forge compilers llvm-openmp python
     conda activate arcae-build
+    echo "MACOSX_DEPLOYMENT_TARGET=$MACOSX_DEPLOYMENT_TARGET"
   CIBW_MANYLINUX_X86_64_IMAGE: quay.io/pypa/manylinux_2_28_x86_64
   CIBW_TEST_EXTRAS_LINUX: applications,test
   CIBW_TEST_COMMAND_LINUX: py.test -s -vvv --pyargs arcae
