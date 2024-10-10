@@ -2,7 +2,7 @@
 History
 =======
 
-X.Y.Z (DD-MM-YYYY)
+0.2.6 (10-09-2024)
 ------------------
 * Disable tmate in continuous integration (:pr:`135`)
 * Update to latest cibuildwheel (:pr:`131`, :pr:`133`)
