@@ -173,8 +173,7 @@ jobs:
               -w {dest_dir} \
               -v {wheel} \
               --exclude libarrow_python.dylib \
-              --exclude libarrow.1601.dylib \
-              --ignore-missing-dependencies
+              --exclude libarrow.1601.dylib
         run: bash ci/scripts/run_cibuildwheel.sh
 
       - name: Upload wheel artifacts
