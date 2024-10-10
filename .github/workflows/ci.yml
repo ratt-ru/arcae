@@ -183,9 +183,9 @@ jobs:
           name: ${{ env.ARTIFACT_NAME }}-${{ matrix.os_short }}-${{ matrix.cpython }}-${{ matrix.arch }}
           path: ./wheelhouse/*.whl
 
-      - name: Debug with tmate on failure
-        if: ${{ failure() }}
-        uses: mxschmitt/action-tmate@v3
+      # - name: Debug with tmate on failure
+      #   if: ${{ failure() }}
+      #   uses: mxschmitt/action-tmate@v3
 
   upload-to-test-pypi:
     name: Upload release to Test PyPI
