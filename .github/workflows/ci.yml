@@ -105,6 +105,8 @@ jobs:
           - is_main_or_release: false
             cpython: cp310
           - is_main_or_release: false
+            cpython: cp311
+          - is_main_or_release: false
             cpython: cp312
         include:
           - os: ubuntu-22.04
