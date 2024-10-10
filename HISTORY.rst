@@ -4,7 +4,8 @@ History
 
 X.Y.Z (DD-MM-YYYY)
 ------------------
-* Use conda forge compilers on MACOSX and update MACOX_DEPLOYMENT_TARGET=12.0 (:pr:`131`)
+* Update to latest cibuildwheel (:pr:`131`, :pr:`133`)
+* Use conda forge compilers on MACOSX and update MACOX_DEPLOYMENT_TARGET=12.0 (:pr:`131`, :pr:`133`)
 * Avoid sorting sorted indices (:pr:`129`, :pr:`130`)
 
 0.2.5 (04-10-2024)
