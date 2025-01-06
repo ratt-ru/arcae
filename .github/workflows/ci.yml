@@ -174,7 +174,7 @@ jobs:
               -v {wheel} \
               --exclude libarrow_python.dylib \
               --exclude libarrow.1601.dylib \
-              --exclude libc++.1.dylib \
+              --exclude libc++.1.0.dylib \
               --ignore-missing-dependencies
         run: bash ci/scripts/run_cibuildwheel.sh
 
