@@ -145,6 +145,19 @@ index f9447d9c6..80a17be99 100644
  RUNTIME DESTINATION bin
  LIBRARY DESTINATION lib${LIB_SUFFIX}
  ARCHIVE DESTINATION lib${LIB_SUFFIX}
+diff --git a/casa/Exceptions/Error.h b/casa/Exceptions/Error.h
+index 12229f902..a15e5080b 100644
+--- a/casa/Exceptions/Error.h
++++ b/casa/Exceptions/Error.h
+@@ -91,7 +91,7 @@ namespace casacore { //# NAMESPACE CASACORE - BEGIN
+ #define ThrowIfError(c,m) {if (AIPS_UNLIKELY(c)) {casacore::AipsError::throwIfError (casacore::True, (m), __FILE__, __LINE__, __PRETTY_FUNCTION__);}}
+ 
+ // Repackage and rethrow an AipsError exception.
+-#define Rethrow(e,m) {throw casacore::AipsError::repackageAipsError ((e),(m),__FILE__,__LINE__, __PRETTY_FUNCTION__);}
++// #define Rethrow(e,m) {throw casacore::AipsError::repackageAipsError ((e),(m),__FILE__,__LINE__, __PRETTY_FUNCTION__);}
+ 
+ 
+ // <summary>Base class for all Casacore library errors</summary>
 diff --git a/casa/Json/JsonOut.h b/casa/Json/JsonOut.h
 index b5229c57d..66596d273 100644
 --- a/casa/Json/JsonOut.h
