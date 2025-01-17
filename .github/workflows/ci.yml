@@ -162,10 +162,8 @@ jobs:
             export PATH="/opt/homebrew/opt/llvm/bin:$PATH"
             export LDFLAGS="-L/opt/homebrew/opt/llvm/lib"
             export CPPFLAGS="-I/opt/homebrew/opt/llvm/include"
-            SDK_PATH=$(xcrun --sdk macosx --show-sdk-path)
-            echo "SDK Path $SDK_PATH"
-            export MACOSX_DEPLOYMENT_TARGET=$(basename "$SDK_PATH")
-            echo "Deployment Target $MACOSX_DEPLOYMENT_TARGET"
+            export MACOSX_DEPLOYMENT_TARGET=$(xcrun --sdk macosx --show-sdk-version)
+            echo "MACOSX_DEPLOYMENT_TARGET=$MACOSX_DEPLOYMENT_TARGET"
           CIBW_ENVIRONMENT: ${{ env.CIBW_ENVIRONMENT_COMMON }}
           CIBW_MANYLINUX_X86_64_IMAGE: quay.io/pypa/manylinux_2_28_x86_64
           CIBW_TEST_EXTRAS_LINUX: applications,test
