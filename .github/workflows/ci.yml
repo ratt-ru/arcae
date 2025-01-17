@@ -120,11 +120,13 @@ jobs:
           - os: macos-13
             os_short: macos
             arch: "x86_64"
+            deployment_target: "13.0"
             triplet: "x64-osx-dynamic-cxx17-abi1-rel"
             extra_build: "macosx_x86_64"
           - os: macos-14
             os_short: macos
             arch: "arm64"
+            deployment_target: "14.0"
             triplet: "arm64-osx-dynamic-cxx17-abi1-rel"
             extra_build: "macosx_arm64"
     steps:
@@ -145,11 +147,8 @@ jobs:
       - name: Set MACOSX_DEPLOYMENT_TARGET
         if: ${{ matrix.os_short == 'macos'}}
         run: |
-          SDK_VERSION=$(xcrun --sdk macosx --show-sdk-version 2>/dev/null)
-          MAJOR_VERSION=$(echo $SDK_VERSION | cut -d '.' -f 1)
-          MACOSX_DEPLOYMENT_TARGET="${MAJOR_VERSION}.0"
-          echo "MACOS_DEPLOYMENT_TARGET=$MACOSX_DEPLOYMENT_TARGET"
-          echo "MACOSX_DEPLOYMENT_TARGET=$MACOSX_DEPLOYMENT_TARGET" >> $GITHUB_ENV
+          echo "MACOSX_DEPLOYMENT_TARGET=${{ matrix.deployment_target }}"
+          echo "MACOSX_DEPLOYMENT_TARGET=${{ matrix.deployment_target }}" >> $GITHUB_ENV
 
       - name: Set Common Build Environment Variable
         env:
