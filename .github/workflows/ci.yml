@@ -169,6 +169,7 @@ jobs:
             export CPPFLAGS="-I/opt/homebrew/opt/llvm/include"
             export MACOSX_DEPLOYMENT_TARGET=$(xcrun --sdk macosx --show-sdk-version)
             echo "MACOSX_DEPLOYMENT_TARGET=$MACOSX_DEPLOYMENT_TARGET"
+            export MACOSX_DEPLOYMENT_TARGET=12.0
           CIBW_ENVIRONMENT: ${{ env.CIBW_ENVIRONMENT_COMMON }}
           CIBW_MANYLINUX_X86_64_IMAGE: quay.io/pypa/manylinux_2_28_x86_64
           CIBW_MANYLINUX_AARCH64_IMAGE: quay.io/pypa/manylinux_2_28_aarch64
