@@ -151,6 +151,7 @@ jobs:
             ACTIONS_CACHE_URL=${{ env.ACTIONS_CACHE_URL }}
             ACTIONS_RUNTIME_TOKEN=${{ env.ACTIONS_RUNTIME_TOKEN }}
             VCPKG_BINARY_SOURCES="clear;x-gha,readwrite"
+            VCPKG_FORCE_SYSTEM_BINARIES=1
             VCPKG_TARGET_TRIPLET=${{ matrix.triplet }}
             VCPKG_INSTALLED_DIR=${{ env.VCPKG_INSTALLED_DIR }}
             LD_LIBRARY_PATH=${{ env.VCPKG_INSTALLED_DIR }}/${{ matrix.triplet }}/lib
