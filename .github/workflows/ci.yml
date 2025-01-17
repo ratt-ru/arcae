@@ -114,9 +114,9 @@ jobs:
             extra_build: "manylinux_x86_64"
           - os: ubuntu-22.04-arm
             os_short: linux
-            arch: "arm64"
+            arch: "aarch64"
             triplet: "arm64-linux-dynamic-cxx17-abi1-rel"
-            extra_build: "manylinux_arm64"
+            extra_build: "manylinux_aarch64"
           - os: macos-13
             os_short: macos
             arch: "x86_64"
