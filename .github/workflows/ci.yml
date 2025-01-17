@@ -142,6 +142,14 @@ jobs:
       - name: Expose GitHub Runtime
         uses: crazy-max/ghaction-github-runtime@v3
 
+      - name: Set MACOSX_DEPLOYMENT_TARGET
+        if: ${{ matrix.os_short == 'macos'}}
+        run: |
+          SDK_VERSION=$(xcrun --sdk macosx --show-sdk-version 2>/dev/null)
+          MAJOR_VERSION=$(echo $SDK_VERSION | cut -d '.' -f 1)
+          MACOSX_DEPLOYMENT_TARGET="${MAJOR_VERSION}.0"
+          echo "MACOSX_DEPLOYMENT_TARGET=$MACOS_EXPLOYMENT_TARGET" >> $GITHUB_ENV
+
       - name: Set Common Build Environment Variable
         env:
           COMMON_ENV: >
@@ -171,6 +179,9 @@ jobs:
             echo "MACOSX_DEPLOYMENT_TARGET=$MACOSX_DEPLOYMENT_TARGET"
             export MACOSX_DEPLOYMENT_TARGET=12.0
           CIBW_ENVIRONMENT: ${{ env.CIBW_ENVIRONMENT_COMMON }}
+          CIBW_ENVIRONMENT_MACOS: >
+            ${{ env.CIBW_ENVIRONMENT_COMMON }}
+            MACOSX_DEPLOYMENT_TARGET=${{ env.MACOSX_DEPLOYMENT_TARGET }}
           CIBW_MANYLINUX_X86_64_IMAGE: quay.io/pypa/manylinux_2_28_x86_64
           CIBW_MANYLINUX_AARCH64_IMAGE: quay.io/pypa/manylinux_2_28_aarch64
           CIBW_TEST_EXTRAS_LINUX: applications,test
