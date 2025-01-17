@@ -1,8 +1,27 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 41def1e5f..6577e743b 100644
+index 41def1e5f..ab36dca59 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -198,9 +198,13 @@ if (NOT CMAKE_BUILD_TYPE)
+@@ -132,11 +132,14 @@ endif( )
+ if (ENABLE_SHARED)
+     option (BUILD_SHARED_LIBS "" YES)
+     if (ENABLE_RPATH)
+-        # Set RPATH to use for installed targets; append linker search path
+-        set(CMAKE_INSTALL_NAME_DIR "${CMAKE_INSTALL_PREFIX}/lib" )
+-        set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
+         set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+-        set(CMAKE_MACOSX_RPATH TRUE)
++        if(APPLE)
++            set(CMAKE_MACOSX_RPATH TRUE)
++            set(CMAKE_INSTALL_RPATH "@loader_path/")
++            set(CMAKE_INSTALL_NAME_DIR "@rpath")
++        else()
++            set(CMAKE_INSTALL_RPATH "$ORIGIN")
++        endif()
+     endif (ENABLE_RPATH)
+ 	if( CASA_BUILD )
+ 		option(NO_SOVERSION "Build shared libraries without version information" NO)
+@@ -198,9 +201,13 @@ if (NOT CMAKE_BUILD_TYPE)
      endif(_cmpvar STREQUAL "dbg" OR _cmpvar STREQUAL "debug")
  endif (NOT CMAKE_BUILD_TYPE)
  
@@ -19,7 +38,7 @@ index 41def1e5f..6577e743b 100644
  
  # Ensure clang is not complaining about unused arguments.
  if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-@@ -345,11 +349,6 @@ endif (_usebison STREQUAL YES)
+@@ -345,11 +352,6 @@ endif (_usebison STREQUAL YES)
  if (_uselapack STREQUAL YES)
      find_package (BLAS REQUIRED)
      find_package (LAPACK REQUIRED)
@@ -31,7 +50,7 @@ index 41def1e5f..6577e743b 100644
  endif (_uselapack STREQUAL YES)
  if (_usefits STREQUAL YES)
      find_package (CFITSIO 3.030 REQUIRED) # Should pad to three decimal digits
-@@ -391,11 +390,15 @@ if (HDF5_FOUND)
+@@ -391,11 +393,15 @@ if (HDF5_FOUND)
      add_definitions(-DHAVE_HDF5)
  endif (HDF5_FOUND)
  
@@ -52,7 +71,7 @@ index 41def1e5f..6577e743b 100644
  
  if (DL_FOUND)
      add_definitions(-DHAVE_DL)
-@@ -548,8 +551,41 @@ endforeach (module)
+@@ -548,8 +554,41 @@ endforeach (module)
  
  # Install pkg-config support file
  CONFIGURE_FILE("casacore.pc.in" "casacore.pc" @ONLY)
