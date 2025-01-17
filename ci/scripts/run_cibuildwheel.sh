@@ -14,7 +14,6 @@ if [[ $(uname) == "Darwin" ]]; then
   source "${MINIFORGE_PATH}/etc/profile.d/conda.sh"
   conda create -n arcae-build -c conda-forge compilers llvm-openmp python
   conda activate arcae-build
-  export LIBRARY_PATH=/usr/lib:$LIBRARY_PATH
 fi
 
 python -m pip install cibuildwheel
