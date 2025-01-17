@@ -148,7 +148,8 @@ jobs:
           SDK_VERSION=$(xcrun --sdk macosx --show-sdk-version 2>/dev/null)
           MAJOR_VERSION=$(echo $SDK_VERSION | cut -d '.' -f 1)
           MACOSX_DEPLOYMENT_TARGET="${MAJOR_VERSION}.0"
-          echo "MACOSX_DEPLOYMENT_TARGET=$MACOS_EXPLOYMENT_TARGET" >> $GITHUB_ENV
+          echo "MACOS_DEPLOYMENT_TARGET=$MACOSX_DEPLOYMENT_TARGET"
+          echo "MACOSX_DEPLOYMENT_TARGET=$MACOSX_DEPLOYMENT_TARGET" >> $GITHUB_ENV
 
       - name: Set Common Build Environment Variable
         env:
@@ -175,9 +176,6 @@ jobs:
             export PATH="/opt/homebrew/opt/llvm/bin:$PATH"
             export LDFLAGS="-L/opt/homebrew/opt/llvm/lib"
             export CPPFLAGS="-I/opt/homebrew/opt/llvm/include"
-            export MACOSX_DEPLOYMENT_TARGET=$(xcrun --sdk macosx --show-sdk-version)
-            echo "MACOSX_DEPLOYMENT_TARGET=$MACOSX_DEPLOYMENT_TARGET"
-            export MACOSX_DEPLOYMENT_TARGET=12.0
           CIBW_ENVIRONMENT: ${{ env.CIBW_ENVIRONMENT_COMMON }}
           CIBW_ENVIRONMENT_MACOS: >
             ${{ env.CIBW_ENVIRONMENT_COMMON }}
