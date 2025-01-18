@@ -1,6 +1,6 @@
 #!/bin/bash
 
-PYTHON_VERSION="3.8"
+PYTHON_VERSION="3.10"
 
 function usage {
   echo ""
@@ -61,7 +61,7 @@ export CIBW_REPAIR_WHEEL_COMMAND_LINUX="auditwheel repair -w {dest_dir} {wheel} 
 # $ docker run -it --rm cibw-debug /bin/bash
 export CIBW_TEST_SKIP="*"
 export CIBW_TEST_EXTRAS=
-export CIBW_TEST_COMMAND="python -c 'from arcae.lib.arrow_tables import Table'"
+export CIBW_TEST_COMMAND=bash ci/scripts/run_tests.sh
 export CIBW_VERBOSITY=3
 
 echo "Creating VCPKG Binary Cache in $VCPKG_HOST_BINARY_CACHE"
