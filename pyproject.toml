@@ -30,7 +30,7 @@ dev = [
 test = [
     "duckdb",
     "pytest >= 7.0.0",
-    "python-casacore >= 3.5.0; sys_platform != 'darwin' and python_version<'3.14'",
+    "python-casacore >= 3.5.0; sys_platform == 'linux' and platform_machine == 'x86_64' and python_version<'3.14'",
     "requests"
 ]
 
