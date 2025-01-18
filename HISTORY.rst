@@ -4,6 +4,9 @@ History
 
 0.2.6 (10-09-2024)
 ------------------
+* Update to vcpkg 2024.12.15 (:pr:`138`)
+* Use github arm64 runners (:pr:`138`)
+* Constrained mininum MACOSX_DEPLOYMENT_TARGET to 13.0 on Intel x86 and 14.0 on Darwin arm64 (:pr:`138`)
 * Disable tmate in continuous integration (:pr:`135`)
 * Update to latest cibuildwheel (:pr:`131`, :pr:`133`)
 * Use conda forge compilers on MACOSX and update MACOX_DEPLOYMENT_TARGET=12.0 (:pr:`131`, :pr:`133`)
