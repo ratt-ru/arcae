@@ -36,6 +36,7 @@
 #include "arcae/type_traits.h"
 
 using ::arrow::Array;
+using ::arrow::ArrayData;
 using ::arrow::Buffer;
 using ::arrow::CallbackOptions;
 using ::arrow::CollectAsyncGenerator;
@@ -45,7 +46,6 @@ using ::arrow::Int32Builder;
 using ::arrow::ListArray;
 using ::arrow::MakeMappedGenerator;
 using ::arrow::MakeVectorGenerator;
-using ::arrow::PrimitiveArray;
 using ::arrow::Result;
 using ::arrow::ShouldSchedule;
 using ::arrow::Status;
@@ -295,6 +295,16 @@ Result<ConvertStrategy> GetConvertStrategy() {
   return Status::Invalid("Invalid 'casa.convert.strategy=", strategy, "'");
 }
 
+// Avoid a long string of templated NumericArray cases by using the
+// lower level ArrayData construction mechanism
+std::shared_ptr<Array> MakePrimitiveArray(std::shared_ptr<arrow::DataType> dtype,
+                                          const std::int64_t N,
+                                          std::shared_ptr<Buffer> buffer) {
+  auto array_data = std::make_shared<ArrayData>(
+      std::move(dtype), N, std::vector<std::shared_ptr<Buffer>>{nullptr, buffer});
+  return arrow::MakeArray(array_data);
+}
+
 // Given a buffer populated with values
 // and an expected result shape,
 // create an output array
@@ -316,7 +326,8 @@ Result<std::shared_ptr<Array>> MakeArray(const ResultShapeData& result_shape,
     ARROW_ASSIGN_OR_RAISE(result, builder.Finish());
   } else if (casacore::isComplex(casa_type)) {
     // Buffer holds complex values, created a fixed or nested list
-    auto base = std::make_shared<PrimitiveArray>(arrow_dtype, 2 * nelements, buffer);
+    auto base =
+        MakePrimitiveArray(std::move(arrow_dtype), 2 * nelements, std::move(buffer));
     if (strat == ConvertStrategy::FIXED) {
       ARROW_ASSIGN_OR_RAISE(result, FixedSizeListArray::FromArrays(base, 2));
     } else if (strat == ConvertStrategy::LIST) {
@@ -329,7 +340,7 @@ Result<std::shared_ptr<Array>> MakeArray(const ResultShapeData& result_shape,
       ARROW_ASSIGN_OR_RAISE(result, ListArray::FromArrays(*offsets, *base));
     }
   } else if (IsPrimitiveType(casa_type)) {
-    result = std::make_shared<PrimitiveArray>(arrow_dtype, nelements, buffer);
+    result = MakePrimitiveArray(std::move(arrow_dtype), nelements, std::move(buffer));
   } else {
     return Status::TypeError("Unhandled CASA Type ", casa_type);
   }
