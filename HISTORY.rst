@@ -4,6 +4,7 @@ History
 
 0.2.6 (10-09-2024)
 ------------------
+* Prevent print segmentation faults caused by the use of PrimitiveArrays (:pr:`139`)
 * Update to vcpkg 2024.12.15 (:pr:`138`)
 * Use github arm64 runners (:pr:`138`)
 * Constrained mininum MACOSX_DEPLOYMENT_TARGET to 13.0 on Intel x86 and 14.0 on Darwin arm64 (:pr:`138`)
