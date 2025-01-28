@@ -74,6 +74,10 @@ def test_ms_and_weather_subtable(tmp_path_factory):
         assert "WEATHER" in td["_keywords_"]
         assert td["_keywords_"]["WEATHER"] == f"Table: {ms}/WEATHER"
 
+    # Opening the table works with the subtable :: reference syntax
+    with Table.from_filename(f"{ms}::WEATHER") as W:
+        pass
+
 
 def test_weather_subtable_descriptor():
     # Test required and complete descriptor for the WEATHER subtable
