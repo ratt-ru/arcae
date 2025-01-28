@@ -24,9 +24,10 @@ def test_ms_addrows(tmp_path_factory):
 
 def test_ms_and_weather_subtable(tmp_path_factory):
     ms = tmp_path_factory.mktemp("test") / "test.ms"
-    with Table.ms_from_descriptor(str(ms)):
+    with Table.ms_from_descriptor(str(ms)) as T:
         assert (ms / "table.dat").exists()
         assert not (ms / "WEATHER").exists()
+        assert "WEATHER" not in T.tabledesc()["_keywords_"]
 
     # Basic descriptor
     table_desc = ms_descriptor("WEATHER", complete=False)
@@ -66,6 +67,16 @@ def test_ms_and_weather_subtable(tmp_path_factory):
             "WIND_SPEED",
             "WIND_SPEED_FLAG",
         ]
+
+    # Weather table is linked in the Measurement Set
+    with Table.from_filename(str(ms)) as T:
+        td = T.tabledesc()
+        assert "WEATHER" in td["_keywords_"]
+        assert td["_keywords_"]["WEATHER"] == f"Table: {ms}/WEATHER"
+
+    # Opening the table works with the subtable :: reference syntax
+    with Table.from_filename(f"{ms}::WEATHER") as W:
+        pass
 
 
 def test_weather_subtable_descriptor():

@@ -4,6 +4,7 @@ History
 
 X.Y.Z (DD-MM-YYYY)
 ------------------
+* Link subtables against the Measurement Set during creation (:pr:`140`)
 * Prevent print segmentation faults caused by the use of PrimitiveArrays (:pr:`139`)
 * Update to vcpkg 2024.12.15 (:pr:`138`)
 * Use github arm64 runners (:pr:`138`)
