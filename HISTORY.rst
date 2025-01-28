@@ -2,7 +2,7 @@
 History
 =======
 
-X.Y.Z (DD-MM-YYYY)
+0.2.7 (28-01-2025)
 ------------------
 * Link subtables against the Measurement Set during creation (:pr:`140`)
 * Prevent print segmentation faults caused by the use of PrimitiveArrays (:pr:`139`)
