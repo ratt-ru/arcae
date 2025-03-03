@@ -2,6 +2,11 @@
 History
 =======
 
+X.Y.Z (DD-MM-YYYY)
+------------------
+* Use cmake.version instead of deprecated cmake.mininum_version (:pr:`142`)
+* Fix requires_python setting in pyproject.toml (:pr:`142`)
+
 0.2.7 (28-01-2025)
 ------------------
 * Link subtables against the Measurement Set during creation (:pr:`140`)
