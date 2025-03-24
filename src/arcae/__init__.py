@@ -7,7 +7,7 @@ from typing import Union, TYPE_CHECKING
 if TYPE_CHECKING:
     from arcae.lib.arrow_tables import Table
 
-__version__ = "0.2.7"
+__version__ = "0.2.8"
 
 PYTHON_CASACORE_FOUND = "casacore" in sys.modules
 COEXIST_WITH_PYTHON_CASACORE = int(os.environ.get("ARCAE_WITH_CASACORE", 0)) != 0
