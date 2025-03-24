@@ -2,7 +2,7 @@
 History
 =======
 
-X.Y.Z (DD-MM-YYYY)
+0.2.8 (24-03-2025)
 ------------------
 * Upgrade to casacore 3.7.1 (:pr:`144`)
 * Use cmake.version instead of deprecated cmake.mininum_version (:pr:`142`)
