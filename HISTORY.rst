@@ -4,6 +4,7 @@ History
 
 X.Y.Z (DD-MM-YYYY)
 ------------------
+* Upgrade to casacore 3.7.1 (:pr:`144`)
 * Use cmake.version instead of deprecated cmake.mininum_version (:pr:`142`)
 * Fix requires_python setting in pyproject.toml (:pr:`142`)
 
