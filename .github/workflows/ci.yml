@@ -162,8 +162,7 @@ jobs:
           CIBW_BUILD: ${{ matrix.cpython }}-${{ matrix.extra_build }}
           CIBW_BUILD_FRONTEND: build
           CIBW_ARCHS: ${{ matrix.arch }}
-          CIBW_BEFORE_ALL_LINUX: |
-            yum install -y zip flex bison gcc-gfortran ninja-build
+          CIBW_BEFORE_ALL_LINUX: yum install -y zip flex bison gcc-gfortran
           CIBW_BEFORE_ALL_MACOS: |
             brew install python llvm
             brew reinstall gcc
