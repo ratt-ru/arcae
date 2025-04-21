@@ -136,8 +136,8 @@ struct ReadCallback {
           auto pos = chunk.ScratchPositions();
           for (std::size_t i = 0; i < pos.size(); ++i) pos[i] = 0;
 
-          for (auto done = false;
-               !done;) {  // Iterate over the spans in memory, copying data
+          // Iterate over the spans in memory, copying data
+          for (auto done = false; !done;) {
             std::size_t i = 0, o = 0;
             for (std::ptrdiff_t d = 0; d < ndim; ++d) {
               i += pos[d] * chunk_strides[d];
