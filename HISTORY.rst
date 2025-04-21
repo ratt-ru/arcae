@@ -2,6 +2,10 @@
 History
 =======
 
+X.Y.Z (DD-MM-YYYY)
+------------------
+* Upgrade to vcpkg 2025.04.09 (:pr:`146`)
+
 0.2.8 (24-03-2025)
 ------------------
 * Upgrade to casacore 3.7.1 (:pr:`144`)
