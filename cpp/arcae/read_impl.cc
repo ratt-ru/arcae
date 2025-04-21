@@ -149,7 +149,7 @@ struct ReadCallback {
             for (std::ptrdiff_t d = 0; d < ndim; ++d) {  // Iterate in FORTRAN order
               if (++pos[d] < spans[d].mem.size())
                 break;               // Iteration doesn't reach dim end
-              pos[d] = 0;            // OtherwBasic iteration worksise reset, next dim
+              pos[d] = 0;            // Otherwise reset, next dim
               done = d == last_dim;  // We're done if the last dimension is reset
             }
           }
