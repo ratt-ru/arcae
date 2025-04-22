@@ -4,7 +4,7 @@ History
 
 X.Y.Z (DD-MM-YYYY)
 ------------------
-* Slight loop optimisation (:pr:`147`)
+* Slight loop optimisation (:pr:`147`, :pr:`148`)
 * Upgrade to vcpkg 2025.04.09 (:pr:`146`)
 
 0.2.8 (24-03-2025)
