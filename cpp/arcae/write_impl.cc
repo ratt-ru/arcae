@@ -101,7 +101,6 @@ struct WriteCallback {
     auto transpose_fut = arrow::DeferNotOk(GetCpuThreadPool()->Submit(
         [chunk = chunk, buffer = buffer]() mutable -> CasaArray<CT> {
           std::ptrdiff_t ndim = chunk.nDim();
-          std::ptrdiff_t last_dim = ndim - 1;
           auto spans = chunk.DimensionSpans();
           auto min_mem = chunk.MinMemIndex();
           auto chunk_strides = chunk.ChunkStrides();
@@ -129,7 +128,7 @@ struct WriteCallback {
               if (++pos[d] < spans[d].mem.size())
                 break;               // Iteration doesn't reach dim end
               pos[d] = 0;            // Otherwise reset, next dim
-              done = d == last_dim;  // We're done if the last dimension is reset
+              done = d + 1 == ndim;  // We're done if the last dimension is reset
             }
           }
 
