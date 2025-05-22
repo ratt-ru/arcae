@@ -91,9 +91,9 @@ with added support for some `NumPy Advanced Indexing <numpy_advanced_indexing_>`
 
     casa_table = arcae.table("/path/to/measurementset.ms", readonly=False)
     # Get rows 10 and 2, and channels 16 to 32, and all correlations
-    data = casa_table.getcol("DATA", index=([10, 2], slice(16, 32), None)
+    data = casa_table.getcol("DATA", index=([10, 2], slice(16, 32), None))
     # Write some modified data back
-    casa_table.putcol("DATA", data + 1*1j, index=([10, 2], slice(16, 32), None)
+    casa_table.putcol("DATA", data + 1*1j, index=([10, 2], slice(16, 32), None))
 
 See the test cases for further use cases.
 
