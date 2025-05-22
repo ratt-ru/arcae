@@ -101,7 +101,6 @@ struct WriteCallback {
     auto transpose_fut = arrow::DeferNotOk(GetCpuThreadPool()->Submit(
         [chunk = chunk, buffer = buffer]() mutable -> CasaArray<CT> {
           std::ptrdiff_t ndim = chunk.nDim();
-          std::ptrdiff_t last_dim = ndim - 1;
           auto spans = chunk.DimensionSpans();
           auto min_mem = chunk.MinMemIndex();
           auto chunk_strides = chunk.ChunkStrides();
@@ -116,7 +115,7 @@ struct WriteCallback {
           for (std::size_t i = 0; i < pos.size(); ++i) pos[i] = 0;
 
           // Iterate over the spans in memory, copying data
-          while (true) {
+          for (auto done = false; !done;) {
             std::size_t i = 0, o = 0;
             for (std::ptrdiff_t d = 0; d < ndim; ++d) {
               i += (spans[d].mem[pos[d]] - min_mem[d]) * buffer_strides[d];
@@ -127,11 +126,13 @@ struct WriteCallback {
             out_ptr[o] = std::move(in_ptr[i]);
             for (std::ptrdiff_t d = 0; d < ndim; ++d) {  // Iterate in FORTRAN order
               if (++pos[d] < spans[d].mem.size())
-                break;     // Iteration doesn't reach dim end
-              pos[d] = 0;  // OtherwBasic iteration worksise reset, next dim
-              if (d == last_dim) return array;  // The last dim is reset, we're done
+                break;               // Iteration doesn't reach dim end
+              pos[d] = 0;            // Otherwise reset, next dim
+              done = d + 1 == ndim;  // We're done if the last dimension is reset
             }
           }
+
+          return array;
         }));
 
     return itp->Then(transpose_fut,

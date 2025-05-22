@@ -126,7 +126,6 @@ struct ReadCallback {
     return read_fut.Then(
         [chunk = chunk, buffer = buffer](const CasaArray<CT>& data) mutable -> bool {
           std::ptrdiff_t ndim = chunk.nDim();
-          std::ptrdiff_t last_dim = ndim - 1;
           auto spans = chunk.DimensionSpans();
           auto min_mem = chunk.MinMemIndex();
           auto chunk_strides = chunk.ChunkStrides();
@@ -136,7 +135,8 @@ struct ReadCallback {
           auto pos = chunk.ScratchPositions();
           for (std::size_t i = 0; i < pos.size(); ++i) pos[i] = 0;
 
-          while (true) {  // Iterate over the spans in memory, copying data
+          // Iterate over the spans in memory, copying data
+          for (auto done = false; !done;) {
             std::size_t i = 0, o = 0;
             for (std::ptrdiff_t d = 0; d < ndim; ++d) {
               i += pos[d] * chunk_strides[d];
@@ -147,11 +147,13 @@ struct ReadCallback {
             out_ptr[o] = std::move(in_ptr[i]);
             for (std::ptrdiff_t d = 0; d < ndim; ++d) {  // Iterate in FORTRAN order
               if (++pos[d] < spans[d].mem.size())
-                break;     // Iteration doesn't reach dim end
-              pos[d] = 0;  // OtherwBasic iteration worksise reset, next dim
-              if (d == last_dim) return true;  // The last dim is reset, we're done
+                break;               // Iteration doesn't reach dim end
+              pos[d] = 0;            // Otherwise reset, next dim
+              done = d + 1 == ndim;  // We're done if the last dimension is reset
             }
           }
+
+          return true;
         },
         {}, CallbackOptions{ShouldSchedule::Always, GetCpuThreadPool()});
   }
