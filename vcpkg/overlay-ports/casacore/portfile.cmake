@@ -54,7 +54,7 @@ vcpkg_cmake_configure(
         -DBUILD_PYTHON=OFF
         -DBUILD_TESTING=OFF
         -DUSE_PCH=OFF
-        -DCMAKE_CXX_STANDARD=17
+        -DCMAKE_CXX_STANDARD=20
         ${fortran_args}
 )
 
