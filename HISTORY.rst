@@ -4,6 +4,7 @@ History
 
 X.Y.Z (DD-MM-YYYY)
 ------------------
+* Upgrade to C++20 (:pr:`150`)
 * Upgrade to cibuildwheel 2.23.3 (:pr:`149`)
 * Slight loop optimisation (:pr:`147`, :pr:`148`)
 * Upgrade to vcpkg 2025.04.09 (:pr:`146`)
