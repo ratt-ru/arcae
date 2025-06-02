@@ -1,7 +1,7 @@
 vcpkg_download_distfile(ARCHIVE
-    URLS "https://heasarc.gsfc.nasa.gov/FTP/software/fitsio/c/cfitsio-4.1.0.tar.gz \
-    https://www.mirrorservice.org/sites/distfiles.macports.org/cfitsio/cfitsio-4.1.0.tar.gz \
-    https://distfiles.macports.org/cfitsio/cfitsio-4.1.0.tar.gz"
+    URLS "https://heasarc.gsfc.nasa.gov/FTP/software/fitsio/c/cfitsio-4.1.0.tar.gz"
+         "https://www.mirrorservice.org/sites/distfiles.macports.org/cfitsio/cfitsio-4.1.0.tar.gz"
+         "https://distfiles.macports.org/cfitsio/cfitsio-4.1.0.tar.gz"
     FILENAME "cfitsio-4.1.0.tar.gz"
     SHA512 bbbe10e890e74a30a9806dd2bbf711b3b1f15502b210b222d2d57cc083495c3b66b44927e4680f989045187fb7075f7187e2805ddcb4753ce53c68c3442cc813
 )
