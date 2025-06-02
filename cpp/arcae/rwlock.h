@@ -41,7 +41,7 @@ class RWLock {
   arrow::Status lock_shared() { return lock_impl(false); }
 
   void unlock() {
-    flock lock_data = {
+    struct flock lock_data = {
         .l_type = F_UNLCK,
         .l_whence = SEEK_SET,
         .l_start = 0,
@@ -55,7 +55,7 @@ class RWLock {
   void unlock_shared() {
     std::unique_lock<std::mutex> fnctl_lock(fcntl_mutex_);
     if (--fcntl_readers_ == 0) {
-      flock lock_data = {
+      struct flock lock_data = {
           .l_type = F_UNLCK,
           .l_whence = SEEK_SET,
           .l_start = 0,
@@ -94,7 +94,7 @@ class RWLock {
     auto status = [&]() {
       while (true) {
         using LockType = decltype(flock::l_type);
-        flock lock_data = {
+        struct flock lock_data = {
             .l_type = LockType(write ? F_WRLCK : F_RDLCK),
             .l_whence = SEEK_SET,
             .l_start = 0,
@@ -139,7 +139,7 @@ class RWLock {
     auto status = [&]() {
       while (true) {
         using LockType = decltype(flock::l_type);
-        flock lock_data = {
+        struct flock lock_data = {
             .l_type = LockType(write ? F_WRLCK : F_RDLCK),
             .l_whence = SEEK_SET,
             .l_start = 0,
@@ -200,7 +200,7 @@ class RWLock {
       for (auto remaining = timeout - (end - start); remaining > 0s;
            remaining -= lock_sleep) {
         using LockFlagType = decltype(flock::l_type);
-        flock lock_data = {
+        struct flock lock_data = {
             .l_type = LockFlagType(write ? F_WRLCK : F_RDLCK),
             .l_whence = SEEK_SET,
             .l_start = 0,

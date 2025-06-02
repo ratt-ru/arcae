@@ -55,7 +55,7 @@ arrow::Result<RWLock> RWLock::Create(std::string_view lock_filename, bool write)
     return arrow::Status::IOError("Creating lock file ", lock_name, " failed");
   }
 
-  flock lock_data = {
+  struct flock lock_data = {
       .l_type = F_WRLCK, .l_whence = SEEK_SET, .l_start = 0, .l_len = 0,
       // .l_pid = getpid(),
   };
@@ -69,7 +69,7 @@ arrow::Result<RWLock> RWLock::Create(std::string_view lock_filename, bool write)
 }
 
 arrow::Status RWLock::other_locks() {
-  flock lock_data = {
+  struct flock lock_data = {
       .l_type = F_WRLCK,
       .l_whence = SEEK_SET,
       .l_start = 0,
