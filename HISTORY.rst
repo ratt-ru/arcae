@@ -4,6 +4,7 @@ History
 
 X.Y.Z (DD-MM-YYYY)
 ------------------
+* Add cfitsio mirrors (:pr:`153`)
 * Disable use of github actions cache by vcpkg (:pr:`152`)
 * Upgrade to C++20 (:pr:`150`)
 * Upgrade to cibuildwheel 2.23.3 (:pr:`149`)
