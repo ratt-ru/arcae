@@ -170,6 +170,7 @@ jobs:
             export PATH="/opt/homebrew/opt/llvm/bin:$PATH"
             export LDFLAGS="-L/opt/homebrew/opt/llvm/lib"
             export CPPFLAGS="-I/opt/homebrew/opt/llvm/include"
+          CIBW_CONTAINER_ENGINE: "docker; create_args: --network=host"
           CIBW_ENVIRONMENT: ${{ env.CIBW_ENVIRONMENT_COMMON }}
           CIBW_ENVIRONMENT_MACOS: >
             ${{ env.CIBW_ENVIRONMENT_COMMON }}
