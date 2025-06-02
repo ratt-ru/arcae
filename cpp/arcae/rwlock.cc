@@ -42,6 +42,8 @@ std::string RWLock::make_lockname(std::string_view prefix) {
 
 RWLock::~RWLock() {
   if (fd_ != -1) close(fd_);
+  mutex_.unlock();
+  mutex_.unlock_shared();
 }
 
 arrow::Result<RWLock> RWLock::Create(std::string_view lock_filename, bool write) {
