@@ -18,7 +18,7 @@ namespace arcae {
 
 namespace {
 
-static constexpr char hex[] = "0123456789abcdef";
+// static constexpr char hex[] = "0123456789abcdef";
 static constexpr std::size_t NHEXDIGITS = 8;
 
 }  // namespace
