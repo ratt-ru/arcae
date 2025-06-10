@@ -47,18 +47,8 @@ namespace {
 // If, the supplied row is negative (-1) and a result_shape is supplied
 // the shape is derived from this source, otherwise the CASA shape is
 // used as the reference value
-Result<IPosition> GetRowShape(const TableColumn& column,
-                              const std::optional<IPosition>& result_shape, IndexType r) {
-  if (r < 0) {
-    if (!result_shape.has_value()) {
-      return Status::IndexError(
-          "Negative selection indices may only be present "
-          "when a fixed shape result array is provided");
-    }
-    const auto& shape = result_shape.value();
-    // Return secondary dimensions
-    return shape.getFirst(shape.size() - 1);
-  } else if (r >= IndexType(column.nrow())) {
+Result<IPosition> GetTableRowShape(const TableColumn& column, IndexType r) {
+  if (r < 0 || r >= IndexType(column.nrow())) {
     return Status::IndexError("Row ", r, " in column ", column.columnDesc().name(),
                               " is out of bounds");
   } else if (column.isDefined(r)) {
@@ -94,21 +84,45 @@ Result<RowShapes> MakeRowData(const TableColumn& column, const Selection& select
   RowShapes shapes;
   const auto& column_desc = column.columnDesc();
 
+  // Lambda that gets the shape from the column's row
+  // Clipping against the selection is performed
+  auto GetClippedColumnShape = [&](auto r) -> Result<IPosition> {
+    ARROW_ASSIGN_OR_RAISE(auto shape, GetTableRowShape(column, r));
+    ARROW_RETURN_NOT_OK(ClipShape(column_desc, shape, selection));
+    return shape;
+  };
+
+  // Lambda handling the more complex span case.
+  auto GetSpanShape = [&](auto r) -> Result<IPosition> {
+    // Standard case
+    if (r >= 0) return GetClippedColumnShape(r);
+
+    // Negative row indices mean that the shape should be derived
+    // from the result array, rather than the column row shape
+    // It's not necessary to clip by selection indices in this case
+    if (result_shape) {
+      const auto& shape = result_shape.value();
+      return shape.getFirst(shape.size() - 1);
+    }
+
+    return Status::IndexError(
+        "Negative selection indices may only be used "
+        "in conjunction with a fixed shape result array");
+  };
+
   // Get the row selection if provided
   if (selection.HasRowSpan()) {
     auto span = selection.GetRowSpan();
     shapes.reserve(span.size());
     for (std::size_t r = 0; r < span.size(); ++r) {
-      ARROW_ASSIGN_OR_RAISE(auto shape, GetRowShape(column, result_shape, span[r]));
-      ARROW_RETURN_NOT_OK(ClipShape(column_desc, shape, selection));
+      ARROW_ASSIGN_OR_RAISE(auto shape, GetSpanShape(span[r]));
       shapes.emplace_back(std::move(shape));
     }
     // otherwise, the entire column
   } else {
     shapes.reserve(column.nrow());
     for (std::size_t r = 0; r < column.nrow(); ++r) {
-      ARROW_ASSIGN_OR_RAISE(auto shape, GetRowShape(column, result_shape, r));
-      ARROW_RETURN_NOT_OK(ClipShape(column_desc, shape, selection));
+      ARROW_ASSIGN_OR_RAISE(auto shape, GetClippedColumnShape(r));
       shapes.emplace_back(std::move(shape));
     }
   }
@@ -495,7 +509,7 @@ Result<ResultShapeData> ResultShapeData::MakeRead(
     return Status::NotImplemented("Column ", column_name, " has varying dimensions");
   }
 
-  // Even though the column varys
+  // Even though the column varies
   // the resultant shape after selection is fixed
   // There's no need to clip the shape as this
   // will have been done in MakeRowData
