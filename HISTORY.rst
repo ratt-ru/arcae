@@ -4,6 +4,7 @@ History
 
 X.Y.Z (DD-MM-YYYY)
 ------------------
+* Avoid clipping selections against the result array shape for ignored rows for read operations (:pr:`154`)
 * Add cfitsio mirrors (:pr:`153`)
 * Disable use of github actions cache by vcpkg (:pr:`152`)
 * Upgrade to C++20 (:pr:`150`)
