@@ -2,6 +2,10 @@
 History
 =======
 
+X.Y.Z (DD-MM-YYYY)
+------------------
+* Write locking (:pr:`151`)
+
 0.2.9 (10-06-2025)
 ------------------
 * Avoid clipping selections against the result array shape for ignored rows for read operations (:pr:`154`)

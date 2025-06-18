@@ -124,8 +124,7 @@ Result<std::size_t> NewTableProxy::nRows() const {
 
 Result<bool> NewTableProxy::AddRows(std::size_t nrows) {
   return itp_
-      ->RunAsync([nrows = nrows](TableProxy& tp) {
-        detail::MaybeReopenRW(tp);
+      ->RunWriteAsync([nrows = nrows](TableProxy& tp) {
         tp.addRow(nrows);
         return true;
       })
@@ -135,9 +134,8 @@ Result<bool> NewTableProxy::AddRows(std::size_t nrows) {
 Result<bool> NewTableProxy::AddColumns(const std::string& json_columndescs,
                                        const std::string& json_dminfo) {
   return itp_
-      ->RunAsync([json_columndescs = json_columndescs,
-                  json_dminfo = json_dminfo](TableProxy& tp) {
-        detail::MaybeReopenRW(tp);
+      ->RunWriteAsync([json_columndescs = json_columndescs,
+                       json_dminfo = json_dminfo](TableProxy& tp) {
         Record columndescs = JsonParser::parse(json_columndescs).toRecord();
         Record dminfo = JsonParser::parse(json_dminfo).toRecord();
         tp.addColumns(columndescs, dminfo, false);
