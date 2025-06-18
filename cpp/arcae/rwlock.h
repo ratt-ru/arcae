@@ -9,7 +9,6 @@
 #include <string>
 #include <string_view>
 #include <thread>
-#include <utility>
 
 #if defined(_WIN32) || defined(_WIN64)
 #error Posix fcntl support required
@@ -31,15 +30,9 @@ class RWLock {
   static arrow::Result<RWLock> Create(std::string_view lock_filename = "",
                                       bool write = false);
 
-  RWLock(RWLock&& other)
-      : fd_(std::exchange(other.fd_, -1)),
-        fcntl_readers_(0),
-        lock_filename_(std::move(other.lock_filename_)),
-        mutex_() {
-    other.mutex_.unlock();
-    other.mutex_.unlock_shared();
-  }
-
+  RWLock() : fd_(-1) {};
+  RWLock(RWLock&& rhs);
+  RWLock& operator=(RWLock&& rhs);
   ~RWLock();
 
   arrow::Status lock() { return lock_impl(true); }
@@ -145,6 +138,21 @@ class RWLock {
   std::string lock_filename_;
   std::shared_timed_mutex mutex_;
   std::mutex fcntl_mutex_;
+};
+
+class RWLockGuard {
+ private:
+  RWLock& lock_;
+  bool write_;
+
+ public:
+  RWLockGuard(RWLock& lock, bool write = false) : lock_(lock), write_(write) {
+    if (auto status = write_ ? lock_.lock() : lock_.lock_shared(); !status.ok()) {
+      ARROW_LOG(ERROR) << "Unable to lock " << status;
+      std::exit(1);
+    }
+  };
+  ~RWLockGuard() { write_ ? lock_.unlock() : lock_.unlock_shared(); }
 };
 
 }  // namespace arcae

@@ -1,8 +1,10 @@
 #include "arcae/rwlock.h"
 
+#include <cassert>
 #include <random>
 #include <string>
 #include <string_view>
+#include <utility>
 
 #if defined(_WIN32) || defined(_WIN64)
 #error Posix fcntl support required
@@ -19,7 +21,7 @@ namespace arcae {
 
 namespace {
 
-// static constexpr char hex[] = "0123456789abcdef";
+static constexpr char hex[] = "0123456789abcdef";
 static constexpr std::size_t NHEXDIGITS = 8;
 
 }  // namespace
@@ -32,19 +34,42 @@ std::string RWLock::make_lockname(std::string_view prefix) {
   std::string result;
   result.reserve(prefix.size() + 1 + NHEXDIGITS);
   result.append(prefix);
-  // result.push_back('-');
+  result.push_back('-');
 
-  // for (std::size_t i = 0; i < NHEXDIGITS; ++i) {
-  //   result.push_back(hex[distribution(gen)]);
-  // }
+  for (std::size_t i = 0; i < NHEXDIGITS; ++i) {
+    result.push_back(hex[distribution(gen)]);
+  }
 
   return result;
+}
+
+RWLock::RWLock(RWLock&& rhs)
+    : fd_(std::exchange(rhs.fd_, -1)),
+      fcntl_readers_(std::exchange(rhs.fcntl_readers_, 0)),
+      lock_filename_(std::move(rhs.lock_filename_)),
+      mutex_() {
+  rhs.mutex_.unlock();
+  rhs.mutex_.unlock_shared();
+}
+
+RWLock& RWLock::operator=(RWLock&& rhs) {
+  using std::swap;
+  if (this != &rhs) {
+    std::swap(fd_, rhs.fd_);
+    std::swap(fcntl_readers_, rhs.fcntl_readers_);
+    std::swap(lock_filename_, rhs.lock_filename_);
+    rhs.mutex_.unlock();
+    rhs.mutex_.unlock_shared();
+  }
+  return *this;
 }
 
 RWLock::~RWLock() {
   if (fd_ != -1) close(fd_);
   mutex_.unlock();
   mutex_.unlock_shared();
+  // fcntl_readers_ = 0;
+  lock_filename_.clear();
 }
 
 void RWLock::unlock() {
@@ -55,12 +80,14 @@ void RWLock::unlock() {
       .l_len = 0,
   };
 
+  assert(fd_ != -1);
   fcntl(fd_, F_SETLK, &lock_data);
   mutex_.unlock();
 }
 
 void RWLock::unlock_shared() {
   std::unique_lock<std::mutex> fnctl_lock(fcntl_mutex_);
+  assert(fd_ != -1);
   // Last reader releases the fcntl lock
   if (--fcntl_readers_ == 0) {
     struct flock lock_data = {
@@ -76,8 +103,8 @@ void RWLock::unlock_shared() {
 }
 
 arrow::Result<RWLock> RWLock::Create(std::string_view lock_filename, bool write) {
-  std::string lock_name =
-      lock_filename.size() == 0 ? make_lockname() : std::string(lock_filename);
+  std::string lock_name = make_lockname(lock_filename);
+  // lock_filename.size() == 0 ? make_lockname() : std::string(lock_filename);
   int fd;
 
   if (fd = open(lock_name.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR); fd == -1) {
@@ -136,6 +163,7 @@ arrow::Status RWLock::lock_impl(bool write) {
   auto status = [&]() {
     while (true) {
       using LockType = decltype(flock::l_type);
+      assert(fd_ != -1);
       struct flock lock_data = {
           .l_type = LockType(write ? F_WRLCK : F_RDLCK),
           .l_whence = SEEK_SET,
@@ -145,6 +173,7 @@ arrow::Status RWLock::lock_impl(bool write) {
       };
 
       // Indicate success if file-locking succeeds
+      assert(fd_ != -1);
       if (fcntl(fd_, F_SETLK, &lock_data) == 0) return arrow::Status::OK();
 
       switch (errno) {
