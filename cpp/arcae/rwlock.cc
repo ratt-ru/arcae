@@ -1,14 +1,15 @@
 #include "arcae/rwlock.h"
 
-#include <atomic>
 #include <random>
 #include <string>
 #include <string_view>
-#include "arrow/status.h"
-#include "arrow/util/logging.h"
 
+#if defined(_WIN32) || defined(_WIN64)
+#error Posix fcntl support required
+#else
 #include <fcntl.h>
 #include <unistd.h>
+#endif
 
 #include <arrow/result.h>
 #include <arrow/status.h>
@@ -43,6 +44,34 @@ std::string RWLock::make_lockname(std::string_view prefix) {
 RWLock::~RWLock() {
   if (fd_ != -1) close(fd_);
   mutex_.unlock();
+  mutex_.unlock_shared();
+}
+
+void RWLock::unlock() {
+  struct flock lock_data = {
+      .l_type = F_UNLCK,
+      .l_whence = SEEK_SET,
+      .l_start = 0,
+      .l_len = 0,
+  };
+
+  fcntl(fd_, F_SETLK, &lock_data);
+  mutex_.unlock();
+}
+
+void RWLock::unlock_shared() {
+  std::unique_lock<std::mutex> fnctl_lock(fcntl_mutex_);
+  // Last reader releases the fcntl lock
+  if (--fcntl_readers_ == 0) {
+    struct flock lock_data = {
+        .l_type = F_UNLCK,
+        .l_whence = SEEK_SET,
+        .l_start = 0,
+        .l_len = 0,
+    };
+    fcntl(fd_, F_SETLK, &lock_data);
+  };
+
   mutex_.unlock_shared();
 }
 
@@ -90,6 +119,105 @@ arrow::Status RWLock::other_locks() {
                   << " l_start " << lock_data.l_start << " l_len " << lock_data.l_len;
 
   return arrow::Status::OK();
+}
+
+arrow::Status RWLock::lock_impl(bool write) {
+  const std::string_view lock_type(write ? "write" : "read");
+  write ? mutex_.lock() : mutex_.lock_shared();
+  std::random_device rd;
+  std::mt19937 gen(rd());
+  std::uniform_real_distribution<> distribution(-1e-4, 1e-4);
+  std::chrono::duration<double> lock_sleep = 10ms;
+
+  // Repeatedly attempt acquisition of
+  // the fcntl lock with exponential backoff.
+  // A blocking F_SETLKW could be used but in practice
+  // one ends up having to handle EDEADLK.
+  auto status = [&]() {
+    while (true) {
+      using LockType = decltype(flock::l_type);
+      struct flock lock_data = {
+          .l_type = LockType(write ? F_WRLCK : F_RDLCK),
+          .l_whence = SEEK_SET,
+          .l_start = 0,
+          .l_len = 0,
+          //.l_pid = getpid(),
+      };
+
+      // Indicate success if file-locking succeeds
+      if (fcntl(fd_, F_SETLK, &lock_data) == 0) return arrow::Status::OK();
+
+      switch (errno) {
+        case EAGAIN:
+          break;
+        case EACCES:
+          return arrow::Status::IOError("Permission denied attempting a ", lock_type,
+                                        " lock on ", lock_filename_);
+        case ENOLCK:
+          return arrow::Status::IOError(
+              "No locks were available on ", lock_filename_, ". ",
+              "If located on an NFS filesystem, please log an issue");
+        default:
+          return arrow::Status::IOError("Error code ", errno, " returned attempting a ",
+                                        lock_type, " lock on ", lock_filename_);
+      }
+
+      std::this_thread::sleep_for(lock_sleep);
+      if (lock_sleep * 1.5 < 1s) {
+        lock_sleep *= 1.5;
+        lock_sleep += std::chrono::duration<double>(distribution(gen));
+      }
+    }
+  }();
+
+  // Unlock if fcntl lock acquisition failed
+  if (!status.ok()) write ? mutex_.unlock() : mutex_.unlock_shared();
+  return status;
+}
+
+arrow::Status RWLock::try_lock_impl(bool write) {
+  std::string_view lock_type = write ? "write" : "read";
+  if (!(write ? mutex_.try_lock() : mutex_.try_lock_shared())) {
+    return arrow::Status::Cancelled("Acquisition of ", lock_type, " lock failed");
+  }
+
+  constexpr auto lock_sleep = 100ms;
+  auto status = [&]() {
+    while (true) {
+      using LockType = decltype(flock::l_type);
+      struct flock lock_data = {
+          .l_type = LockType(write ? F_WRLCK : F_RDLCK),
+          .l_whence = SEEK_SET,
+          .l_start = 0,
+          .l_len = 0,
+          //.l_pid = getpid(),
+      };
+
+      // Indicate success if file-locking succeeds
+      if (fcntl(fd_, F_SETLK, &lock_data) == 0) return arrow::Status::OK();
+
+      switch (errno) {
+        case EAGAIN:
+          break;
+        case EACCES:
+          return arrow::Status::IOError("Permission denied attempting a ", lock_type,
+                                        " lock on ", lock_filename_);
+        case ENOLCK:
+          return arrow::Status::IOError(
+              "No locks were available on ", lock_filename_, ". ",
+              "If located on an NFS filesystem, please log an issue");
+        default:
+          return arrow::Status::IOError("Error code ", errno, " returned attempting a ",
+                                        lock_type, " lock on ", lock_filename_);
+      }
+
+      std::this_thread::sleep_for(lock_sleep);
+    }
+  }();
+
+  // Unlock if fcntl lock acquisition failed
+  if (!status.ok()) write ? mutex_.unlock() : mutex_.unlock_shared();
+  return status;
 }
 
 }  // namespace arcae
