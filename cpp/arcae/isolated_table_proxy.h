@@ -15,7 +15,7 @@
 #include <arrow/util/future.h>
 #include <arrow/util/thread_pool.h>
 
-#include <arcae/rwlock.h>
+#include "arcae/rwlock.h"
 #include "arcae/table_utils.h"
 #include "arcae/type_traits.h"
 
