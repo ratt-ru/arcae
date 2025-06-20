@@ -454,6 +454,7 @@ def test_taql_table_arg(sorting_table):
     assert_array_equal(result["ROW"], [9, 8, 7, 6, 5, 4, 3, 2, 1, 0])
 
 
+@pytest.mark.skip(reason="https://github.com/apache/arrow/issues/43696")
 def test_print_dataset_structure(partitioned_dataset):
     """Print the directory stucture of the partitioned dataset"""
     partitioned_dataset = str(partitioned_dataset)
@@ -469,6 +470,7 @@ def test_print_dataset_structure(partitioned_dataset):
             print("{}{}".format(subindent, f))
 
 
+@pytest.mark.skip(reason="https://github.com/apache/arrow/issues/43696")
 def test_dataset_predicates(partitioned_dataset):
     """Illustrate native arrow dataset predicates"""
     partitioned_dataset = pad.dataset(partitioned_dataset)
@@ -487,6 +489,7 @@ def test_dataset_predicates(partitioned_dataset):
     assert antenna2.size > 0 and np.all((antenna2 >= 2) & (antenna2 <= 3))
 
 
+@pytest.mark.skip(reason="https://github.com/apache/arrow/issues/43696")
 def test_duckdb(partitioned_dataset):
     """Illustrate integation between dataset and duckdb"""
     partitioned_dataset = pad.dataset(partitioned_dataset)
