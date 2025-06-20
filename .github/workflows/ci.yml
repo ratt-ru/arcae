@@ -93,13 +93,15 @@ jobs:
       matrix:
         os: ["ubuntu-22.04", "macos-13", "macos-14", "ubuntu-22.04-arm"]
         # https://peps.python.org/pep-0425
-        cpython: ["cp310", "cp311", "cp312"]
+        cpython: ["cp310", "cp311", "cp312", "cp313"]
         is_main_or_release:
           - ${{ contains(github.ref, 'main') || startsWith(github.ref, 'refs/tags')}}
         # Avoid building all wheels in a PR
         exclude:
           - is_main_or_release: false
             cpython: cp310
+          - is_main_or_release: false
+            cpython: cp311
           - is_main_or_release: false
             cpython: cp312
         include:
@@ -172,7 +174,7 @@ jobs:
             auditwheel repair
             -w {dest_dir} {wheel}
             --exclude libarrow_python.so
-            --exclude libarrow.so.1601
+            --exclude libarrow.so.2000
           CIBW_REPAIR_WHEEL_COMMAND_MACOS: |
             DYLD_LIBRARY_PATH=$LD_LIBRARY_PATH delocate-listdeps {wheel}
             DYLD_LIBRARY_PATH=$LD_LIBRARY_PATH delocate-wheel \
@@ -180,7 +182,7 @@ jobs:
               -w {dest_dir} \
               -v {wheel} \
               --exclude libarrow_python.dylib \
-              --exclude libarrow.1601.dylib \
+              --exclude libarrow.2000.dylib \
               --ignore-missing-dependencies
         uses: pypa/cibuildwheel@v3.0.0
 
