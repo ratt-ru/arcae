@@ -174,7 +174,7 @@ jobs:
             auditwheel repair
             -w {dest_dir} {wheel}
             --exclude libarrow_python.so
-            --exclude libarrow.so.2000
+            --exclude libarrow.so
           CIBW_REPAIR_WHEEL_COMMAND_MACOS: |
             DYLD_LIBRARY_PATH=$LD_LIBRARY_PATH delocate-listdeps {wheel}
             DYLD_LIBRARY_PATH=$LD_LIBRARY_PATH delocate-wheel \
@@ -182,7 +182,7 @@ jobs:
               -w {dest_dir} \
               -v {wheel} \
               --exclude libarrow_python.dylib \
-              --exclude libarrow.2000.dylib \
+              --exclude libarrow.dylib \
               --ignore-missing-dependencies
         uses: pypa/cibuildwheel@v3.0.0
 
