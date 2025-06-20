@@ -36,14 +36,14 @@ TEST(RWLockTest, Basic) {
     for (std::size_t i = 0; i < NTASKS; ++i) {
       auto ms_wait = std::chrono::milliseconds{ms_distribution(gen)};
       ASSERT_OK_AND_ASSIGN(auto future, pool->Submit([&lock, ms_wait = ms_wait, i = i]() {
-        ASSERT_OK(i % 2 ? lock.lock_shared() : lock.lock());
+        ASSERT_OK(i % 2 ? lock->lock_shared() : lock->lock());
         std::this_thread::sleep_for(ms_wait);
-        i % 2 ? lock.unlock_shared() : lock.unlock();
+        i % 2 ? lock->unlock_shared() : lock->unlock();
       }));
       futures.emplace_back(std::move(future));
     };
 
-    ASSERT_OK(lock.other_locks());
+    ASSERT_OK(lock->other_locks());
     auto result = arrow::All(futures).result();
 
     while (waitpid(-1, &status, WNOHANG) == 0) {
@@ -65,14 +65,14 @@ TEST(RWLockTest, Basic) {
     for (std::size_t i = 0; i < NTASKS; ++i) {
       auto ms_wait = std::chrono::milliseconds{ms_distribution(gen)};
       ASSERT_OK_AND_ASSIGN(auto future, pool->Submit([&lock, ms_wait = ms_wait, i = i]() {
-        ASSERT_OK(i % 2 ? lock.lock_shared() : lock.lock());
+        ASSERT_OK(i % 2 ? lock->lock_shared() : lock->lock());
         std::this_thread::sleep_for(ms_wait);
-        i % 2 ? lock.unlock_shared() : lock.unlock();
+        i % 2 ? lock->unlock_shared() : lock->unlock();
       }));
       futures.emplace_back(std::move(future));
     };
 
-    ASSERT_OK(lock.other_locks());
+    ASSERT_OK(lock->other_locks());
     auto result = arrow::All(futures).result();
     exit(0);
   }

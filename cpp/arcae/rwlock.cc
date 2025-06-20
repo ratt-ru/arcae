@@ -1,6 +1,7 @@
 #include "arcae/rwlock.h"
 
 #include <cassert>
+#include <memory>
 #include <random>
 #include <string>
 #include <string_view>
@@ -102,10 +103,11 @@ void RWLock::unlock_shared() {
   mutex_.unlock_shared();
 }
 
-arrow::Result<RWLock> RWLock::Create(std::string_view lock_filename, bool write) {
+arrow::Result<std::shared_ptr<RWLock>> RWLock::Create(std::string_view lock_filename,
+                                                      bool write) {
   std::string lock_name = make_lockname(lock_filename);
   // lock_filename.size() == 0 ? make_lockname() : std::string(lock_filename);
-  int fd;
+  int fd = 0;
 
   if (fd = open(lock_name.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR); fd == -1) {
     return arrow::Status::IOError("Creating lock file ", lock_name, " failed");
@@ -121,7 +123,11 @@ arrow::Result<RWLock> RWLock::Create(std::string_view lock_filename, bool write)
                                   " failed");
   };
 
-  return RWLock(fd, lock_name, write);
+  struct enable_make_shared : public RWLock {
+   public:
+    using RWLock::RWLock;
+  };
+  return std::make_shared<enable_make_shared>(fd, std::string_view(lock_name), write);
 }
 
 arrow::Status RWLock::other_locks() {
@@ -182,6 +188,9 @@ arrow::Status RWLock::lock_impl(bool write) {
         case EACCES:
           return arrow::Status::IOError("Permission denied attempting a ", lock_type,
                                         " lock on ", lock_filename_);
+        case EBADF:
+          return arrow::Status::IOError("Bad file descriptor ", fd_, " for ",
+                                        lock_filename_);
         case ENOLCK:
           return arrow::Status::IOError(
               "No locks were available on ", lock_filename_, ". ",
@@ -231,6 +240,9 @@ arrow::Status RWLock::try_lock_impl(bool write) {
         case EACCES:
           return arrow::Status::IOError("Permission denied attempting a ", lock_type,
                                         " lock on ", lock_filename_);
+        case EBADF:
+          return arrow::Status::IOError("Bad file descriptor ", fd_, " for ",
+                                        lock_filename_);
         case ENOLCK:
           return arrow::Status::IOError(
               "No locks were available on ", lock_filename_, ". ",

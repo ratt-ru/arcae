@@ -4,6 +4,7 @@
 #include <cerrno>
 
 #include <chrono>
+#include <memory>
 #include <mutex>
 #include <shared_mutex>
 #include <string>
@@ -25,14 +26,16 @@ using namespace std::literals;
 
 namespace arcae {
 
-class RWLock {
+class RWLock : public std::enable_shared_from_this<RWLock> {
  public:
-  static arrow::Result<RWLock> Create(std::string_view lock_filename = "",
-                                      bool write = false);
+  static arrow::Result<std::shared_ptr<RWLock>> Create(
+      std::string_view lock_filename = "", bool write = false);
 
   RWLock() : fd_(-1) {};
+  RWLock(const RWLock&) = delete;
   RWLock(RWLock&& rhs);
   RWLock& operator=(RWLock&& rhs);
+  RWLock& operator=(const RWLock&) = delete;
   ~RWLock();
 
   arrow::Status lock() { return lock_impl(true); }
@@ -59,6 +62,9 @@ class RWLock {
   }
 
  protected:
+  RWLock(int fd, std::string_view lock_filename, bool write = false)
+      : fd_(fd), fcntl_readers_(0), lock_filename_(lock_filename) {}
+
   arrow::Status lock_impl(bool write);
   arrow::Status try_lock_impl(bool write);
 
@@ -102,6 +108,9 @@ class RWLock {
         switch (errno) {
           case EAGAIN:
             break;
+          case EBADF:
+            return arrow::Status::IOError("Bad file descriptor ", fd_, " for ",
+                                          lock_filename_);
           case EACCES:
             return arrow::Status::IOError("Permission denied attempting a ", lock_type,
                                           " lock on ", lock_filename_);
@@ -130,8 +139,8 @@ class RWLock {
  private:
   static std::string make_lockname(std::string_view prefix = "lock");
 
-  RWLock(int fd, std::string_view lock_filename, bool write = false)
-      : fd_(fd), fcntl_readers_(0), lock_filename_(lock_filename) {}
+  // RWLock(int fd, std::string_view lock_filename, bool write = false)
+  //     : fd_(fd), fcntl_readers_(0), lock_filename_(lock_filename) {}
 
   int fd_;
   int fcntl_readers_;

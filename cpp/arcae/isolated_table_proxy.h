@@ -43,7 +43,7 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
   ArrowFutureType<Fn, const casacore::TableProxy&> RunAsync(Fn&& functor) const {
     using ResultType = ArrowResultType<Fn, const casacore::TableProxy&>;
     ARROW_RETURN_NOT_OK(CheckClosed());
-    RWLockGuard lock(lock_, false);
+    RWLockGuard lock(*lock_, false);
     auto instance = GetInstance();
     return RunInPool(instance,
                      [this, instance = instance,
@@ -65,7 +65,7 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
   ArrowFutureType<Fn, casacore::TableProxy&> RunAsync(Fn&& functor) {
     using ResultType = ArrowFutureType<Fn, casacore::TableProxy&>;
     ARROW_RETURN_NOT_OK(CheckClosed());
-    RWLockGuard lock(lock_, false);
+    RWLockGuard lock(*lock_, false);
     auto instance = GetInstance();
     return RunInPool(instance,
                      [this, instance = instance,
@@ -87,7 +87,7 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
   ArrowFutureType<Fn, casacore::TableProxy&> RunWriteAsync(Fn&& functor) {
     using ResultType = ArrowFutureType<Fn, casacore::TableProxy&>;
     ARROW_RETURN_NOT_OK(CheckClosed());
-    RWLockGuard lock(lock_, true);
+    RWLockGuard lock(*lock_, true);
     auto instance = GetInstance();
     return RunInPool(instance,
                      [this, instance = instance,
@@ -158,7 +158,7 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
   ArrowResultType<Fn, const casacore::TableProxy&> RunSync(Fn&& functor) const {
     using ResultType = ArrowFutureType<Fn, const casacore::TableProxy&>;
     ARROW_RETURN_NOT_OK(CheckClosed());
-    RWLockGuard lock(lock_, false);
+    RWLockGuard lock(*lock_, false);
     auto instance = GetInstance();
     return RunInPoolSync([this, instance = instance,
                           functor = std::forward<Fn>(functor)]() mutable -> ResultType {
@@ -179,7 +179,7 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
   ArrowResultType<Fn, casacore::TableProxy&> RunSync(Fn&& functor) {
     using ResultType = ArrowResultType<Fn, casacore::TableProxy&>;
     ARROW_RETURN_NOT_OK(CheckClosed());
-    RWLockGuard lock(lock_, false);
+    RWLockGuard lock(*lock_, false);
     auto instance = GetInstance();
     return RunInPoolSync(instance,
                          [this, instance = instance,
@@ -319,7 +319,7 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
   std::vector<ProxyAndPool> proxy_pools_;
   bool is_closed_;
   std::vector<std::shared_ptr<IsolatedTableProxy>> dependencies_;
-  mutable RWLock lock_;
+  mutable std::shared_ptr<RWLock> lock_;
 };
 
 }  // namespace detail
