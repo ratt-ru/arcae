@@ -2,6 +2,11 @@
 History
 =======
 
+0.3.0 (21-06-2025)
+------------------
+* Upgrade to pyarrow 20
+* Support python 3.13
+
 0.2.9 (10-06-2025)
 ------------------
 * Avoid clipping selections against the result array shape for ignored rows for read operations (:pr:`154`)
