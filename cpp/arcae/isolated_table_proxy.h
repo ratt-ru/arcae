@@ -255,6 +255,8 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
       itp->proxy_pools_.emplace_back(ProxyAndPool{std::move(table_proxy), GetPool(i)});
     }
 
+    // Acquire the parent table lock
+    itp->lock_ = this->lock_;
     itp->is_closed_ = false;
     // Add an explicit dependency on the ITP
     itp->dependencies_.push_back(shared_from_this());
