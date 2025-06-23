@@ -123,11 +123,14 @@ arrow::Result<std::shared_ptr<RWLock>> RWLock::Create(std::string_view lock_file
                                   " failed");
   };
 
-  struct enable_make_shared : public RWLock {
+  struct enable_make_shared_rwlock : public RWLock {
    public:
-    using RWLock::RWLock;
+    enable_make_shared_rwlock(int fd, std::string_view lock_name, bool write)
+        : RWLock(fd, lock_name, write) {};
   };
-  return std::make_shared<enable_make_shared>(fd, std::string_view(lock_name), write);
+
+  return std::make_shared<enable_make_shared_rwlock>(fd, std::string_view(lock_name),
+                                                     write);
 }
 
 arrow::Status RWLock::other_locks() {

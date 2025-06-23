@@ -62,9 +62,6 @@ class RWLock : public std::enable_shared_from_this<RWLock> {
   }
 
  protected:
-  RWLock(int fd, std::string_view lock_filename, bool write = false)
-      : fd_(fd), fcntl_readers_(0), lock_filename_(lock_filename) {}
-
   arrow::Status lock_impl(bool write);
   arrow::Status try_lock_impl(bool write);
 
@@ -139,8 +136,8 @@ class RWLock : public std::enable_shared_from_this<RWLock> {
  private:
   static std::string make_lockname(std::string_view prefix = "lock");
 
-  // RWLock(int fd, std::string_view lock_filename, bool write = false)
-  //     : fd_(fd), fcntl_readers_(0), lock_filename_(lock_filename) {}
+  RWLock(int fd, std::string_view lock_filename, bool write = false)
+      : fd_(fd), fcntl_readers_(0), lock_filename_(lock_filename) {}
 
   int fd_;
   int fcntl_readers_;
