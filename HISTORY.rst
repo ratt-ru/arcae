@@ -6,6 +6,11 @@ X.Y.Z (DD-MM-YYYY)
 ------------------
 * Write locking (:pr:`151`)
 
+0.3.0 (21-06-2025)
+------------------
+* Upgrade to pyarrow 20 (:pr:`157`)
+* Support python 3.13 (:pr:`157`)
+
 0.2.9 (10-06-2025)
 ------------------
 * Avoid clipping selections against the result array shape for ignored rows for read operations (:pr:`154`)
