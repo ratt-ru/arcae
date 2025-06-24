@@ -2,6 +2,8 @@
 
 #include <cassert>
 #include <cerrno>
+#include <cstring>
+
 #include <memory>
 #include <random>
 #include <string>
@@ -91,8 +93,8 @@ arrow::Result<std::shared_ptr<RWLock>> RWLock::Create(std::string_view lock_file
   int mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
 
   if (fd = open(lock_name.c_str(), flags, mode); fd == -1) {
-    return arrow::Status::IOError("Creation of ", lock_name, " failed with error number ",
-                                  errno)
+    return arrow::Status::IOError("Creation of ", lock_name, " failed with  ",
+                                  strerror(errno), " (", errno, ')')
         .WithDetail(std::make_shared<FcntlStatusDetail>(errno));
   }
 

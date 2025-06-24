@@ -226,8 +226,13 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
     auto first_table = proxy->proxy_pools_[0].table_proxy_->table();
     switch (first_table.tableType()) {
       case casacore::Table::Plain: {
-        auto path = std::filesystem::path(std::string_view(first_table.tableName()));
-        path /= "table.arcae.lock";
+        // NOTE: first_table.tableName() doesn't always give the underlying
+        // table name on disk in the case of reference (or concatenated tables)
+        // getPartNames(true) is used and the first table on disk is used for
+        // as the location for the lock
+        auto names = first_table.getPartNames(true);
+        assert(names.size() > 0);
+        auto path = std::filesystem::path(names[0].c_str()) / "table.arcae.lock";
         ARROW_ASSIGN_OR_RAISE(auto rwlock, RWLock::Create(path.native()));
         proxy->lock_ = std::dynamic_pointer_cast<BaseRWLock>(rwlock);
         break;
