@@ -45,6 +45,7 @@ class BaseRWLock : public std::enable_shared_from_this<BaseRWLock> {
 
   virtual void unlock() = 0;
   virtual void unlock_shared() = 0;
+  virtual ~BaseRWLock() {};
 };
 
 // Noops
@@ -70,7 +71,7 @@ class RWLock : public BaseRWLock {
   RWLock(RWLock&& rhs) = delete;
   RWLock& operator=(const RWLock&) = delete;
   RWLock& operator=(RWLock&& rhs) = delete;
-  ~RWLock();
+  ~RWLock() override;
 
   arrow::Status lock() override { return lock_impl(true); }
   arrow::Status lock_shared() override { return lock_impl(false); }
