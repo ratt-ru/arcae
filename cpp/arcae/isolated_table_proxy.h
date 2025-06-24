@@ -1,6 +1,7 @@
 #ifndef ARCAE_ISOLATED_TABLE_PROXY_H
 #define ARCAE_ISOLATED_TABLE_PROXY_H
 
+#include <filesystem>
 #include <memory>
 #include <type_traits>
 #include <vector>
@@ -208,7 +209,6 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
     std::shared_ptr<IsolatedTableProxy> proxy =
         std::make_shared<enable_make_shared_itp>();
     proxy->proxy_pools_.reserve(ninstances);
-    ARROW_ASSIGN_OR_RAISE(proxy->lock_, RWLock::Create("/tmp/blah"));
     auto fwd_functor = std::forward<Fn>(functor);
 
     // Mark as closed so that if construction fails, we don't try to close it
@@ -221,6 +221,25 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
       ARROW_ASSIGN_OR_RAISE(auto table_proxy, table_fut.MoveResult());
       proxy->proxy_pools_.push_back(
           ProxyAndPool{std::move(table_proxy), std::move(io_pool)});
+    }
+
+    auto first_table = proxy->proxy_pools_[0].table_proxy_->table();
+    switch (first_table.tableType()) {
+      case casacore::Table::Plain: {
+        auto path = std::filesystem::path(std::string_view(first_table.tableName()));
+        path /= "table.arcae.lock";
+        ARROW_ASSIGN_OR_RAISE(auto rwlock, RWLock::Create(path.native()));
+        proxy->lock_ = std::dynamic_pointer_cast<BaseRWLock>(rwlock);
+        break;
+      }
+      case casacore::Table::Memory: {
+        proxy->lock_ =
+            std::dynamic_pointer_cast<BaseRWLock>(std::make_shared<NullRWLock>());
+        break;
+      }
+      default:
+        return arrow::Status::NotImplemented("Unhandled table type ",
+                                             first_table.tableType());
     }
 
     proxy->is_closed_ = false;
@@ -321,7 +340,7 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
   std::vector<ProxyAndPool> proxy_pools_;
   bool is_closed_;
   std::vector<std::shared_ptr<IsolatedTableProxy>> dependencies_;
-  mutable std::shared_ptr<RWLock> lock_;
+  mutable std::shared_ptr<BaseRWLock> lock_;
 };
 
 }  // namespace detail

@@ -26,30 +26,68 @@ using namespace std::literals;
 
 namespace arcae {
 
-class RWLock : public std::enable_shared_from_this<RWLock> {
+// Additional Status Detail related to RWLocks
+class FcntlStatusDetail : public arrow::StatusDetail {
+ public:
+  FcntlStatusDetail(int e) : errorno_(e) {}
+  virtual const char* type_id() const override { return "FcntlStatusDetail"; }
+  virtual std::string ToString() const override { return std::to_string(errorno_); }
+  int errorno_;
+};
+
+// Base locking class
+class BaseRWLock : public std::enable_shared_from_this<BaseRWLock> {
+ public:
+  virtual arrow::Status lock() = 0;
+  virtual arrow::Status lock_shared() = 0;
+  virtual arrow::Status try_lock() = 0;
+  virtual arrow::Status try_lock_shared() = 0;
+
+  virtual void unlock() = 0;
+  virtual void unlock_shared() = 0;
+};
+
+// Noops
+class NullRWLock : public BaseRWLock {
+ public:
+  virtual arrow::Status lock() override { return arrow::Status::OK(); }
+  virtual arrow::Status lock_shared() override { return arrow::Status::OK(); }
+
+  virtual arrow::Status try_lock() override { return arrow::Status::OK(); }
+  virtual arrow::Status try_lock_shared() override { return arrow::Status::OK(); }
+
+  virtual void unlock() override {}
+  virtual void unlock_shared() override {};
+};
+
+//
+class RWLock : public BaseRWLock {
  public:
   static arrow::Result<std::shared_ptr<RWLock>> Create(
       std::string_view lock_filename = "", bool write = false);
 
-  RWLock() : fd_(-1) {};
   RWLock(const RWLock&) = delete;
-  RWLock(RWLock&& rhs);
-  RWLock& operator=(RWLock&& rhs);
+  RWLock(RWLock&& rhs) = delete;
   RWLock& operator=(const RWLock&) = delete;
+  RWLock& operator=(RWLock&& rhs) = delete;
   ~RWLock();
 
-  arrow::Status lock() { return lock_impl(true); }
-  arrow::Status lock_shared() { return lock_impl(false); }
+  arrow::Status lock() override { return lock_impl(true); }
+  arrow::Status lock_shared() override { return lock_impl(false); }
 
-  void unlock();
-  void unlock_shared();
+  void unlock() override;
+  void unlock_shared() override;
 
-  std::size_t read_locks() { return fcntl_readers_; }
+  // Race condition, use for test cases only
+  std::size_t read_locks() {
+    std::unique_lock<std::mutex> fnctl_lock(fcntl_mutex_);
+    return fcntl_readers_;
+  }
 
   arrow::Status other_locks();
 
-  arrow::Status try_lock() { return try_lock_impl(true); }
-  arrow::Status try_lock_shared() { return try_lock_impl(false); }
+  arrow::Status try_lock() override { return try_lock_impl(true); }
+  arrow::Status try_lock_shared() override { return try_lock_impl(false); }
 
   template <class Rep, class Period>
   arrow::Status try_lock_for(const std::chrono::duration<Rep, Period>& timeout) {
@@ -148,11 +186,11 @@ class RWLock : public std::enable_shared_from_this<RWLock> {
 
 class RWLockGuard {
  private:
-  RWLock& lock_;
+  BaseRWLock& lock_;
   bool write_;
 
  public:
-  RWLockGuard(RWLock& lock, bool write = false) : lock_(lock), write_(write) {
+  RWLockGuard(BaseRWLock& lock, bool write = false) : lock_(lock), write_(write) {
     if (auto status = write_ ? lock_.lock() : lock_.lock_shared(); !status.ok()) {
       ARROW_LOG(ERROR) << "Unable to lock " << status;
       std::exit(1);

@@ -1,11 +1,11 @@
 #include "arcae/rwlock.h"
 
 #include <cassert>
+#include <cerrno>
 #include <memory>
 #include <random>
 #include <string>
 #include <string_view>
-#include <utility>
 
 #if defined(_WIN32) || defined(_WIN64)
 #error Posix fcntl support required
@@ -42,27 +42,6 @@ std::string RWLock::make_lockname(std::string_view prefix) {
   }
 
   return result;
-}
-
-RWLock::RWLock(RWLock&& rhs)
-    : fd_(std::exchange(rhs.fd_, -1)),
-      fcntl_readers_(std::exchange(rhs.fcntl_readers_, 0)),
-      lock_filename_(std::move(rhs.lock_filename_)),
-      mutex_() {
-  rhs.mutex_.unlock();
-  rhs.mutex_.unlock_shared();
-}
-
-RWLock& RWLock::operator=(RWLock&& rhs) {
-  using std::swap;
-  if (this != &rhs) {
-    std::swap(fd_, rhs.fd_);
-    std::swap(fcntl_readers_, rhs.fcntl_readers_);
-    std::swap(lock_filename_, rhs.lock_filename_);
-    rhs.mutex_.unlock();
-    rhs.mutex_.unlock_shared();
-  }
-  return *this;
 }
 
 RWLock::~RWLock() {
@@ -106,29 +85,23 @@ void RWLock::unlock_shared() {
 arrow::Result<std::shared_ptr<RWLock>> RWLock::Create(std::string_view lock_filename,
                                                       bool write) {
   std::string lock_name = make_lockname(lock_filename);
-  // lock_filename.size() == 0 ? make_lockname() : std::string(lock_filename);
   int fd = 0;
+  // Attempt to open or create the lock file in readwrite mode
+  int flags = O_CREAT | O_RDWR;
+  int mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
 
-  if (fd = open(lock_name.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR); fd == -1) {
-    return arrow::Status::IOError("Creating lock file ", lock_name, " failed");
+  if (fd = open(lock_name.c_str(), flags, mode); fd == -1) {
+    return arrow::Status::IOError("Creation of ", lock_name, " failed with error number ",
+                                  errno)
+        .WithDetail(std::make_shared<FcntlStatusDetail>(errno));
   }
 
-  struct flock lock_data = {
-      .l_type = F_WRLCK, .l_whence = SEEK_SET, .l_start = 0, .l_len = 0,
-      // .l_pid = getpid(),
-  };
-
-  if (fcntl(fd, F_GETLK, &lock_data) == -1) {
-    return arrow::Status::IOError("Retrieving lock information for ", lock_name,
-                                  " failed");
-  };
-
+  // Enable std::make_shared with a protected constructor
   struct enable_make_shared_rwlock : public RWLock {
    public:
     enable_make_shared_rwlock(int fd, std::string_view lock_name, bool write)
         : RWLock(fd, lock_name, write) {};
   };
-
   return std::make_shared<enable_make_shared_rwlock>(fd, std::string_view(lock_name),
                                                      write);
 }
@@ -143,8 +116,8 @@ arrow::Status RWLock::other_locks() {
   };
 
   if (fcntl(fd_, F_GETLK, &lock_data) == -1) {
-    return arrow::Status::IOError("Retrieving lock information for ", lock_filename_,
-                                  " failed");
+    return arrow::Status::IOError("Fail to retrieve lock information for ",
+                                  lock_filename_);
   }
 
   ARROW_LOG(INFO) << "show_lock pid " << lock_data.l_pid << " l_type "
@@ -168,7 +141,7 @@ arrow::Status RWLock::lock_impl(bool write) {
   // Repeatedly attempt acquisition of
   // the fcntl lock with exponential backoff.
   // A blocking F_SETLKW could be used but in practice
-  // one ends up having to handle EDEADLK.
+  // this produces EDEADLK.
   auto status = [&]() {
     while (true) {
       using LockType = decltype(flock::l_type);
