@@ -220,7 +220,7 @@ arrow::Status child_loop(PipeComms& pipe_comms, std::string_view lock_filename) 
       auto n = strlen(kRequestLock) + 1;
       auto req_lock_type_str = std::string_view(std::begin(msg) + n, std::end(msg));
       ARROW_ASSIGN_OR_RAISE(
-          auto requested_lock, [&]() -> arrow::Result<decltype(F_UNLCK)> {
+          auto requested_lock, [&]() -> arrow::Result<arcae::FcntlLockType> {
             if (req_lock_type_str.starts_with("none"))
               return F_UNLCK;
             else if (req_lock_type_str.starts_with("read"))
@@ -420,8 +420,8 @@ TEST(RWLockTest, InterProcessObservability) {
 
   // Second child observes the first child's write lock
   ASSERT_OK(comms[1].send(kRequestLock + " read"s, PARENT_CONTEXT));
-  ASSERT_OK(
-      comms[1].expect("fail write " + std::to_string(child_pid[0]), PARENT_CONTEXT));
+  auto child_0_pid = std::to_string(child_pid[0]);
+  ASSERT_OK(comms[1].expect("fail write " + child_0_pid, PARENT_CONTEXT));
 
   // Release the write lock in the first child
   ASSERT_OK(comms[0].send(kWriteUnlock + "thread 2"s, PARENT_CONTEXT));
@@ -440,8 +440,9 @@ TEST(RWLockTest, InterProcessObservability) {
   ASSERT_OK(comms[0].expect("none", PARENT_CONTEXT));
 
   // First child observes read lock in response to a write lock request
-  ASSERT_OK(comms[0].send(kRequestLock + " read"s, PARENT_CONTEXT));
-  ASSERT_OK(comms[0].expect("none", PARENT_CONTEXT));
+  ASSERT_OK(comms[0].send(kRequestLock + " write"s, PARENT_CONTEXT));
+  auto child_1_pid = std::to_string(child_pid[1]);
+  ASSERT_OK(comms[0].expect("fail read " + child_1_pid, PARENT_CONTEXT));
 
   ASSERT_OK(ShutdownChildren(comms, child_pid));
 }
