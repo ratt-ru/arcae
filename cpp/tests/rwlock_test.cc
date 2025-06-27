@@ -13,6 +13,7 @@
 #include <string>
 
 #include <fcntl.h>
+#include <sched.h>
 #include <unistd.h>
 
 #include <gtest/gtest.h>
@@ -28,8 +29,13 @@ using namespace std::literals;
 namespace fs = std::filesystem;
 using arcae::RWLock;
 
+using arrow::Result;
+using arrow::Status;
+using arrow::internal::ThreadPool;
+
 namespace {
 
+// Instructions to the child process control loop
 static constexpr char kExit[] = "exit";
 static constexpr char kWriteLock[] = "write lock";
 static constexpr char kReadLock[] = "read lock";
@@ -61,6 +67,8 @@ fs::path temp_directory_name(std::size_t len = 8) {
 
 static constexpr std::size_t NCHILDREN = 2;
 
+// Helper class for managing pipe interactions between
+// a parent and a child process
 struct PipeComms {
   static constexpr std::size_t NPIPES = 2;
   static constexpr std::size_t MSG_SIZE = 1024;
@@ -97,9 +105,9 @@ struct PipeComms {
   static arrow::Result<PipeComms> Create() {
     PipeComms result;
     if (pipe(result.p_to_c) == -1)
-      return arrow::Status::IOError("Failed to create parent to child pipe");
+      return Status::IOError("Failed to create parent to child pipe");
     if (pipe(result.c_to_p) == -1)
-      return arrow::Status::IOError("Failed to create child to parent pipe");
+      return Status::IOError("Failed to create child to parent pipe");
     return result;
   }
 
@@ -120,10 +128,10 @@ struct PipeComms {
     auto pipe = (context == PARENT ? p_to_c : c_to_p)[PipeEnd::WRITE];
     std::copy_n(std::begin(msg), n, buffer);
     if (write(pipe, buffer, n) == -1) {
-      return arrow::Status::IOError("Write of ", n, " bytes failed due to ",
-                                    strerror(errno), " on pipe ", pipe);
+      return Status::IOError("Write of ", n, " bytes failed due to ", strerror(errno),
+                             " on pipe ", pipe);
     }
-    return arrow::Status::OK();
+    return Status::OK();
   }
 
   // Receive a message in the current context
@@ -133,18 +141,17 @@ struct PipeComms {
     if (auto n = read(pipe, buffer, MSG_SIZE); n > 0) {
       return std::string(buffer, buffer + n);
     } else if (n < 0) {
-      return arrow::Status::IOError("Read failed due to ", strerror(errno), " on pipe ",
-                                    pipe);
+      return Status::IOError("Read failed due to ", strerror(errno), " on pipe ", pipe);
     }
 
-    return arrow::Status::Cancelled("Read failed due to EOF on pipe ", pipe);
+    return Status::Cancelled("Read failed due to EOF on pipe ", pipe);
   }
 
   // Expect a message in the current context
   arrow::Status expect(std::string_view expected, ProcessContext context) {
     ARROW_ASSIGN_OR_RAISE(auto msg, receive(context));
-    if (msg == expected) return arrow::Status::OK();
-    return arrow::Status::Invalid('\"', msg, "\" did not match \"", expected, '\"');
+    if (msg == expected) return Status::OK();
+    return Status::Invalid('\"', msg, "\" did not match \"", expected, '\"');
   }
 
   // Close any open pipe descriptors
@@ -163,58 +170,48 @@ struct PipeComms {
 };
 
 // Child process loop
+// Waits for instructions from the parent process such as
+// "read lock", "write lock", "query fctnl readers",
+// "read lock thread 1", "write lock thread 2".
+// Generally responds to the parent process with
+// "ok", "fail" or some additional requested information
 arrow::Status child_loop(PipeComms& pipe_comms, std::string_view lock_filename) {
   constexpr auto context = PipeComms::CHILD;
-  auto threads = std::map<int, arrow::internal::ThreadPool>();
   ARROW_ASSIGN_OR_RAISE(auto lock, RWLock::Create(lock_filename));
-  if (lock == nullptr) return arrow::Status::Invalid("Cast failed");
-  if (!lock->has_fd()) return arrow::Status::Invalid("No disk lock");
+  if (lock == nullptr) return Status::Invalid("Cast failed");
+  if (!lock->has_fd()) return Status::Invalid("No disk lock");
 
-  // auto MaybeRunInThread = [&](auto && f, auto && s, std::string_view msg) {
-  //   int thread = -1;
-
-  //   if (auto p = msg.find("thread"); p != std::string_view::npos) {
-  //     p += strlen("thread");
-  //     try {
-  //       thread = std::stoi(std::string(msg.substr(p)));
-  //     } catch(std::exception & e) {
-  //       thread = -1;
-  //     }
-  //   }
-
-  //   auto result = std::move(f)();
-
-  // };
-
-  while (true) {
-    ARROW_ASSIGN_OR_RAISE(auto msg, pipe_comms.receive(context));
+  // Lambda handling individual messages
+  // Messages are distinguished by their suffix.
+  // i.e "write lock" or "query fctnl readers"
+  auto HandleMsg = [&](std::string_view msg) -> Result<bool> {
     if (msg == kExit) {
       // Exit child loop
       ARROW_RETURN_NOT_OK(pipe_comms.send("ok", context));
-      return arrow::Status::OK();
-    } else if (msg == kWriteLock) {
+      return false;
+    } else if (msg.starts_with(kWriteLock)) {
       // Acquire write lock
       ARROW_RETURN_NOT_OK(lock->lock());
       ARROW_RETURN_NOT_OK(pipe_comms.send("ok", context));
-    } else if (msg == kWriteUnlock) {
+    } else if (msg.starts_with(kWriteUnlock)) {
       // Release write lock
       lock->unlock();
       ARROW_RETURN_NOT_OK(pipe_comms.send("ok", context));
-    } else if (msg == kReadLock) {
+    } else if (msg.starts_with(kReadLock)) {
       // Acquire read lock
       ARROW_RETURN_NOT_OK(lock->lock_shared());
       ARROW_RETURN_NOT_OK(pipe_comms.send("ok", context));
-    } else if (msg == kReadUnlock) {
+    } else if (msg.starts_with(kReadUnlock)) {
       // Release read lock
       lock->unlock_shared();
       ARROW_RETURN_NOT_OK(pipe_comms.send("ok", context));
-    } else if (msg == kTryWriteLock) {
+    } else if (msg.starts_with(kTryWriteLock)) {
       ARROW_ASSIGN_OR_RAISE(auto success, lock->try_lock());
       ARROW_RETURN_NOT_OK(pipe_comms.send(success ? "ok" : "fail", context));
-    } else if (msg == kTryReadLock) {
+    } else if (msg.starts_with(kTryReadLock)) {
       ARROW_ASSIGN_OR_RAISE(auto success, lock->try_lock_shared());
       ARROW_RETURN_NOT_OK(pipe_comms.send(success ? "ok" : "fail", context));
-    } else if (msg == kQueryFcntlReaders) {
+    } else if (msg.starts_with(kQueryFcntlReaders)) {
       // Query fcntl readers
       auto response = "ok " + std::to_string(lock->fcntl_readers());
       ARROW_RETURN_NOT_OK(pipe_comms.send(response, context));
@@ -224,150 +221,229 @@ arrow::Status child_loop(PipeComms& pipe_comms, std::string_view lock_filename) 
       auto req_lock_type_str = std::string_view(std::begin(msg) + n, std::end(msg));
       ARROW_ASSIGN_OR_RAISE(
           auto requested_lock, [&]() -> arrow::Result<decltype(F_UNLCK)> {
-            if (req_lock_type_str == "none")
+            if (req_lock_type_str.starts_with("none"))
               return F_UNLCK;
-            else if (req_lock_type_str == "read")
+            else if (req_lock_type_str.starts_with("read"))
               return F_RDLCK;
-            else if (req_lock_type_str == "write")
+            else if (req_lock_type_str.starts_with("write"))
               return F_WRLCK;
             else
-              return arrow::Status::IOError("unknown lock type ", req_lock_type_str);
+              return Status::IOError("unknown lock type ", req_lock_type_str);
           }());
 
       ARROW_ASSIGN_OR_RAISE(auto lock_info, lock->other_locks(requested_lock));
       auto [lock_type, pid] = lock_info;
-      auto response = [&]() {
+      auto response = [&]() -> std::string {
         switch (lock_type) {
           case F_UNLCK:
-            return "ok";
+            return "none";
           case F_RDLCK:
-            return "fail read";
+            return "fail read " + std::to_string(pid);
           case F_WRLCK:
-            return "fail write";
+            return "fail write " + std::to_string(pid);
           default:
             return "unknown";
         }
       }();
       ARROW_RETURN_NOT_OK(pipe_comms.send(response, context));
-
     } else {
-      return arrow::Status::IOError("Unhandled message ", msg);
+      return Status::IOError("Unhandled message ", msg);
     }
+
+    return true;
+  };
+
+  // Single thread ThreadPools
+  auto threads = std::map<int, std::shared_ptr<ThreadPool>>();
+
+  // Possibly execute the supplied functor in a ThreadPool,
+  // depending on the presence of constructs like "thread 1"
+  // or "thread 2" in the message suffix
+  auto MaybeRunInThread = [&](std::string_view msg, auto&& f) -> arrow::Result<bool> {
+    int thread = [&]() -> int {
+      if (auto p = msg.find("thread"); p != std::string_view::npos) {
+        try {
+          return std::stoi(std::string(msg.substr(p + strlen("thread"))));
+        } catch (std::exception& e) {
+        }
+      }
+      return -1;
+    }();
+
+    // Execute functor on thread if requested, creating it if necessary
+    if (thread >= 0) {
+      ARROW_LOG(INFO) << "Executing " << msg << " on thread " << thread;
+      decltype(threads.begin()) pool_it;
+      if (pool_it = threads.find(thread); pool_it == threads.end()) {
+        ARROW_ASSIGN_OR_RAISE(auto pool, ThreadPool::Make(1));
+        pool_it = threads.insert({thread, pool}).first;
+      }
+      auto future = arrow::DeferNotOk(pool_it->second->Submit(std::move(f)));
+      return future.MoveResult();
+    }
+
+    // Otherwise call functor in the main thread
+    return std::move(f)();
+  };
+
+  // Run the message loop until exit (or error)
+  for (auto loop = true; loop;) {
+    ARROW_ASSIGN_OR_RAISE(auto msg, pipe_comms.receive(context));
+    ARROW_ASSIGN_OR_RAISE(loop, MaybeRunInThread(msg, [&]() { return HandleMsg(msg); }));
   }
+
+  return Status::OK();
 }
 
-TEST(RWLockTest, Basic) {
-  PipeComms comms[NCHILDREN];
-  pid_t child_pid[NCHILDREN];
-
-  for (std::size_t c = 0; c < NCHILDREN; ++c) {
-    ASSERT_OK_AND_ASSIGN(comms[c], PipeComms::Create());
+// Spawns some children running child_loop
+// and returns control to the parent process
+template <std::size_t CHILDREN>
+arrow::Status SpawnChildren(std::array<PipeComms, CHILDREN>& comms,
+                            std::array<pid_t, CHILDREN>& child_pid) {
+  for (std::size_t c = 0; c < CHILDREN; ++c) {
+    ARROW_ASSIGN_OR_RAISE(comms[c], PipeComms::Create());
   }
 
   auto path = temp_directory_name();
-  ASSERT_TRUE(fs::create_directory(path));
+  if (!fs::create_directory(path))
+    return Status::IOError("Unable to create ", path.native());
   auto lock_name = path / "table.lock";
 
-  for (std::size_t c = 0; c < NCHILDREN; ++c) {
+  for (std::size_t c = 0; c < CHILDREN; ++c) {
     if (child_pid[c] = fork(); child_pid[c] == 0) {
       // child process
-      // Run child loop and exit the process appropriately
+      // run child loop and exit appropriately
       comms[c].close_unused_ends(PipeComms::CHILD);
-      auto status = child_loop(comms[c], lock_name.native());
+      auto status = [&]() {
+        try {
+          return child_loop(comms[c], lock_name.native());
+        } catch (std::exception& e) {
+          return Status::UnknownError(e.what());
+        }
+      }();
+
       if (status.ok()) exit(EXIT_SUCCESS);
-      ARROW_LOG(WARNING) << "Child " << c << " failed with " << status;
+      ARROW_LOG(WARNING) << "Child " << c << " failed: " << status;
       exit(EXIT_FAILURE);
     } else if (child_pid[c] == -1) {
-      FAIL() << "Child " << c << " forks failed";
-    } else {
-      // parent process
-      // do some cleanup
-      // and then fallback to the comms
-      // pattern below
-      comms[c].close_unused_ends(PipeComms::PARENT);
+      return Status::IOError("Fork of Child ", c, " failed");
     }
+    // parent process. do pipe end cleanup
+    comms[c].close_unused_ends(PipeComms::PARENT);
   }
 
-  constexpr auto context = PipeComms::PARENT;
+  return Status::OK();
+}
 
-  // Acquire a read lock in the first child
-  ASSERT_OK(comms[0].send(kReadLock, context));
-  ASSERT_OK(comms[0].expect("ok", context));
-
-  ASSERT_OK(comms[0].send(kQueryFcntlReaders, context));
-  ASSERT_OK(comms[0].expect("ok 1", context));
-
-  ASSERT_OK(comms[0].send(kReadLock, context));
-  ASSERT_OK(comms[0].expect("ok", context));
-
-  ASSERT_OK(comms[0].send(kQueryFcntlReaders, context));
-  ASSERT_OK(comms[0].expect("ok 2", context));
-
-  ASSERT_OK(comms[0].send(kReadUnlock, context));
-  ASSERT_OK(comms[0].expect("ok", context));
-
-  ASSERT_OK(comms[0].send(kQueryFcntlReaders, context));
-  ASSERT_OK(comms[0].expect("ok 1", context));
-
-  // A read lock in another child process would not
-  // be blocked by the read lock in the first child process
-  ASSERT_OK(comms[0].send(kRequestLock + " read"s, context));
-  ASSERT_OK(comms[0].expect("ok", context));
-
-  // A write lock in another child would encounter a read lock
-  // from the first child
-  ASSERT_OK(comms[1].send(kRequestLock + " write"s, context));
-  ASSERT_OK(comms[1].expect("fail read", context));
-
-  ASSERT_OK(comms[0].send(kReadUnlock, context));
-  ASSERT_OK(comms[0].expect("ok", context));
-
-  ASSERT_OK(comms[0].send(kQueryFcntlReaders, context));
-  ASSERT_OK(comms[0].expect("ok 0", context));
-
-  ASSERT_OK(comms[0].send(kReadUnlock, context));
-  ASSERT_OK(comms[0].expect("ok", context));
-
-  ASSERT_OK(comms[0].send(kQueryFcntlReaders, context));
-  ASSERT_OK(comms[0].expect("ok 0", context));
-
-  // A write lock in another child would
-  // not encounter conflicting locks
-  ASSERT_OK(comms[1].send(kRequestLock + " write"s, context));
-  ASSERT_OK(comms[1].expect("ok", context));
-
-  // Acquire a write lock in second child
-  ASSERT_OK(comms[1].send(kWriteLock, context));
-  ASSERT_OK(comms[1].expect("ok", context));
-
-  // Attempting a read lock in the first child
-  // would encounter the write lock in the second
-  ASSERT_OK(comms[0].send(kRequestLock + " read"s, context));
-  ASSERT_OK(comms[0].expect("fail write", context));
-
-  ASSERT_OK(comms[0].send(kTryReadLock, context));
-  ASSERT_OK(comms[0].expect("fail", context));
-
-  ASSERT_OK(comms[1].send(kWriteUnlock, context));
-  ASSERT_OK(comms[1].expect("ok", context));
-
-  ASSERT_OK(comms[0].send(kTryReadLock, context));
-  ASSERT_OK(comms[0].expect("ok", context));
-
-  ASSERT_OK(comms[0].send(kQueryFcntlReaders, context));
-  ASSERT_OK(comms[0].expect("ok 1", context));
-
+// Issues exit instructions to the child process
+// and waits for it to shutdown
+template <std::size_t CHILDREN>
+arrow::Status ShutdownChildren(std::array<PipeComms, CHILDREN>& comms,
+                               std::array<pid_t, CHILDREN>& child_pid) {
   for (std::size_t c = 0; c < NCHILDREN; ++c) {
     int status;
-    ASSERT_OK(comms[c].send("exit", context));
-    ASSERT_OK(comms[c].expect("ok", context));
+    ARROW_RETURN_NOT_OK(comms[c].send("exit", PipeComms::PARENT));
+    ARROW_RETURN_NOT_OK(comms[c].expect("ok", PipeComms::PARENT));
 
     if (auto w_pid = waitpid(child_pid[c], &status, 0); w_pid == -1) {
-      FAIL() << "Waiting for child failed";
+      return Status::IOError("Waiting for child ", c, " failed");
     } else if (status != EXIT_SUCCESS) {
-      FAIL() << "Child " << w_pid << " failed with exit code " << status;
+      return Status::IOError("Child ", c, " failed with exit code", status);
     }
   }
+
+  return Status::OK();
+}
+
+static constexpr auto PARENT_CONTEXT = PipeComms::PARENT;
+
+TEST(RWLockTest, FcntlReaders) {
+  std::array<PipeComms, NCHILDREN> comms;
+  std::array<pid_t, NCHILDREN> child_pid;
+
+  ASSERT_OK(SpawnChildren(comms, child_pid));
+  constexpr std::size_t NREADLOCKS = 3;
+
+  // Base case for no locks
+  ASSERT_OK(comms[0].send(kQueryFcntlReaders, PARENT_CONTEXT));
+  ASSERT_OK(comms[0].expect("ok 0", PARENT_CONTEXT));
+
+  for (std::size_t i = 0; i < NREADLOCKS; ++i) {
+    auto thread = std::to_string(i);
+
+    // Acquire a read lock in the first child
+    ASSERT_OK(comms[0].send(kReadLock + " thread "s + thread, PARENT_CONTEXT));
+    ASSERT_OK(comms[0].expect("ok", PARENT_CONTEXT));
+
+    // Confirm number of readers
+    ASSERT_OK(comms[0].send(kQueryFcntlReaders + " thread "s + std::to_string(i),
+                            PARENT_CONTEXT));
+    ASSERT_OK(comms[0].expect("ok " + std::to_string(i + 1), PARENT_CONTEXT));
+  }
+
+  for (std::size_t i = 0; i < NREADLOCKS; ++i) {
+    auto thread = std::to_string(i);
+    // Release a read lock in the first child
+    ASSERT_OK(comms[0].send(kReadUnlock + " thread "s + thread, PARENT_CONTEXT));
+    ASSERT_OK(comms[0].expect("ok", PARENT_CONTEXT));
+
+    // Confirm number of readers
+    ASSERT_OK(comms[0].send(kQueryFcntlReaders + " thread "s + thread, PARENT_CONTEXT));
+    ASSERT_OK(
+        comms[0].expect("ok " + std::to_string(NREADLOCKS - i - 1), PARENT_CONTEXT));
+  }
+
+  ASSERT_OK(ShutdownChildren(comms, child_pid));
+}
+
+TEST(RWLockTest, InterProcessObservability) {
+  std::array<PipeComms, NCHILDREN> comms;
+  std::array<pid_t, NCHILDREN> child_pid;
+
+  ASSERT_OK(SpawnChildren(comms, child_pid));
+
+  // Acquire a write lock in the first child
+  ASSERT_OK(comms[0].send(kWriteLock + "thread 1"s, PARENT_CONTEXT));
+  ASSERT_OK(comms[0].expect("ok", PARENT_CONTEXT));
+
+  // Failed to acquire a write lock in the same process and thread
+  ASSERT_OK(comms[0].send(kTryWriteLock + "thread 1"s, PARENT_CONTEXT));
+  ASSERT_OK(comms[0].expect("fail", PARENT_CONTEXT));
+
+  // Failed to acquire a write lock in the same process and a different thread
+  ASSERT_OK(comms[0].send(kTryWriteLock + "thread 2"s, PARENT_CONTEXT));
+  ASSERT_OK(comms[0].expect("fail", PARENT_CONTEXT));
+
+  // Failed to acquire a write lock in a different process
+  ASSERT_OK(comms[1].send(kTryWriteLock + "thread 2"s, PARENT_CONTEXT));
+  ASSERT_OK(comms[1].expect("fail", PARENT_CONTEXT));
+
+  // Second child observes the first child's write lock
+  ASSERT_OK(comms[1].send(kRequestLock + " read"s, PARENT_CONTEXT));
+  ASSERT_OK(
+      comms[1].expect("fail write " + std::to_string(child_pid[0]), PARENT_CONTEXT));
+
+  // Release the write lock in the first child
+  ASSERT_OK(comms[0].send(kWriteUnlock + "thread 2"s, PARENT_CONTEXT));
+  ASSERT_OK(comms[0].expect("ok", PARENT_CONTEXT));
+
+  // Second child observes no lock
+  ASSERT_OK(comms[1].send(kRequestLock + " read"s, PARENT_CONTEXT));
+  ASSERT_OK(comms[1].expect("none", PARENT_CONTEXT));
+
+  // Second child acquires a read lock
+  ASSERT_OK(comms[1].send(kReadLock + " thread 1"s, PARENT_CONTEXT));
+  ASSERT_OK(comms[1].expect("ok", PARENT_CONTEXT));
+
+  // First child observes no lock in response to a read lock request
+  ASSERT_OK(comms[0].send(kRequestLock + " read"s, PARENT_CONTEXT));
+  ASSERT_OK(comms[0].expect("none", PARENT_CONTEXT));
+
+  // First child observes read lock in response to a write lock request
+  ASSERT_OK(comms[0].send(kRequestLock + " read"s, PARENT_CONTEXT));
+  ASSERT_OK(comms[0].expect("none", PARENT_CONTEXT));
+
+  ASSERT_OK(ShutdownChildren(comms, child_pid));
 }
 
 TEST(RWLockTest, ReadFallback) {
