@@ -1,12 +1,14 @@
 #ifndef ARCAE_ISOLATED_TABLE_PROXY_H
 #define ARCAE_ISOLATED_TABLE_PROXY_H
 
+#include <filesystem>
 #include <memory>
 #include <type_traits>
 #include <vector>
 
 #include <casacore/casa/Exceptions/Error.h>
 #include <casacore/tables/Tables.h>
+#include <casacore/tables/Tables/Table.h>
 #include <casacore/tables/Tables/TableProxy.h>
 
 #include <arrow/result.h>
@@ -14,6 +16,8 @@
 #include <arrow/util/future.h>
 #include <arrow/util/thread_pool.h>
 
+#include "arcae/rwlock.h"
+#include "arcae/table_utils.h"
 #include "arcae/type_traits.h"
 
 namespace arcae {
@@ -40,25 +44,7 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
   ArrowFutureType<Fn, const casacore::TableProxy&> RunAsync(Fn&& functor) const {
     using ResultType = ArrowResultType<Fn, const casacore::TableProxy&>;
     ARROW_RETURN_NOT_OK(CheckClosed());
-    auto instance = GetInstance();
-    return RunInPool([this, instance = instance,
-                      functor = std::forward<Fn>(functor)]() mutable -> ResultType {
-      try {
-        return std::invoke(functor, *this->GetProxy(instance));
-      } catch (casacore::AipsError& e) {
-        return arrow::Status::Invalid("Unhandled casacore exception: ", e.what());
-      }
-    });
-  }
-
-  // Runs functions with signature
-  // ReturnType Function(TableProxy &) on the isolation thread
-  // returning an arrow::Future<ReturnType>
-  template <typename Fn,
-            typename = std::enable_if_t<std::is_invocable_v<Fn, casacore::TableProxy&>>>
-  ArrowFutureType<Fn, casacore::TableProxy&> RunAsync(Fn&& functor) {
-    using ResultType = ArrowFutureType<Fn, casacore::TableProxy&>;
-    ARROW_RETURN_NOT_OK(CheckClosed());
+    RWLockGuard lock(*lock_, false);
     auto instance = GetInstance();
     return RunInPool(instance,
                      [this, instance = instance,
@@ -72,6 +58,53 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
                      });
   }
 
+  // Runs functions with signature
+  // ReturnType Function(TableProxy &) on the isolation thread
+  // returning an arrow::Future<ReturnType>
+  template <typename Fn,
+            typename = std::enable_if_t<std::is_invocable_v<Fn, casacore::TableProxy&>>>
+  ArrowFutureType<Fn, casacore::TableProxy&> RunAsync(Fn&& functor) {
+    using ResultType = ArrowFutureType<Fn, casacore::TableProxy&>;
+    ARROW_RETURN_NOT_OK(CheckClosed());
+    RWLockGuard lock(*lock_, false);
+    auto instance = GetInstance();
+    return RunInPool(instance,
+                     [this, instance = instance,
+                      functor = std::forward<Fn>(functor)]() mutable -> ResultType {
+                       try {
+                         return std::invoke(functor, *this->GetProxy(instance));
+                       } catch (casacore::AipsError& e) {
+                         return arrow::Status::Invalid("Unhandled casacore exception: ",
+                                                       e.what());
+                       }
+                     });
+  }
+
+  // Runs functions with signature
+  // ReturnType Function(TableProxy &) on the isolation thread
+  // returning an arrow::Future<ReturnType>
+  template <typename Fn,
+            typename = std::enable_if_t<std::is_invocable_v<Fn, casacore::TableProxy&>>>
+  ArrowFutureType<Fn, casacore::TableProxy&> RunWriteAsync(Fn&& functor) {
+    using ResultType = ArrowFutureType<Fn, casacore::TableProxy&>;
+    ARROW_RETURN_NOT_OK(CheckClosed());
+    RWLockGuard lock(*lock_, true);
+    auto instance = GetInstance();
+    return RunInPool(instance,
+                     [this, instance = instance,
+                      functor = std::forward<Fn>(functor)]() mutable -> ResultType {
+                       try {
+                         auto proxy = this->GetProxy(instance);
+                         MaybeReopenRW(*proxy);
+                         return std::invoke(functor, *proxy);
+                       } catch (casacore::AipsError& e) {
+                         return arrow::Status::Invalid("Unhandled casacore exception: ",
+                                                       e.what());
+                       }
+                     });
+  }
+
+  // Then(Future, Fn(const TableProxy &))
   template <typename Fn, typename R,
             typename = std::enable_if_t<
                 std::is_invocable_v<Fn, const R&, const casacore::TableProxy&>>>
@@ -94,6 +127,7 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
                                this->GetPool(instance).get()});
   }
 
+  // Then(Future, Fn(TableProxy &))
   template <typename Fn, typename R,
             typename = std::enable_if_t<
                 std::is_invocable_v<Fn, const R&, casacore::TableProxy&>>>
@@ -125,6 +159,7 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
   ArrowResultType<Fn, const casacore::TableProxy&> RunSync(Fn&& functor) const {
     using ResultType = ArrowFutureType<Fn, const casacore::TableProxy&>;
     ARROW_RETURN_NOT_OK(CheckClosed());
+    RWLockGuard lock(*lock_, false);
     auto instance = GetInstance();
     return RunInPoolSync([this, instance = instance,
                           functor = std::forward<Fn>(functor)]() mutable -> ResultType {
@@ -145,6 +180,7 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
   ArrowResultType<Fn, casacore::TableProxy&> RunSync(Fn&& functor) {
     using ResultType = ArrowResultType<Fn, casacore::TableProxy&>;
     ARROW_RETURN_NOT_OK(CheckClosed());
+    RWLockGuard lock(*lock_, false);
     auto instance = GetInstance();
     return RunInPoolSync(instance,
                          [this, instance = instance,
@@ -187,6 +223,29 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
           ProxyAndPool{std::move(table_proxy), std::move(io_pool)});
     }
 
+    auto first_table = proxy->proxy_pools_[0].table_proxy_->table();
+    switch (first_table.tableType()) {
+      case casacore::Table::Plain: {
+        // NOTE: first_table.tableName() doesn't always give the underlying
+        // table name on disk in the case of reference (or concatenated tables)
+        // getPartNames(true) is used and the first table on disk is used for
+        // as the location for the lock
+        auto names = first_table.getPartNames(true);
+        assert(names.size() > 0);
+        auto path = std::filesystem::path(names[0].c_str()) / "table.arcae.lock";
+        ARROW_ASSIGN_OR_RAISE(auto rwlock, RWLock::Create(path.native()));
+        proxy->lock_ = std::dynamic_pointer_cast<BaseRWLock>(rwlock);
+        break;
+      }
+      case casacore::Table::Memory: {
+        ARROW_ASSIGN_OR_RAISE(proxy->lock_, RWLock::Create(""));
+        break;
+      }
+      default:
+        return arrow::Status::NotImplemented("Unhandled table type ",
+                                             first_table.tableType());
+    }
+
     proxy->is_closed_ = false;
     return proxy;
   }
@@ -219,6 +278,8 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
       itp->proxy_pools_.emplace_back(ProxyAndPool{std::move(table_proxy), GetPool(i)});
     }
 
+    // Acquire the parent table lock
+    itp->lock_ = this->lock_;
     itp->is_closed_ = false;
     // Add an explicit dependency on the ITP
     itp->dependencies_.push_back(shared_from_this());
@@ -228,7 +289,8 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
   std::shared_ptr<casacore::TableProxy> Proxy() const { return nullptr; }
 
  protected:
-  IsolatedTableProxy() = default;
+  IsolatedTableProxy() : lock_() {};
+  // IsolatedTableProxy() : lock_(std::move(lock)) {};
   IsolatedTableProxy(const IsolatedTableProxy& rhs) = delete;
   IsolatedTableProxy(IsolatedTableProxy&& rhs) = delete;
   IsolatedTableProxy& operator=(const IsolatedTableProxy& rhs) = delete;
@@ -282,6 +344,7 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
   std::vector<ProxyAndPool> proxy_pools_;
   bool is_closed_;
   std::vector<std::shared_ptr<IsolatedTableProxy>> dependencies_;
+  mutable std::shared_ptr<BaseRWLock> lock_;
 };
 
 }  // namespace detail
