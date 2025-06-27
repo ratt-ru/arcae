@@ -238,8 +238,7 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
         break;
       }
       case casacore::Table::Memory: {
-        proxy->lock_ =
-            std::dynamic_pointer_cast<BaseRWLock>(std::make_shared<NullRWLock>());
+        ARROW_ASSIGN_OR_RAISE(proxy->lock_, RWLock::Create(""));
         break;
       }
       default:
