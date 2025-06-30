@@ -354,6 +354,7 @@ arrow::Status ShutdownChildren(std::array<PipeComms, CHILDREN>& comms,
 
 static constexpr auto PARENT_CONTEXT = PipeComms::PARENT;
 
+// Test that acquiring read locks increases the number of fcntl readers
 TEST(SharedFcntlMutexTest, FcntlReaders) {
   std::array<PipeComms, NCHILDREN> comms;
   std::array<pid_t, NCHILDREN> child_pid;
@@ -393,26 +394,26 @@ TEST(SharedFcntlMutexTest, FcntlReaders) {
   ASSERT_OK(ShutdownChildren(comms, child_pid));
 }
 
+// Test that IPC locking and lock observation behaves as expected
 TEST(SharedFcntlMutexTest, InterProcessObservability) {
   std::array<PipeComms, NCHILDREN> comms;
   std::array<pid_t, NCHILDREN> child_pid;
-
   ASSERT_OK(SpawnChildren(comms, child_pid));
 
   // Acquire a write lock in the first process
-  ASSERT_OK(comms[0].send(kWriteLock + "thread 1"s, PARENT_CONTEXT));
+  ASSERT_OK(comms[0].send(kWriteLock + " thread 1"s, PARENT_CONTEXT));
   ASSERT_OK(comms[0].expect("ok", PARENT_CONTEXT));
 
   // Failed to acquire a write lock in the same process and thread
-  ASSERT_OK(comms[0].send(kTryWriteLock + "thread 1"s, PARENT_CONTEXT));
+  ASSERT_OK(comms[0].send(kTryWriteLock + " thread 1"s, PARENT_CONTEXT));
   ASSERT_OK(comms[0].expect("fail", PARENT_CONTEXT));
 
   // Failed to acquire a write lock in the same process and a different thread
-  ASSERT_OK(comms[0].send(kTryWriteLock + "thread 2"s, PARENT_CONTEXT));
+  ASSERT_OK(comms[0].send(kTryWriteLock + " thread 2"s, PARENT_CONTEXT));
   ASSERT_OK(comms[0].expect("fail", PARENT_CONTEXT));
 
   // Failed to acquire a write lock in a different process
-  ASSERT_OK(comms[1].send(kTryWriteLock + "thread 2"s, PARENT_CONTEXT));
+  ASSERT_OK(comms[1].send(kTryWriteLock + " thread 2"s, PARENT_CONTEXT));
   ASSERT_OK(comms[1].expect("fail", PARENT_CONTEXT));
 
   // Second process observes the first's write lock
@@ -421,7 +422,7 @@ TEST(SharedFcntlMutexTest, InterProcessObservability) {
   ASSERT_OK(comms[1].expect("fail write " + child_0_pid, PARENT_CONTEXT));
 
   // Release write lock in the first process
-  ASSERT_OK(comms[0].send(kWriteUnlock + "thread 2"s, PARENT_CONTEXT));
+  ASSERT_OK(comms[0].send(kWriteUnlock + " thread 2"s, PARENT_CONTEXT));
   ASSERT_OK(comms[0].expect("ok", PARENT_CONTEXT));
 
   // Second process observes no lock
@@ -444,6 +445,8 @@ TEST(SharedFcntlMutexTest, InterProcessObservability) {
   ASSERT_OK(ShutdownChildren(comms, child_pid));
 }
 
+// Test readonly fallback in the case of a
+// read-only table lock/directory
 TEST(SharedFcntlMutexTest, ReadFallback) {
   using fs::perm_options;
   using fs::perms;
@@ -468,8 +471,46 @@ TEST(SharedFcntlMutexTest, ReadFallback) {
 
   ASSERT_OK_AND_ASSIGN(auto lock, SharedFcntlMutex::Create(lock_name.native()));
   ASSERT_FALSE(lock->has_fd());
-  arcae::SharedFcntlGuard guard(*lock);
+  // Write locks fail but read locks succeed
+  ASSERT_NOT_OK(lock->lock());
   ASSERT_OK(lock->lock_shared());
 }
 
+// Test that the SharedFcntlGuard behaves as expected
+TEST(SharedFcntlMutexTest, LockGuard) {
+  auto path = temp_directory_name();
+  if (!fs::create_directory(path)) FAIL() << "Unable to create " << path.native();
+  auto lock_name = path / "table.lock";
+
+  ASSERT_OK_AND_ASSIGN(auto mutex, SharedFcntlMutex::Create(lock_name.native()));
+  bool success;
+
+  {
+    // Read guard
+    arcae::SharedFcntlGuard lock(*mutex, false);
+    // Write locking fails
+    ASSERT_OK_AND_ASSIGN(success, mutex->try_lock());
+    ASSERT_FALSE(success);
+
+    ASSERT_EQ(mutex->fcntl_readers(), 1);
+  }
+
+  // Can write lock
+  ASSERT_OK_AND_ASSIGN(success, mutex->try_lock());
+  ASSERT_TRUE(success);
+  mutex->unlock();
+
+  {
+    // Write guard
+    arcae::SharedFcntlGuard lock(*mutex, true);
+    // Read locking fails
+    ASSERT_OK_AND_ASSIGN(success, mutex->try_lock_shared());
+    ASSERT_FALSE(success);
+  }
+
+  // Can read lock lock
+  ASSERT_OK_AND_ASSIGN(success, mutex->try_lock_shared());
+  ASSERT_TRUE(success);
+  mutex->unlock();
+}
 }  // namespace
