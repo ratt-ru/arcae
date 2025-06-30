@@ -5,10 +5,9 @@
 #include <limits>
 #include <memory>
 
-#include <arrow/util/logging.h>
 #include "arrow/status.h"
-#include "arrow/util/functional.h"
 #include "arrow/util/future.h"
+#include "arrow/util/logging.h"
 #include "arrow/util/thread_pool.h"
 
 #include <casacore/tables/Tables/TableProxy.h>
