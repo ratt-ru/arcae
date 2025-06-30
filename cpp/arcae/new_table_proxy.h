@@ -11,6 +11,7 @@
 
 #include "arcae/isolated_table_proxy.h"
 #include "arcae/selection.h"
+#include "arcae/shared_fcntl_mutex.h"
 #include "arcae/type_traits.h"
 
 namespace arcae {
@@ -27,6 +28,38 @@ class NewTableProxy {
     std::shared_ptr<NewTableProxy> ntp = std::make_shared<enable_make_shared_ntp>();
     ARROW_ASSIGN_OR_RAISE(
         ntp->itp_, detail::IsolatedTableProxy::Make(std::move(functor), ninstances));
+
+    auto lock =
+        ntp->itp_
+            ->RunAsync([&](casacore::TableProxy& table_proxy)
+                           -> arrow::Result<std::shared_ptr<BaseSharedFcntlMutex>> {
+              auto& table = table_proxy.table();
+              switch (table.tableType()) {
+                case casacore::Table::Plain: {
+                  // NOTE: first_table.tableName() doesn't always give the underlying
+                  // table name on disk in the case of reference (or concatenated tables)
+                  // getPartNames(true) is used and the first table on disk is used for
+                  // as the location for the lock
+                  auto names = table.getPartNames(true);
+                  assert(names.size() > 0);
+                  auto path =
+                      std::filesystem::path(names[0].c_str()) / "table.arcae.lock";
+                  ARROW_ASSIGN_OR_RAISE(auto lock,
+                                        SharedFcntlMutex::Create(path.native()));
+                  return std::dynamic_pointer_cast<BaseSharedFcntlMutex>(lock);
+                }
+                case casacore::Table::Memory: {
+                  return std::make_shared<NullSharedFcntlMutex>();
+                  break;
+                }
+                default:
+                  return arrow::Status::NotImplemented("Unhandled table type ",
+                                                       table.tableType());
+              }
+            })
+            .MoveResult();
+
+    ARROW_ASSIGN_OR_RAISE(ntp->fcntl_mutex_, lock);
     return ntp;
   }
 
@@ -38,6 +71,7 @@ class NewTableProxy {
     struct enable_make_shared_ntp : public NewTableProxy {};
     std::shared_ptr<NewTableProxy> ntp = std::make_shared<enable_make_shared_ntp>();
     ARROW_ASSIGN_OR_RAISE(ntp->itp_, itp_->Spawn(std::forward<Fn>(functor)));
+    ntp->fcntl_mutex_ = fcntl_mutex_;
     return ntp;
   }
 
@@ -97,6 +131,7 @@ class NewTableProxy {
 
  private:
   std::shared_ptr<detail::IsolatedTableProxy> itp_;
+  std::shared_ptr<BaseSharedFcntlMutex> fcntl_mutex_;
 };
 
 }  // namespace arcae
