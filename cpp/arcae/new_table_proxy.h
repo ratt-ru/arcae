@@ -1,6 +1,7 @@
 #ifndef ARCAE_NEW_TABLE_PROXY_H
 #define ARCAE_NEW_TABLE_PROXY_H
 
+#include <filesystem>
 #include <memory>
 #include <type_traits>
 
@@ -49,8 +50,8 @@ class NewTableProxy {
                   return std::dynamic_pointer_cast<BaseSharedFcntlMutex>(lock);
                 }
                 case casacore::Table::Memory: {
-                  return std::make_shared<NullSharedFcntlMutex>();
-                  break;
+                  auto lock = std::make_shared<NullSharedFcntlMutex>();
+                  return std::dynamic_pointer_cast<BaseSharedFcntlMutex>(lock);
                 }
                 default:
                   return arrow::Status::NotImplemented("Unhandled table type ",
