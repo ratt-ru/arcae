@@ -23,9 +23,9 @@ add_executable(data_partition_test data_partition_test.cc)
 target_link_libraries(data_partition_test PRIVATE GTest::gtest_main arcae test_utils)
 add_test(data_partition_test data_partition_test)
 
-add_executable(rwlock_test rwlock_test.cc)
-target_link_libraries(rwlock_test PRIVATE GTest::gtest_main arcae test_utils)
-add_test(rwlock_test rwlock_test)
+add_executable(shared_fcntl_mutex_test shared_fcntl_mutex_test.cc)
+target_link_libraries(shared_fcntl_mutex_test PRIVATE GTest::gtest_main arcae test_utils)
+add_test(shared_fcntl_mutex_test shared_fcntl_mutex_test)
 
 add_executable(selection_test selection_test.cc)
 target_link_libraries(selection_test PRIVATE GTest::gtest_main arcae test_utils)
@@ -45,6 +45,6 @@ set_tests_properties(result_shape_test
                      isolated_table_proxy_test
                      new_table_proxy_test
                      parallel_write_test
-                     rwlock_test
+                     shared_fcntl_mutex_test
                      selection_test
                      PROPERTIES ENVIRONMENT "LD_LIBRARY_PATH=${VCPKG_LIBDIRS}")

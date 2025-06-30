@@ -10,7 +10,7 @@ add_library(arcae SHARED
     arcae/new_table_proxy.cc
     arcae/read_impl.cc
     arcae/write_impl.cc
-    arcae/rwlock.cc
+    arcae/shared_fcntl_mutex.cc
     arcae/result_shape.cc
     arcae/service_locator.cc
     arcae/table_factory.cc

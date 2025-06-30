@@ -1,12 +1,9 @@
-#include "arcae/rwlock.h"
+#include "arcae/shared_fcntl_mutex.h"
 
 #include <algorithm>
 #include <cstddef>
-#include <cstdio>
 #include <cstdlib>
-#include <ctime>
 #include <filesystem>
-#include <map>
 #include <memory>
 #include <random>
 #include <sstream>
@@ -27,7 +24,7 @@
 using namespace std::literals;
 
 namespace fs = std::filesystem;
-using arcae::RWLock;
+using arcae::SharedFcntlMutex;
 
 using arrow::Result;
 using arrow::Status;
@@ -177,7 +174,7 @@ struct PipeComms {
 // "ok", "fail" or some additional requested information
 arrow::Status child_loop(PipeComms& pipe_comms, std::string_view lock_filename) {
   constexpr auto context = PipeComms::CHILD;
-  ARROW_ASSIGN_OR_RAISE(auto lock, RWLock::Create(lock_filename));
+  ARROW_ASSIGN_OR_RAISE(auto lock, SharedFcntlMutex::Create(lock_filename));
   if (lock == nullptr) return Status::Invalid("Cast failed");
   if (!lock->has_fd()) return Status::Invalid("No disk lock");
 
@@ -357,7 +354,7 @@ arrow::Status ShutdownChildren(std::array<PipeComms, CHILDREN>& comms,
 
 static constexpr auto PARENT_CONTEXT = PipeComms::PARENT;
 
-TEST(RWLockTest, FcntlReaders) {
+TEST(SharedFcntlMutexTest, FcntlReaders) {
   std::array<PipeComms, NCHILDREN> comms;
   std::array<pid_t, NCHILDREN> child_pid;
 
@@ -396,7 +393,7 @@ TEST(RWLockTest, FcntlReaders) {
   ASSERT_OK(ShutdownChildren(comms, child_pid));
 }
 
-TEST(RWLockTest, InterProcessObservability) {
+TEST(SharedFcntlMutexTest, InterProcessObservability) {
   std::array<PipeComms, NCHILDREN> comms;
   std::array<pid_t, NCHILDREN> child_pid;
 
@@ -447,7 +444,7 @@ TEST(RWLockTest, InterProcessObservability) {
   ASSERT_OK(ShutdownChildren(comms, child_pid));
 }
 
-TEST(RWLockTest, ReadFallback) {
+TEST(SharedFcntlMutexTest, ReadFallback) {
   using fs::perm_options;
   using fs::perms;
 
@@ -469,9 +466,9 @@ TEST(RWLockTest, ReadFallback) {
 
   auto lock_name = tmp_dir / "arcae.table.lock";
 
-  ASSERT_OK_AND_ASSIGN(auto lock, RWLock::Create(lock_name.native()));
+  ASSERT_OK_AND_ASSIGN(auto lock, SharedFcntlMutex::Create(lock_name.native()));
   ASSERT_FALSE(lock->has_fd());
-  arcae::RWLockGuard guard(*lock);
+  arcae::SharedFcntlGuard guard(*lock);
   ASSERT_OK(lock->lock_shared());
 }
 

@@ -1,4 +1,4 @@
-#include "arcae/rwlock.h"
+#include "arcae/shared_fcntl_mutex.h"
 
 #include <cassert>
 #include <cerrno>
@@ -68,11 +68,13 @@ auto MaybeSetFcntlLock(int fd, bool write,
 
 }  // namespace
 
-auto RWLock::Create(std::string_view lock_filename) -> Result<std::shared_ptr<RWLock>> {
+auto SharedFcntlMutex::Create(std::string_view lock_filename)
+    -> Result<std::shared_ptr<SharedFcntlMutex>> {
   // Enable std::make_shared with a protected constructor
-  struct enable_rwlock : public RWLock {
+  struct enable_rwlock : public SharedFcntlMutex {
    public:
-    enable_rwlock(int fd, std::string_view lock_name) : RWLock(fd, lock_name) {};
+    enable_rwlock(int fd, std::string_view lock_name)
+        : SharedFcntlMutex(fd, lock_name) {};
   };
 
   if (lock_filename.empty()) return std::make_shared<enable_rwlock>(-1, lock_filename);
@@ -98,7 +100,7 @@ auto RWLock::Create(std::string_view lock_filename) -> Result<std::shared_ptr<RW
   return std::make_shared<enable_rwlock>(fd, lock_filename);
 }
 
-RWLock::~RWLock() {
+SharedFcntlMutex::~SharedFcntlMutex() {
   if (fd_ != -1) {
     // Note that this destructor doesn't handle all edge cases.
     // For example, if another thread holds a read lock, this
@@ -110,7 +112,7 @@ RWLock::~RWLock() {
   lock_filename_.clear();
 }
 
-void RWLock::unlock() {
+void SharedFcntlMutex::unlock() {
   if (fd_ != -1) {
     struct flock lock_data = {
         .l_type = F_UNLCK,
@@ -124,7 +126,7 @@ void RWLock::unlock() {
   mutex_.unlock();
 }
 
-void RWLock::unlock_shared() {
+void SharedFcntlMutex::unlock_shared() {
   std::unique_lock<std::mutex> fnctl_lock(fcntl_read_mutex_);
   // Last reader releases the fcntl lock
   if (fd_ != -1 && reader_counts_ > 0 && --reader_counts_ == 0) {
@@ -140,12 +142,13 @@ void RWLock::unlock_shared() {
   mutex_.unlock_shared();
 }
 
-auto RWLock::fcntl_readers() -> std::size_t {
+auto SharedFcntlMutex::fcntl_readers() -> std::size_t {
   std::unique_lock<std::mutex> fnctl_lock(fcntl_read_mutex_);
   return reader_counts_;
 }
 
-auto RWLock::other_locks(FcntlLockType lock_type) -> Result<RWLock::LockInfo> {
+auto SharedFcntlMutex::other_locks(FcntlLockType lock_type)
+    -> Result<SharedFcntlMutex::LockInfo> {
   struct flock lock_data = {
       .l_type = lock_type,
       .l_whence = SEEK_SET,
@@ -158,10 +161,10 @@ auto RWLock::other_locks(FcntlLockType lock_type) -> Result<RWLock::LockInfo> {
     return Status::IOError("Fail to retrieve lock information for ", lock_filename_);
   }
 
-  return RWLock::LockInfo{lock_data.l_type, lock_data.l_pid};
+  return SharedFcntlMutex::LockInfo{lock_data.l_type, lock_data.l_pid};
 }
 
-auto RWLock::lock_impl(bool write) -> Status {
+auto SharedFcntlMutex::lock_impl(bool write) -> Status {
   std::unique_lock<std::mutex> reader_lock(fcntl_read_mutex_, std::defer_lock);
 
   if (write) {
@@ -213,7 +216,7 @@ auto RWLock::lock_impl(bool write) -> Status {
   return status;
 }
 
-auto RWLock::try_lock_impl(bool write) -> Result<bool> {
+auto SharedFcntlMutex::try_lock_impl(bool write) -> Result<bool> {
   std::unique_lock<std::mutex> reader_lock(fcntl_read_mutex_, std::defer_lock);
 
   if (write) {

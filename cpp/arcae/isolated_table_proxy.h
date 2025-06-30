@@ -16,7 +16,7 @@
 #include <arrow/util/future.h>
 #include <arrow/util/thread_pool.h>
 
-#include "arcae/rwlock.h"
+#include "arcae/shared_fcntl_mutex.h"
 #include "arcae/table_utils.h"
 #include "arcae/type_traits.h"
 
@@ -44,7 +44,7 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
   ArrowFutureType<Fn, const casacore::TableProxy&> RunAsync(Fn&& functor) const {
     using ResultType = ArrowResultType<Fn, const casacore::TableProxy&>;
     ARROW_RETURN_NOT_OK(CheckClosed());
-    RWLockGuard lock(*lock_, false);
+    SharedFcntlGuard lock(*lock_, false);
     auto instance = GetInstance();
     return RunInPool(instance,
                      [this, instance = instance,
@@ -66,7 +66,7 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
   ArrowFutureType<Fn, casacore::TableProxy&> RunAsync(Fn&& functor) {
     using ResultType = ArrowFutureType<Fn, casacore::TableProxy&>;
     ARROW_RETURN_NOT_OK(CheckClosed());
-    RWLockGuard lock(*lock_, false);
+    SharedFcntlGuard lock(*lock_, false);
     auto instance = GetInstance();
     return RunInPool(instance,
                      [this, instance = instance,
@@ -88,7 +88,7 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
   ArrowFutureType<Fn, casacore::TableProxy&> RunWriteAsync(Fn&& functor) {
     using ResultType = ArrowFutureType<Fn, casacore::TableProxy&>;
     ARROW_RETURN_NOT_OK(CheckClosed());
-    RWLockGuard lock(*lock_, true);
+    SharedFcntlGuard lock(*lock_, true);
     auto instance = GetInstance();
     return RunInPool(instance,
                      [this, instance = instance,
@@ -159,7 +159,7 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
   ArrowResultType<Fn, const casacore::TableProxy&> RunSync(Fn&& functor) const {
     using ResultType = ArrowFutureType<Fn, const casacore::TableProxy&>;
     ARROW_RETURN_NOT_OK(CheckClosed());
-    RWLockGuard lock(*lock_, false);
+    SharedFcntlGuard lock(*lock_, false);
     auto instance = GetInstance();
     return RunInPoolSync([this, instance = instance,
                           functor = std::forward<Fn>(functor)]() mutable -> ResultType {
@@ -180,7 +180,7 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
   ArrowResultType<Fn, casacore::TableProxy&> RunSync(Fn&& functor) {
     using ResultType = ArrowResultType<Fn, casacore::TableProxy&>;
     ARROW_RETURN_NOT_OK(CheckClosed());
-    RWLockGuard lock(*lock_, false);
+    SharedFcntlGuard lock(*lock_, false);
     auto instance = GetInstance();
     return RunInPoolSync(instance,
                          [this, instance = instance,
@@ -233,12 +233,12 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
         auto names = first_table.getPartNames(true);
         assert(names.size() > 0);
         auto path = std::filesystem::path(names[0].c_str()) / "table.arcae.lock";
-        ARROW_ASSIGN_OR_RAISE(auto rwlock, RWLock::Create(path.native()));
-        proxy->lock_ = std::dynamic_pointer_cast<BaseRWLock>(rwlock);
+        ARROW_ASSIGN_OR_RAISE(auto rwlock, SharedFcntlMutex::Create(path.native()));
+        proxy->lock_ = std::dynamic_pointer_cast<BaseSharedFcntlMutex>(rwlock);
         break;
       }
       case casacore::Table::Memory: {
-        ARROW_ASSIGN_OR_RAISE(proxy->lock_, RWLock::Create(""));
+        ARROW_ASSIGN_OR_RAISE(proxy->lock_, SharedFcntlMutex::Create(""));
         break;
       }
       default:
@@ -344,7 +344,7 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
   std::vector<ProxyAndPool> proxy_pools_;
   bool is_closed_;
   std::vector<std::shared_ptr<IsolatedTableProxy>> dependencies_;
-  mutable std::shared_ptr<BaseRWLock> lock_;
+  mutable std::shared_ptr<BaseSharedFcntlMutex> lock_;
 };
 
 }  // namespace detail
