@@ -1,14 +1,12 @@
 #ifndef ARCAE_ISOLATED_TABLE_PROXY_H
 #define ARCAE_ISOLATED_TABLE_PROXY_H
 
-#include <filesystem>
 #include <memory>
 #include <type_traits>
 #include <vector>
 
 #include <casacore/casa/Exceptions/Error.h>
 #include <casacore/tables/Tables.h>
-#include <casacore/tables/Tables/Table.h>
 #include <casacore/tables/Tables/TableProxy.h>
 
 #include <arrow/result.h>
@@ -43,16 +41,14 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
     using ResultType = ArrowResultType<Fn, const casacore::TableProxy&>;
     ARROW_RETURN_NOT_OK(CheckClosed());
     auto instance = GetInstance();
-    return RunInPool(instance,
-                     [this, instance = instance,
+    return RunInPool([this, instance = instance,
                       functor = std::forward<Fn>(functor)]() mutable -> ResultType {
-                       try {
-                         return std::invoke(functor, *this->GetProxy(instance));
-                       } catch (casacore::AipsError& e) {
-                         return arrow::Status::Invalid("Unhandled casacore exception: ",
-                                                       e.what());
-                       }
-                     });
+      try {
+        return std::invoke(functor, *this->GetProxy(instance));
+      } catch (casacore::AipsError& e) {
+        return arrow::Status::Invalid("Unhandled casacore exception: ", e.what());
+      }
+    });
   }
 
   // Runs functions with signature
@@ -76,7 +72,6 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
                      });
   }
 
-  // Then(Future, Fn(const TableProxy &))
   template <typename Fn, typename R,
             typename = std::enable_if_t<
                 std::is_invocable_v<Fn, const R&, const casacore::TableProxy&>>>
@@ -99,7 +94,6 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
                                this->GetPool(instance).get()});
   }
 
-  // Then(Future, Fn(TableProxy &))
   template <typename Fn, typename R,
             typename = std::enable_if_t<
                 std::is_invocable_v<Fn, const R&, casacore::TableProxy&>>>
