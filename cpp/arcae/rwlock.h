@@ -101,7 +101,7 @@ class RWLock : public BaseRWLock, std::enable_shared_from_this<RWLock> {
 
  protected:
   RWLock(int fd, std::string_view lock_filename)
-      : fd_(fd), fcntl_readers_(0), lock_filename_(lock_filename) {}
+      : fd_(fd), lock_filename_(lock_filename), reader_counts_(0) {}
 
   arrow::Status lock_impl(bool write);
   arrow::Result<bool> try_lock_impl(bool write);
@@ -110,12 +110,19 @@ class RWLock : public BaseRWLock, std::enable_shared_from_this<RWLock> {
 
  private:
   int fd_;
-  int fcntl_readers_;
   std::string lock_filename_;
+  // Multiple-reader Single-writer mutex
+  // Guards access at the process level
   std::shared_mutex mutex_;
-  std::mutex fcntl_mutex_;
+  // Number of concurrent readers
+  int reader_counts_;
+  // Guards access to the fcntl lock
+  // This is only needed for reads as
+  // mutex_ will only ever allow one writer
+  std::mutex fcntl_read_mutex_;
 };
 
+// RAII lock/unlocking of RWLock
 class RWLockGuard {
  private:
   BaseRWLock& lock_;
@@ -124,7 +131,7 @@ class RWLockGuard {
  public:
   RWLockGuard(BaseRWLock& lock, bool write = false) : lock_(lock), write_(write) {
     if (auto status = write_ ? lock_.lock() : lock_.lock_shared(); !status.ok()) {
-      ARROW_LOG(ERROR) << "Unable to lock " << status;
+      ARROW_LOG(FATAL) << "Unable to lock " << status;
     }
   };
   ~RWLockGuard() { write_ ? lock_.unlock() : lock_.unlock_shared(); }

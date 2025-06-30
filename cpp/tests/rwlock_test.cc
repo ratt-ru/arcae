@@ -402,7 +402,7 @@ TEST(RWLockTest, InterProcessObservability) {
 
   ASSERT_OK(SpawnChildren(comms, child_pid));
 
-  // Acquire a write lock in the first child
+  // Acquire a write lock in the first process
   ASSERT_OK(comms[0].send(kWriteLock + "thread 1"s, PARENT_CONTEXT));
   ASSERT_OK(comms[0].expect("ok", PARENT_CONTEXT));
 
@@ -418,28 +418,28 @@ TEST(RWLockTest, InterProcessObservability) {
   ASSERT_OK(comms[1].send(kTryWriteLock + "thread 2"s, PARENT_CONTEXT));
   ASSERT_OK(comms[1].expect("fail", PARENT_CONTEXT));
 
-  // Second child observes the first child's write lock
+  // Second process observes the first's write lock
   ASSERT_OK(comms[1].send(kRequestLock + " read"s, PARENT_CONTEXT));
   auto child_0_pid = std::to_string(child_pid[0]);
   ASSERT_OK(comms[1].expect("fail write " + child_0_pid, PARENT_CONTEXT));
 
-  // Release the write lock in the first child
+  // Release write lock in the first process
   ASSERT_OK(comms[0].send(kWriteUnlock + "thread 2"s, PARENT_CONTEXT));
   ASSERT_OK(comms[0].expect("ok", PARENT_CONTEXT));
 
-  // Second child observes no lock
+  // Second process observes no lock
   ASSERT_OK(comms[1].send(kRequestLock + " read"s, PARENT_CONTEXT));
   ASSERT_OK(comms[1].expect("none", PARENT_CONTEXT));
 
-  // Second child acquires a read lock
+  // Second process acquires a read lock
   ASSERT_OK(comms[1].send(kReadLock + " thread 1"s, PARENT_CONTEXT));
   ASSERT_OK(comms[1].expect("ok", PARENT_CONTEXT));
 
-  // First child observes no lock in response to a read lock request
+  // First process observes no lock when requesting a read lock
   ASSERT_OK(comms[0].send(kRequestLock + " read"s, PARENT_CONTEXT));
   ASSERT_OK(comms[0].expect("none", PARENT_CONTEXT));
 
-  // First child observes read lock in response to a write lock request
+  // First process observes read lock when requesting a write lock
   ASSERT_OK(comms[0].send(kRequestLock + " write"s, PARENT_CONTEXT));
   auto child_1_pid = std::to_string(child_pid[1]);
   ASSERT_OK(comms[0].expect("fail read " + child_1_pid, PARENT_CONTEXT));
