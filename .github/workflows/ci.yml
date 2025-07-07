@@ -184,7 +184,7 @@ jobs:
               --exclude libarrow_python.2000.dylib \
               --exclude libarrow.2000.dylib \
               --ignore-missing-dependencies
-        uses: pypa/cibuildwheel@v3.0.0
+        uses: pypa/cibuildwheel@v3.0.1
 
       - name: Upload wheel artifacts
         uses: actions/upload-artifact@v4
