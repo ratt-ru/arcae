@@ -64,7 +64,7 @@ class NullSharedFcntlMutex : public BaseSharedFcntlMutex {
 // 2. fcntl process lock that coordinates multiple-reader single-writer (MRSW)
 //    access across processes.
 //
-// (1) is implemented using a std::shared_mutex. By it's nature this restricts
+// (1) is implemented using a std::shared_mutex. By its nature this restricts
 // access to the underlying fcntl lock to a single thread in the case of writes.
 // Further care must be taken to restrict access of multiple readers
 // to the underlying fcntl lock: This is accomplished with a std::mutex
