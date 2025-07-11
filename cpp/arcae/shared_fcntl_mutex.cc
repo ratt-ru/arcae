@@ -153,7 +153,6 @@ auto SharedFcntlMutex::other_locks(FcntlLockType lock_type)
       .l_whence = SEEK_SET,
       .l_start = 0,
       .l_len = 0,
-      .l_pid = getpid(),
   };
 
   if (fcntl(fd_, F_GETLK, &lock_data) == -1) {
