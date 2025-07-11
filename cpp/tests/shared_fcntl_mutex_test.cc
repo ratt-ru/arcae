@@ -253,6 +253,7 @@ arrow::Status child_loop(PipeComms& pipe_comms, std::string_view lock_filename) 
   // depending on the presence of constructs like "thread 1"
   // or "thread 2" in the message suffix
   auto MaybeRunInThread = [&](std::string_view msg, auto&& f) -> arrow::Result<bool> {
+    using FType = decltype(f);
     int thread = [&]() -> int {
       if (auto p = msg.find("thread"); p != std::string_view::npos) {
         return std::stoi(std::string(msg.substr(p + strlen("thread"))));
@@ -268,12 +269,12 @@ arrow::Status child_loop(PipeComms& pipe_comms, std::string_view lock_filename) 
         ARROW_ASSIGN_OR_RAISE(auto pool, ThreadPool::Make(1));
         pool_it = threads.emplace(thread, pool).first;
       }
-      auto future = arrow::DeferNotOk(pool_it->second->Submit(std::move(f)));
+      auto future = arrow::DeferNotOk(pool_it->second->Submit(std::forward<FType>(f)));
       return future.MoveResult();
     }
 
     // Otherwise call functor in the main thread
-    return std::move(f)();
+    return std::forward<FType>(f)();
   };
 
   // Run the message loop until exit (or error)
