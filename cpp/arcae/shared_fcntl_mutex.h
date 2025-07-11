@@ -78,7 +78,7 @@ class SharedFcntlMutex : public BaseSharedFcntlMutex,
   // Guards access to the fcntl lock
   // This is only needed for reads as
   // mutex_ will only ever allow one writer
-  std::mutex fcntl_read_mutex_;
+  mutable std::mutex fcntl_read_mutex_;
 
  public:
   struct LockInfo {
@@ -121,11 +121,11 @@ class SharedFcntlMutex : public BaseSharedFcntlMutex,
   bool has_fd() const { return fd_ != -1; }
 
   // Testing function prone to race conditions...
-  std::size_t fcntl_readers();
+  std::size_t fcntl_readers() const;
 
   // Testing function returning information about
   // other locks that would block the requested lock type
-  arrow::Result<LockInfo> other_locks(FcntlLockType lock_type);
+  arrow::Result<LockInfo> other_locks(FcntlLockType lock_type) const;
 
  protected:
   SharedFcntlMutex(int fd, std::string_view lock_filename)

@@ -141,12 +141,12 @@ void SharedFcntlMutex::unlock_shared() {
   mutex_.unlock_shared();
 }
 
-auto SharedFcntlMutex::fcntl_readers() -> std::size_t {
+auto SharedFcntlMutex::fcntl_readers() const -> std::size_t {
   std::unique_lock<std::mutex> fcntl_lock(fcntl_read_mutex_);
   return reader_count_;
 }
 
-auto SharedFcntlMutex::other_locks(FcntlLockType lock_type)
+auto SharedFcntlMutex::other_locks(FcntlLockType lock_type) const
     -> Result<SharedFcntlMutex::LockInfo> {
   struct flock lock_data = {
       .l_type = lock_type,
