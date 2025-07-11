@@ -119,29 +119,45 @@ struct PipeComms {
     c_to_p[c2p_ctx] = -1;
   }
 
-  // Send message in the current context
+  // Send a null terminated message in the current context
   arrow::Status send(std::string_view msg, ProcessContext context) {
-    auto n = MSG_SIZE < msg.size() ? MSG_SIZE : msg.size();
     auto pipe = (context == PARENT ? p_to_c : c_to_p)[PipeEnd::WRITE];
-    std::copy_n(std::begin(msg), n, buffer);
-    if (write(pipe, buffer, n) == -1) {
-      return Status::IOError("Write of ", n, " bytes failed due to ", strerror(errno),
-                             " on pipe ", pipe);
+    std::size_t written = 0;
+
+    for (std::size_t written = 0; written < msg.size();) {
+      auto n = write(pipe, msg.data() + written, msg.size() - written);
+      if (n == -1)
+        return Status::IOError("Write of ", msg.size(), " bytes failed due to ",
+                               strerror(errno), " on pipe ", pipe);
+      written += n;
     }
+
+    const char nullchar = 0;
+
+    if (write(pipe, &nullchar, sizeof(nullchar)) == -1)
+      return Status::IOError("Write of ", msg.size(), " bytes failed due to ",
+                             strerror(errno), " on pipe ", pipe);
+
     return Status::OK();
   }
 
-  // Receive a message in the current context
+  // Receive a message terminated with 0 in the current context
   arrow::Result<std::string> receive(ProcessContext context) {
     auto pipe = (context == PARENT ? c_to_p : p_to_c)[PipeEnd::READ];
+    std::size_t bytes_read = 0;
 
-    if (auto n = read(pipe, buffer, MSG_SIZE); n > 0) {
-      return std::string(buffer, buffer + n);
-    } else if (n < 0) {
-      return Status::IOError("Read failed due to ", strerror(errno), " on pipe ", pipe);
+    while (bytes_read < MSG_SIZE) {
+      auto nread = read(pipe, buffer + bytes_read, MSG_SIZE - bytes_read);
+      if (nread == -1)
+        return Status::IOError("Read failed due to ", strerror(errno), " on pipe ", pipe);
+      else if (nread == 0)
+        break;
+      bytes_read += nread;
+      // exit if null terminated
+      if (buffer[bytes_read - 1] == 0) break;
     }
 
-    return Status::Cancelled("Read failed due to EOF on pipe ", pipe);
+    return std::string(buffer, buffer + bytes_read - 1);
   }
 
   // Expect a message in the current context
