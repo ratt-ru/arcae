@@ -263,10 +263,10 @@ arrow::Status child_loop(PipeComms& pipe_comms, std::string_view lock_filename) 
     // Execute functor on thread if requested, creating it if necessary
     if (thread >= 0) {
       ARROW_LOG(INFO) << "Executing " << msg << " on thread " << thread;
-      decltype(threads.begin()) pool_it;
-      if (pool_it = threads.find(thread); pool_it == threads.end()) {
+      auto pool_it = threads.find(thread);
+      if (pool_it == threads.end()) {
         ARROW_ASSIGN_OR_RAISE(auto pool, ThreadPool::Make(1));
-        pool_it = threads.insert({thread, pool}).first;
+        pool_it = threads.emplace(thread, pool).first;
       }
       auto future = arrow::DeferNotOk(pool_it->second->Submit(std::move(f)));
       return future.MoveResult();
