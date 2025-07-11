@@ -348,7 +348,7 @@ arrow::Status SpawnChildren(std::array<PipeComms, CHILDREN>& comms,
 template <std::size_t CHILDREN>
 arrow::Status ShutdownChildren(std::array<PipeComms, CHILDREN>& comms,
                                const std::array<pid_t, CHILDREN>& child_pid) {
-  for (std::size_t c = 0; c < NCHILDREN; ++c) {
+  for (std::size_t c = 0; c < CHILDREN; ++c) {
     int status;
     ARROW_RETURN_NOT_OK(comms[c].send("exit", PipeComms::PARENT));
     ARROW_RETURN_NOT_OK(comms[c].expect("ok", PipeComms::PARENT));
