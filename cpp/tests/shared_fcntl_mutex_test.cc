@@ -9,6 +9,7 @@
 #include <random>
 #include <sstream>
 #include <string>
+#include <thread>
 
 #include <fcntl.h>
 #include <sched.h>
@@ -393,6 +394,9 @@ TEST(SharedFcntlMutexTest, TestBlocking) {
   // Blocking attempt on a read lock in second child
   ASSERT_OK(comms[1].send(kReadLock, PARENT_CONTEXT));
 
+  // Wait for some time
+  std::this_thread::sleep_for(200ms);
+
   // Release write lock in first child
   ASSERT_OK(comms[0].send(kWriteUnlock, PARENT_CONTEXT));
   ASSERT_OK(comms[0].expect("ok", PARENT_CONTEXT));
@@ -405,8 +409,11 @@ TEST(SharedFcntlMutexTest, TestBlocking) {
   ASSERT_OK(comms[0].send(kTryWriteLock, PARENT_CONTEXT));
   ASSERT_OK(comms[0].expect("fail"s, PARENT_CONTEXT));
 
-  // Blocking attemp at a write lock in the first child
+  // Blocking attempt at a write lock in the first child
   ASSERT_OK(comms[0].send(kWriteLock, PARENT_CONTEXT));
+
+  // Wait for some time
+  std::this_thread::sleep_for(200ms);
 
   // Release the read lock in the second child
   ASSERT_OK(comms[1].send(kReadUnlock, PARENT_CONTEXT));
