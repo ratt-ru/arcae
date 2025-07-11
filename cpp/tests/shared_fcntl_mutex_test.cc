@@ -498,7 +498,9 @@ TEST(SharedFcntlMutexTest, LockGuard) {
     // Read guard
     arcae::SharedFcntlGuard lock(*mutex, false);
     // Write locking fails
-    ASSERT_OK_AND_ASSIGN(success, mutex->try_lock());
+    Result<bool> result = Status::IOError("thread didn't join");
+    std::thread([&]() { result = mutex->try_lock(); }).join();
+    ASSERT_OK_AND_ASSIGN(auto success, result);
     ASSERT_FALSE(success);
 
     ASSERT_EQ(mutex->fcntl_readers(), 1);
@@ -513,7 +515,9 @@ TEST(SharedFcntlMutexTest, LockGuard) {
     // Write guard
     arcae::SharedFcntlGuard lock(*mutex, true);
     // Read locking fails
-    ASSERT_OK_AND_ASSIGN(success, mutex->try_lock_shared());
+    Result<bool> result = Status::IOError("thread didn't join");
+    std::thread([&]() { result = mutex->try_lock_shared(); }).join();
+    ASSERT_OK_AND_ASSIGN(auto success, result);
     ASSERT_FALSE(success);
   }
 
