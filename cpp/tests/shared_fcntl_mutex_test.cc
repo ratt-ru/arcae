@@ -305,13 +305,12 @@ arrow::Status SpawnChildren(std::array<PipeComms, CHILDREN>& comms,
       // child process
       // run child loop and exit appropriately
       comms[c].close_unused_ends(PipeComms::CHILD);
-      auto status = [&]() {
-        try {
-          return child_loop(comms[c], lock_name.native());
-        } catch (std::exception& e) {
-          return Status::UnknownError(e.what());
-        }
-      }();
+      arrow::Status status;
+      try {
+        status = child_loop(comms[c], lock_name.native());
+      } catch (std::exception& e) {
+        status = Status::UnknownError(e.what());
+      }
 
       if (status.ok()) exit(EXIT_SUCCESS);
       ARROW_LOG(WARNING) << "Child " << c << " failed: " << status;
