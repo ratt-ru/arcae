@@ -216,32 +216,28 @@ arrow::Status child_loop(PipeComms& pipe_comms, std::string_view lock_filename) 
       // Query locks from other processes that interfere with the requested lock
       auto n = strlen(kRequestLock) + 1;
       auto req_lock_type_str = std::string_view(std::begin(msg) + n, std::end(msg));
-      ARROW_ASSIGN_OR_RAISE(
-          auto requested_lock, [&]() -> arrow::Result<arcae::FcntlLockType> {
-            if (req_lock_type_str.starts_with("none"))
-              return F_UNLCK;
-            else if (req_lock_type_str.starts_with("read"))
-              return F_RDLCK;
-            else if (req_lock_type_str.starts_with("write"))
-              return F_WRLCK;
-            else
-              return Status::IOError("unknown lock type ", req_lock_type_str);
-          }());
+      arcae::FcntlLockType requested_lock;
+      if (req_lock_type_str.starts_with("none"))
+        requested_lock = F_UNLCK;
+      else if (req_lock_type_str.starts_with("read"))
+        requested_lock = F_RDLCK;
+      else if (req_lock_type_str.starts_with("write"))
+        requested_lock = F_WRLCK;
+      else
+        return Status::IOError("unknown lock type ", req_lock_type_str);
 
       ARROW_ASSIGN_OR_RAISE(auto lock_info, lock->other_locks(requested_lock));
       auto [lock_type, pid] = lock_info;
-      auto response = [&]() -> std::string {
-        switch (lock_type) {
-          case F_UNLCK:
-            return "none";
-          case F_RDLCK:
-            return "fail read " + std::to_string(pid);
-          case F_WRLCK:
-            return "fail write " + std::to_string(pid);
-          default:
-            return "unknown";
-        }
-      }();
+      std::string response;
+      if (lock_type == F_UNLCK)
+        response = "none";
+      else if (lock_type == F_RDLCK)
+        response = "fail read " + std::to_string(pid);
+      else if (lock_type == F_WRLCK)
+        response = "fail write " + std::to_string(pid);
+      else
+        response = "unknown";
+
       ARROW_RETURN_NOT_OK(pipe_comms.send(response, context));
     } else {
       return Status::IOError("Unhandled message ", msg);
