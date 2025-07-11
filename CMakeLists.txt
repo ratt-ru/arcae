@@ -51,6 +51,7 @@ project(arcae CXX)
 
 include(FindPyArrow)
 include(CTest)
+include(CheckIncludeFileCXX)
 
 include_directories(cpp)
 add_compile_options("-D_GLIBCXX_USE_CXX11_ABI=1")

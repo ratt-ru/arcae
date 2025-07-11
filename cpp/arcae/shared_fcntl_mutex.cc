@@ -13,12 +13,8 @@
 #include <string_view>
 #include <thread>
 
-#if defined(_WIN32) || defined(_WIN64)
-#error Posix fcntl support required
-#else
 #include <fcntl.h>
 #include <unistd.h>
-#endif
 
 #include <arrow/result.h>
 #include <arrow/status.h>

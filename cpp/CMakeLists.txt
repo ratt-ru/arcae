@@ -2,6 +2,18 @@ find_package(PkgConfig REQUIRED)
 find_package(absl CONFIG REQUIRED)
 pkg_check_modules(casacore REQUIRED IMPORTED_TARGET casacore)
 
+
+check_include_file_cxx(fcntl.h  HAVE_FCNTL_H)
+check_include_file_cxx(unistd.h HAVE_UNISTD_H)
+
+if (NOT HAVE_FCNTL_H)
+    message(FATAL_ERROR "fnctl.h not found)
+endif()
+
+if (NOT HAVE_UNISTD_H)
+    message(FATAL_ERROR "unistd.h not found)
+endif()
+
 add_library(arcae SHARED
     arcae/configuration.cc
     arcae/descriptor.cc
