@@ -49,7 +49,7 @@ class NullSharedFcntlMutex : public BaseSharedFcntlMutex {
   virtual arrow::Result<bool> try_lock_shared() override { return true; }
 
   virtual void unlock() override {}
-  virtual void unlock_shared() override {};
+  virtual void unlock_shared() override {}
 };
 
 // Two part lock guarding access to a CASA table across multiple processes
