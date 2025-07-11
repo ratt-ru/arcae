@@ -79,11 +79,17 @@ struct PipeComms {
 
   char buffer[MSG_SIZE];
   // parent to child descriptors
-  int p_to_c[NPIPES] = {-1};
+  int p_to_c[NPIPES];
   // child to parent descriptors
-  int c_to_p[NPIPES] = {-1};
+  int c_to_p[NPIPES];
 
-  PipeComms() = default;
+  PipeComms() noexcept {
+    for (std::size_t p = 0; p < NPIPES; ++p) {
+      p_to_c[p] = -1;
+      c_to_p[p] = -1;
+    }
+  };
+
   PipeComms(const PipeComms&) = delete;
   PipeComms& operator=(const PipeComms& other) = delete;
   PipeComms(PipeComms&& other) noexcept {
