@@ -179,7 +179,7 @@ arrow::Status child_loop(PipeComms& pipe_comms, std::string_view lock_filename) 
   if (!lock->has_fd()) return Status::Invalid("No disk lock");
 
   // Lambda handling individual messages
-  // Messages are distinguished by their suffix.
+  // Messages are distinguished by their prefix.
   // i.e "write lock" or "query fctnl readers"
   auto HandleMsg = [&](std::string_view msg) -> Result<bool> {
     if (msg == kExit) {
