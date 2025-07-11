@@ -365,6 +365,56 @@ arrow::Status ShutdownChildren(std::array<PipeComms, CHILDREN>& comms,
 
 static constexpr auto PARENT_CONTEXT = PipeComms::PARENT;
 
+TEST(SharedFcntlMutexTest, TestBlocking) {
+  // This test performs a superficial check for blocking behaviour
+  // by competing read and write locks issued in separate processes
+  // As it is not easy to check whether the attempt to acquire a lock blocks
+  // a failed try_lock is expected before issuing the blocking lock
+  // (that eventually succeeds)
+  std::array<PipeComms, NCHILDREN> comms;
+  std::array<pid_t, NCHILDREN> child_pid;
+
+  ASSERT_OK(SpawnChildren(comms, child_pid));
+
+  // Acquire a write lock in first child
+  ASSERT_OK(comms[0].send(kWriteLock, PARENT_CONTEXT));
+  ASSERT_OK(comms[0].expect("ok", PARENT_CONTEXT));
+
+  // Verify that a non-blocking read lock attempt in the second child fails
+  ASSERT_OK(comms[1].send(kTryReadLock, PARENT_CONTEXT));
+  ASSERT_OK(comms[1].expect("fail"s, PARENT_CONTEXT));
+
+  // Blocking attempt on a read lock in second child
+  ASSERT_OK(comms[1].send(kReadLock, PARENT_CONTEXT));
+
+  // Release write lock in first child
+  ASSERT_OK(comms[0].send(kWriteUnlock, PARENT_CONTEXT));
+  ASSERT_OK(comms[0].expect("ok", PARENT_CONTEXT));
+
+  // Second child unblocks, acquires read lock
+  // and we can now observe it's response
+  ASSERT_OK(comms[1].expect("ok", PARENT_CONTEXT));
+
+  // Verify that a non-blocking write lock attempt in the first child fails
+  ASSERT_OK(comms[0].send(kTryWriteLock, PARENT_CONTEXT));
+  ASSERT_OK(comms[0].expect("fail"s, PARENT_CONTEXT));
+
+  // Blocking attemp at a write lock in the first child
+  ASSERT_OK(comms[0].send(kWriteLock, PARENT_CONTEXT));
+
+  // Release the read lock in the second child
+  ASSERT_OK(comms[1].send(kReadUnlock, PARENT_CONTEXT));
+
+  // First child acquires the write lock
+  ASSERT_OK(comms[0].expect("ok", PARENT_CONTEXT));
+
+  // Final unlock
+  ASSERT_OK(comms[0].send(kWriteUnlock, PARENT_CONTEXT));
+  ASSERT_OK(comms[0].expect("ok", PARENT_CONTEXT));
+
+  ASSERT_OK(ShutdownChildren(comms, child_pid));
+}
+
 // Test that acquiring read locks increases the number of fcntl readers
 TEST(SharedFcntlMutexTest, FcntlReaders) {
   std::array<PipeComms, NCHILDREN> comms;
