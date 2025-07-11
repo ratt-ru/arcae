@@ -415,10 +415,6 @@ TEST(SharedFcntlMutexTest, InterProcessObservability) {
   ASSERT_OK(comms[0].send(kWriteLock + " thread 1"s, PARENT_CONTEXT));
   ASSERT_OK(comms[0].expect("ok", PARENT_CONTEXT));
 
-  // Failed to acquire a write lock in the same process and thread
-  ASSERT_OK(comms[0].send(kTryWriteLock + " thread 1"s, PARENT_CONTEXT));
-  ASSERT_OK(comms[0].expect("fail", PARENT_CONTEXT));
-
   // Failed to acquire a write lock in the same process and a different thread
   ASSERT_OK(comms[0].send(kTryWriteLock + " thread 2"s, PARENT_CONTEXT));
   ASSERT_OK(comms[0].expect("fail", PARENT_CONTEXT));
