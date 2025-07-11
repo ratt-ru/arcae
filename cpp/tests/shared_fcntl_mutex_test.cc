@@ -255,10 +255,7 @@ arrow::Status child_loop(PipeComms& pipe_comms, std::string_view lock_filename) 
   auto MaybeRunInThread = [&](std::string_view msg, auto&& f) -> arrow::Result<bool> {
     int thread = [&]() -> int {
       if (auto p = msg.find("thread"); p != std::string_view::npos) {
-        try {
-          return std::stoi(std::string(msg.substr(p + strlen("thread"))));
-        } catch (std::exception& e) {
-        }
+        return std::stoi(std::string(msg.substr(p + strlen("thread"))));
       }
       return -1;
     }();
