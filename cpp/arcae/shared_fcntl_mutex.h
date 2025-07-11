@@ -54,7 +54,7 @@ class NullSharedFcntlMutex : public BaseSharedFcntlMutex {
 
 // Two part lock guarding access to a CASA table across multiple processes
 //
-// It's interface is somewhat similar to C++ standard library mutexes
+// Its interface is somewhat similar to C++ standard library mutexes
 // but methods may return arrow::{Status,Result} instead.
 //
 // It combines:
