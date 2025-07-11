@@ -49,7 +49,7 @@ static constexpr std::size_t NTASKS = 10;
 fs::path temp_directory_name(std::size_t len = 8) {
   std::random_device dev;
   std::mt19937 prng(dev());
-  std::uniform_int_distribution<> dist(0, 16);
+  std::uniform_int_distribution<> dist(0, 15);
 
   std::stringstream ss;
   ss << "temp-dir-";
