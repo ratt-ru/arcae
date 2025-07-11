@@ -74,7 +74,7 @@ auto SharedFcntlMutex::Create(std::string_view lock_filename)
   struct enable_rwlock : public SharedFcntlMutex {
    public:
     enable_rwlock(int fd, std::string_view lock_name)
-        : SharedFcntlMutex(fd, lock_name) {};
+        : SharedFcntlMutex(fd, lock_name) {}
   };
 
   if (lock_filename.empty()) return std::make_shared<enable_rwlock>(-1, lock_filename);
