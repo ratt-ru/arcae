@@ -137,7 +137,7 @@ void SharedFcntlMutex::unlock_shared() {
         .l_len = 0,
     };
     fcntl(fd_, F_SETLK, &lock_data);
-  };
+  }
 
   mutex_.unlock_shared();
 }
