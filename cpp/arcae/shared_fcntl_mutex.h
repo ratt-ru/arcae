@@ -36,7 +36,7 @@ class BaseSharedFcntlMutex {
 
   virtual void unlock() = 0;
   virtual void unlock_shared() = 0;
-  virtual ~BaseSharedFcntlMutex() {};
+  virtual ~BaseSharedFcntlMutex() {}
 };
 
 // Noop class, mostly for use with in memory tables
