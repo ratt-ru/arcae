@@ -86,9 +86,13 @@ auto SharedFcntlMutex::Create(std::string_view lock_filename)
       case EACCES:
         fd = -1;
         break;
-      default:
-        return Status::IOError("Create/Open of ", lock_filename, " failed with  ",
-                               strerror(errno), " (", errno, ')');
+      default: {
+        char errmsg[1024];
+        [[maybe_unused]] auto r =
+            strerror_r(errno, errmsg, sizeof(errmsg) / sizeof(char));
+        return Status::IOError("Create/Open of ", lock_filename, " failed with  ", errmsg,
+                               " (", errno, ')');
+      }
     }
   }
 

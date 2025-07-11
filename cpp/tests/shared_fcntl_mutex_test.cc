@@ -128,17 +128,19 @@ struct PipeComms {
 
     for (std::size_t written = 0; written < msg.size();) {
       auto n = write(pipe, msg.data() + written, msg.size() - written);
-      if (n == -1)
-        return Status::IOError("Write of ", msg.size(), " bytes failed due to ",
-                               strerror(errno), " on pipe ", pipe);
+      if (n == -1) {
+        return Status::IOError("Write of ", msg.size(), " bytes failed due to ", errno,
+                               " on pipe ", pipe);
+      }
       written += n;
     }
 
     const char nullchar = 0;
 
-    if (write(pipe, &nullchar, sizeof(nullchar)) == -1)
-      return Status::IOError("Write of ", msg.size(), " bytes failed due to ",
-                             strerror(errno), " on pipe ", pipe);
+    if (write(pipe, &nullchar, sizeof(nullchar)) == -1) {
+      return Status::IOError("Write of ", msg.size(), " bytes failed due to ", errno,
+                             " on pipe ", pipe);
+    }
 
     return Status::OK();
   }
@@ -151,7 +153,7 @@ struct PipeComms {
     while (bytes_read < MSG_SIZE) {
       auto nread = read(pipe, buffer + bytes_read, MSG_SIZE - bytes_read);
       if (nread == -1)
-        return Status::IOError("Read failed due to ", strerror(errno), " on pipe ", pipe);
+        return Status::IOError("Read failed due to ", errno, " on pipe ", pipe);
       else if (nread == 0)
         break;
       bytes_read += nread;
