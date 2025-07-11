@@ -168,7 +168,7 @@ struct PipeComms {
 
 // Child process loop
 // Waits for instructions from the parent process such as
-// "read lock", "write lock", "query fctnl readers",
+// "read lock", "write lock", "query fcntl readers",
 // "read lock thread 1", "write lock thread 2".
 // Generally responds to the parent process with
 // "ok", "fail" or some additional requested information
