@@ -84,7 +84,7 @@ struct PipeComms {
   PipeComms() = default;
   PipeComms(const PipeComms&) = delete;
   PipeComms& operator=(const PipeComms& other) = delete;
-  PipeComms(PipeComms&& other) {
+  PipeComms(PipeComms&& other) noexcept {
     for (std::size_t p = 0; p < NPIPES; ++p) {
       p_to_c[p] = std::exchange(other.p_to_c[p], -1);
       c_to_p[p] = std::exchange(other.c_to_p[p], -1);
