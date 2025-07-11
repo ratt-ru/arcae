@@ -127,7 +127,7 @@ void SharedFcntlMutex::unlock() {
 }
 
 void SharedFcntlMutex::unlock_shared() {
-  std::unique_lock<std::mutex> fnctl_lock(fcntl_read_mutex_);
+  std::unique_lock<std::mutex> fcntl_lock(fcntl_read_mutex_);
   // Last reader releases the fcntl lock
   if (fd_ != -1 && reader_counts_ > 0 && --reader_counts_ == 0) {
     struct flock lock_data = {
