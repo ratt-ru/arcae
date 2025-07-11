@@ -65,8 +65,7 @@ class NullSharedFcntlMutex : public BaseSharedFcntlMutex {
 // Further care must be taken to restrict access of multiple readers
 // to the underlying fcntl lock: This is accomplished with a std::mutex
 // and a reader counter.
-class SharedFcntlMutex : public BaseSharedFcntlMutex,
-                         std::enable_shared_from_this<SharedFcntlMutex> {
+class SharedFcntlMutex : public BaseSharedFcntlMutex {
  private:
   int fd_;
   std::string lock_filename_;
