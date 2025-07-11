@@ -280,12 +280,10 @@ arrow::Status child_loop(PipeComms& pipe_comms, std::string_view lock_filename) 
   // or "thread 2" in the message suffix
   auto MaybeRunInThread = [&](std::string_view msg, auto&& f) -> arrow::Result<bool> {
     using FType = decltype(f);
-    int thread = [&]() -> int {
-      if (auto p = msg.find("thread"); p != std::string_view::npos) {
-        return std::stoi(std::string(msg.substr(p + strlen("thread"))));
-      }
-      return -1;
-    }();
+    int thread = -1;
+    if (auto p = msg.find("thread"); p != std::string_view::npos) {
+      thread = std::stoi(std::string(msg.substr(p + strlen("thread"))));
+    }
 
     // Execute functor on thread if requested, creating it if necessary
     if (thread >= 0) {
