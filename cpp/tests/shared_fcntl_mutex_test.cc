@@ -517,7 +517,7 @@ TEST(SharedFcntlMutexTest, LockGuard) {
     ASSERT_FALSE(success);
   }
 
-  // Can read lock lock
+  // Can read lock
   ASSERT_OK_AND_ASSIGN(success, mutex->try_lock_shared());
   ASSERT_TRUE(success);
   mutex->unlock();
