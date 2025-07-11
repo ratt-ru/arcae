@@ -325,8 +325,8 @@ arrow::Status SpawnChildren(std::array<PipeComms, CHILDREN>& comms,
   return Status::OK();
 }
 
-// Issues exit instructions to the child process
-// and waits for it to shutdown
+// Issue exit instructions to child processes
+// and waits for them to shutdown
 template <std::size_t CHILDREN>
 arrow::Status ShutdownChildren(std::array<PipeComms, CHILDREN>& comms,
                                std::array<pid_t, CHILDREN>& child_pid) {
