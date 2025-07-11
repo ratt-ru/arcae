@@ -78,14 +78,14 @@ auto SharedFcntlMutex::Create(std::string_view lock_filename)
 
   if (lock_filename.empty()) return std::make_shared<enable_rwlock>(-1, lock_filename);
 
-  int fd = -1;
   // Attempt to open or create the lock file in readwrite mode
   int flags = O_CREAT | O_RDWR;
-  int mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
+  int mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH;
+  int fd = open(std::string(lock_filename).c_str(), flags, mode);
 
-  if (fd = open(std::string(lock_filename).c_str(), flags, mode); fd == -1) {
+  if (fd == -1) {
     switch (errno) {
-      // Can't access the directory
+      // Can't access the file
       // In this case the lock falls back to readonly
       case EACCES:
         fd = -1;
