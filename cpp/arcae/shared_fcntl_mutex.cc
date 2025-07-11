@@ -185,8 +185,7 @@ auto SharedFcntlMutex::lock_impl(bool write) -> Status {
   // the fcntl lock with exponential backoff.
   // A blocking F_SETLKW could be used but in practice
   // this can result in the kernel producing EDEADLK.
-  std::random_device rd;
-  std::mt19937 gen(rd());
+  std::mt19937 gen(std::chrono::high_resolution_clock::now().time_since_epoch().count());
   std::uniform_real_distribution<> dist(-1e-4, 1e-4);
   std::chrono::duration<double> lock_sleep = 10ms;
 
