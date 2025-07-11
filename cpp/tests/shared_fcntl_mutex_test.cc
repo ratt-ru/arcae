@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdlib>
 #include <filesystem>
+#include <locale>
 #include <memory>
 #include <random>
 #include <sstream>
@@ -52,6 +53,7 @@ fs::path temp_directory_name(std::size_t len = 8) {
   std::uniform_int_distribution<> dist(0, 15);
 
   std::stringstream ss;
+  ss.imbue(std::locale::classic());
   ss << "temp-dir-";
   fs::path path = fs::current_path();
 
