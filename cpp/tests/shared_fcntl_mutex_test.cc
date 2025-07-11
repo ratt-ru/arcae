@@ -433,7 +433,7 @@ TEST(SharedFcntlMutexTest, InterProcessObservability) {
   ASSERT_OK(comms[1].expect("fail write " + child_0_pid, PARENT_CONTEXT));
 
   // Release write lock in the first process
-  ASSERT_OK(comms[0].send(kWriteUnlock + " thread 2"s, PARENT_CONTEXT));
+  ASSERT_OK(comms[0].send(kWriteUnlock + " thread 1"s, PARENT_CONTEXT));
   ASSERT_OK(comms[0].expect("ok", PARENT_CONTEXT));
 
   // Second process observes no lock
