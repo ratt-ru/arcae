@@ -128,7 +128,7 @@ void SharedFcntlMutex::unlock() {
 void SharedFcntlMutex::unlock_shared() {
   std::unique_lock<std::mutex> fcntl_lock(fcntl_read_mutex_);
   // Last reader releases the fcntl lock
-  if (fd_ != -1 && reader_counts_ > 0 && --reader_counts_ == 0) {
+  if (fd_ != -1 && reader_count_ > 0 && --reader_count_ == 0) {
     struct flock lock_data = {
         .l_type = F_UNLCK,
         .l_whence = SEEK_SET,
@@ -143,7 +143,7 @@ void SharedFcntlMutex::unlock_shared() {
 
 auto SharedFcntlMutex::fcntl_readers() -> std::size_t {
   std::unique_lock<std::mutex> fcntl_lock(fcntl_read_mutex_);
-  return reader_counts_;
+  return reader_count_;
 }
 
 auto SharedFcntlMutex::other_locks(FcntlLockType lock_type)
@@ -178,7 +178,7 @@ auto SharedFcntlMutex::lock_impl(bool write) -> Status {
     // Otherwise the read lock now guards the acquisition
     // of the fcntl lock below
     reader_lock.lock();
-    if (reader_counts_++ > 0) return Status::OK();
+    if (reader_count_++ > 0) return Status::OK();
   }
 
   // Repeatedly attempt acquisition of
@@ -205,7 +205,7 @@ auto SharedFcntlMutex::lock_impl(bool write) -> Status {
       mutex_.unlock();
     } else {
       // Covered by reader_lock
-      reader_counts_--;
+      reader_count_--;
       mutex_.unlock_shared();
     }
   }
@@ -229,7 +229,7 @@ auto SharedFcntlMutex::try_lock_impl(bool write) -> Result<bool> {
     // Otherwise the read lock now guards the acquisition
     // of the fcntl lock below
     reader_lock.lock();
-    if (reader_counts_++ > 0) return true;
+    if (reader_count_++ > 0) return true;
   }
 
   auto result = MaybeSetFcntlLock(fd_, write, lock_filename_);
@@ -240,7 +240,7 @@ auto SharedFcntlMutex::try_lock_impl(bool write) -> Result<bool> {
       mutex_.unlock();
     } else {
       // Covered by reader_lock
-      --reader_counts_;
+      --reader_count_;
       mutex_.unlock_shared();
     }
   }

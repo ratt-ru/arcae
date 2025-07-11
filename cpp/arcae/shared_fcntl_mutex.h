@@ -74,7 +74,7 @@ class SharedFcntlMutex : public BaseSharedFcntlMutex,
   // Guards access at the process level
   std::shared_mutex mutex_;
   // Number of concurrent readers
-  int reader_counts_;
+  int reader_count_;
   // Guards access to the fcntl lock
   // This is only needed for reads as
   // mutex_ will only ever allow one writer
@@ -129,7 +129,7 @@ class SharedFcntlMutex : public BaseSharedFcntlMutex,
 
  protected:
   SharedFcntlMutex(int fd, std::string_view lock_filename)
-      : fd_(fd), lock_filename_(lock_filename), reader_counts_(0) {}
+      : fd_(fd), lock_filename_(lock_filename), reader_count_(0) {}
 
   arrow::Status lock_impl(bool write);
   arrow::Result<bool> try_lock_impl(bool write);
