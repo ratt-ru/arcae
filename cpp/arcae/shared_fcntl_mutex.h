@@ -56,7 +56,7 @@ class NullSharedFcntlMutex : public BaseSharedFcntlMutex {
 // It combines:
 //
 // 1. A per-process lock that provides multiple-reader single-writer (MRSW)
-//    access to an underlying
+//    access to an underlying:
 // 2. fcntl process lock that coordinates multiple-reader single-writer (MRSW)
 //    access across processes.
 //
