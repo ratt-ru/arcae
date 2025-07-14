@@ -1,6 +1,5 @@
 #include "arcae/shared_fcntl_mutex.h"
 
-#include <algorithm>
 #include <cstddef>
 #include <cstdlib>
 #include <filesystem>
