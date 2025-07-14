@@ -141,7 +141,7 @@ void SharedFcntlMutex::unlock_shared() {
 }
 
 auto SharedFcntlMutex::fcntl_readers() const -> std::size_t {
-  std::unique_lock<std::mutex> fcntl_lock(fcntl_read_mutex_);
+  std::lock_guard<std::mutex> fcntl_lock(fcntl_read_mutex_);
   return reader_count_;
 }
 
