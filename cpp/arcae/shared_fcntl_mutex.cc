@@ -39,7 +39,6 @@ auto MaybeSetFcntlLock(int fd, bool write,
       .l_whence = SEEK_SET,
       .l_start = 0,
       .l_len = 0,
-      //.l_pid = getpid(),
   };
 
   // Indicate success if file-locking succeeds
