@@ -2,6 +2,7 @@
 #define ARCAE_ISOLATED_TABLE_PROXY_H
 
 #include <memory>
+#include <stdexcept>
 #include <type_traits>
 #include <vector>
 
@@ -47,6 +48,8 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
         return std::invoke(functor, *this->GetProxy(instance));
       } catch (casacore::AipsError& e) {
         return arrow::Status::Invalid("Unhandled casacore exception: ", e.what());
+      } catch (std::runtime_error& e) {
+        return arrow::Status::Invalid("Unhandled exception: ", e.what());
       }
     });
   }
@@ -68,6 +71,8 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
                        } catch (casacore::AipsError& e) {
                          return arrow::Status::Invalid("Unhandled casacore exception: ",
                                                        e.what());
+                       } catch (std::runtime_error& e) {
+                         return arrow::Status::Invalid("Unhandled exception: ", e.what());
                        }
                      });
   }
@@ -87,6 +92,8 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
             return std::invoke(fn, result, *this->GetProxy(instance));
           } catch (casacore::AipsError& e) {
             return arrow::Status::Invalid("Unhandled casacore exception: ", e.what());
+          } catch (std::runtime_error& e) {
+            return arrow::Status::Invalid("Unhandled exception: ", e.what());
           }
         },
         {},
@@ -109,6 +116,8 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
             return std::invoke(fn, result, *this->GetProxy(instance));
           } catch (casacore::AipsError& e) {
             return arrow::Status::Invalid("Unhandled casacore exception: ", e.what());
+          } catch (std::runtime_error& e) {
+            return arrow::Status::Invalid("Unhandled exception: ", e.what());
           }
         },
         {},
@@ -132,6 +141,8 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
         return std::invoke(functor, *this->GetProxy(instance));
       } catch (casacore::AipsError& e) {
         return arrow::Status::Invalid("Unhandled casacore exception: ", e.what());
+      } catch (std::runtime_error& e) {
+        return arrow::Status::Invalid("Unhandled exception: ", e.what());
       }
     });
   }
@@ -146,16 +157,18 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
     using ResultType = ArrowResultType<Fn, casacore::TableProxy&>;
     ARROW_RETURN_NOT_OK(CheckClosed());
     auto instance = GetInstance();
-    return RunInPoolSync(instance,
-                         [this, instance = instance,
-                          functor = std::forward<Fn>(functor)]() mutable -> ResultType {
-                           try {
-                             return std::invoke(functor, *this->GetProxy(instance));
-                           } catch (casacore::AipsError& e) {
-                             return arrow::Status::Invalid(
-                                 "Unhandled casacore exception: ", e.what());
-                           }
-                         });
+    return RunInPoolSync(
+        instance,
+        [this, instance = instance,
+         functor = std::forward<Fn>(functor)]() mutable -> ResultType {
+          try {
+            return std::invoke(functor, *this->GetProxy(instance));
+          } catch (casacore::AipsError& e) {
+            return arrow::Status::Invalid("Unhandled casacore exception: ", e.what());
+          } catch (std::runtime_error& e) {
+            return arrow::Status::Invalid("Unhandled exception: ", e.what());
+          }
+        });
   }
 
   // Construct an IsolatedTableProxy with the supplied function
