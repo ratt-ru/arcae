@@ -99,7 +99,7 @@ Result<bool> NewTableProxy::PutColumn(const std::string& column,
                                       const std::shared_ptr<Array>& data,
                                       const detail::Selection& selection) const {
   SharedFcntlGuard lock(*fcntl_mutex_, true);
-  return WriteImpl(itp_, column, data, selection).MoveResult();
+  return WriteImpl(itp_->SpawnWriter(), column, data, selection).MoveResult();
 }
 
 Result<std::string> NewTableProxy::Name() const {
@@ -138,7 +138,7 @@ Result<std::size_t> NewTableProxy::nRows() const {
 
 Result<bool> NewTableProxy::AddRows(std::size_t nrows) {
   SharedFcntlGuard lock(*fcntl_mutex_, true);
-  return itp_
+  return itp_->SpawnWriter()
       ->RunAsync([nrows = nrows](TableProxy& tp) {
         detail::MaybeReopenRW(tp);
         tp.addRow(nrows);
@@ -150,7 +150,7 @@ Result<bool> NewTableProxy::AddRows(std::size_t nrows) {
 Result<bool> NewTableProxy::AddColumns(const std::string& json_columndescs,
                                        const std::string& json_dminfo) {
   SharedFcntlGuard lock(*fcntl_mutex_, true);
-  return itp_
+  return itp_->SpawnWriter()
       ->RunAsync([json_columndescs = json_columndescs,
                   json_dminfo = json_dminfo](TableProxy& tp) {
         detail::MaybeReopenRW(tp);

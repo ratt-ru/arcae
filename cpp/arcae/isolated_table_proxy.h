@@ -20,7 +20,32 @@
 namespace arcae {
 namespace detail {
 
-// Isolates access to a CASA Table to a single thread
+// Mediates access to multiple instances of the same CASA table opened in separate
+// threads.
+//
+// For example, the following code snippet opens up 8 instances of "observation.ms"
+//
+//   auto itp = IsolatedTableProxy::Make(
+//    [auto filename = "observation.ms"]() ->
+//    arrow::Result<std::shared_ptr<casacore::TableProxy>> {
+//      return std::make_shared<casacore::TableProxy>(filename, casacore::Record(),
+//      TableOption::Old);
+//    }, 8);
+//
+//  One can then run read-only functions against that TableProxy inside each thread.
+//
+//    auto nrows = itp->RunAsync([](const casacore::TableProxy & tp) {
+//       return tp.nrows();
+//    }).MoveResult();
+//
+// In general, writing to a CASA table simultaneously from multiple threads is unsafe,
+// use SpawnWriter to ensure that only one instance is used to issue multiple write
+// requests on one instance
+//
+//    itp->SpawnWriter()->RunAsync([auto column="DATA"](casacore::TableProxy & tp)) {
+//       tp.PutColumn(column, ...);
+//    }
+
 class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProxy> {
  public:
   // Close the IsolatedTableProxy
@@ -238,7 +263,11 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
     return itp;
   }
 
-  std::shared_ptr<casacore::TableProxy> Proxy() const { return nullptr; }
+  // Spawns an IsolatedTableProxy encapsulating a single instance
+  // from this ITP. Suitable for constraining writes to a single
+  // thread and instance as concurrent writes issued from multiple
+  // threads will produce race conditions in the underlying casacore layer
+  std::shared_ptr<IsolatedTableProxy> SpawnWriter();
 
  protected:
   IsolatedTableProxy() = default;

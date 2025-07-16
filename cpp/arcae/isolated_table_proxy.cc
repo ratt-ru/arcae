@@ -26,7 +26,7 @@ bool IsolatedTableProxy::IsClosed() const { return is_closed_; }
 std::size_t IsolatedTableProxy::GetInstance() const {
   using NumTasksType = decltype(ProxyAndPool::io_pool_->GetNumTasks());
   std::size_t instance = 0;
-  NumTasksType num_tasks = std::numeric_limits<NumTasksType>::max();
+  auto num_tasks = std::numeric_limits<NumTasksType>::max();
   assert(proxy_pools_.size() > 0);
 
   for (std::size_t i = 0; i < proxy_pools_.size(); ++i) {
@@ -74,6 +74,22 @@ Result<bool> IsolatedTableProxy::Close() {
     return true;
   }
   return false;
+}
+
+std::shared_ptr<IsolatedTableProxy> IsolatedTableProxy::SpawnWriter() {
+  // Create an IsolatedTableProxy with a custom deleter that releases
+  // resources (proxies and pools) that are actually managed by the parent ITP
+  std::shared_ptr<IsolatedTableProxy> itp(new IsolatedTableProxy(), [](auto* p) {
+    p->proxy_pools_.clear();
+    p->dependencies_.clear();
+    p->is_closed_ = true;
+    delete p;
+  });
+  itp->dependencies_.emplace_back(shared_from_this());
+  auto instance = GetInstance();
+  itp->proxy_pools_.push_back(proxy_pools_[instance]);
+  itp->is_closed_ = false;
+  return itp;
 }
 
 IsolatedTableProxy::~IsolatedTableProxy() {
