@@ -29,11 +29,22 @@ namespace arcae {
 
 namespace {
 
-// Returns true on try again, signal interrupts and
-// no locks available (on NFS systems)
-auto ShouldRetry(int err) -> bool {
-  return err == EAGAIN || err == EINTR ||
-         (ServiceLocator::configuration().IsTruthy("nfs", "true") && err == ENOLCK);
+// Returns true on no locks avaiable on an NFS file system
+auto ConsiderSuccessful(int err) -> bool {
+  return err == ENOLCK && ServiceLocator::configuration().IsTruthy("nfs", "true");
+}
+
+// Returns true on try again and signal interrupts
+auto ShouldRetry(int err) -> bool { return err == EAGAIN || err == EINTR; }
+
+// Increase the given duration by a given factor,
+// up to a maximum
+template <typename Duration>
+auto IncreaseSleep(const Duration& duration, double factor = 1.5,
+                   const Duration maximum = 200ms) -> Duration {
+  auto new_sleep = duration * factor;
+  if (new_sleep > maximum) new_sleep = maximum;
+  return new_sleep;
 }
 
 // Convert an errno into an arrow::Status
@@ -54,9 +65,10 @@ auto FcntlSetLockError(int err, FcntlLockType lock_type,
       return Status::IOError("Bad file descriptor accessing ", filename, " during a ",
                              lock_str, " operation");
     case ENOLCK:
-      return Status::IOError("No locks were available on ", filename, " during a ",
-                             lock_str, "operation. ",
-                             "If located on an  NFS filesystem, please log an issue");
+      return Status::IOError(
+          "No locks were available on ", filename, " during a ", lock_str, "operation. ",
+          "If ", filename, " is located on an NFS filesystem ",
+          "consider configuring nfs=true within arcae's configuration");
     default: {
       char errmsg[1024];
       [[maybe_unused]] auto r = strerror_r(errno, errmsg, sizeof(errmsg) / sizeof(char));
@@ -126,10 +138,14 @@ arrow::Status SharedFcntlMutex::unlock() {
         .l_start = MUTEX_LOCK_START,
         .l_len = MUTEX_LOCK_LENGTH,
     };
+    std::chrono::duration<double> lock_sleep = 10ms;
 
-    while (fcntl(fd_, F_SETLK, &lock) != 0) {
+    while (fcntl(fd_, F_SETLK, &lock) != 0 && !ConsiderSuccessful(errno)) {
       if (!ShouldRetry(errno))
         return FcntlSetLockError(errno, lock.l_type, lock_filename_);
+
+      std::this_thread::sleep_for(lock_sleep);
+      lock_sleep = IncreaseSleep(lock_sleep);
     }
   }
   mutex_.unlock();
@@ -146,9 +162,14 @@ arrow::Status SharedFcntlMutex::unlock_shared() {
         .l_start = MUTEX_LOCK_START,
         .l_len = MUTEX_LOCK_LENGTH,
     };
-    while (fcntl(fd_, F_SETLK, &lock) != 0) {
+    std::chrono::duration<double> lock_sleep = 10ms;
+
+    while (fcntl(fd_, F_SETLK, &lock) != 0 && !ConsiderSuccessful(errno)) {
       if (!ShouldRetry(errno))
         return FcntlSetLockError(errno, lock.l_type, lock_filename_);
+
+      std::this_thread::sleep_for(lock_sleep);
+      lock_sleep = IncreaseSleep(lock_sleep);
     }
   }
 
@@ -214,12 +235,13 @@ auto SharedFcntlMutex::lock_impl(bool write) -> Status {
     };
 
     while (true) {
-      if (fcntl(fd_, F_SETLK, &lock) == 0) return Status::OK();
+      if (fcntl(fd_, F_SETLK, &lock) == 0 || ConsiderSuccessful(errno))
+        return Status::OK();
       if (!ShouldRetry(errno))
         return FcntlSetLockError(errno, lock.l_type, lock_filename_);
       auto jitter = std::chrono::duration<double>(dist(gen));
       std::this_thread::sleep_for(lock_sleep + jitter);
-      if ((lock_sleep *= 1.5) > 200ms) lock_sleep = 200ms;
+      lock_sleep = IncreaseSleep(lock_sleep);
     }
   }();
 
@@ -263,7 +285,7 @@ auto SharedFcntlMutex::try_lock_impl(bool write) -> Result<bool> {
 
   Result<bool> result;
 
-  if (fcntl(fd_, F_SETLK, &lock) == 0) {
+  if (fcntl(fd_, F_SETLK, &lock) == 0 || ConsiderSuccessful(errno)) {
     result = true;
   } else if (ShouldRetry(errno)) {
     result = false;
