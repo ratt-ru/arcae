@@ -440,6 +440,9 @@ class Configuration(MutableMapping):
         return config.Size()
 
 
+arcae_config = Configuration()
+
+
 def merge_np_partitions(
     partitions: List[Dict[str, np.ndarray]]
 ) -> Dict[str, np.ndarray]:

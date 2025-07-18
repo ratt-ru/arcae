@@ -65,10 +65,11 @@ auto FcntlSetLockError(int err, FcntlLockType lock_type,
       return Status::IOError("Bad file descriptor accessing ", filename, " during a ",
                              lock_str, " operation");
     case ENOLCK:
-      return Status::IOError(
-          "No locks were available on ", filename, " during a ", lock_str, "operation. ",
-          "If ", filename, " is located on an NFS filesystem ",
-          "consider configuring nfs=true within arcae's configuration");
+      return Status::IOError("No locks were available on ", filename, " during a ",
+                             lock_str, "operation. ", "If ", filename,
+                             " is located on an NFS filesystem ",
+                             "consider configuring nfs=true within arcae's configuration "
+                             "(See arcae's README.rst).");
     default: {
       char errmsg[1024];
       [[maybe_unused]] auto r = strerror_r(errno, errmsg, sizeof(errmsg) / sizeof(char));
