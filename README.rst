@@ -97,6 +97,19 @@ with added support for some `NumPy Advanced Indexing <numpy_advanced_indexing_>`
 
 See the test cases for further use cases.
 
+Configuration
+-------------
+
+It's possible to configure arcae via a dictionary-like interface.
+One can enable arcae to work on NFS file-systems with the following
+command.
+
+  .. code-block:: python
+
+    from arcae.lib.arrow_tables import arcae_config
+    arcae_config["nfs"] = "true"
+
+
 
 Exporting Measurement Sets to Arrow Parquet Datasets
 ----------------------------------------------------

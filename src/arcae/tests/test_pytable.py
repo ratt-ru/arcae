@@ -520,73 +520,70 @@ def test_duckdb(partitioned_dataset):
 
 
 def test_config():
-    from arcae.lib.arrow_tables import Configuration
+    from arcae.lib.arrow_tables import arcae_config
 
-    global_config = Configuration()
+    assert arcae_config["validation-level"] == "full"
 
-    assert global_config["validation-level"] == "full"
+    arcae_config["blah"] = "foo"
+    assert arcae_config["blah"] == "foo"
+    assert len(arcae_config) == 2
 
-    global_config["blah"] = "foo"
-    assert global_config["blah"] == "foo"
-    assert len(global_config) == 2
-
-    global_config["qux"] = "bar"
-    assert global_config["qux"] == "bar"
-    assert len(global_config) == 3
+    arcae_config["qux"] = "bar"
+    assert arcae_config["qux"] == "bar"
+    assert len(arcae_config) == 3
 
     try:
-        global_config["foo"] == "bar"
+        arcae_config["foo"] == "bar"
     except KeyError as e:
         assert "foo" in e.args[0]
 
-    assert global_config.get("foo") is None
-    assert global_config.get("foo", "bar") == "bar"
+    assert arcae_config.get("foo") is None
+    assert arcae_config.get("foo", "bar") == "bar"
 
-    assert list(global_config.items()) == [
+    assert list(arcae_config.items()) == [
         ("blah", "foo"),
         ("qux", "bar"),
         ("validation-level", "full"),
     ]
 
     try:
-        global_config["foo"] = 1
+        arcae_config["foo"] = 1
     except TypeError as e:
         assert "(expected str, got int)" in e.args[0]
 
-    del global_config["blah"]
-    del global_config["qux"]
+    del arcae_config["blah"]
+    del arcae_config["qux"]
 
-    assert list(global_config.items()) == [("validation-level", "full")]
+    assert list(arcae_config.items()) == [("validation-level", "full")]
 
 
 def test_config_context_mgr():
     from arcae import config
-    from arcae.lib.arrow_tables import Configuration
+    from arcae.lib.arrow_tables import arcae_config
 
-    global_config = Configuration()
-    assert list(global_config.items()) == [("validation-level", "full")]
+    assert list(arcae_config.items()) == [("validation-level", "full")]
 
     with config.set(**{"foo": "bar", "qux-baz": "blah"}):
-        assert global_config["foo"] == "bar"
-        assert global_config["qux-baz"] == "blah"
+        assert arcae_config["foo"] == "bar"
+        assert arcae_config["qux-baz"] == "blah"
 
     with pytest.raises(KeyError):
-        assert global_config["foo"] == "foo"
+        assert arcae_config["foo"] == "foo"
 
     with pytest.raises(KeyError):
-        assert global_config["qux-baz"] == "blah"
+        assert arcae_config["qux-baz"] == "blah"
 
     with config.set(**{"foo": "bar"}):
-        assert global_config["foo"] == "bar"
+        assert arcae_config["foo"] == "bar"
 
         with config.set(**{"qux": "baz"}):
-            assert global_config["foo"] == "bar"
-            assert global_config["qux"] == "baz"
+            assert arcae_config["foo"] == "bar"
+            assert arcae_config["qux"] == "baz"
 
         with pytest.raises(KeyError):
-            global_config["qux"]
+            arcae_config["qux"]
 
     with pytest.raises(KeyError):
-        global_config["foo"]
+        arcae_config["foo"]
 
-    assert list(global_config.items()) == [("validation-level", "full")]
+    assert list(arcae_config.items()) == [("validation-level", "full")]
