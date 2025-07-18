@@ -136,8 +136,6 @@ class SharedFcntlMutex : public BaseSharedFcntlMutex {
   SharedFcntlMutex(int fd, std::string_view lock_filename)
       : fd_(fd), lock_filename_(lock_filename), reader_count_(0) {}
 
-  flock BaseLockStruct();
-
   arrow::Status lock_impl(bool write);
   arrow::Result<bool> try_lock_impl(bool write);
 };
