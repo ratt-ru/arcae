@@ -21,6 +21,8 @@ using namespace std::literals;
 namespace arcae {
 
 using FcntlLockType = decltype(flock::l_type);
+using FcntlLockStartType = decltype(flock::l_start);
+using FcntlLocLengthType = decltype(flock::l_len);
 
 // Base locking class
 class BaseSharedFcntlMutex {
@@ -30,8 +32,8 @@ class BaseSharedFcntlMutex {
   virtual arrow::Result<bool> try_lock() = 0;
   virtual arrow::Result<bool> try_lock_shared() = 0;
 
-  virtual void unlock() = 0;
-  virtual void unlock_shared() = 0;
+  virtual arrow::Status unlock() = 0;
+  virtual arrow::Status unlock_shared() = 0;
   virtual ~BaseSharedFcntlMutex() {}
 };
 
@@ -44,8 +46,8 @@ class NullSharedFcntlMutex : public BaseSharedFcntlMutex {
   virtual arrow::Result<bool> try_lock() override { return true; }
   virtual arrow::Result<bool> try_lock_shared() override { return true; }
 
-  virtual void unlock() override {}
-  virtual void unlock_shared() override {}
+  virtual arrow::Status unlock() override { return arrow::Status::OK(); }
+  virtual arrow::Status unlock_shared() override { return arrow::Status::OK(); }
 };
 
 // Two part lock guarding access to a CASA table across multiple processes
@@ -79,6 +81,10 @@ class SharedFcntlMutex : public BaseSharedFcntlMutex {
   // mutex_ will only ever allow one writer
   mutable std::mutex fcntl_read_mutex_;
 
+  // This locks the entire file
+  static constexpr FcntlLockStartType MUTEX_LOCK_START = 0;
+  static constexpr FcntlLocLengthType MUTEX_LOCK_LENGTH = 0;
+
  public:
   struct LockInfo {
     FcntlLockType lock_type;
@@ -103,9 +109,9 @@ class SharedFcntlMutex : public BaseSharedFcntlMutex {
   arrow::Status lock_shared() override { return lock_impl(false); }
 
   // Release a write lock
-  void unlock() override;
+  arrow::Status unlock() override;
   // Release a read lock
-  void unlock_shared() override;
+  arrow::Status unlock_shared() override;
 
   // Try to acquire a write lock
   // Returns immediately indicating success or failure
@@ -130,6 +136,8 @@ class SharedFcntlMutex : public BaseSharedFcntlMutex {
   SharedFcntlMutex(int fd, std::string_view lock_filename)
       : fd_(fd), lock_filename_(lock_filename), reader_count_(0) {}
 
+  flock BaseLockStruct();
+
   arrow::Status lock_impl(bool write);
   arrow::Result<bool> try_lock_impl(bool write);
 };
@@ -147,7 +155,11 @@ class SharedFcntlGuard {
       ARROW_LOG(FATAL) << "Unable to lock " << status;
     }
   };
-  ~SharedFcntlGuard() { write_ ? lock_.unlock() : lock_.unlock_shared(); }
+  ~SharedFcntlGuard() {
+    if (auto status = write_ ? lock_.unlock() : lock_.unlock_shared(); !status.ok()) {
+      ARROW_LOG(FATAL) << "unable to unlock " << status;
+    }
+  }
 };
 
 }  // namespace arcae

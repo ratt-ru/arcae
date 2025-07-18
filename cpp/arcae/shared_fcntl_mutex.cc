@@ -20,6 +20,8 @@
 #include <arrow/status.h>
 #include <arrow/util/logging.h>
 
+#include "arcae/service_locator.h"
+
 using arrow::Result;
 using arrow::Status;
 
@@ -27,37 +29,43 @@ namespace arcae {
 
 namespace {
 
-// Sets a read or write fcntl lock on the
-// given file descriptor
-// Returns true on success or false on an EAGAIN result
-// Other fcntl error codes are propagated as errors in the result object
-auto MaybeSetFcntlLock(int fd, bool write,
-                       std::string_view lock_filename) -> Result<bool> {
-  const std::string_view lock_type(write ? "write" : "read");
-  struct flock lock_data = {
-      .l_type = FcntlLockType(write ? F_WRLCK : F_RDLCK),
-      .l_whence = SEEK_SET,
-      .l_start = 0,
-      .l_len = 0,
-  };
+// Returns true on try again, signal interrupts and
+// no locks available (on NFS systems)
+auto ShouldRetry(int err) -> bool {
+  return err == EAGAIN || err == EINTR ||
+         (ServiceLocator::configuration().IsTruthy("nfs", "true") && err == ENOLCK);
+}
 
-  // Indicate success if file-locking succeeds
-  if (fcntl(fd, F_SETLK, &lock_data) == 0) return true;
+// Convert an errno into an arrow::Status
+auto FcntlSetLockError(int err, FcntlLockType lock_type,
+                       std::string_view filename) -> arrow::Status {
+  const std::string_view lock_str = [&]() {
+    if (lock_type == F_WRLCK) return "write lock";
+    if (lock_type == F_RDLCK) return "read lock";
+    if (lock_type == F_UNLCK) return "unlock";
+    return "unknown";
+  }();
 
-  switch (errno) {
-    case EAGAIN:
-      return false;
+  switch (err) {
     case EACCES:
-      return Status::IOError("Permission denied attempting a ", lock_type, " lock on ",
-                             lock_filename);
+      return Status::IOError("Permission denied attempting a ", lock_str,
+                             " operation on ", filename);
     case EBADF:
-      return Status::IOError("Bad file descriptor ", fd, " for ", lock_filename);
+      return Status::IOError("Bad file descriptor accessing ", filename, " during a ",
+                             lock_str, " operation");
     case ENOLCK:
-      return Status::IOError("No locks were available on ", lock_filename, ". ",
-                             "If located on an NFS filesystem, please log an issue");
-    default:
-      return Status::IOError("Error code ", errno, " returned attempting a ", lock_type,
-                             " lock on ", lock_filename);
+      return Status::IOError("No locks were available on ", filename, " during a ",
+                             lock_str, "operation. ",
+                             "If located on an  NFS filesystem, please log an issue");
+    default: {
+      char errmsg[1024];
+      [[maybe_unused]] auto r = strerror_r(errno, errmsg, sizeof(errmsg) / sizeof(char));
+
+      return Status::IOError("Error code ", err, " with message '", r,
+                             "' returned "
+                             "when attempting a lock on ",
+                             filename);
+    }
   }
 }
 
@@ -110,34 +118,42 @@ SharedFcntlMutex::~SharedFcntlMutex() {
   lock_filename_.clear();
 }
 
-void SharedFcntlMutex::unlock() {
+arrow::Status SharedFcntlMutex::unlock() {
   if (fd_ != -1) {
-    struct flock lock_data = {
+    struct flock lock = {
         .l_type = F_UNLCK,
         .l_whence = SEEK_SET,
-        .l_start = 0,
-        .l_len = 0,
+        .l_start = MUTEX_LOCK_START,
+        .l_len = MUTEX_LOCK_LENGTH,
     };
 
-    fcntl(fd_, F_SETLK, &lock_data);
+    while (fcntl(fd_, F_SETLK, &lock) != 0) {
+      if (!ShouldRetry(errno))
+        return FcntlSetLockError(errno, lock.l_type, lock_filename_);
+    }
   }
   mutex_.unlock();
+  return Status::OK();
 }
 
-void SharedFcntlMutex::unlock_shared() {
+arrow::Status SharedFcntlMutex::unlock_shared() {
   std::unique_lock<std::mutex> fcntl_lock(fcntl_read_mutex_);
   // Last reader releases the fcntl lock
   if (fd_ != -1 && reader_count_ > 0 && --reader_count_ == 0) {
-    struct flock lock_data = {
+    struct flock lock = {
         .l_type = F_UNLCK,
         .l_whence = SEEK_SET,
-        .l_start = 0,
-        .l_len = 0,
+        .l_start = MUTEX_LOCK_START,
+        .l_len = MUTEX_LOCK_LENGTH,
     };
-    fcntl(fd_, F_SETLK, &lock_data);
+    while (fcntl(fd_, F_SETLK, &lock) != 0) {
+      if (!ShouldRetry(errno))
+        return FcntlSetLockError(errno, lock.l_type, lock_filename_);
+    }
   }
 
   mutex_.unlock_shared();
+  return Status::OK();
 }
 
 auto SharedFcntlMutex::fcntl_readers() const -> std::size_t {
@@ -147,18 +163,21 @@ auto SharedFcntlMutex::fcntl_readers() const -> std::size_t {
 
 auto SharedFcntlMutex::other_locks(FcntlLockType lock_type) const
     -> Result<SharedFcntlMutex::LockInfo> {
-  struct flock lock_data = {
+  struct flock lock = {
       .l_type = lock_type,
       .l_whence = SEEK_SET,
-      .l_start = 0,
-      .l_len = 0,
+      .l_start = MUTEX_LOCK_START,
+      .l_len = MUTEX_LOCK_LENGTH,
   };
 
-  if (fcntl(fd_, F_GETLK, &lock_data) == -1) {
-    return Status::IOError("Fail to retrieve lock information for ", lock_filename_);
+  if (fcntl(fd_, F_GETLK, &lock) == -1) {
+    return Status::IOError("Error ", errno,
+                           " occurred while inspecting fcntl locks "
+                           "on file ",
+                           lock_filename_);
   }
 
-  return SharedFcntlMutex::LockInfo{lock_data.l_type, lock_data.l_pid};
+  return SharedFcntlMutex::LockInfo{lock.l_type, lock.l_pid};
 }
 
 auto SharedFcntlMutex::lock_impl(bool write) -> Status {
@@ -189,9 +208,15 @@ auto SharedFcntlMutex::lock_impl(bool write) -> Status {
   std::chrono::duration<double> lock_sleep = 10ms;
 
   auto status = [&]() {
+    struct flock lock {
+      .l_type = FcntlLockType(write ? F_WRLCK : F_RDLCK), .l_whence = SEEK_SET,
+      .l_start = MUTEX_LOCK_START, .l_len = MUTEX_LOCK_LENGTH,
+    };
+
     while (true) {
-      ARROW_ASSIGN_OR_RAISE(auto success, MaybeSetFcntlLock(fd_, write, lock_filename_));
-      if (success) return Status::OK();
+      if (fcntl(fd_, F_SETLK, &lock) == 0) return Status::OK();
+      if (!ShouldRetry(errno))
+        return FcntlSetLockError(errno, lock.l_type, lock_filename_);
       auto jitter = std::chrono::duration<double>(dist(gen));
       std::this_thread::sleep_for(lock_sleep + jitter);
       if ((lock_sleep *= 1.5) > 200ms) lock_sleep = 200ms;
@@ -231,7 +256,20 @@ auto SharedFcntlMutex::try_lock_impl(bool write) -> Result<bool> {
     if (reader_count_++ > 0) return true;
   }
 
-  auto result = MaybeSetFcntlLock(fd_, write, lock_filename_);
+  struct flock lock {
+    .l_type = FcntlLockType(write ? F_WRLCK : F_RDLCK), .l_whence = SEEK_SET,
+    .l_start = MUTEX_LOCK_START, .l_len = MUTEX_LOCK_LENGTH,
+  };
+
+  Result<bool> result;
+
+  if (fcntl(fd_, F_SETLK, &lock) == 0) {
+    result = true;
+  } else if (ShouldRetry(errno)) {
+    result = false;
+  } else {
+    result = FcntlSetLockError(errno, lock.l_type, lock_filename_);
+  }
 
   // Unlock mutex if fcntl lock acquisition failed
   if (!result.ok() || result.ValueOrDie() == false) {

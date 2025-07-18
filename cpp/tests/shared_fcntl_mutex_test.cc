@@ -218,7 +218,7 @@ arrow::Status child_loop(PipeComms& pipe_comms, std::string_view lock_filename) 
       ARROW_RETURN_NOT_OK(pipe_comms.send("ok", context));
     } else if (msg.starts_with(kWriteUnlock)) {
       // Release write lock
-      lock->unlock();
+      ARROW_RETURN_NOT_OK(lock->unlock());
       ARROW_RETURN_NOT_OK(pipe_comms.send("ok", context));
     } else if (msg.starts_with(kReadLock)) {
       // Acquire read lock
@@ -226,7 +226,7 @@ arrow::Status child_loop(PipeComms& pipe_comms, std::string_view lock_filename) 
       ARROW_RETURN_NOT_OK(pipe_comms.send("ok", context));
     } else if (msg.starts_with(kReadUnlock)) {
       // Release read lock
-      lock->unlock_shared();
+      ARROW_RETURN_NOT_OK(lock->unlock_shared());
       ARROW_RETURN_NOT_OK(pipe_comms.send("ok", context));
     } else if (msg.starts_with(kTryWriteLock)) {
       ARROW_ASSIGN_OR_RAISE(auto success, lock->try_lock());
@@ -569,7 +569,7 @@ TEST(SharedFcntlMutexTest, LockGuard) {
   // Can write lock
   ASSERT_OK_AND_ASSIGN(success, mutex->try_lock());
   ASSERT_TRUE(success);
-  mutex->unlock();
+  ASSERT_OK(mutex->unlock());
 
   {
     // Write guard
@@ -584,6 +584,6 @@ TEST(SharedFcntlMutexTest, LockGuard) {
   // Can read lock
   ASSERT_OK_AND_ASSIGN(success, mutex->try_lock_shared());
   ASSERT_TRUE(success);
-  mutex->unlock();
+  ASSERT_OK(mutex->unlock());
 }
 }  // namespace
