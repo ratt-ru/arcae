@@ -31,7 +31,7 @@ namespace {
 
 // Returns true on no locks avaiable on an NFS file system
 auto ConsiderSuccessful(int err) -> bool {
-  return err == ENOLCK && ServiceLocator::configuration().IsTruthy("nfs", "true");
+  return err == ENOLCK && ServiceLocator::configuration().IsTruthy("nfs", "1");
 }
 
 // Returns true on try again and signal interrupts
