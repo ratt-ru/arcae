@@ -1,4 +1,4 @@
-#include <arrow/ipc/json_simple.h>
+#include <arrow/json/from_string.h>
 #include <arrow/testing/gtest_util.h>
 #include <arrow/type_fwd.h>
 
@@ -27,7 +27,7 @@ using ::arcae::detail::ResultShapeData;
 using ::arcae::detail::Selection;
 using ::arcae::detail::SelectionBuilder;
 
-using ::arrow::ipc::internal::json::ArrayFromJSON;
+using ::arrow::json::ArrayFromJSONString;
 
 using casacore::Array;
 using casacore::ArrayColumnDesc;
@@ -219,8 +219,8 @@ TEST_F(ColumnShapeTest, WriteFixed) {
   auto fixed = GetArrayColumn<Complex>(table_proxy_.table(), "MODEL_DATA");
   auto dtype = arrow::fixed_size_list(
       arrow::fixed_size_list(arrow::fixed_size_list(arrow::float32(), 2), 2), 2);
-  ASSERT_OK_AND_ASSIGN(auto data, ArrayFromJSON(dtype,
-                                                R"([[[[0, 0], [1, 1]],
+  ASSERT_OK_AND_ASSIGN(auto data, ArrayFromJSONString(dtype,
+                                                      R"([[[[0, 0], [1, 1]],
                                           [[2, 2], [3, 3]]],
                                          [[[4, 4], [5, 5]],
                                           [[6, 6], [7, 7]]]])"));
@@ -241,8 +241,8 @@ TEST_F(ColumnShapeTest, WriteVariable) {
   auto dtype = arrow::list(arrow::list(arrow::list(arrow::float32())));
 
   // Supplied as a list, but actually fixed
-  ASSERT_OK_AND_ASSIGN(auto data, ArrayFromJSON(dtype,
-                                                R"([[[[0, 0], [1, 1], [2, 2]],
+  ASSERT_OK_AND_ASSIGN(auto data, ArrayFromJSONString(dtype,
+                                                      R"([[[[0, 0], [1, 1], [2, 2]],
                                           [[3, 3], [4, 4], [5, 5]]],
                                          [[[6, 6], [7, 7], [8, 8]],
                                           [[9, 9], [10, 10], [11, 11]]]])"));
@@ -258,8 +258,8 @@ TEST_F(ColumnShapeTest, WriteVariable) {
   ASSERT_OK_AND_ASSIGN(auto offsets, shape_data.GetOffsets());
 
   // Variably shaped
-  ASSERT_OK_AND_ASSIGN(data, ArrayFromJSON(dtype,
-                                           R"([[[[0, 0], [1, 1]],
+  ASSERT_OK_AND_ASSIGN(data, ArrayFromJSONString(dtype,
+                                                 R"([[[[0, 0], [1, 1]],
                                           [[3, 3], [4, 4]]],
                                          [[[6, 6], [7, 7], [8, 8]],
                                           [[9, 9], [10, 10], [11, 11]]]])"));
