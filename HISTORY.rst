@@ -4,6 +4,7 @@ History
 
 0.3.0 (21-06-2025)
 ------------------
+* Upgrade to pyarrow 21 (:pr:`160`)
 * Upgrade to pyarrow 20 (:pr:`157`)
 * Support python 3.13 (:pr:`157`)
 
