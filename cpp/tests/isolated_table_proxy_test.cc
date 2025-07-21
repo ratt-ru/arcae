@@ -1,7 +1,6 @@
 #include <memory>
 #include "gtest/gtest.h"
 
-#include <arrow/ipc/json_simple.h>
 #include <arrow/status.h>
 #include <arrow/testing/gtest_util.h>
 
