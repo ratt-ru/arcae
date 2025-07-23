@@ -7,7 +7,7 @@
         {
             "name": "casacore",
             "default-features": false,
-            "features": ["dysco", "mutex"]
+            "features": ["dysco", "mutex", "tablelocking"]
         },
         "gtest"
     ]
