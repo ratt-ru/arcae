@@ -8,6 +8,7 @@
 #include <casacore/ms/MeasurementSets/MeasurementSet.h>
 #include <casacore/tables/Tables.h>
 
+#include <casacore/casa/IO/FileLocker.h>
 #include <casacore/tables/Tables/TableLock.h>
 #include <casacore/tables/Tables/TableProxy.h>
 #include <gtest/gtest.h>
@@ -19,6 +20,7 @@ using ::arrow::Result;
 
 using ::arcae::detail::IsolatedTableProxy;
 
+using LockType = ::casacore::FileLocker::LockType;
 using ::casacore::Array;
 using ::casacore::ArrayColumn;
 using ::casacore::ArrayColumnDesc;
@@ -78,10 +80,10 @@ class WriteTests : public ::testing::Test {
 
   arrow::Result<std::shared_ptr<IsolatedTableProxy>> OpenTable() {
     return IsolatedTableProxy::Make([name = table_name_]() {
-      auto lock = TableLock(TableLock::LockOption::AutoLocking);
+      auto lock = TableLock(TableLock::LockOption::UserLocking);
       auto lockoptions = Record();
-      lockoptions.define("option", "nolock");
-      lockoptions.define("internal", lock.interval());
+      lockoptions.define("option", "user");
+      lockoptions.define("interval", lock.interval());
       lockoptions.define("maxwait", casacore::Int(lock.maxWait()));
       auto tp = std::make_shared<TableProxy>(name, lockoptions, Table::Old);
       tp->reopenRW();
@@ -122,13 +124,14 @@ TEST_F(WriteTests, Parallel) {
 
                   try {
                     column.putColumnRange(Slice(start, nrow), data);
-                    table.flush();
+                    // table.flush();
                   } catch (std::exception& e) {
                     return arrow::Status::Invalid("Write failed ", e.what());
                   }
 
                   return true;
-                });
+                },
+                LockType::Write);
           }));
 
       futures.push_back(result);

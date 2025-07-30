@@ -140,10 +140,10 @@ index 12229f902..a15e5080b 100644
  
  // <summary>Base class for all Casacore library errors</summary>
 diff --git a/casa/IO/FileLocker.cc b/casa/IO/FileLocker.cc
-index b55c080d8..48fb54c64 100644
+index b55c080d8..f59da456c 100644
 --- a/casa/IO/FileLocker.cc
 +++ b/casa/IO/FileLocker.cc
-@@ -24,157 +24,290 @@
+@@ -24,157 +24,286 @@
  //#                        Charlottesville, VA 22903-2475 USA
  
  #include <casacore/casa/IO/FileLocker.h>
@@ -291,7 +291,7 @@ index b55c080d8..48fb54c64 100644
 -        itsWriteLocked = True;
 +
 +    for (uInt a = 0; a < nattempts + 1; ++a) {
-+        if (fcntl(itsFD, F_SETLK, &lock) == 0) return True;
++        if (fcntl(itsFD, F_SETLK, &lock) != -1) return True;
 +        itsError = errno;
 +        if(ShouldRetry(itsError)) {
 +            itsError = 0;
@@ -366,11 +366,7 @@ index b55c080d8..48fb54c64 100644
 +    RecursiveMutexLock state_lock(itsStateMutex);
 +    // Notify waiting threads of state change on exit
 +    auto defer_notify = finally([&](...) { itsCondVar.notify_all(); });
-+
-+    auto AllLocks = [&]() -> std::size_t {
-+        return numLocks(Read) + numLocks(Write);
-+    };
-+
++    auto AllLocks = [this]() -> std::size_t { return numLocks(Read) + numLocks(Write); };
 +    auto tid = std::this_thread::get_id();
 +    auto thread_lock_type = None;
 +    if (auto it = itsLockType.find(tid); it != std::end(itsLockType)) thread_lock_type = it->second;
@@ -388,7 +384,7 @@ index b55c080d8..48fb54c64 100644
 +            // To acquire a Write Lock, we wait until:
 +            // 1. no other threads are acquiring a lock, and
 +            // 2. no other thread wants a write lock, and
-+            // 3. this is the only read-locked thread (downgrade) or
++            // 3. this is the only read-locked thread (upgrade) or
 +            //    there are no other read or write locked threads
 +            itsCondVar.wait(state_lock, [&]() {
 +                return !itsAcquiringLock && itsWantsWriteLock == 1 &&
@@ -406,7 +402,7 @@ index b55c080d8..48fb54c64 100644
 +            // To acquire a read lock, wait until:
 +            // 1. no other threads are acquiring, and
 +            // 2. no other thread wants a write lock, and
-+            // 3. this is the only write-locked thread (upgrade) or
++            // 3. this is the only write-locked thread (downgrade) or
 +            //    there are no write-locked threads
 +            itsCondVar.wait(state_lock, [&]() {
 +                return !itsAcquiringLock && itsWantsWriteLock == 0 &&
@@ -553,7 +549,7 @@ index b55c080d8..48fb54c64 100644
      itsError = 0;
  #if defined(AIPS_NOFILELOCK)
      return True;
-@@ -185,7 +318,7 @@ Bool FileLocker::release()
+@@ -185,7 +314,7 @@ Bool FileLocker::release()
      ls.l_start  = itsStart;
      ls.l_len    = itsLength;
      if (fcntl (itsFD, F_SETLK, &ls) != -1) {
@@ -562,7 +558,7 @@ index b55c080d8..48fb54c64 100644
      }
  #if defined(AIPS_LINUX) || defined(AIPS_DARWIN)
      if (errno == ENOLCK) {
-@@ -215,17 +348,22 @@ Bool FileLocker::canLock (uInt& pid, LockType type)
+@@ -215,17 +344,22 @@ Bool FileLocker::canLock (uInt& pid, LockType type)
      pid = 0;
      itsError = 0;
      struct flock ls;
@@ -590,7 +586,7 @@ index b55c080d8..48fb54c64 100644
      }
      itsError = errno;
      return False;
-@@ -234,11 +372,11 @@ Bool FileLocker::canLock (uInt& pid, LockType type)
+@@ -234,11 +368,11 @@ Bool FileLocker::canLock (uInt& pid, LockType type)
  
  String FileLocker::lastMessage() const
  {
