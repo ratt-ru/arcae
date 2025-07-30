@@ -225,7 +225,11 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
     return itp;
   }
 
-  std::shared_ptr<casacore::TableProxy> Proxy() const { return nullptr; }
+  // Spawns an IsolatedTableProxy encapsulating a single instance
+  // from this ITP. Suitable for constraining writes to a single
+  // thread and instance as concurrent writes issued from multiple
+  // threads will produce race conditions in the underlying casacore layer
+  std::shared_ptr<IsolatedTableProxy> SpawnWriter();
 
  protected:
   IsolatedTableProxy() = default;
