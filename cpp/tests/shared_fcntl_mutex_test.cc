@@ -25,6 +25,7 @@
 using namespace std::literals;
 
 namespace fs = std::filesystem;
+using arcae::SharedFcntlGuard;
 using arcae::SharedFcntlMutex;
 
 using arrow::Result;
@@ -556,7 +557,7 @@ TEST(SharedFcntlMutexTest, LockGuard) {
 
   {
     // Read guard
-    arcae::SharedFcntlGuard lock(*mutex, false);
+    arcae::SharedFcntlGuard lock(*mutex, SharedFcntlGuard::LockMode::READ);
     // Write locking fails
     Result<bool> result = Status::IOError("thread didn't join");
     std::thread([&]() { result = mutex->try_lock(); }).join();
@@ -573,7 +574,7 @@ TEST(SharedFcntlMutexTest, LockGuard) {
 
   {
     // Write guard
-    arcae::SharedFcntlGuard lock(*mutex, true);
+    arcae::SharedFcntlGuard lock(*mutex, SharedFcntlGuard::LockMode::WRITE);
     // Read locking fails
     Result<bool> result = Status::IOError("thread didn't join");
     std::thread([&]() { result = mutex->try_lock_shared(); }).join();

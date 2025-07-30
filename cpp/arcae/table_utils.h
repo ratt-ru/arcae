@@ -21,6 +21,25 @@ bool IsPrimitiveType(casacore::DataType data_type);
 // otherwise returns false
 bool MaybeReopenRW(casacore::TableProxy& tp);
 
+template <typename F>
+class Finalizer {
+ public:
+  Finalizer(F&& f) : finalizer_(std::forward<F>(f)), enabled_(true) {};
+  ~Finalizer() {
+    if (enabled_) finalizer_();
+  };
+  void disable() { enabled_ = false; }
+
+ private:
+  F finalizer_;
+  bool enabled_;
+};
+
+template <typename F>
+Finalizer<F> finally(F&& f) {
+  return Finalizer<F>(std::forward<F>(f));
+}
+
 }  // namespace detail
 }  // namespace arcae
 

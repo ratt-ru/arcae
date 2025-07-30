@@ -19,12 +19,15 @@ namespace arcae {
 
 class NewTableProxy {
  public:
+  enum AccessMode { READONLY, READWRITE };
+
   // Construct a NewTableProxy with the supplied function
   template <typename Fn, typename = std::enable_if<std::is_same_v<
                              detail::ArrowResultType<Fn>,
                              arrow::Result<std::shared_ptr<casacore::TableProxy>>>>>
   static arrow::Result<std::shared_ptr<NewTableProxy>> Make(Fn&& functor,
-                                                            std::size_t ninstances = 1) {
+                                                            std::size_t ninstances = 1,
+                                                            AccessMode mode = READONLY) {
     struct enable_make_shared_ntp : public NewTableProxy {};
     std::shared_ptr<NewTableProxy> ntp = std::make_shared<enable_make_shared_ntp>();
     ARROW_ASSIGN_OR_RAISE(
@@ -35,28 +38,24 @@ class NewTableProxy {
             ->RunAsync([&](casacore::TableProxy& table_proxy)
                            -> arrow::Result<std::shared_ptr<BaseSharedFcntlMutex>> {
               auto& table = table_proxy.table();
-              switch (table.tableType()) {
-                case casacore::Table::Plain: {
-                  // NOTE: first_table.tableName() doesn't always give the underlying
-                  // table name on disk in the case of reference (or concatenated tables)
-                  // getPartNames(true) is used and the first table on disk is used for
-                  // as the location for the lock
-                  auto names = table.getPartNames(true);
-                  assert(names.size() > 0);
-                  auto path =
-                      std::filesystem::path(names[0].c_str()) / "table.arcae.lock";
-                  ARROW_ASSIGN_OR_RAISE(auto lock,
-                                        SharedFcntlMutex::Create(path.native()));
-                  return std::dynamic_pointer_cast<BaseSharedFcntlMutex>(lock);
-                }
-                case casacore::Table::Memory: {
-                  auto lock = std::make_shared<NullSharedFcntlMutex>();
-                  return std::dynamic_pointer_cast<BaseSharedFcntlMutex>(lock);
-                }
-                default:
-                  return arrow::Status::NotImplemented("Unhandled table type ",
-                                                       table.tableType());
+              if (mode == READONLY || table.tableType() == casacore::Table::Memory) {
+                ARROW_LOG(INFO) << "Creating a ReadonlyFcntlMutex";
+                auto lock = std::make_shared<ReadonlyFcntlMutex>();
+                return std::dynamic_pointer_cast<BaseSharedFcntlMutex>(lock);
+              } else if (table.tableType() == casacore::Table::Plain) {
+                ARROW_LOG(INFO) << "Creating a SharedFcntlMutex";
+                // NOTE: first_table.tableName() doesn't always give the underlying
+                // table name on disk in the case of reference (or concatenated tables)
+                // getPartNames(true) is used and the first table on disk is used for
+                // as the location for the lock
+                auto names = table.getPartNames(true);
+                assert(names.size() > 0);
+                auto path = std::filesystem::path(names[0].c_str()) / "table.arcae.lock";
+                ARROW_ASSIGN_OR_RAISE(auto lock, SharedFcntlMutex::Create(path.native()));
+                return std::dynamic_pointer_cast<BaseSharedFcntlMutex>(lock);
               }
+              return arrow::Status::NotImplemented("Unhandled table type ",
+                                                   table.tableType());
             })
             .MoveResult();
 

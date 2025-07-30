@@ -65,7 +65,7 @@ jobs:
           sudo apt update
           sudo apt install build-essential cmake
           python -m pip install -U pip
-          python -m pip install pyarrow
+          python -m pip install pyarrow==20.0.0
 
       - name: Build C++ libraries and tests
         env:

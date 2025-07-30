@@ -4,6 +4,7 @@ find_package(absl CONFIG REQUIRED)
 add_library(test_utils test_utils.cc)
 add_compile_options("-fsanitize=address")
 add_link_options("-fsanitize=address")
+#add_compile_options("-g")
 
 add_executable(configuration_test configuration_test.cc)
 target_link_libraries(configuration_test PRIVATE GTest::gtest_main arcae test_utils)

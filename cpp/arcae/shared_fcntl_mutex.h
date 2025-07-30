@@ -37,16 +37,20 @@ class BaseSharedFcntlMutex {
   virtual ~BaseSharedFcntlMutex() {}
 };
 
-// Noop class, mostly for use with in memory tables
-class NullSharedFcntlMutex : public BaseSharedFcntlMutex {
+// Readonly mutex class
+class ReadonlyFcntlMutex : public BaseSharedFcntlMutex {
  public:
-  virtual arrow::Status lock() override { return arrow::Status::OK(); }
+  virtual arrow::Status lock() override { return arrow::Status::IOError("Not writable"); }
   virtual arrow::Status lock_shared() override { return arrow::Status::OK(); }
 
-  virtual arrow::Result<bool> try_lock() override { return true; }
+  virtual arrow::Result<bool> try_lock() override {
+    return arrow::Status::IOError("Not writable");
+  }
   virtual arrow::Result<bool> try_lock_shared() override { return true; }
 
-  virtual arrow::Status unlock() override { return arrow::Status::OK(); }
+  virtual arrow::Status unlock() override {
+    return arrow::Status::IOError("Not writable");
+  }
   virtual arrow::Status unlock_shared() override { return arrow::Status::OK(); }
 };
 
@@ -142,19 +146,24 @@ class SharedFcntlMutex : public BaseSharedFcntlMutex {
 
 // RAII lock/unlocking of SharedFcntlMutex
 class SharedFcntlGuard {
+ public:
+  enum LockMode { READ, WRITE };
+
  private:
   BaseSharedFcntlMutex& lock_;
-  bool write_;
+  LockMode mode_;
 
  public:
-  SharedFcntlGuard(BaseSharedFcntlMutex& lock, bool write = false)
-      : lock_(lock), write_(write) {
-    if (auto status = write_ ? lock_.lock() : lock_.lock_shared(); !status.ok()) {
+  SharedFcntlGuard(BaseSharedFcntlMutex& lock, LockMode mode = READ)
+      : lock_(lock), mode_(mode) {
+    if (auto status = (mode_ == READ ? lock_.lock_shared() : lock_.lock());
+        !status.ok()) {
       ARROW_LOG(FATAL) << "Unable to lock " << status;
     }
   };
   ~SharedFcntlGuard() {
-    if (auto status = write_ ? lock_.unlock() : lock_.unlock_shared(); !status.ok()) {
+    if (auto status = mode_ == READ ? lock_.unlock_shared() : lock_.unlock();
+        !status.ok()) {
       ARROW_LOG(FATAL) << "unable to unlock " << status;
     }
   }
