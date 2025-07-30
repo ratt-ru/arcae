@@ -19,6 +19,10 @@
 namespace arcae {
 namespace detail {
 
+using CasaTableProxy = casacore::TableProxy;
+using ConstTableProxyRef = const CasaTableProxy&;
+using TableProxyRef = CasaTableProxy&;
+
 // Isolates access to a CASA Table to a single thread
 class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProxy> {
  public:
@@ -35,10 +39,10 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
   // Runs function with signature
   // ReturnType Function(const TableProxy &) on the isolation thread
   // returning an arrow::Future<ReturnType>
-  template <typename Fn, typename = std::enable_if_t<
-                             std::is_invocable_v<Fn, const casacore::TableProxy&>>>
-  ArrowFutureType<Fn, const casacore::TableProxy&> RunAsync(Fn&& functor) const {
-    using ResultType = ArrowResultType<Fn, const casacore::TableProxy&>;
+  template <typename Fn,
+            typename = std::enable_if_t<std::is_invocable_v<Fn, ConstTableProxyRef>>>
+  ArrowFutureType<Fn, ConstTableProxyRef> RunAsync(Fn&& functor) const {
+    using ResultType = ArrowResultType<Fn, ConstTableProxyRef>;
     ARROW_RETURN_NOT_OK(CheckClosed());
     auto instance = GetInstance();
     return RunInPool([this, instance = instance,
@@ -55,9 +59,9 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
   // ReturnType Function(TableProxy &) on the isolation thread
   // returning an arrow::Future<ReturnType>
   template <typename Fn,
-            typename = std::enable_if_t<std::is_invocable_v<Fn, casacore::TableProxy&>>>
-  ArrowFutureType<Fn, casacore::TableProxy&> RunAsync(Fn&& functor) {
-    using ResultType = ArrowFutureType<Fn, casacore::TableProxy&>;
+            typename = std::enable_if_t<std::is_invocable_v<Fn, TableProxyRef>>>
+  ArrowFutureType<Fn, TableProxyRef> RunAsync(Fn&& functor) {
+    using ResultType = ArrowFutureType<Fn, TableProxyRef>;
     ARROW_RETURN_NOT_OK(CheckClosed());
     auto instance = GetInstance();
     return RunInPool(instance,
@@ -72,12 +76,12 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
                      });
   }
 
-  template <typename Fn, typename R,
-            typename = std::enable_if_t<
-                std::is_invocable_v<Fn, const R&, const casacore::TableProxy&>>>
-  ArrowFutureType<Fn, const R&, const casacore::TableProxy&> Then(
-      arrow::Future<R>& future, Fn&& functor) const {
-    using ResultType = ArrowFutureType<Fn, const R&, const casacore::TableProxy&>;
+  template <
+      typename Fn, typename R,
+      typename = std::enable_if_t<std::is_invocable_v<Fn, const R&, ConstTableProxyRef>>>
+  ArrowFutureType<Fn, const R&, ConstTableProxyRef> Then(arrow::Future<R>& future,
+                                                         Fn&& functor) const {
+    using ResultType = ArrowFutureType<Fn, const R&, ConstTableProxyRef>;
     ARROW_RETURN_NOT_OK(CheckClosed());
     auto instance = GetInstance();
     return future.Then(
@@ -95,11 +99,10 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
   }
 
   template <typename Fn, typename R,
-            typename = std::enable_if_t<
-                std::is_invocable_v<Fn, const R&, casacore::TableProxy&>>>
-  ArrowFutureType<Fn, const R&, casacore::TableProxy&> Then(arrow::Future<R>& future,
-                                                            Fn&& functor) {
-    using ResultType = ArrowFutureType<Fn, const R&, casacore::TableProxy&>;
+            typename = std::enable_if_t<std::is_invocable_v<Fn, const R&, TableProxyRef>>>
+  ArrowFutureType<Fn, const R&, TableProxyRef> Then(arrow::Future<R>& future,
+                                                    Fn&& functor) {
+    using ResultType = ArrowFutureType<Fn, const R&, TableProxyRef>;
     ARROW_RETURN_NOT_OK(CheckClosed());
     auto instance = GetInstance();
     return future.Then(
@@ -120,10 +123,10 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
   // ReturnType Function(const TableProxy &) on the isolation thread
   // If ReturnType is not an arrow::Result, it will be converted
   // to an arrow::Result<ReturnType>
-  template <typename Fn, typename = std::enable_if_t<
-                             std::is_invocable_v<Fn, const casacore::TableProxy&>>>
-  ArrowResultType<Fn, const casacore::TableProxy&> RunSync(Fn&& functor) const {
-    using ResultType = ArrowFutureType<Fn, const casacore::TableProxy&>;
+  template <typename Fn,
+            typename = std::enable_if_t<std::is_invocable_v<Fn, ConstTableProxyRef>>>
+  ArrowResultType<Fn, ConstTableProxyRef> RunSync(Fn&& functor) const {
+    using ResultType = ArrowFutureType<Fn, ConstTableProxyRef>;
     ARROW_RETURN_NOT_OK(CheckClosed());
     auto instance = GetInstance();
     return RunInPoolSync([this, instance = instance,
@@ -141,9 +144,9 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
   // If ReturnType is not an arrow::Result, it will be converted
   // to an arrow::Result<ReturnType>
   template <typename Fn,
-            typename = std::enable_if_t<std::is_invocable_v<Fn, casacore::TableProxy&>>>
-  ArrowResultType<Fn, casacore::TableProxy&> RunSync(Fn&& functor) {
-    using ResultType = ArrowResultType<Fn, casacore::TableProxy&>;
+            typename = std::enable_if_t<std::is_invocable_v<Fn, TableProxyRef>>>
+  ArrowResultType<Fn, TableProxyRef> RunSync(Fn&& functor) {
+    using ResultType = ArrowResultType<Fn, TableProxyRef>;
     ARROW_RETURN_NOT_OK(CheckClosed());
     auto instance = GetInstance();
     return RunInPoolSync(instance,
@@ -159,10 +162,9 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
   }
 
   // Construct an IsolatedTableProxy with the supplied function
-  template <
-      typename Fn,
-      typename = std::enable_if<std::is_same_v<
-          ArrowResultType<Fn>, arrow::Result<std::shared_ptr<casacore::TableProxy>>>>>
+  template <typename Fn,
+            typename = std::enable_if<std::is_same_v<
+                ArrowResultType<Fn>, arrow::Result<std::shared_ptr<CasaTableProxy>>>>>
   static arrow::Result<std::shared_ptr<IsolatedTableProxy>> Make(
       Fn&& functor, std::size_t ninstances = 1) {
     if (ninstances < 1) {
@@ -197,13 +199,13 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
   // for e.g. Taql queries
   template <typename Fn,
             typename = std::enable_if<
-                std::is_invocable_v<Fn, const casacore::TableProxy&> &&
-                std::is_same_v<ArrowResultType<Fn, const casacore::TableProxy&>,
-                               arrow::Result<std::shared_ptr<casacore::TableProxy>>>>>
+                std::is_invocable_v<Fn, ConstTableProxyRef> &&
+                std::is_same_v<ArrowResultType<Fn, ConstTableProxyRef>,
+                               arrow::Result<std::shared_ptr<CasaTableProxy>>>>>
   arrow::Result<std::shared_ptr<IsolatedTableProxy>> Spawn(Fn&& functor) {
     struct enable_make_shared_itp : public IsolatedTableProxy {};
     std::shared_ptr<IsolatedTableProxy> itp = std::make_shared<enable_make_shared_itp>();
-    using ResultType = arrow::Result<std::shared_ptr<casacore::TableProxy>>;
+    using ResultType = arrow::Result<std::shared_ptr<CasaTableProxy>>;
 
     // Mark as closed so that if construction fails, we don't try to close it
     itp->is_closed_ = true;
