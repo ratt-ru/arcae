@@ -28,6 +28,8 @@ class Configuration {
 
   arrow::Result<std::string> Get(const std::string& key) const;
   std::string GetDefault(const std::string& key, std::string default_value) const;
+  bool IsTruthy(const std::string& key) const;
+  bool IsTruthy(const std::string& key, std::string_view default_value) const;
   arrow::Result<bool> Delete(const std::string& key);
 };
 

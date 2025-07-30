@@ -291,7 +291,7 @@ Future<bool> WriteImpl(const std::shared_ptr<IsolatedTableProxy>& itp,
 
   auto shape_fut = itp->RunAsync([column = column, selection = selection, data = data](
                                      TableProxy& tp) mutable -> Result<ShapeResult> {
-    if (!tp.isWritable()) tp.reopenRW();
+    MaybeReopenRW(tp);
     ARROW_RETURN_NOT_OK(ColumnExists(tp.table(), column));
     auto table_column = TableColumn(tp.table(), column);
     ARROW_ASSIGN_OR_RAISE(auto shape_data,

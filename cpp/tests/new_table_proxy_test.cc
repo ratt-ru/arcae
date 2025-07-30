@@ -1,3 +1,4 @@
+#include <casacore/tables/Tables/Table.h>
 #include <sys/types.h>
 #include <algorithm>
 #include <cassert>
@@ -7,6 +8,7 @@
 #include <memory>
 #include <random>
 #include <string>
+#include <string_view>
 
 #include <arrow/api.h>
 #include <arrow/array/array_nested.h>
@@ -20,6 +22,8 @@
 
 #include <casacore/casa/Arrays/IPosition.h>
 #include <casacore/casa/BasicSL/Complexfwd.h>
+#include <casacore/casa/Json.h>
+#include <casacore/casa/Json/JsonKVMap.h>
 #include <casacore/casa/Utilities/DataType.h>
 #include <casacore/ms/MeasurementSets/MeasurementSet.h>
 #include <casacore/tables/Tables/ColumnDesc.h>
@@ -37,6 +41,7 @@
 using ::arcae::GetArrayColumn;
 using ::arcae::GetScalarColumn;
 using ::arcae::NewTableProxy;
+using AccessMode = ::arcae::NewTableProxy::AccessMode;
 using ::arcae::detail::Index;
 using ::arcae::detail::IndexSpan;
 using ::arcae::detail::IndexType;
@@ -62,9 +67,9 @@ namespace {
 
 static constexpr std::size_t knInstances = 4;
 
-static constexpr std::size_t knrow = 10;
-static constexpr std::size_t knchan = 16;
-static constexpr std::size_t kncorr = 4;
+static constexpr ssize_t knrow = 10;
+static constexpr ssize_t knchan = 16;
+static constexpr ssize_t kncorr = 4;
 
 static constexpr std::size_t kNDim = 3;
 static constexpr std::array<std::size_t, kNDim> kDimensions = {kncorr, knchan, knrow};
@@ -85,50 +90,24 @@ struct Parametrization {
   std::array<std::size_t, kNDim> remove = {0, 0, 0};
 };
 
-class ZeroRowTableProxyTest : public ::testing::Test {
- protected:
-  std::string table_name_;
-
-  void SetUp() override {
-    auto* test_info = ::testing::UnitTest::GetInstance()->current_test_info();
-    table_name_ = test_info->name() + "-"s + arcae::hexuuid(4) + ".table"s;
-    auto table_desc = TableDesc(MS::requiredTableDesc());
-    auto data_shape = IPosition({kncorr, knchan});
-    auto data_column_desc =
-        ArrayColumnDesc<Complex>("DATA", data_shape, ColumnDesc::FixedShape);
-    table_desc.addColumn(data_column_desc);
-    auto setup_new_table = SetupNewTable(table_name_, table_desc, Table::New);
-    auto ms = MS(setup_new_table, 0);
-    ms.createDefaultSubtables(Table::New);
-  }
-
-  arrow::Result<std::shared_ptr<NewTableProxy>> OpenTable() {
-    return NewTableProxy::Make([name = table_name_]() {
-      auto lock = TableLock(TableLock::LockOption::AutoLocking);
-      auto lockoptions = Record();
-      lockoptions.define("option", "nolock");
-      lockoptions.define("internal", lock.interval());
-      lockoptions.define("maxwait", casacore::Int(lock.maxWait()));
-      return std::make_shared<TableProxy>(name, lockoptions, Table::Old);
-    });
-  }
-
-  void TearDown() override { std::filesystem::remove_all(table_name_); }
-};
-
-class FixedTableProxyTest : public ::testing::TestWithParam<Parametrization> {
+// Mixin class providing methods for
+// 1. Creating Measurement Sets
+// 2. Opening them
+// 3. Creating test data
+class TestMixin {
  protected:
   std::string table_name_;
   Array<Complex> complex_vals_;
   Array<String> str_vals_;
 
-  void SetUp() override {
+  void MakeMeasurementSet(const ssize_t nrow = knrow) {
     auto* test_info = ::testing::UnitTest::GetInstance()->current_test_info();
     table_name_ = test_info->name() + "-"s + arcae::hexuuid(4) + ".table"s;
     // Replace / in the Parametrized Test name with '~'
     for (int i = 0; i < table_name_.size(); ++i) {
       if (table_name_[i] == '/') table_name_[i] = '~';
     }
+    table_name_ = "/tmp/"s + table_name_;
     auto table_desc = TableDesc(MS::requiredTableDesc());
     auto data_shape = IPosition({kncorr, knchan});
 
@@ -145,31 +124,41 @@ class FixedTableProxyTest : public ::testing::TestWithParam<Parametrization> {
     table_desc.addColumn(var_str_data_column_desc);
 
     auto setup_new_table = SetupNewTable(table_name_, table_desc, Table::New);
-    auto ms = MS(setup_new_table, knrow);
+    auto ms = MS(setup_new_table, nrow);
     auto data = GetArrayColumn<Complex>(ms, "MODEL_DATA");
     auto str_data = GetArrayColumn<String>(ms, "STRING_DATA");
     auto var_str_data = GetArrayColumn<String>(ms, "VAR_STRING_DATA");
     auto var_data = GetArrayColumn<Complex>(ms, "VAR_DATA");
     auto time = GetScalarColumn<casacore::Double>(ms, "TIME");
 
+    ARROW_LOG(INFO) << "CREATING MS " << ms.tableName();
+
     // Initialise the time column
-    for (std::size_t i = 0; i < knrow; ++i) time.put(i, i);
+    for (std::size_t i = 0; i < nrow; ++i) time.put(i, i);
 
     // Initialise data and string data
-    complex_vals_ = Array<Complex>(IPosition({kncorr, knchan, knrow}));
-    str_vals_ = Array<String>(IPosition({kncorr, knchan, knrow}));
+    complex_vals_ = Array<Complex>(IPosition({kncorr, knchan, nrow}));
+    str_vals_ = Array<String>(IPosition({kncorr, knchan, nrow}));
 
     for (std::size_t i = 0; i < complex_vals_.size(); ++i) {
       auto v = Complex::value_type(i);
       complex_vals_.data()[i] = {v, v};
       str_vals_.data()[i] = "FOO-" + std::to_string(i);
     }
+  }
 
-    // Write test data to the MS
-    // data.putColumn(complex_vals_);
-    // var_data.putColumn(complex_vals_);
-    // str_data.putColumn(str_vals_);
-    // var_str_data.putColumn(str_vals_);
+  arrow::Result<std::shared_ptr<NewTableProxy>> OpenTable(
+      AccessMode mode = AccessMode::READONLY) {
+    return NewTableProxy::Make(
+        [name = table_name_]() {
+          auto lock = TableLock(TableLock::LockOption::UserLocking);
+          auto lockoptions = Record();
+          lockoptions.define("option", "user");
+          lockoptions.define("internal", lock.interval());
+          lockoptions.define("maxwait", casacore::Int(lock.maxWait()));
+          return std::make_shared<TableProxy>(name, lockoptions, Table::Old);
+        },
+        knInstances, mode);
   }
 
   // Create complex test data for the given indices
@@ -228,28 +217,29 @@ class FixedTableProxyTest : public ::testing::TestWithParam<Parametrization> {
 
     return array;
   }
+};
 
-  arrow::Result<std::shared_ptr<NewTableProxy>> OpenTable(std::size_t instances = 1,
-                                                          bool readonly = true) {
-    return NewTableProxy::Make(
-        [&, name = table_name_]() {
-          auto lock = TableLock(TableLock::LockOption::AutoLocking);
-          auto lockoptions = Record();
-          lockoptions.define("option", "nolock");
-          lockoptions.define("internal", lock.interval());
-          lockoptions.define("maxwait", casacore::Int(lock.maxWait()));
-          auto tp = std::make_shared<TableProxy>(name, lockoptions, Table::Old);
-          if (!readonly) tp->reopenRW();
-          return tp;
-        },
-        instances);
-  }
+class ZeroRowTableProxyTest : public TestMixin, public ::testing::Test {
+ protected:
+  void SetUp() override { MakeMeasurementSet(0); }
+};
 
-  void TearDown() override { std::filesystem::remove_all(table_name_); }
+TEST_F(ZeroRowTableProxyTest, ZeroRowCase) {
+  ASSERT_OK_AND_ASSIGN(auto ntp, OpenTable());
+  ASSERT_OK_AND_ASSIGN(auto data, ntp->GetColumn("MODEL_DATA"));
+  ASSERT_OK_AND_ASSIGN(auto time, ntp->GetColumn("TIME"));
+  EXPECT_EQ(time->length(), 0);
+  EXPECT_EQ(data->length(), 0);
+}
+
+class ParametrizedFixedTableProxyTest : public TestMixin,
+                                        public ::testing::TestWithParam<Parametrization> {
+ protected:
+  void SetUp() override { MakeMeasurementSet(knrow); }
 };
 
 INSTANTIATE_TEST_SUITE_P(
-    ParametrizationSuite, FixedTableProxyTest,
+    ParametrizationSuite, ParametrizedFixedTableProxyTest,
     ::testing::Values(
         Parametrization{{false, false, false}, {false, false, false}},
         Parametrization{{false, false, false}, {true, true, true}},
@@ -258,8 +248,8 @@ INSTANTIATE_TEST_SUITE_P(
         Parametrization{{true, true, true}, {true, true, true}, {1, 3, 5}},
         Parametrization{{true, true, true}, {false, false, false}, {1, 3, 5}}));
 
-TEST_P(FixedTableProxyTest, Fixed) {
-  ASSERT_OK_AND_ASSIGN(auto wntp, OpenTable(1, false));
+TEST_P(ParametrizedFixedTableProxyTest, Fixed) {
+  ASSERT_OK_AND_ASSIGN(auto wntp, OpenTable(AccessMode::READWRITE));
   const auto& params = GetParam();
   auto builder = SelectionBuilder().Order('F');
 
@@ -320,7 +310,7 @@ TEST_P(FixedTableProxyTest, Fixed) {
   ASSERT_OK(wntp->PutColumn("VAR_STRING_DATA", write_str, selection));
   ASSERT_OK(wntp->Close());
 
-  ASSERT_OK_AND_ASSIGN(auto ntp, OpenTable(knInstances));
+  ASSERT_OK_AND_ASSIGN(auto ntp, OpenTable());
   ASSERT_OK_AND_ASSIGN(auto data, ntp->GetColumn("MODEL_DATA", selection));
   ASSERT_OK_AND_ASSIGN(auto var_data, ntp->GetColumn("VAR_DATA", selection));
   ASSERT_OK_AND_ASSIGN(auto str_data, ntp->GetColumn("STRING_DATA", selection));
@@ -382,6 +372,12 @@ TEST_P(FixedTableProxyTest, Fixed) {
   }
 }
 
+class FixedTableProxyTest : public TestMixin,
+                            public ::testing::TestWithParam<Parametrization> {
+ protected:
+  void SetUp() override { MakeMeasurementSet(knrow); }
+};
+
 TEST_F(FixedTableProxyTest, Table) {
   ASSERT_OK_AND_ASSIGN(auto ntp, OpenTable());
   ASSERT_OK_AND_ASSIGN(auto table, ntp->ToArrow({}, {"MODEL_DATA"}));
@@ -390,8 +386,60 @@ TEST_F(FixedTableProxyTest, Table) {
   ASSERT_OK_AND_ASSIGN(table, ntp->ToArrow({}, {}));
 }
 
+TEST_F(FixedTableProxyTest, BareAddColumns) {
+  // TODO: Embed knrow, knchan and kncorr in the shape and tileshapes
+  auto json_column_desc = R"""(
+  {
+    "ACK": {
+      "dataManagerGroup": "ACKBAR_GROUP",
+      "dataManagerType": "TiledColumnStMan",
+      "ndim": 2,
+      "shape": [16, 4],
+      "valueType": "BOOLEAN"
+    },
+    "BAR": {
+      "dataManagerGroup": "ACKBAR_GROUP",
+      "dataManagerType": "TiledColumnStMan",
+      "ndim": 2,
+      "shape": [16, 4],
+      "valueType": "COMPLEX"
+    }
+  }
+  )""";
+
+  std::string json_dminfo = R"""(
+  {
+    "*1": {
+      "NAME": "ACKBAR_GROUP",
+      "TYPE": "TiledColumnStMan",
+      "SPEC": {"DEFAULTTILESHAPE": [16, 4, 10]},
+      "COLUMNS": ["ACK", "BAR"]
+    }
+  }
+  )""";
+
+  auto column_desc = casacore::JsonParser::parse(json_column_desc).toRecord();
+  auto dminfo = casacore::JsonParser::parse(json_dminfo).toRecord();
+
+  auto lock = TableLock(TableLock::LockOption::UserLocking);
+  auto lockoptions = Record();
+  lockoptions.define("option", "user");
+  lockoptions.define("internal", lock.interval());
+  lockoptions.define("maxwait", casacore::Int(lock.maxWait()));
+  auto tp = TableProxy(table_name_, lockoptions, Table::Old);
+  tp.reopenRW();
+  tp.addColumns(column_desc, dminfo, false);
+  tp.flush(false);
+  tp.resync();
+  EXPECT_FALSE(std::find(tp.columnNames().begin(), tp.columnNames().end(), "ACK") ==
+               tp.columnNames().end());
+  EXPECT_FALSE(std::find(tp.columnNames().begin(), tp.columnNames().end(), "BAR") ==
+               tp.columnNames().end());
+  tp.close();
+}
+
 TEST_F(FixedTableProxyTest, AddColumns) {
-  ASSERT_OK_AND_ASSIGN(auto ntp, OpenTable());
+  ASSERT_OK_AND_ASSIGN(auto ntp, OpenTable(AccessMode::READWRITE));
 
   // TODO: Embed knrow, knchan and kncorr in the shape and tileshapes
   auto column_desc = R"""(
@@ -434,16 +482,8 @@ TEST_F(FixedTableProxyTest, AddColumns) {
   EXPECT_TRUE(dminfo.find(R"("BAR"])") != std::string::npos) << dminfo;
 }
 
-TEST_F(ZeroRowTableProxyTest, ZeroRowCase) {
-  ASSERT_OK_AND_ASSIGN(auto ntp, OpenTable());
-  ASSERT_OK_AND_ASSIGN(auto data, ntp->GetColumn("DATA"));
-  ASSERT_OK_AND_ASSIGN(auto time, ntp->GetColumn("TIME"));
-  EXPECT_EQ(time->length(), 0);
-  EXPECT_EQ(data->length(), 0);
-}
-
 TEST_F(FixedTableProxyTest, NegativeSelection) {
-  ASSERT_OK_AND_ASSIGN(auto ntp, OpenTable());
+  ASSERT_OK_AND_ASSIGN(auto ntp, OpenTable(AccessMode::READWRITE));
 
   // Create a selection with negative indices
   Index rows(knrow);
@@ -540,7 +580,7 @@ TEST_F(FixedTableProxyTest, NegativeSelection) {
 
 // Test that adding rows to the table works
 TEST_F(FixedTableProxyTest, AddRows) {
-  ASSERT_OK_AND_ASSIGN(auto ntp, OpenTable());
+  ASSERT_OK_AND_ASSIGN(auto ntp, OpenTable(AccessMode::READWRITE));
   ASSERT_OK_AND_ASSIGN(auto nrow, ntp->nRows());
   EXPECT_EQ(nrow, knrow);
   ASSERT_OK(ntp->AddRows(100));
@@ -549,7 +589,7 @@ TEST_F(FixedTableProxyTest, AddRows) {
 }
 
 TEST_F(FixedTableProxyTest, CastData) {
-  ASSERT_OK_AND_ASSIGN(auto ntp, OpenTable());
+  ASSERT_OK_AND_ASSIGN(auto ntp, OpenTable(AccessMode::READWRITE));
   std::shared_ptr<arrow::Array> double_array;
   std::shared_ptr<arrow::Array> flag_array;
   std::vector<double> double_values(knrow * knchan * kncorr * 2);
@@ -670,9 +710,9 @@ class VariableProxyTest : public ::testing::TestWithParam<Parametrization> {
 
   arrow::Result<std::shared_ptr<NewTableProxy>> OpenTable() {
     return NewTableProxy::Make([name = table_name_]() {
-      auto lock = TableLock(TableLock::LockOption::AutoLocking);
+      auto lock = TableLock(TableLock::LockOption::UserLocking);
       auto lockoptions = Record();
-      lockoptions.define("option", "nolock");
+      lockoptions.define("option", "user");
       lockoptions.define("internal", lock.interval());
       lockoptions.define("maxwait", casacore::Int(lock.maxWait()));
       return std::make_shared<TableProxy>(name, lockoptions, Table::Old);
@@ -821,7 +861,7 @@ TEST_P(VariableProxyTest, Variable) {
   EXPECT_EQ(row_offset, str_data->length());
 }
 
-TEST_F(VariableProxyTest, NegativeSelection) {
+TEST_P(VariableProxyTest, NegativeSelection) {
   ASSERT_OK_AND_ASSIGN(auto ntp, OpenTable());
 
   // Derive minimum viable dimension size.

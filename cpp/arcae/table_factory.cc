@@ -24,6 +24,7 @@
 #include <casacore/ms/MeasurementSets/MeasurementSet.h>
 #include <casacore/tables/Tables.h>
 #include <casacore/tables/Tables/SetupNewTab.h>
+#include <casacore/tables/Tables/TableLock.h>
 #include <casacore/tables/Tables/TableProxy.h>
 
 #include "arcae/descriptor.h"
@@ -31,11 +32,15 @@
 
 using namespace std::literals;
 
+using AccessMode = ::arcae::NewTableProxy::AccessMode;
+
 using ::arrow::Result;
 using ::arrow::Status;
 
 using ::casacore::JsonParser;
+using ::casacore::Record;
 using ::casacore::Table;
+using ::casacore::TableLock;
 using ::casacore::TableProxy;
 
 using ::casacore::MeasurementSet;
@@ -70,22 +75,27 @@ Result<std::shared_ptr<NewTableProxy>> OpenTable(const std::string& filename,
                                                  std::size_t ninstances, bool readonly,
                                                  const std::string& json_lockoptions) {
   return NewTableProxy::Make(
-      [&filename, &readonly, &json_lockoptions]() -> Result<std::shared_ptr<TableProxy>> {
+      [&filename, &json_lockoptions]() -> Result<std::shared_ptr<TableProxy>> {
         auto lock_record = JsonParser::parse(json_lockoptions).toRecord();
         try {
+          auto lock = TableLock(TableLock::LockOption::UserLocking);
+          auto lockoptions = Record();
+          lockoptions.define("option", "user");
+          lockoptions.define("internal", lock.interval());
+          lockoptions.define("maxwait", casacore::Int(lock.maxWait()));
           auto proxy = std::make_shared<TableProxy>(filename, lock_record,
                                                     Table::TableOption::Old);
-          if (!readonly) proxy->reopenRW();
           return proxy;
         } catch (std::exception& e) {
           return Status::Invalid(e.what());
         }
       },
-      ninstances);
+      ninstances, readonly ? AccessMode::READONLY : AccessMode::READWRITE);
 }
 
 Result<std::shared_ptr<NewTableProxy>> DefaultMS(const std::string& name,
                                                  const std::string& subtable,
+                                                 std::size_t ninstances,
                                                  const std::string& json_table_desc,
                                                  const std::string& json_dminfo) {
   // Upper case subtable name
@@ -105,7 +115,7 @@ Result<std::shared_ptr<NewTableProxy>> DefaultMS(const std::string& name,
       auto setup_new_table,
       DefaultMSFactory(modname, usubtable, json_table_desc, json_dminfo));
 
-  return NewTableProxy::Make([&]() -> Result<std::shared_ptr<TableProxy>> {
+  auto MakeMS = [&]() -> Result<std::shared_ptr<TableProxy>> {
     // MAIN Measurement Set case
     if (usubtable.empty() || usubtable == kMain) {
       auto ms = MeasurementSet(setup_new_table);
@@ -172,7 +182,9 @@ Result<std::shared_ptr<NewTableProxy>> DefaultMS(const std::string& name,
     // Link the table against the Measurement Set
     ms.rwKeywordSet().defineTable(usubtable, subtable->table());
     return subtable;
-  });
+  };
+
+  return NewTableProxy::Make(std::move(MakeMS), 1, NewTableProxy::AccessMode::READWRITE);
 }
 
 // Execute a TAQL query on the supplied tables
@@ -180,9 +192,11 @@ Result<std::shared_ptr<NewTableProxy>> Taql(
     const std::string& taql, const std::vector<std::shared_ptr<NewTableProxy>>& tables) {
   // Easy case
   if (tables.size() == 0) {
-    return NewTableProxy::Make([taql = taql]() -> Result<std::shared_ptr<TableProxy>> {
-      return std::make_shared<TableProxy>(taql, std::vector<TableProxy>{});
-    });
+    return NewTableProxy::Make(
+        [taql = taql]() -> Result<std::shared_ptr<TableProxy>> {
+          return std::make_shared<TableProxy>(taql, std::vector<TableProxy>{});
+        },
+        1, AccessMode::READONLY);
   } else if (tables.size() == 1) {
     return tables[0]->Spawn(
         [taql = taql](const TableProxy& tp) -> Result<std::shared_ptr<TableProxy>> {

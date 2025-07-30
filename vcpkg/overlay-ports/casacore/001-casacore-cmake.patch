@@ -774,3 +774,21 @@ index f65cf26dd..75268a528 100644
    }
    if (options.nfields() == 1) {
      return TableLock(opt);
+diff --git a/tables/Tables/TableSyncData.cc b/tables/Tables/TableSyncData.cc
+index fc463fdfe..841c42e09 100644
+--- a/tables/Tables/TableSyncData.cc
++++ b/tables/Tables/TableSyncData.cc
+@@ -127,6 +127,13 @@ Bool TableSyncData::read (rownr_t& nrrow, uInt& nrcolumn, Bool& tableChanged,
+     // by an external filler).
+     Int nrcol = -1;
+     if (itsMemIO->length() > 0) {
++#ifdef AIPS_TABLE_NOLOCKING
++        // When table locking is disabled,
++        // the buffer position is at the end of the buffer
++        // for some reason that is not yet understood.
++        // This temporary fix resets the position to the buffer start
++        itsMemIO->seek(0);
++#endif
+         uint version = itsAipsIO.getstart ("sync");
+         if (version > 2) {
+           throw TableError ("TableSyncData version " + String::toString(version) +

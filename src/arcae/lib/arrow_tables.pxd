@@ -94,6 +94,7 @@ cdef extern from "arcae/table_factory.h" namespace "arcae" nogil:
     cdef CResult[shared_ptr[CCasaTable]] CDefaultMS" arcae::DefaultMS"(
             const string & name,
             const string & subtable,
+            const size_t ninstances,
             const string & json_table_desc,
             const string & json_dminfo)
     cdef CResult[shared_ptr[CCasaTable]] CTaql" arcae::Taql"(
