@@ -294,16 +294,18 @@ Future<bool> WriteImpl(const std::shared_ptr<IsolatedTableProxy>& itp,
     std::shared_ptr<Selection> selection;
   };
 
-  auto shape_fut = itp->RunAsync([column = column, selection = selection, data = data](
-                                     TableProxy& tp) mutable -> Result<ShapeResult> {
-    if (!tp.isWritable()) tp.reopenRW();
-    ARROW_RETURN_NOT_OK(ColumnExists(tp.table(), column));
-    auto table_column = TableColumn(tp.table(), column);
-    ARROW_ASSIGN_OR_RAISE(auto shape_data,
-                          ResultShapeData::MakeWrite(table_column, data, selection));
-    return ShapeResult{std::make_shared<ResultShapeData>(std::move(shape_data)),
-                       std::make_shared<Selection>(std::move(selection))};
-  });
+  auto shape_fut = itp->RunAsync(
+      [column = column, selection = selection,
+       data = data](TableProxy& tp) mutable -> Result<ShapeResult> {
+        if (!tp.isWritable()) tp.reopenRW();
+        ARROW_RETURN_NOT_OK(ColumnExists(tp.table(), column));
+        auto table_column = TableColumn(tp.table(), column);
+        ARROW_ASSIGN_OR_RAISE(auto shape_data,
+                              ResultShapeData::MakeWrite(table_column, data, selection));
+        return ShapeResult{std::make_shared<ResultShapeData>(std::move(shape_data)),
+                           std::make_shared<Selection>(std::move(selection))};
+      },
+      LockType::Write);
 
   // Partition the resulting shape into contiguous chunks
   // of data to write to disk
