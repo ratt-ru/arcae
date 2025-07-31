@@ -102,11 +102,13 @@ Result<std::shared_ptr<NewTableProxy>> DefaultMS(const std::string& name,
     modname.append(usubtable);
   }
 
-  ARROW_ASSIGN_OR_RAISE(
-      auto setup_new_table,
-      DefaultMSFactory(modname, usubtable, json_table_desc, json_dminfo));
+  auto MakeMS = [name = name, modname = modname, usubtable = usubtable,
+                 json_table_desc = json_table_desc,
+                 json_dminfo = json_dminfo]() -> Result<std::shared_ptr<TableProxy>> {
+    ARROW_ASSIGN_OR_RAISE(
+        auto setup_new_table,
+        DefaultMSFactory(modname, usubtable, json_table_desc, json_dminfo));
 
-  auto MakeMS = [&]() -> Result<std::shared_ptr<TableProxy>> {
     // MAIN Measurement Set case
     if (usubtable.empty() || usubtable == kMain) {
       auto ms = MeasurementSet(setup_new_table);
