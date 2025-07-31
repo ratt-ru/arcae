@@ -86,6 +86,7 @@ Result<std::shared_ptr<NewTableProxy>> OpenTable(const std::string& filename,
 
 Result<std::shared_ptr<NewTableProxy>> DefaultMS(const std::string& name,
                                                  const std::string& subtable,
+                                                 std::size_t ninstances,
                                                  const std::string& json_table_desc,
                                                  const std::string& json_dminfo) {
   // Upper case subtable name
@@ -105,7 +106,7 @@ Result<std::shared_ptr<NewTableProxy>> DefaultMS(const std::string& name,
       auto setup_new_table,
       DefaultMSFactory(modname, usubtable, json_table_desc, json_dminfo));
 
-  return NewTableProxy::Make([&]() -> Result<std::shared_ptr<TableProxy>> {
+  auto MakeMS = [&]() -> Result<std::shared_ptr<TableProxy>> {
     // MAIN Measurement Set case
     if (usubtable.empty() || usubtable == kMain) {
       auto ms = MeasurementSet(setup_new_table);
@@ -172,7 +173,9 @@ Result<std::shared_ptr<NewTableProxy>> DefaultMS(const std::string& name,
     // Link the table against the Measurement Set
     ms.rwKeywordSet().defineTable(usubtable, subtable->table());
     return subtable;
-  });
+  };
+
+  return NewTableProxy::Make(std::move(MakeMS), ninstances);
 }
 
 // Execute a TAQL query on the supplied tables

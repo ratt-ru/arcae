@@ -14,7 +14,7 @@ arrow::Result<std::shared_ptr<NewTableProxy>> OpenTable(
     const std::string& filename, std::size_t ninstances = 1, bool readonly = true,
     const std::string& json_lockoptions = R"({"option": "auto"})");
 arrow::Result<std::shared_ptr<NewTableProxy>> DefaultMS(
-    const std::string& name, const std::string& subtable = "MAIN",
+    const std::string& name, const std::string& subtable = "MAIN", std::size_t ninstances = 1,
     const std::string& json_table_desc = "{}", const std::string& json_dminfo = "{}");
 arrow::Result<std::shared_ptr<NewTableProxy>> Taql(
     const std::string& taql,
