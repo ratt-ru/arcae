@@ -54,8 +54,10 @@ const std::shared_ptr<ThreadPool>& IsolatedTableProxy::GetPool(
 }
 
 std::shared_ptr<IsolatedTableProxy> IsolatedTableProxy::SpawnWriter() {
-  // Create an IsolatedTableProxy with a custom deleter that releases
-  // resources (proxies and pools) that are actually managed by the parent ITP
+  // Create an IsolatedTableProxy that serialises writes to a single
+  // table instance (and thread).
+  // A custom deleter that releases resources (proxies and pools)
+  // that are actually managed by the parent ITP
   std::shared_ptr<IsolatedTableProxy> itp(new IsolatedTableProxy(), [](auto* p) {
     p->proxy_pools_.clear();
     p->dependencies_.clear();
@@ -63,7 +65,9 @@ std::shared_ptr<IsolatedTableProxy> IsolatedTableProxy::SpawnWriter() {
     delete p;
   });
   itp->dependencies_.emplace_back(shared_from_this());
-  auto instance = GetInstance();
+  // Using the first instance means that writes can still work after
+  // non-syncable operations like AddColumns
+  auto instance = 0;  // GetInstance();
   itp->proxy_pools_.push_back(proxy_pools_[instance]);
   itp->is_closed_ = false;
   return itp;

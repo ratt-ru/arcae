@@ -42,20 +42,9 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
 
   [[nodiscard]] static decltype(auto) MaybeLockAndFinalise(CasaTableProxy* proxy,
                                                            CasaLockType lock_type) {
-    std::string_view lock_str = [&]() -> std::string_view {
-      if (lock_type == CasaLockType::Write) return "write";
-      if (lock_type == CasaLockType::Read) return "read";
-      return "none";
-    }();
-
-    if (lock_type != CasaLockType::None) {
-      ARROW_LOG(INFO) << "Locking a " << lock_str;
-      proxy->lock(lock_type == CasaLockType::Write, 3);
-    }
+    if (lock_type != CasaLockType::None) proxy->lock(lock_type == CasaLockType::Write, 0);
     return finally([=]() {
       if (lock_type != CasaLockType::None) {
-        ARROW_LOG(INFO) << "Unlocking a " << lock_str;
-        ;
         proxy->unlock();
       }
     });
@@ -173,10 +162,14 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
     using ResultType = ArrowFutureType<Fn, ConstTableProxyRef>;
     ARROW_RETURN_NOT_OK(CheckClosed());
     auto instance = GetInstance();
-    return RunInPoolSync([this, instance = instance,
+    return RunInPoolSync([this, instance = instance, lock_type = lock_type,
                           functor = std::forward<Fn>(functor)]() mutable -> ResultType {
       try {
-        return std::invoke(functor, *this->GetProxy(instance));
+        auto proxy = this->GetProxy(instance);
+        [[maybe_unused]] auto unlocker =
+            this->MaybeLockAndFinalise(proxy.get(), lock_type);
+
+        return std::invoke(functor, *proxy);
       } catch (casacore::AipsError& e) {
         return arrow::Status::Invalid("Unhandled casacore exception: ", e.what());
       }
@@ -195,10 +188,14 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
     ARROW_RETURN_NOT_OK(CheckClosed());
     auto instance = GetInstance();
     return RunInPoolSync(instance,
-                         [this, instance = instance,
+                         [this, instance = instance, lock_type = lock_type,
                           functor = std::forward<Fn>(functor)]() mutable -> ResultType {
                            try {
-                             return std::invoke(functor, *this->GetProxy(instance));
+                             auto proxy = this->GetProxy(instance);
+                             [[maybe_unused]] auto unlocker =
+                                 this->MaybeLockAndFinalise(proxy.get(), lock_type);
+
+                             return std::invoke(functor, *proxy);
                            } catch (casacore::AipsError& e) {
                              return arrow::Status::Invalid(
                                  "Unhandled casacore exception: ", e.what());
