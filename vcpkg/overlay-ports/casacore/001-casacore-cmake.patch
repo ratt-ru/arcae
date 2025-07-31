@@ -1419,36 +1419,18 @@ index 32ab695fc..ef2dff8db 100644
  // <linkto class=RefRows>RefRows</linkto> object,
  // especially if the RefRows object contains slices.
 diff --git a/tables/Tables/TableProxy.cc b/tables/Tables/TableProxy.cc
-index f65cf26dd..75268a528 100644
+index f65cf26dd..33c7b0838 100644
 --- a/tables/Tables/TableProxy.cc
 +++ b/tables/Tables/TableProxy.cc
-@@ -97,7 +97,7 @@ TableProxy::TableProxy (const String& tableName,
-   if (nrow < 0) {
-     nrow = 0;
-   }
--  
-+
-   TableDesc tabdesc;
-   String message;
-   if (!makeTableDesc (tableDesc, tabdesc, message)) {
-@@ -111,7 +111,7 @@ TableProxy::TableProxy (const String& tableName,
+@@ -224,7 +224,7 @@ String TableProxy::endianFormat() const
+   return "little";
  }
  
- TableProxy::TableProxy (const Vector<String>& tableNames,
--			const Vector<String>& concatenateSubTableNames, 
-+			const Vector<String>& concatenateSubTableNames,
- 			const Record& lockOptions,
- 			int option)
+-void TableProxy::lock (Bool mode, Int nattempts)
++Bool TableProxy::lock (Bool mode, Int nattempts)
  {
-@@ -128,7 +128,7 @@ TableProxy::TableProxy (const Vector<String>& tableNames,
- 	     subNames.begin());
-   table_p = Table (tabs, subNames);
+   table_p.lock (mode, nattempts);
  }
-- 
-+
- TableProxy::TableProxy (const std::vector<TableProxy>& tables,
- 			const Vector<String>& concatenateSubTableNames,
- 			int, int, int)
 @@ -271,6 +271,9 @@ Record TableProxy::lockOptions()
        option = "autonoread";
      }
@@ -1459,37 +1441,6 @@ index f65cf26dd..75268a528 100644
    default:
      option = "unknown";
    }
-@@ -285,9 +288,9 @@ Bool TableProxy::isMultiUsed (Bool checkSubTables)
-   return table_p.isMultiUsed (checkSubTables);
- }
- 
--String TableProxy::toAscii (const String& asciiFile, 
--                            const String& headerFile, 
--                            const Vector<String>& columns, 
-+String TableProxy::toAscii (const String& asciiFile,
-+                            const String& headerFile,
-+                            const Vector<String>& columns,
-                             const String& sep,
-                             const Vector<Int>& precision,
-                             Bool useBrackets)
-@@ -313,7 +316,7 @@ String TableProxy::toAscii (const String& asciiFile,
-   for (Int j=0; j<ncols; j++) {
-     col_is_good[j] = getColInfo (colNames[j], useBrackets,
-                                  col_type[j], message);
--    // Remember last good column 
-+    // Remember last good column
-     if (col_is_good[j]) {
-       last_good_col = j;
-     }
-@@ -931,7 +934,7 @@ Record TableProxy::getTableDesc(const TableDesc & tabdesc, Bool cOrder)
-       rec.defineRecord (columnDescription.name(),
-                 recordColumnDesc (columnDescription, cOrder));
-     }
--    
-+
-     // Convert hypercolumns
-     rec.defineRecord ("_define_hypercolumn_",
-         recordHCDesc (tabdesc));
 @@ -1172,7 +1175,7 @@ Record TableProxy::getVarColumn (const String& columnName,
    char namebuf[22];
    for (Int64 i=0; i<nrows; i++) {
@@ -1499,138 +1450,6 @@ index f65cf26dd..75268a528 100644
      if (tabcol.isDefined(row)) {
        getValueFromTable(columnName, row, 1, 1, False).toRecord (rec, namebuf);
      } else {
-@@ -2158,7 +2161,7 @@ ValueHolder TableProxy::getValueFromTable (const String& colName,
-   }
-   if (isScalar) {
-     switch (dtype) {
--    case TpBool: 
-+    case TpBool:
-       {
- 	ScalarColumn<Bool> ac(table_p,colName);
- 	if (isCell) {
-@@ -2170,7 +2173,7 @@ ValueHolder TableProxy::getValueFromTable (const String& colName,
-       break;
-     case TpUChar:
-       {
--	ScalarColumn<uChar> ac(table_p,colName); 
-+	ScalarColumn<uChar> ac(table_p,colName);
- 	if (isCell) {
- 	  return ValueHolder (ac(rownr));
- 	}else{
-@@ -2180,7 +2183,7 @@ ValueHolder TableProxy::getValueFromTable (const String& colName,
-       break;
-     case TpShort:
-       {
--	ScalarColumn<Short> ac(table_p,colName); 
-+	ScalarColumn<Short> ac(table_p,colName);
- 	if (isCell) {
- 	  return ValueHolder (ac(rownr));
- 	}else{
-@@ -2190,7 +2193,7 @@ ValueHolder TableProxy::getValueFromTable (const String& colName,
-       break;
-     case TpUShort:
-       {
--	ScalarColumn<uShort> ac(table_p,colName); 
-+	ScalarColumn<uShort> ac(table_p,colName);
- 	if (isCell) {
- 	  return ValueHolder (ac(rownr));
- 	}else{
-@@ -2200,17 +2203,17 @@ ValueHolder TableProxy::getValueFromTable (const String& colName,
-       break;
-     case TpInt:
-       {
--	ScalarColumn<Int> ac(table_p,colName); 
-+	ScalarColumn<Int> ac(table_p,colName);
- 	if (isCell) {
- 	  return ValueHolder (ac(rownr));
--	}else{ 
-+	}else{
- 	  return ValueHolder (ac.getColumnRange(Slice(rownr, nrow, incr)));
- 	}
-       }
-       break;
-     case TpUInt:
-       {
--	ScalarColumn<uInt> ac(table_p,colName); 
-+	ScalarColumn<uInt> ac(table_p,colName);
- 	if (isCell) {
- 	  return ValueHolder (ac(rownr));
- 	}else{
-@@ -2220,17 +2223,17 @@ ValueHolder TableProxy::getValueFromTable (const String& colName,
-       break;
-     case TpInt64:
-       {
--	ScalarColumn<Int64> ac(table_p,colName); 
-+	ScalarColumn<Int64> ac(table_p,colName);
- 	if (isCell) {
- 	  return ValueHolder (ac(rownr));
--	}else{ 
-+	}else{
- 	  return ValueHolder (ac.getColumnRange(Slice(rownr, nrow, incr)));
- 	}
-       }
-       break;
-     case TpFloat:
-       {
--	ScalarColumn<Float> ac(table_p,colName); 
-+	ScalarColumn<Float> ac(table_p,colName);
- 	if (isCell) {
- 	  return ValueHolder (ac(rownr));
- 	}else{
-@@ -2240,7 +2243,7 @@ ValueHolder TableProxy::getValueFromTable (const String& colName,
-       break;
-     case TpDouble:
-       {
--	ScalarColumn<Double> ac(table_p,colName); 
-+	ScalarColumn<Double> ac(table_p,colName);
- 	if (isCell) {
- 	  return ValueHolder (ac(rownr));
- 	}else{
-@@ -2250,7 +2253,7 @@ ValueHolder TableProxy::getValueFromTable (const String& colName,
-       break;
-     case TpComplex:
-       {
--	ScalarColumn<Complex> ac(table_p,colName); 
-+	ScalarColumn<Complex> ac(table_p,colName);
- 	if (isCell) {
- 	  return ValueHolder (ac(rownr));
- 	}else{
-@@ -2260,7 +2263,7 @@ ValueHolder TableProxy::getValueFromTable (const String& colName,
-       break;
-     case TpDComplex:
-       {
--	ScalarColumn<DComplex> ac(table_p,colName); 
-+	ScalarColumn<DComplex> ac(table_p,colName);
- 	if (isCell) {
- 	  return ValueHolder (ac(rownr));
- 	}else{
-@@ -2270,7 +2273,7 @@ ValueHolder TableProxy::getValueFromTable (const String& colName,
-       break;
-     case TpString:
-       {
--	ScalarColumn<String> ac(table_p,colName); 
-+	ScalarColumn<String> ac(table_p,colName);
- 	if (isCell) {
- 	  return ValueHolder (ac(rownr));
- 	}else{
-@@ -2280,7 +2283,7 @@ ValueHolder TableProxy::getValueFromTable (const String& colName,
-       break;
-     case TpRecord:
-       {
--	ScalarColumn<TableRecord> ac(table_p,colName); 
-+	ScalarColumn<TableRecord> ac(table_p,colName);
- 	if (isCell) {
- 	  // Transform a TableRecord into a Record.
- 	  return ValueHolder (ac(rownr).toRecord());
-@@ -2862,7 +2865,7 @@ void TableProxy::putValueInTable (const String& colName,
-   DataType type = table_p.tableDesc().columnDesc(colName).dataType();
-   if (isScalar) {
-     switch (type) {
--    case TpBool: 
-+    case TpBool:
-       {
- 	ScalarColumn<Bool> col(table_p, colName);
- 	if (isCell) {
 @@ -3403,10 +3406,12 @@ TableLock TableProxy::makeLockOptions (const Record& options)
      opt = TableLock::PermanentLocking;
    } else if (str == "permanentwait") {
@@ -1645,3 +1464,16 @@ index f65cf26dd..75268a528 100644
    }
    if (options.nfields() == 1) {
      return TableLock(opt);
+diff --git a/tables/Tables/TableProxy.h b/tables/Tables/TableProxy.h
+index 5b4c539dd..7d885c52d 100644
+--- a/tables/Tables/TableProxy.h
++++ b/tables/Tables/TableProxy.h
+@@ -198,7 +198,7 @@ public:
+   String endianFormat() const;
+ 
+   // Acquire a (read or write) lock on the table.
+-  void lock (Bool mode, Int nattempts);
++  Bool lock (Bool mode, Int nattempts);
+ 
+   // Release a lock on the table.
+   void unlock();
