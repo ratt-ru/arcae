@@ -6,6 +6,7 @@ from collections.abc import MutableMapping, Sequence
 import cython
 import json
 from typing import Any, Dict, List, Union
+import warnings
 
 from libcpp cimport bool
 from libcpp.memory cimport shared_ptr
@@ -158,6 +159,13 @@ cdef class Table:
             string cfilename = tobytes(filename)
             size_t cninstances = ninstances
             Table table = Table.__new__(Table)
+
+        if lockoptions != "auto":
+            warnings.warn(
+                f"lockoptions is deprecated: "
+                f"'{lockoptions}' will not be applied.",
+                DeprecationWarning
+            )
 
         if isinstance(lockoptions, str):
             lockoptions = f"{{\"option\": \"{lockoptions}\"}}"
