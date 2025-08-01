@@ -121,6 +121,7 @@ TEST_F(WriteTests, Parallel) {
                   column.setMaximumCacheSize(1);
                   auto data = Array<CasaComplex>(IPos({kncorr, knchan, int(nrow)}));
                   data.set(start);
+                  table.lock(true, 0);
 
                   try {
                     column.putColumnRange(Slice(start, nrow), data);
@@ -128,6 +129,7 @@ TEST_F(WriteTests, Parallel) {
                   } catch (std::exception& e) {
                     return arrow::Status::Invalid("Write failed ", e.what());
                   }
+                  table.unlock();
 
                   return true;
                 },
@@ -159,6 +161,8 @@ TEST_F(WriteTests, Parallel) {
           auto table_column = TableColumn(table, "MODEL_DATA");
           const auto& column_desc = table_column.columnDesc();
           auto column = ArrayColumn<CasaComplex>(table_column);
+          table.lock(false, 0);
+          std::shared_ptr<void> result(nullptr, [&](...) { table.unlock(); });
 
           try {
             return column.getColumnRange(Slice(start, nrow));
