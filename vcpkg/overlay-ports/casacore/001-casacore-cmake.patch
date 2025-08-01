@@ -1419,18 +1419,21 @@ index 32ab695fc..ef2dff8db 100644
  // <linkto class=RefRows>RefRows</linkto> object,
  // especially if the RefRows object contains slices.
 diff --git a/tables/Tables/TableProxy.cc b/tables/Tables/TableProxy.cc
-index f65cf26dd..33c7b0838 100644
+index f65cf26dd..5577655c5 100644
 --- a/tables/Tables/TableProxy.cc
 +++ b/tables/Tables/TableProxy.cc
-@@ -224,7 +224,7 @@ String TableProxy::endianFormat() const
+@@ -224,9 +224,9 @@ String TableProxy::endianFormat() const
    return "little";
  }
  
 -void TableProxy::lock (Bool mode, Int nattempts)
 +Bool TableProxy::lock (Bool mode, Int nattempts)
  {
-   table_p.lock (mode, nattempts);
+-  table_p.lock (mode, nattempts);
++  return table_p.lock (mode, nattempts);
  }
+ 
+ void TableProxy::unlock()
 @@ -271,6 +271,9 @@ Record TableProxy::lockOptions()
        option = "autonoread";
      }
