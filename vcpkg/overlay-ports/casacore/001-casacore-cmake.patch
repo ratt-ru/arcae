@@ -140,10 +140,10 @@ index 12229f902..a15e5080b 100644
  
  // <summary>Base class for all Casacore library errors</summary>
 diff --git a/casa/IO/FileLocker.cc b/casa/IO/FileLocker.cc
-index b55c080d8..611dd8a1e 100644
+index b55c080d8..bb14afc9f 100644
 --- a/casa/IO/FileLocker.cc
 +++ b/casa/IO/FileLocker.cc
-@@ -24,157 +24,296 @@
+@@ -24,157 +24,289 @@
  //#                        Charlottesville, VA 22903-2475 USA
  
  #include <casacore/casa/IO/FileLocker.h>
@@ -208,8 +208,7 @@ index b55c080d8..611dd8a1e 100644
 +  itsMsgShown        (False),
 +  itsAcquiringLock   (false),
 +  itsWantsWriteLock  (0),
-+  itsLockType        ({{std::this_thread::get_id(), None}}),
-+  itsThreadFD        ({{std::this_thread::get_id(), itsFD}})
++  itsLockType        ({{std::this_thread::get_id(), None}})
  {}
  
  FileLocker::FileLocker (int fd, uInt start, uInt length)
@@ -227,8 +226,7 @@ index b55c080d8..611dd8a1e 100644
 +  itsMsgShown        (False),
 +  itsAcquiringLock   (false),
 +  itsWantsWriteLock  (0),
-+  itsLockType        ({{std::this_thread::get_id(), None}}),
-+  itsThreadFD        ({{std::this_thread::get_id(), itsFD}})
++  itsLockType        ({{std::this_thread::get_id(), None}})
  {}
  
 -FileLocker::~FileLocker()
@@ -239,8 +237,7 @@ index b55c080d8..611dd8a1e 100644
 +    itsLength(std::exchange(rhs.itsLength, 0)),
 +    itsAcquiringLock(std::exchange(rhs.itsAcquiringLock, false)),
 +    itsWantsWriteLock(std::exchange(rhs.itsWantsWriteLock, 0)),
-+    itsLockType(std::move(rhs.itsLockType)),
-+    itsThreadFD(std::move(rhs.itsThreadFD))
++    itsLockType(std::move(rhs.itsLockType))
  {}
  
 -Bool FileLocker::acquire (LockType type, uInt nattempts)
@@ -253,22 +250,12 @@ index b55c080d8..611dd8a1e 100644
 +        std::swap(itsAcquiringLock, rhs.itsAcquiringLock);
 +        std::swap(itsWantsWriteLock, rhs.itsWantsWriteLock);
 +        std::swap(itsLockType, rhs.itsLockType);
-+        std::swap(itsThreadFD, rhs.itsThreadFD);
 +    }
 +    return *this;
 +}
 +
 +FileLocker::~FileLocker()
  {
--    itsError = 0;
--    // Always success if locking is not supported.
--#if defined(AIPS_NOFILELOCK)
--    itsReadLocked = True;
--    if (!itsWriteLocked  &&  type == Write) {
--        itsWriteLocked = True;
-+    for (auto & [tid, fd]: itsThreadFD) {
-+        if (itsFD != fd) FiledesIO::close(fd);
-     }
 +}
 +
 +
@@ -288,7 +275,35 @@ index b55c080d8..611dd8a1e 100644
 +
 +Bool FileLocker::fcntlAquire(RecursiveMutexLock & state_lock, LockType type, uInt nattempts) {
 +    #if defined(AIPS_NOFILELOCK)
-     return True;
++    return True;
++    #endif
++
++    if (type == None) return True;
++
++    struct flock lock;
++    lock.l_type = decltype(lock.l_type)(type == Read ? F_RDLCK : F_WRLCK);
++    lock.l_whence = SEEK_SET;
++    lock.l_start = itsStart;
++    lock.l_len = itsLength;
++
+     itsError = 0;
+-    // Always success if locking is not supported.
+-#if defined(AIPS_NOFILELOCK)
+-    itsReadLocked = True;
+-    if (!itsWriteLocked  &&  type == Write) {
+-        itsWriteLocked = True;
++
++    for (uInt a = 0; a < nattempts + 1; ++a) {
++        if (fcntl(itsFD, F_SETLK, &lock) != -1) return True;
++        itsError = errno;
++        if(ShouldRetry(itsError)) {
++            itsError = 0;
++            state_lock.unlock();
++            std::this_thread::sleep_for(1s);
++            state_lock.lock();
++        }
+     }
+-    return True;
 -#else
 -    struct flock ls;
 -    ls.l_whence = SEEK_SET;
@@ -308,40 +323,6 @@ index b55c080d8..611dd8a1e 100644
 -	    itsWriteLocked = False;
 -	}
 -	ls.l_type = F_RDLCK;
-+    #endif
-+
-+    if (type == None) return True;
-+
-+    struct flock lock;
-+    lock.l_type = decltype(lock.l_type)(type == Read ? F_RDLCK : F_WRLCK);
-+    lock.l_whence = SEEK_SET;
-+    lock.l_start = itsStart;
-+    lock.l_len = itsLength;
-+
-+    itsError = 0;
-+
-+    for (uInt a = 0; a < nattempts + 1; ++a) {
-+        if (fcntl(itsFD, F_SETLK, &lock) != -1) return True;
-+        itsError = errno;
-+        if(ShouldRetry(itsError)) {
-+            itsError = 0;
-+            state_lock.unlock();
-+            std::this_thread::sleep_for(1s);
-+            state_lock.lock();
-+        }
-     }
--    if (nattempts == 0) {
--	// Wait until lock succeeds.
--	if (fcntl (itsFD, F_SETLKW, &ls) != -1) {
--	    itsReadLocked = True;
--	    if (type == Write) {
--		itsWriteLocked = True;
--	    }
--///	    cout << "acquired " << itsReadLocked << ' ' <<itsWriteLocked <<
--///	      ' '<<itsStart<<' '<<itsLength<<endl;
--	    return True;
--	}
--	itsError = errno;
 +
 +    return False;
 +}
@@ -359,10 +340,9 @@ index b55c080d8..611dd8a1e 100644
 +        case Read: return type == Read;
 +        default: break;
      }
--    // Do finite number of attempts. Wait 1 second between each attempt.
--    for (uInt i=0; i<nattempts; i++) {
--	if (fcntl (itsFD, F_SETLK, &ls) != -1) {
--	    itsError = 0;
+-    if (nattempts == 0) {
+-	// Wait until lock succeeds.
+-	if (fcntl (itsFD, F_SETLKW, &ls) != -1) {
 -	    itsReadLocked = True;
 -	    if (type == Write) {
 -		itsWriteLocked = True;
@@ -371,33 +351,7 @@ index b55c080d8..611dd8a1e 100644
 -///	      ' '<<itsStart<<' '<<itsLength<<endl;
 -	    return True;
 -	}
--	// If locking fails, there is usually something wrong with locking
--        // over NFS because the statd or lockd deamons are not running.
--	// Hence locks on NFS files result in ENOLCK. Treat it as success.
--	// Issue a message if hit for the first time.
--#if defined(AIPS_LINUX) || defined(AIPS_DARWIN)
--	if (errno == ENOLCK) {
--	    itsError = 0;
--	    itsReadLocked = True;
--	    if (type == Write) {
--		itsWriteLocked = True;
--	    }
--	    if (!itsMsgShown) {
--	      itsMsgShown = True;
--	      cerr << "*** The ENOLCK error was returned by the kernel." << endl;
--              cerr << "*** It usually means that a lock for an NFS file could not be" << endl;
--              cerr << "*** obtained, maybe because the statd or lockd daemon is not running." << endl;
--	    }
--	    return True;
--	}
--#endif
 -	itsError = errno;
--	if (errno != EAGAIN  &&  errno != EACCES) {
--	    i = nattempts;                             // exit the loop
--	}
--	if (i < nattempts-1) {
--	    sleep (1);
--	}
 +
 +    return False;
 +}
@@ -469,7 +423,46 @@ index b55c080d8..611dd8a1e 100644
 +            itsAcquiringLock = true;
 +            break;
 +        }
-+    }
+     }
+-    // Do finite number of attempts. Wait 1 second between each attempt.
+-    for (uInt i=0; i<nattempts; i++) {
+-	if (fcntl (itsFD, F_SETLK, &ls) != -1) {
+-	    itsError = 0;
+-	    itsReadLocked = True;
+-	    if (type == Write) {
+-		itsWriteLocked = True;
+-	    }
+-///	    cout << "acquired " << itsReadLocked << ' ' <<itsWriteLocked <<
+-///	      ' '<<itsStart<<' '<<itsLength<<endl;
+-	    return True;
+-	}
+-	// If locking fails, there is usually something wrong with locking
+-        // over NFS because the statd or lockd deamons are not running.
+-	// Hence locks on NFS files result in ENOLCK. Treat it as success.
+-	// Issue a message if hit for the first time.
+-#if defined(AIPS_LINUX) || defined(AIPS_DARWIN)
+-	if (errno == ENOLCK) {
+-	    itsError = 0;
+-	    itsReadLocked = True;
+-	    if (type == Write) {
+-		itsWriteLocked = True;
+-	    }
+-	    if (!itsMsgShown) {
+-	      itsMsgShown = True;
+-	      cerr << "*** The ENOLCK error was returned by the kernel." << endl;
+-              cerr << "*** It usually means that a lock for an NFS file could not be" << endl;
+-              cerr << "*** obtained, maybe because the statd or lockd daemon is not running." << endl;
+-	    }
+-	    return True;
+-	}
+-#endif
+-	itsError = errno;
+-	if (errno != EAGAIN  &&  errno != EACCES) {
+-	    i = nattempts;                             // exit the loop
+-	}
+-	if (i < nattempts-1) {
+-	    sleep (1);
+-	}
 +
 +    auto result = fcntlAquire(state_lock, requested_lock_type, nattempts);
 +
@@ -559,7 +552,7 @@ index b55c080d8..611dd8a1e 100644
      itsError = 0;
  #if defined(AIPS_NOFILELOCK)
      return True;
-@@ -185,7 +324,7 @@ Bool FileLocker::release()
+@@ -185,7 +317,7 @@ Bool FileLocker::release()
      ls.l_start  = itsStart;
      ls.l_len    = itsLength;
      if (fcntl (itsFD, F_SETLK, &ls) != -1) {
@@ -568,7 +561,7 @@ index b55c080d8..611dd8a1e 100644
      }
  #if defined(AIPS_LINUX) || defined(AIPS_DARWIN)
      if (errno == ENOLCK) {
-@@ -215,30 +354,58 @@ Bool FileLocker::canLock (uInt& pid, LockType type)
+@@ -215,17 +347,22 @@ Bool FileLocker::canLock (uInt& pid, LockType type)
      pid = 0;
      itsError = 0;
      struct flock ls;
@@ -596,32 +589,8 @@ index b55c080d8..611dd8a1e 100644
      }
      itsError = errno;
      return False;
- #endif
- }
+@@ -234,11 +371,11 @@ Bool FileLocker::canLock (uInt& pid, LockType type)
  
-+int FileLocker::threadFD() const{
-+    RecursiveMutexLock state_lock(itsStateMutex);
-+    return internal_threadFD();
-+}
-+
-+int FileLocker::internal_threadFD() const {
-+    auto tid = std::this_thread::get_id();
-+    if (auto it = itsThreadFD.find(tid); it != std::end(itsThreadFD))
-+        return it->second;
-+
-+    int thread_fd = fcntl(itsFD, F_DUPFD, 0);
-+
-+    for (int count = 0; thread_fd == -1 || count < 10; ++ count) {
-+        std::this_thread::sleep_for(1s);
-+        thread_fd = fcntl(itsFD, F_DUPFD, 0);
-+    }
-+
-+    if (thread_fd == -1) throw std::runtime_error("-1 file descriptor while duplicating");
-+
-+    itsThreadFD.emplace(tid, thread_fd);
-+    return thread_fd;
-+}
-+
  String FileLocker::lastMessage() const
  {
 -    if (itsError == 0) {
@@ -638,7 +607,7 @@ index b55c080d8..611dd8a1e 100644
  } //# NAMESPACE CASACORE - END
 -
 diff --git a/casa/IO/FileLocker.h b/casa/IO/FileLocker.h
-index 250f5bfe5..0f04691dd 100644
+index 250f5bfe5..34131367c 100644
 --- a/casa/IO/FileLocker.h
 +++ b/casa/IO/FileLocker.h
 @@ -28,15 +28,21 @@
@@ -707,7 +676,7 @@ index 250f5bfe5..0f04691dd 100644
  
      ~FileLocker();
  
-@@ -129,30 +139,43 @@ public:
+@@ -129,7 +139,7 @@ public:
      // Test if the process has a lock for read or write on the file.
      Bool hasLock (LockType = Write) const;
  
@@ -715,13 +684,8 @@ index 250f5bfe5..0f04691dd 100644
 +    // Get the original file descriptor.
      int fd() const;
  
-+    // Get the file descriptor associated with
-+    // the current thread
-+    int threadFD() const;
-+
      // Get the last error.
-     int lastError() const;
- 
+@@ -138,21 +148,26 @@ public:
      // Get the message belonging to the last error.
      String lastMessage() const;
  
@@ -731,9 +695,6 @@ index 250f5bfe5..0f04691dd 100644
 +
 +    Bool fcntlAquire(RecursiveMutexLock & state_lock, LockType type = Write, uInt nattempts = 0);
 +    Bool fcntlRelease();
-+
-+    int internal_threadFD() const;
-+
  private:
      int    itsFD;
      int    itsError;
@@ -745,7 +706,6 @@ index 250f5bfe5..0f04691dd 100644
 +    bool   itsAcquiringLock;
 +    int    itsWantsWriteLock;
 +    std::unordered_map<std::thread::id, LockType> itsLockType;
-+    mutable std::unordered_map<std::thread::id, int> itsThreadFD;
 +    mutable std::recursive_mutex itsStateMutex;
 +    std::condition_variable_any itsCondVar;
  };
@@ -759,22 +719,25 @@ index 250f5bfe5..0f04691dd 100644
  {
      return itsFD;
 diff --git a/casa/IO/LockFile.cc b/casa/IO/LockFile.cc
-index 0f853c520..466db90d7 100644
+index 0f853c520..cd6cc1614 100644
 --- a/casa/IO/LockFile.cc
 +++ b/casa/IO/LockFile.cc
-@@ -23,6 +23,11 @@
+@@ -23,6 +23,14 @@
  //#                        520 Edgemont Road
  //#                        Charlottesville, VA 22903-2475 USA
  
++#include <cassert>
 +#include <cstring>
 +#include <cerrno>
++#include <memory>
 +#include <mutex>
++#include <stdexcept>
 +#include <unordered_map>
 +
  
  #include <casacore/casa/IO/LockFile.h>
  #include <casacore/casa/IO/FiledesIO.h>
-@@ -69,6 +74,29 @@
+@@ -69,6 +77,38 @@
  
  namespace casacore { //# NAMESPACE CASACORE - BEGIN
  
@@ -784,12 +747,13 @@ index 0f853c520..466db90d7 100644
 +struct FileDescriptorLease {
 +    int fd;
 +    int counts;
++    std::unique_ptr<std::mutex> io_mutex;
 +};
 +
 +using FDCache = std::unordered_map<String, FileDescriptorLease>;
 +
-+std::mutex & fd_cache_mutex() {
-+    static std::mutex m;
++std::recursive_mutex & fd_cache_mutex() {
++    static std::recursive_mutex m;
 +    return m;
 +}
 +
@@ -798,13 +762,21 @@ index 0f853c520..466db90d7 100644
 +    return cache;
 +}
 +
++std::mutex & GetIOMutex(const String & name) {
++    std::lock_guard<std::recursive_mutex> lock(fd_cache_mutex());
++    auto it = fd_cache().find(name);
++    if (it == std::end(fd_cache()))
++        throw std::runtime_error("io_mutex not available");
++    return *it->second.io_mutex;
++}
++
 +}  // namespace {
 +
 +
  LockFile::LockFile (const String& fileName, double inspectInterval,
  		    Bool create, Bool setRequestFlag, Bool mustExist,
  		    uInt seqnr, Bool permLocking, Bool noLocking)
-@@ -84,37 +112,50 @@ LockFile::LockFile (const String& fileName, double inspectInterval,
+@@ -84,50 +124,64 @@ LockFile::LockFile (const String& fileName, double inspectInterval,
      AlwaysAssert (SIZEINT == CanonicalConversion::canonicalSize (static_cast<Int*>(0)),
  		  AipsError);
      itsName = Path(fileName).absoluteName();
@@ -818,30 +790,15 @@ index 0f853c520..466db90d7 100644
 -      if (! f.exists()) {
 -        if (!f.canCreate()  &&  !mustExist) {
 -          return;    // Acceptable that lock file does not exist
--        }
--        create = True;
--      }
--    }
--    //# Open the lock file as read/write if it exists.
--    //# If it did not succeed, open as readonly.
--    //# For noLocking, it does not need to exist.
 +
-     int fd = -1;
--    if (!create) {
--      fd = FiledesIO::open (itsName.chars(), True, False);
--      if (fd == -1) {
--        fd = FiledesIO::open (itsName.chars(), False, !noLocking);
--        itsWritable  = False;
--        itsAddToList = False;
--      }
--    } else if (!noLocking) {
--      //# Create a new file with world write access.
--      //# Initialize the values in it.
--      fd = FiledesIO::create (itsName.chars(), 0666);
--      putReqId (fd);
-+    std::lock_guard<std::mutex> lock(fd_cache_mutex());
++    std::unique_lock<std::recursive_mutex> cache_lock(fd_cache_mutex());
 +    auto it = fd_cache().find(itsName);
 +    if (it == std::end(fd_cache())) {
++        // Create the cache entry with fd set to -1
++        // This will be updated later
++        auto fd_lease = FileDescriptorLease{-1, 1, std::make_unique<std::mutex>()};
++        it = fd_cache().emplace(itsName, std::move(fd_lease)).first;
++
 +        //# If needed, create the file if it does not exist yet.
 +        //# If the flag is set, it is allowed that the file does not
 +        //# exist and cannot be created. In that case it is assumed that
@@ -855,14 +812,33 @@ index 0f853c520..466db90d7 100644
 +                }
 +                create = True;
 +            }
-+        }
+         }
+-        create = True;
+-      }
+-    }
+-    //# Open the lock file as read/write if it exists.
+-    //# If it did not succeed, open as readonly.
+-    //# For noLocking, it does not need to exist.
+-    int fd = -1;
+-    if (!create) {
+-      fd = FiledesIO::open (itsName.chars(), True, False);
+-      if (fd == -1) {
+-        fd = FiledesIO::open (itsName.chars(), False, !noLocking);
+-        itsWritable  = False;
+-        itsAddToList = False;
+-      }
+-    } else if (!noLocking) {
+-      //# Create a new file with world write access.
+-      //# Initialize the values in it.
+-      fd = FiledesIO::create (itsName.chars(), 0666);
+-      putReqId (fd);
 +        //# Open the lock file as read/write if it exists.
 +        //# If it did not succeed, open as readonly.
 +        //# For noLocking, it does not need to exist.
 +        if (!create) {
-+            fd = FiledesIO::open (itsName.chars(), True, False);
-+            if (fd == -1) {
-+                fd = FiledesIO::open (itsName.chars(), False, !noLocking);
++            it->second.fd = FiledesIO::open (itsName.chars(), True, False);
++            if (it->second.fd == -1) {
++                it->second.fd = FiledesIO::open (itsName.chars(), False, !noLocking);
 +                itsWritable  = False;
 +                itsAddToList = False;
 +            }
@@ -870,21 +846,36 @@ index 0f853c520..466db90d7 100644
 +        } else if (!noLocking) {
 +            //# Create a new file with world write access.
 +            //# Initialize the values in it.
-+            fd = FiledesIO::create (itsName.chars(), 0666);
-+            putReqId (fd);
++            it->second.fd = FiledesIO::create (itsName.chars(), 0666);
++            putReqId (it->second.fd);
 +        }
 +
-+        // Insert valid descriptors into the cache
-+        if (fd >=0) fd_cache().emplace(itsName, FileDescriptorLease{fd, 1});
 +    } else {
-+        fd = it->second.fd;
 +        ++it->second.counts;
      }
+-    if (fd >= 0) {
 +
-     if (fd >= 0) {
++    if (it->second.fd >= 0) {
        //# Create FileLocker objects for this lock file.
        //# The first one is for read/write locks.
-@@ -136,16 +177,22 @@ LockFile::LockFile (const String& fileName, double inspectInterval,
+       //# The second one is to set the file to "in use" and to tell if
+       //# permanent locking is used.
+-      itsLocker = FileLocker (fd, 4*seqnr, 1);
++      itsLocker = FileLocker (it->second.fd, 4*seqnr, 1);
+       if (permLocking) {
+-        itsUseLocker = FileLocker (fd, 4*seqnr+1, 2);
++        itsUseLocker = FileLocker (it->second.fd, 4*seqnr+1, 2);
+       } else {
+-        itsUseLocker = FileLocker (fd, 4*seqnr+1, 1);
++        itsUseLocker = FileLocker (it->second.fd, 4*seqnr+1, 1);
+       }
+       if (!noLocking) {
+-        itsFileIO.reset (new FiledesIO (fd, itsName));
++        itsFileIO.reset (new FiledesIO (it->second.fd, itsName));
+         // Set the file to in use by acquiring a read lock.
+         itsUseLocker.acquire (FileLocker::Read, 1);
+       }
+@@ -136,10 +190,16 @@ LockFile::LockFile (const String& fileName, double inspectInterval,
  
  LockFile::~LockFile()
  {
@@ -893,7 +884,7 @@ index 0f853c520..466db90d7 100644
 -	FiledesIO::close (fd);
 -    }
 +    // Close file descriptor once all leases have expired
-+    std::lock_guard<std::mutex> lock(fd_cache_mutex());
++    std::lock_guard<std::recursive_mutex> lock(fd_cache_mutex());
 +    auto it = fd_cache().find(itsName);
 +    // No record, just return
 +    if (it == std::end(fd_cache())) return;
@@ -905,111 +896,64 @@ index 0f853c520..466db90d7 100644
  }
  
  Bool LockFile::isMultiUsed()
- {
-     //# If a write lock cannot be obtained, the file is in use.
--    return ( (itsUseLocker.fd() >= 0
-+    return ( (itsUseLocker.threadFD() >= 0
-                 &&  !itsUseLocker.canLock (FileLocker::Write)));
- }
- 
-@@ -238,7 +285,8 @@ Bool LockFile::inspect (Bool always)
- void LockFile::getInfo (MemoryIO& info)
+@@ -239,6 +299,7 @@ void LockFile::getInfo (MemoryIO& info)
  {
      // Do nothing if no locking.
--    if (itsLocker.fd() < 0) {
-+    if (itsLocker.threadFD() < 0) {
+     if (itsLocker.fd() < 0) {
 +        info.seek(Int64(0));
          return;
      }
      // The lock file contains:
-@@ -247,8 +295,8 @@ void LockFile::getInfo (MemoryIO& info)
+@@ -246,6 +307,7 @@ void LockFile::getInfo (MemoryIO& info)
+     // - thereafter the length of the info (as a uInt)
      // - thereafter the entire info
      uChar buffer[2048];
++    std::lock_guard<std::mutex> io_lock(GetIOMutex(itsName));
      // Read the first part of the file.
--    traceLSEEK (itsLocker.fd(), 0, SEEK_SET);
--    uInt leng = ::read (itsLocker.fd(), buffer, sizeof(buffer));
-+    traceLSEEK (itsLocker.threadFD(), 0, SEEK_SET);
-+    uInt leng = ::read (itsLocker.threadFD(), buffer, sizeof(buffer));
-     // Extract the request list from it.
-     convReqId (buffer, leng);
-     // Get the length of the info.
-@@ -270,7 +318,7 @@ void LockFile::getInfo (MemoryIO& info)
-     if (infoLeng > leng) {
- 	infoLeng -= leng;
- 	uChar* buf = new uChar[infoLeng];
--	AlwaysAssert (::read (itsLocker.fd(), buf, infoLeng) == Int(infoLeng),
-+	AlwaysAssert (::read (itsLocker.threadFD(), buf, infoLeng) == Int(infoLeng),
-                       AipsError);
- 	info.write (infoLeng, buf);
- 	delete [] buf;
-@@ -281,7 +329,7 @@ void LockFile::getInfo (MemoryIO& info)
- void LockFile::putInfo (const MemoryIO& info) const
- {
-     uInt infoLeng = const_cast<MemoryIO&>(info).length();
--    if (itsLocker.fd() < 0  ||  !itsWritable  ||  infoLeng == 0) {
-+    if (itsLocker.threadFD() < 0  ||  !itsWritable  ||  infoLeng == 0) {
+     traceLSEEK (itsLocker.fd(), 0, SEEK_SET);
+     uInt leng = ::read (itsLocker.fd(), buffer, sizeof(buffer));
+@@ -284,6 +346,7 @@ void LockFile::putInfo (const MemoryIO& info) const
+     if (itsLocker.fd() < 0  ||  !itsWritable  ||  infoLeng == 0) {
  	return;
      }
++    std::lock_guard<std::mutex> io_lock(GetIOMutex(itsName));
      // Write the info into the lock file preceeded by its length.
-@@ -289,25 +337,25 @@ void LockFile::putInfo (const MemoryIO& info) const
+     uChar buffer[1024];
      uInt leng = CanonicalConversion::fromLocal (buffer, infoLeng);
-     if (infoLeng > 1024 - leng) {
-       // Too large for the buffer, so write length and info separately.
--      traceLSEEK (itsLocker.fd(), SIZEREQID, SEEK_SET);
--      AlwaysAssert (traceWRITE (itsLocker.fd(), (Char *)buffer, leng) ==
-+      traceLSEEK (itsLocker.threadFD(), SIZEREQID, SEEK_SET);
-+      AlwaysAssert (traceWRITE (itsLocker.threadFD(), (Char *)buffer, leng) ==
-                     Int(leng), AipsError);
--      AlwaysAssert (traceWRITE (itsLocker.fd(), (Char *)info.getBuffer(),
-+      AlwaysAssert (traceWRITE (itsLocker.threadFD(), (Char *)info.getBuffer(),
-                                 infoLeng) == Int(infoLeng), AipsError);
-     }else{
-       // Info fits in the buffer, so copy and do a single write.
-       memcpy (buffer+leng, info.getBuffer(), infoLeng);
--      AlwaysAssert (tracePWRITE (itsLocker.fd(), (Char *)buffer, leng+infoLeng,
-+      AlwaysAssert (tracePWRITE (itsLocker.threadFD(), (Char *)buffer, leng+infoLeng,
-                                  SIZEREQID) == Int(leng+infoLeng), AipsError);
-     }
-     // Do an fsync to achieve NFS synchronization.
--    fsync (itsLocker.fd());
-+    fsync (itsLocker.threadFD());
- }
- 
+@@ -307,6 +370,7 @@ void LockFile::putInfo (const MemoryIO& info) const
  Int LockFile::getNrReqId() const
  {
      uChar buffer[8];
--    uInt leng = tracePREAD (itsLocker.fd(), buffer, SIZEINT, 0);
-+    uInt leng = tracePREAD (itsLocker.threadFD(), buffer, SIZEINT, 0);
++    std::lock_guard<std::mutex> io_lock(GetIOMutex(itsName));
+     uInt leng = tracePREAD (itsLocker.fd(), buffer, SIZEINT, 0);
      return getInt (buffer, leng, 0);
  }
- 
-@@ -341,7 +389,7 @@ void LockFile::addReqId()
-     itsReqId[0] = inx+1;
-     itsReqId[2*inx+1] = itsPid;
-     itsReqId[2*inx+2] = itsHostId;
--    putReqId (itsLocker.fd());
-+    putReqId (itsLocker.threadFD());
- }
- 
- void LockFile::removeReqId()
-@@ -361,7 +409,7 @@ void LockFile::removeReqId()
- 	nr -= i+1;
- 	objcopy (&itsReqId[1], &itsReqId[2*i+1], 2*nr);
- 	itsReqId[0] = nr;
--	putReqId (itsLocker.fd());
-+	putReqId (itsLocker.threadFD());
+@@ -368,13 +432,14 @@ void LockFile::removeReqId()
+ void LockFile::putReqId (int fd) const
+ {
+     if (itsAddToList) {
+-	uChar buffer[SIZEREQID];
+-	uInt leng = CanonicalConversion::fromLocal (buffer,
++    	uChar buffer[SIZEREQID];
++	    uInt leng = CanonicalConversion::fromLocal (buffer,
+ 						    itsReqId.storage(),
+ 						    itsReqId.nelements());
++        std::lock_guard<std::mutex> io_lock(GetIOMutex(itsName));
+         AlwaysAssert(tracePWRITE(fd, (Char *)buffer, leng, 0) == Int(leng),
+                      AipsError);
+-	fsync (fd);
++	    fsync (fd);
      }
  }
  
-@@ -380,7 +428,7 @@ void LockFile::putReqId (int fd) const
- 
- void LockFile::getReqId()
+@@ -382,6 +447,7 @@ void LockFile::getReqId()
  {
--    int fd = itsLocker.fd();
-+    int fd = itsLocker.threadFD();
+     int fd = itsLocker.fd();
      uChar buffer[SIZEREQID];
++    std::lock_guard<std::mutex> io_lock(GetIOMutex(itsName));
      if (tracePREAD(fd, buffer, SIZEREQID, 0) > 0) {
  	CanonicalConversion::fromLocal (buffer,
+ 					itsReqId.storage(),
 diff --git a/casa/Json/JsonOut.h b/casa/Json/JsonOut.h
 index b5229c57d..66596d273 100644
 --- a/casa/Json/JsonOut.h
