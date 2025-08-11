@@ -50,6 +50,7 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
         proxy->lock(lock_type == CasaLockType::Write, 0);
     }
     ~MaybeLockAndFinalise() {
+      if (lock_type == CasaLockType::Write) proxy->flush(false);
       if (lock_type != CasaLockType::None) proxy->unlock();
     }
   };
@@ -66,9 +67,9 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
     auto instance = GetInstance();
     return RunInPool([this, instance = instance, lock_type = lock_type,
                       functor = std::forward<Fn>(functor)]() mutable -> ResultType {
-      auto proxy = this->GetProxy(instance);
-      MaybeLockAndFinalise lock(proxy, lock_type);
       try {
+        auto proxy = this->GetProxy(instance);
+        MaybeLockAndFinalise lock(proxy, lock_type);
         return std::invoke(functor, *proxy);
       } catch (casacore::AipsError& e) {
         return arrow::Status::Invalid("Unhandled casacore exception: ", e.what());
@@ -91,10 +92,9 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
     return RunInPool(instance,
                      [this, instance = instance, lock_type = lock_type,
                       functor = std::forward<Fn>(functor)]() mutable -> ResultType {
-                       auto proxy = this->GetProxy(instance);
-                       MaybeLockAndFinalise lock(proxy, lock_type);
-
                        try {
+                         auto proxy = this->GetProxy(instance);
+                         MaybeLockAndFinalise lock(proxy, lock_type);
                          return std::invoke(functor, *proxy);
                        } catch (casacore::AipsError& e) {
                          return arrow::Status::Invalid("Unhandled casacore exception: ",
@@ -117,10 +117,9 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
     return future.Then(
         [this, instance = instance, lock_type = lock_type,
          fn = std::forward<Fn>(functor)](const R& result) mutable -> ResultType {
-          auto proxy = this->GetProxy(instance);
-          MaybeLockAndFinalise lock(proxy, lock_type);
-
           try {
+            auto proxy = this->GetProxy(instance);
+            MaybeLockAndFinalise lock(proxy, lock_type);
             return std::invoke(fn, result, *proxy);
           } catch (casacore::AipsError& e) {
             return arrow::Status::Invalid("Unhandled casacore exception: ", e.what());
@@ -144,10 +143,9 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
     return future.Then(
         [this, instance = instance, lock_type = lock_type,
          fn = std::forward<Fn>(functor)](const R& result) mutable -> ResultType {
-          auto proxy = this->GetProxy(instance);
-          MaybeLockAndFinalise lock(proxy, lock_type);
-
           try {
+            auto proxy = this->GetProxy(instance);
+            MaybeLockAndFinalise lock(proxy, lock_type);
             return std::invoke(fn, result, *proxy);
           } catch (casacore::AipsError& e) {
             return arrow::Status::Invalid("Unhandled casacore exception: ", e.what());
@@ -173,9 +171,9 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
     auto instance = GetInstance();
     return RunInPoolSync([this, instance = instance, lock_type = lock_type,
                           functor = std::forward<Fn>(functor)]() mutable -> ResultType {
-      auto proxy = this->GetProxy(instance);
-      MaybeLockAndFinalise lock(proxy, lock_type);
       try {
+        auto proxy = this->GetProxy(instance);
+        MaybeLockAndFinalise lock(proxy, lock_type);
         return std::invoke(functor, *proxy);
       } catch (casacore::AipsError& e) {
         return arrow::Status::Invalid("Unhandled casacore exception: ", e.what());
@@ -200,9 +198,9 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
         instance,
         [this, instance = instance, lock_type = lock_type,
          functor = std::forward<Fn>(functor)]() mutable -> ResultType {
-          auto proxy = this->GetProxy(instance);
-          MaybeLockAndFinalise lock(proxy, lock_type);
           try {
+            auto proxy = this->GetProxy(instance);
+            MaybeLockAndFinalise lock(proxy, lock_type);
             return std::invoke(functor, *proxy);
           } catch (casacore::AipsError& e) {
             return arrow::Status::Invalid("Unhandled casacore exception: ", e.what());
