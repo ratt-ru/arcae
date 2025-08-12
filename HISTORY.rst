@@ -2,6 +2,11 @@
 History
 =======
 
+0.4.0 (DD-MM-YYYY)
+------------------
+* Implement write-locking (:pr:`162`)
+
+
 0.3.0 (21-06-2025)
 ------------------
 * Upgrade to pyarrow 21 (:pr:`160`)
