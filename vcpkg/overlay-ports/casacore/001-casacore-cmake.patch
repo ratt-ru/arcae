@@ -140,7 +140,7 @@ index 12229f902..a15e5080b 100644
  
  // <summary>Base class for all Casacore library errors</summary>
 diff --git a/casa/IO/FileLocker.cc b/casa/IO/FileLocker.cc
-index b55c080d8..bb14afc9f 100644
+index b55c080d8..9d000257f 100644
 --- a/casa/IO/FileLocker.cc
 +++ b/casa/IO/FileLocker.cc
 @@ -24,157 +24,289 @@
@@ -206,7 +206,7 @@ index b55c080d8..bb14afc9f 100644
 +  itsStart           (0),
 +  itsLength          (0),
 +  itsMsgShown        (False),
-+  itsAcquiringLock   (false),
++  itsModifyingFcntlLock   (false),
 +  itsWantsWriteLock  (0),
 +  itsLockType        ({{std::this_thread::get_id(), None}})
  {}
@@ -224,7 +224,7 @@ index b55c080d8..bb14afc9f 100644
 +  itsStart           (start),
 +  itsLength          (length),
 +  itsMsgShown        (False),
-+  itsAcquiringLock   (false),
++  itsModifyingFcntlLock   (false),
 +  itsWantsWriteLock  (0),
 +  itsLockType        ({{std::this_thread::get_id(), None}})
  {}
@@ -235,7 +235,7 @@ index b55c080d8..bb14afc9f 100644
 +    itsError(std::exchange(rhs.itsError, 0)),
 +    itsStart(std::exchange(rhs.itsStart, 0)),
 +    itsLength(std::exchange(rhs.itsLength, 0)),
-+    itsAcquiringLock(std::exchange(rhs.itsAcquiringLock, false)),
++    itsModifyingFcntlLock(std::exchange(rhs.itsModifyingFcntlLock, false)),
 +    itsWantsWriteLock(std::exchange(rhs.itsWantsWriteLock, 0)),
 +    itsLockType(std::move(rhs.itsLockType))
  {}
@@ -247,7 +247,7 @@ index b55c080d8..bb14afc9f 100644
 +        std::swap(itsError, rhs.itsError);
 +        std::swap(itsStart, rhs.itsStart);
 +        std::swap(itsLength, rhs.itsLength);
-+        std::swap(itsAcquiringLock, rhs.itsAcquiringLock);
++        std::swap(itsModifyingFcntlLock, rhs.itsModifyingFcntlLock);
 +        std::swap(itsWantsWriteLock, rhs.itsWantsWriteLock);
 +        std::swap(itsLockType, rhs.itsLockType);
 +    }
@@ -390,13 +390,13 @@ index b55c080d8..bb14afc9f 100644
 +            // 3. this is the only read-locked thread (upgrade) or
 +            //    there are no other read or write locked threads
 +            itsCondVar.wait(state_lock, [&]() {
-+                return !itsAcquiringLock && itsWantsWriteLock == 1 &&
++                return !itsModifyingFcntlLock && itsWantsWriteLock == 1 &&
 +                        AllLocks() == (thread_lock_type == Read ? 1 : 0);
 +            });
 +            assert(thread_lock_type == None || thread_lock_type == Read);
 +            // Signal lock acquisition
 +            itsLockType.insert_or_assign(tid, Write);
-+            itsAcquiringLock = true;
++            itsModifyingFcntlLock = true;
 +            break;
 +        }
 +        case Read: {
@@ -408,7 +408,7 @@ index b55c080d8..bb14afc9f 100644
 +            // 3. this is the only write-locked thread (downgrade) or
 +            //    there are no write-locked threads
 +            itsCondVar.wait(state_lock, [&]() {
-+                return !itsAcquiringLock && itsWantsWriteLock == 0 &&
++                return !itsModifyingFcntlLock && itsWantsWriteLock == 0 &&
 +                numLocks(Write) == (thread_lock_type == Write ? 1 : 0);
 +            });
 +            assert(thread_lock_type == None || thread_lock_type == Write);
@@ -420,7 +420,7 @@ index b55c080d8..bb14afc9f 100644
 +            }
 +            // Signal lock acquisition
 +            itsLockType.insert_or_assign(tid, Read);
-+            itsAcquiringLock = true;
++            itsModifyingFcntlLock = true;
 +            break;
 +        }
      }
@@ -467,7 +467,7 @@ index b55c080d8..bb14afc9f 100644
 +    auto result = fcntlAquire(state_lock, requested_lock_type, nattempts);
 +
 +    // Lock acquisition has finished
-+    itsAcquiringLock = false;
++    itsModifyingFcntlLock = false;
 +
 +    switch(requested_lock_type) {
 +        case None:
@@ -484,7 +484,23 @@ index b55c080d8..bb14afc9f 100644
 +            if(!result) itsLockType.insert_or_assign(tid, thread_lock_type);
 +            break;
 +        }
-+    }
+     }
+-    itsWriteLocked = False;
+-    // Note that the system keeps a lock per file and not per fd.
+-    // So if the same file is opened in the same process and unlocked
+-    // at the same place, the read lock for this fd is also released.
+-    // If we think we hold a read lock, determine if we still hold it.
+-    // We certainly do not if we asked for a read lock.
+-    // If asked for a write lock, we might still hold it.
+-    // One attempt is enough to see if we indeed can get a read lock.
+-    if (itsReadLocked) {
+-        itsReadLocked = False;
+-	if (type == Write) {
+-	    ls.l_type = F_RDLCK;
+-	    if (fcntl (itsFD, F_SETLK, &ls) != -1) {
+-	        itsReadLocked = True;
+-	    }
+-	}
 +
 +    return result;
 +}
@@ -507,35 +523,20 @@ index b55c080d8..bb14afc9f 100644
 +        itsLockType.insert_or_assign(tid, None);
 +        return True;
      }
--    itsWriteLocked = False;
--    // Note that the system keeps a lock per file and not per fd.
--    // So if the same file is opened in the same process and unlocked
--    // at the same place, the read lock for this fd is also released.
--    // If we think we hold a read lock, determine if we still hold it.
--    // We certainly do not if we asked for a read lock.
--    // If asked for a write lock, we might still hold it.
--    // One attempt is enough to see if we indeed can get a read lock.
--    if (itsReadLocked) {
--        itsReadLocked = False;
--	if (type == Write) {
--	    ls.l_type = F_RDLCK;
--	    if (fcntl (itsFD, F_SETLK, &ls) != -1) {
--	        itsReadLocked = True;
--	    }
--	}
-+
-+    // On successful lock release
-+    // update the lock type and return success
-+    // body repeated for clarity
-+    if (fcntlRelease()) {
-+        itsLockType.insert_or_assign(tid, None);
-+        return True;
-     }
 -///    cout << "failed " << itsReadLocked << ' ' <<itsWriteLocked<<' '<<type<<
 -///	      ' '<<itsStart<<' '<<itsLength<<endl;
-+
-     return False;
+-    return False;
 -#endif
++
++    // Wait until no one else is modifying the lock
++    itsCondVar.wait(state_lock, [&]() { return itsModifyingFcntlLock == false; });
++
++    itsModifyingFcntlLock = true;
++    auto result = fcntlRelease();
++    // On successful lock release, update the lock type
++    if (result) itsLockType.insert_or_assign(tid, None);
++    itsModifyingFcntlLock = false;
++    return result;
  }
  
 +
@@ -607,7 +608,7 @@ index b55c080d8..bb14afc9f 100644
  } //# NAMESPACE CASACORE - END
 -
 diff --git a/casa/IO/FileLocker.h b/casa/IO/FileLocker.h
-index 250f5bfe5..34131367c 100644
+index 250f5bfe5..c3216875f 100644
 --- a/casa/IO/FileLocker.h
 +++ b/casa/IO/FileLocker.h
 @@ -28,15 +28,21 @@
@@ -703,7 +704,7 @@ index 250f5bfe5..34131367c 100644
      Bool   itsMsgShown;           /// temporary for SUSE 6.1
 -    Bool   itsReadLocked;
 -    Bool   itsWriteLocked;
-+    bool   itsAcquiringLock;
++    bool   itsModifyingFcntlLock;
 +    int    itsWantsWriteLock;
 +    std::unordered_map<std::thread::id, LockType> itsLockType;
 +    mutable std::recursive_mutex itsStateMutex;
