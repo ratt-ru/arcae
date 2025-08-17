@@ -140,10 +140,10 @@ index 12229f902..a15e5080b 100644
  
  // <summary>Base class for all Casacore library errors</summary>
 diff --git a/casa/IO/FileLocker.cc b/casa/IO/FileLocker.cc
-index b55c080d8..9d000257f 100644
+index b55c080d8..40223acea 100644
 --- a/casa/IO/FileLocker.cc
 +++ b/casa/IO/FileLocker.cc
-@@ -24,157 +24,289 @@
+@@ -24,157 +24,290 @@
  //#                        Charlottesville, VA 22903-2475 USA
  
  #include <casacore/casa/IO/FileLocker.h>
@@ -536,6 +536,7 @@ index b55c080d8..9d000257f 100644
 +    // On successful lock release, update the lock type
 +    if (result) itsLockType.insert_or_assign(tid, None);
 +    itsModifyingFcntlLock = false;
++    itsCondVar.notify_all();
 +    return result;
  }
  
@@ -553,7 +554,7 @@ index b55c080d8..9d000257f 100644
      itsError = 0;
  #if defined(AIPS_NOFILELOCK)
      return True;
-@@ -185,7 +317,7 @@ Bool FileLocker::release()
+@@ -185,7 +318,7 @@ Bool FileLocker::release()
      ls.l_start  = itsStart;
      ls.l_len    = itsLength;
      if (fcntl (itsFD, F_SETLK, &ls) != -1) {
@@ -562,7 +563,7 @@ index b55c080d8..9d000257f 100644
      }
  #if defined(AIPS_LINUX) || defined(AIPS_DARWIN)
      if (errno == ENOLCK) {
-@@ -215,17 +347,22 @@ Bool FileLocker::canLock (uInt& pid, LockType type)
+@@ -215,17 +348,22 @@ Bool FileLocker::canLock (uInt& pid, LockType type)
      pid = 0;
      itsError = 0;
      struct flock ls;
@@ -590,7 +591,7 @@ index b55c080d8..9d000257f 100644
      }
      itsError = errno;
      return False;
-@@ -234,11 +371,11 @@ Bool FileLocker::canLock (uInt& pid, LockType type)
+@@ -234,11 +372,11 @@ Bool FileLocker::canLock (uInt& pid, LockType type)
  
  String FileLocker::lastMessage() const
  {
