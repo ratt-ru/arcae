@@ -721,7 +721,7 @@ index 250f5bfe5..c3216875f 100644
  {
      return itsFD;
 diff --git a/casa/IO/LockFile.cc b/casa/IO/LockFile.cc
-index 0f853c520..9edb3fdd6 100644
+index 0f853c520..ead966c41 100644
 --- a/casa/IO/LockFile.cc
 +++ b/casa/IO/LockFile.cc
 @@ -23,6 +23,15 @@
@@ -740,7 +740,7 @@ index 0f853c520..9edb3fdd6 100644
  
  #include <casacore/casa/IO/LockFile.h>
  #include <casacore/casa/IO/FiledesIO.h>
-@@ -69,6 +78,49 @@
+@@ -69,6 +78,51 @@
  
  namespace casacore { //# NAMESPACE CASACORE - BEGIN
  
@@ -775,12 +775,14 @@ index 0f853c520..9edb3fdd6 100644
 +
 +Int HashThreadId() {
 +    auto tid_hash = std::hash<std::thread::id>()(std::this_thread::get_id());
-+    constexpr int hash_bytes = sizeof(tid_hash);
-+    constexpr int Int_bytes = sizeof(Int);
-+    static_assert((sizeof(hash_bytes) % sizeof(Int_bytes)) == 0, "size_t doesn't divide Int perfectly");
++    static_assert(sizeof(tid_hash) % 4 == 0, "size_t isn't a multiple of a word");
++    static_assert(sizeof(Int) % 4 == 0, "Int isn't a multiple of a word");
++    constexpr int hash_words = sizeof(tid_hash) / 4;
++    constexpr int Int_words = sizeof(Int) / 4;
++    static_assert((hash_words % Int_words) == 0, "sizeof(size_t) doesn't divide sizeof(Int) perfectly");
 +    Int hash = 0;
-+    const unsigned char * p = reinterpret_cast<const unsigned char *>(&tid_hash);
-+    for (int i = 0; i < hash_bytes; ++i) hash ^= p[i];
++    const Int * p = reinterpret_cast<const Int *>(&tid_hash);
++    for (int i = 0; i < hash_words; ++i) hash ^= p[i];
 +    return hash;
 +}
 +
@@ -790,7 +792,7 @@ index 0f853c520..9edb3fdd6 100644
  LockFile::LockFile (const String& fileName, double inspectInterval,
  		    Bool create, Bool setRequestFlag, Bool mustExist,
  		    uInt seqnr, Bool permLocking, Bool noLocking)
-@@ -84,50 +136,64 @@ LockFile::LockFile (const String& fileName, double inspectInterval,
+@@ -84,50 +138,64 @@ LockFile::LockFile (const String& fileName, double inspectInterval,
      AlwaysAssert (SIZEINT == CanonicalConversion::canonicalSize (static_cast<Int*>(0)),
  		  AipsError);
      itsName = Path(fileName).absoluteName();
@@ -889,7 +891,7 @@ index 0f853c520..9edb3fdd6 100644
          // Set the file to in use by acquiring a read lock.
          itsUseLocker.acquire (FileLocker::Read, 1);
        }
-@@ -136,10 +202,16 @@ LockFile::LockFile (const String& fileName, double inspectInterval,
+@@ -136,10 +204,16 @@ LockFile::LockFile (const String& fileName, double inspectInterval,
  
  LockFile::~LockFile()
  {
@@ -910,7 +912,7 @@ index 0f853c520..9edb3fdd6 100644
  }
  
  Bool LockFile::isMultiUsed()
-@@ -239,6 +311,7 @@ void LockFile::getInfo (MemoryIO& info)
+@@ -239,6 +313,7 @@ void LockFile::getInfo (MemoryIO& info)
  {
      // Do nothing if no locking.
      if (itsLocker.fd() < 0) {
@@ -918,7 +920,7 @@ index 0f853c520..9edb3fdd6 100644
          return;
      }
      // The lock file contains:
-@@ -246,6 +319,7 @@ void LockFile::getInfo (MemoryIO& info)
+@@ -246,6 +321,7 @@ void LockFile::getInfo (MemoryIO& info)
      // - thereafter the length of the info (as a uInt)
      // - thereafter the entire info
      uChar buffer[2048];
@@ -926,7 +928,7 @@ index 0f853c520..9edb3fdd6 100644
      // Read the first part of the file.
      traceLSEEK (itsLocker.fd(), 0, SEEK_SET);
      uInt leng = ::read (itsLocker.fd(), buffer, sizeof(buffer));
-@@ -284,6 +358,7 @@ void LockFile::putInfo (const MemoryIO& info) const
+@@ -284,6 +360,7 @@ void LockFile::putInfo (const MemoryIO& info) const
      if (itsLocker.fd() < 0  ||  !itsWritable  ||  infoLeng == 0) {
  	return;
      }
@@ -934,7 +936,7 @@ index 0f853c520..9edb3fdd6 100644
      // Write the info into the lock file preceeded by its length.
      uChar buffer[1024];
      uInt leng = CanonicalConversion::fromLocal (buffer, infoLeng);
-@@ -307,6 +382,7 @@ void LockFile::putInfo (const MemoryIO& info) const
+@@ -307,6 +384,7 @@ void LockFile::putInfo (const MemoryIO& info) const
  Int LockFile::getNrReqId() const
  {
      uChar buffer[8];
@@ -942,7 +944,7 @@ index 0f853c520..9edb3fdd6 100644
      uInt leng = tracePREAD (itsLocker.fd(), buffer, SIZEINT, 0);
      return getInt (buffer, leng, 0);
  }
-@@ -339,7 +415,7 @@ void LockFile::addReqId()
+@@ -339,7 +417,7 @@ void LockFile::addReqId()
  	inx = NRREQID-1;
      }
      itsReqId[0] = inx+1;
@@ -951,7 +953,7 @@ index 0f853c520..9edb3fdd6 100644
      itsReqId[2*inx+2] = itsHostId;
      putReqId (itsLocker.fd());
  }
-@@ -352,7 +428,7 @@ void LockFile::removeReqId()
+@@ -352,7 +430,7 @@ void LockFile::removeReqId()
      //# can happen when a process with an outstanding request died.
      Int nr = itsReqId[0];
      for (i=0; i<nr; i++) {
@@ -960,7 +962,7 @@ index 0f853c520..9edb3fdd6 100644
          &&  Int(itsHostId) == itsReqId[2*i+2]) {
  	    break;
  	}
-@@ -368,13 +444,14 @@ void LockFile::removeReqId()
+@@ -368,13 +446,14 @@ void LockFile::removeReqId()
  void LockFile::putReqId (int fd) const
  {
      if (itsAddToList) {
@@ -978,7 +980,7 @@ index 0f853c520..9edb3fdd6 100644
      }
  }
  
-@@ -382,6 +459,7 @@ void LockFile::getReqId()
+@@ -382,6 +461,7 @@ void LockFile::getReqId()
  {
      int fd = itsLocker.fd();
      uChar buffer[SIZEREQID];
