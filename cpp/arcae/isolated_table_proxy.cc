@@ -85,6 +85,7 @@ Result<bool> IsolatedTableProxy::Close() {
     results.reserve(proxy_pools_.size());
     for (auto& [proxy, pool] : proxy_pools_) {
       results.push_back(arrow::DeferNotOk(pool->Submit([tp = proxy]() {
+        tp->flush(false);
         tp->close();
         return true;
       })));
