@@ -607,10 +607,10 @@ index b55c080d8..d3a6f0120 100644
  } //# NAMESPACE CASACORE - END
 -
 diff --git a/casa/IO/FileLocker.h b/casa/IO/FileLocker.h
-index 250f5bfe5..c3216875f 100644
+index 250f5bfe5..43b0441ff 100644
 --- a/casa/IO/FileLocker.h
 +++ b/casa/IO/FileLocker.h
-@@ -28,15 +28,21 @@
+@@ -28,6 +28,11 @@
  
  
  //# Includes
@@ -621,42 +621,8 @@ index 250f5bfe5..c3216875f 100644
 +
  #include <casacore/casa/aips.h>
  
-+
  namespace casacore { //# NAMESPACE CASACORE - BEGIN
- 
- //# Forward Declarations
- class String;
- 
- 
--// <summary> 
-+// <summary>
- // Class to handle file locking.
- // </summary>
- 
-@@ -45,11 +51,11 @@ class String;
- // <reviewed reviewer="UNKNOWN" date="before2004/08/25" tests="tLockFile" demos="">
- // </reviewed>
- 
--// <prerequisite> 
-+// <prerequisite>
- //    <li> man page of fcntl
- // </prerequisite>
- 
--// <synopsis> 
-+// <synopsis>
- // This class handles file locking by means of the fcntl SETLK function.
- // Locking of files on NFS-mounted file systems works correctly
- // as long as the NFS lockd and statd deamons are configured correctly.
-@@ -81,7 +87,7 @@ class String;
- // </srcblock>
- // </example>
- 
--// <motivation> 
-+// <motivation>
- // Make it possible to lock files in a standard way.
- // </motivation>
- 
-@@ -94,7 +100,9 @@ public:
+@@ -94,7 +99,9 @@ public:
  	// Acquire a read lock.
  	Read,
  	// Acquire a write lock.
@@ -667,7 +633,7 @@ index 250f5bfe5..c3216875f 100644
      };
  
      // Default constructor creates an invalid fd.
-@@ -105,6 +113,8 @@ public:
+@@ -105,6 +112,8 @@ public:
      // The segment is given by start and length. Length=0 means till the
      // end of the file.
      explicit FileLocker (int fd, uInt start=0, uInt length=0);
@@ -676,7 +642,7 @@ index 250f5bfe5..c3216875f 100644
  
      ~FileLocker();
  
-@@ -129,7 +139,7 @@ public:
+@@ -129,7 +138,7 @@ public:
      // Test if the process has a lock for read or write on the file.
      Bool hasLock (LockType = Write) const;
  
@@ -685,13 +651,14 @@ index 250f5bfe5..c3216875f 100644
      int fd() const;
  
      // Get the last error.
-@@ -138,21 +148,26 @@ public:
+@@ -138,21 +147,26 @@ public:
      // Get the message belonging to the last error.
      String lastMessage() const;
  
++    std::size_t numLocks(LockType type) const;
++
 +protected:
 +    using RecursiveMutexLock = std::unique_lock<std::recursive_mutex>;
-+    std::size_t numLocks(LockType type) const;
 +
 +    Bool fcntlAquire(RecursiveMutexLock & state_lock, LockType type = Write, uInt nattempts = 0);
 +    Bool fcntlRelease();
@@ -710,7 +677,7 @@ index 250f5bfe5..c3216875f 100644
 +    std::condition_variable_any itsCondVar;
  };
  
- 
+-
 -inline Bool FileLocker::hasLock (LockType type) const
 -{
 -    return (type == Write  ?  itsWriteLocked : itsReadLocked);
@@ -719,7 +686,7 @@ index 250f5bfe5..c3216875f 100644
  {
      return itsFD;
 diff --git a/casa/IO/LockFile.cc b/casa/IO/LockFile.cc
-index 0f853c520..ead966c41 100644
+index 0f853c520..76bfa1a1a 100644
 --- a/casa/IO/LockFile.cc
 +++ b/casa/IO/LockFile.cc
 @@ -23,6 +23,15 @@
@@ -986,6 +953,30 @@ index 0f853c520..ead966c41 100644
      if (tracePREAD(fd, buffer, SIZEREQID, 0) > 0) {
  	CanonicalConversion::fromLocal (buffer,
  					itsReqId.storage(),
+@@ -436,4 +516,8 @@ uInt LockFile::showLock (uInt& pid, Bool& permLocked, const String& fileName)
+     return result;
+ }
+ 
++std::size_t LockFile::numLocks(FileLocker::LockType lock_type) const {
++    return itsLocker.numLocks(lock_type);
++}
++
+ } //# NAMESPACE CASACORE - END
+diff --git a/casa/IO/LockFile.h b/casa/IO/LockFile.h
+index 57c57db79..f21246f61 100644
+--- a/casa/IO/LockFile.h
++++ b/casa/IO/LockFile.h
+@@ -280,6 +280,10 @@ public:
+     // be opened.
+     static uInt showLock (uInt& pid, Bool& permLocked, const String& fileName);
+ 
++    // Returns the number of locks hold of the given type
++    // Not thread-safe
++    std::size_t numLocks(FileLocker::LockType lock_type) const;
++
+ private:
+     // The copy constructor cannot be used (its semantics are too difficult).
+     LockFile (const LockFile&);
 diff --git a/casa/Json/JsonOut.h b/casa/Json/JsonOut.h
 index b5229c57d..66596d273 100644
 --- a/casa/Json/JsonOut.h
