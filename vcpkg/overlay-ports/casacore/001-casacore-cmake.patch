@@ -686,7 +686,7 @@ index 250f5bfe5..43b0441ff 100644
  {
      return itsFD;
 diff --git a/casa/IO/LockFile.cc b/casa/IO/LockFile.cc
-index 0f853c520..76bfa1a1a 100644
+index 0f853c520..b4e083701 100644
 --- a/casa/IO/LockFile.cc
 +++ b/casa/IO/LockFile.cc
 @@ -23,6 +23,15 @@
@@ -740,10 +740,10 @@ index 0f853c520..76bfa1a1a 100644
 +
 +Int HashThreadId() {
 +    auto tid_hash = std::hash<std::thread::id>()(std::this_thread::get_id());
-+    static_assert(sizeof(tid_hash) % 4 == 0, "size_t isn't a multiple of a word");
-+    static_assert(sizeof(Int) % 4 == 0, "Int isn't a multiple of a word");
-+    constexpr int hash_words = sizeof(tid_hash) / 4;
-+    constexpr int Int_words = sizeof(Int) / 4;
++    static_assert(sizeof(tid_hash) % SIZEINT == 0, "size_t isn't a multiple of a word");
++    static_assert(sizeof(Int) % SIZEINT == 0, "Int isn't a multiple of a word");
++    constexpr int hash_words = sizeof(tid_hash) / SIZEINT;
++    constexpr int Int_words = sizeof(Int) / SIZEINT;
 +    static_assert((hash_words % Int_words) == 0, "sizeof(size_t) doesn't divide sizeof(Int) perfectly");
 +    Int hash = 0;
 +    const Int * p = reinterpret_cast<const Int *>(&tid_hash);
