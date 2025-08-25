@@ -5,11 +5,10 @@
 #include <limits>
 #include <memory>
 
+#include <arrow/status.h>
+#include <arrow/util/future.h>
 #include <arrow/util/logging.h>
-#include "arrow/status.h"
-#include "arrow/util/functional.h"
-#include "arrow/util/future.h"
-#include "arrow/util/thread_pool.h"
+#include <arrow/util/thread_pool.h>
 
 #include <casacore/tables/Tables/TableProxy.h>
 
@@ -54,6 +53,26 @@ const std::shared_ptr<ThreadPool>& IsolatedTableProxy::GetPool(
   return proxy_pools_[instance].io_pool_;
 }
 
+std::shared_ptr<IsolatedTableProxy> IsolatedTableProxy::SpawnWriter() {
+  // Create an IsolatedTableProxy that serialises writes to a single
+  // table instance (and thread).
+  // A custom deleter that releases resources (proxies and pools)
+  // that are actually managed by the parent ITP
+  std::shared_ptr<IsolatedTableProxy> itp(new IsolatedTableProxy(), [](auto* p) {
+    p->proxy_pools_.clear();
+    p->dependencies_.clear();
+    p->is_closed_ = true;
+    delete p;
+  });
+  itp->dependencies_.emplace_back(shared_from_this());
+  // Using the first instance means that writes can still work after
+  // non-syncable operations like AddColumns
+  auto instance = 0;  // GetInstance();
+  itp->proxy_pools_.push_back(proxy_pools_[instance]);
+  itp->is_closed_ = false;
+  return itp;
+}
+
 Status IsolatedTableProxy::CheckClosed() const {
   if (!is_closed_) return Status::OK();
   return Status::Invalid("TableProxy is closed");
@@ -66,6 +85,7 @@ Result<bool> IsolatedTableProxy::Close() {
     results.reserve(proxy_pools_.size());
     for (auto& [proxy, pool] : proxy_pools_) {
       results.push_back(arrow::DeferNotOk(pool->Submit([tp = proxy]() {
+        tp->flush(false);
         tp->close();
         return true;
       })));

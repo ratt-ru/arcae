@@ -6,6 +6,7 @@ from collections.abc import MutableMapping, Sequence
 import cython
 import json
 from typing import Any, Dict, List, Union
+import warnings
 
 from libcpp cimport bool
 from libcpp.memory cimport shared_ptr
@@ -159,6 +160,13 @@ cdef class Table:
             size_t cninstances = ninstances
             Table table = Table.__new__(Table)
 
+        if lockoptions != "auto":
+            warnings.warn(
+                f"lockoptions is deprecated: "
+                f"'{lockoptions}' will not be applied.",
+                DeprecationWarning
+            )
+
         if isinstance(lockoptions, str):
             lockoptions = f"{{\"option\": \"{lockoptions}\"}}"
         elif isinstance(lockoptions, dict):
@@ -178,6 +186,7 @@ cdef class Table:
     def ms_from_descriptor(
         filename: str,
         subtable: str = "MAIN",
+        ninstances: int = 1,
         table_desc: Dict | None = None,
         dminfo: Dict | None = None
     ) -> Table:
@@ -185,6 +194,7 @@ cdef class Table:
             Table table = Table.__new__(Table)
             string cfilename = tobytes(filename)
             string csubtable = tobytes(subtable)
+            size_t cninstances = int(ninstances)
         json_table_desc = json.dumps(table_desc) if table_desc else "{}"
         json_dminfo = json.dumps(dminfo) if dminfo else "{}"
 
@@ -194,6 +204,7 @@ cdef class Table:
         with nogil:
             table.c_table = GetResultValue(CDefaultMS(cfilename,
                                                       csubtable,
+                                                      cninstances,
                                                       cjson_table_desc,
                                                       cjson_dm_info))
         return table
