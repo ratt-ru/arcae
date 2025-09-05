@@ -43,21 +43,6 @@ namespace {
 // Anonymous Read Functions
 //----------------------------------------------------------------------------
 
-// Get the shape for a particular row (row is excluded from the shape)
-// If, the supplied row is negative (-1) and a result_shape is supplied
-// the shape is derived from this source, otherwise the CASA shape is
-// used as the reference value
-Result<IPosition> GetTableRowShape(const TableColumn& column, IndexType r) {
-  if (r < 0 || r >= IndexType(column.nrow())) {
-    return Status::IndexError("Row ", r, " in column ", column.columnDesc().name(),
-                              " is out of bounds");
-  } else if (column.isDefined(r)) {
-    return column.shape(r);
-  }
-  return Status::IndexError("Row ", r, " in column ", column.columnDesc().name(),
-                            " is not defined");
-}
-
 // Clips the shape against the selection
 Status ClipShape(const ColumnDesc& column_desc, IPosition& shape,
                  const Selection& selection) {
@@ -84,30 +69,32 @@ Result<RowShapes> MakeRowData(const TableColumn& column, const Selection& select
   RowShapes shapes;
   const auto& column_desc = column.columnDesc();
 
-  // Lambda that gets the shape from the column's row
-  // Clipping against the selection is performed
+  // Lambda that gets the shape from the column's row if 0 <= row < nrow
+  // If row < 0 or the row is missing
   auto GetClippedColumnShape = [&](auto r) -> Result<IPosition> {
-    ARROW_ASSIGN_OR_RAISE(auto shape, GetTableRowShape(column, r));
-    ARROW_RETURN_NOT_OK(ClipShape(column_desc, shape, selection));
-    return shape;
-  };
+    if (r >= decltype(r)(column.nrow())) {
+      return Status::IndexError("Requested row ", r, " in column ",
+                                column.columnDesc().name(), " >= column.nrow() ",
+                                column.nrow());
+    }
+    // Get the shape if the row is positive and defined
+    // and clip it against the selection
+    if (r >= 0 && column.isDefined(r)) {
+      auto shape = column.shape(r);
+      ARROW_RETURN_NOT_OK(ClipShape(column_desc, shape, selection));
+      return shape;
+    }
 
-  // Lambda handling the more complex span case.
-  auto GetSpanShape = [&](auto r) -> Result<IPosition> {
-    // Standard case
-    if (r >= 0) return GetClippedColumnShape(r);
-
-    // Negative row indices mean that the shape should be derived
-    // from the result array, rather than the column row shape
-    // It's not necessary to clip by selection indices in this case
     if (result_shape) {
-      const auto& shape = result_shape.value();
+      auto shape = result_shape.value();
       return shape.getFirst(shape.size() - 1);
     }
 
-    return Status::IndexError(
-        "Negative selection indices may only be used "
-        "in conjunction with a fixed shape result array");
+    return Status::IndexError("Requested row ", r, " in column ",
+                              column.columnDesc().name(),
+                              " was negative or missing. "
+                              "Inferring the row shape is impossible without "
+                              "a supplied result array");
   };
 
   // Get the row selection if provided
@@ -115,7 +102,7 @@ Result<RowShapes> MakeRowData(const TableColumn& column, const Selection& select
     auto span = selection.GetRowSpan();
     shapes.reserve(span.size());
     for (std::size_t r = 0; r < span.size(); ++r) {
-      ARROW_ASSIGN_OR_RAISE(auto shape, GetSpanShape(span[r]));
+      ARROW_ASSIGN_OR_RAISE(auto shape, GetClippedColumnShape(span[r]));
       shapes.emplace_back(std::move(shape));
     }
     // otherwise, the entire column
