@@ -16,6 +16,7 @@
 #include <casacore/tables/Tables/TableColumn.h>
 
 #include "arcae/selection.h"
+#include "arrow/array/array_base.h"
 
 namespace arcae {
 namespace detail {
@@ -93,6 +94,9 @@ struct ResultShapeData {
   // Get the number of elements in the result
   std::size_t nElements() const noexcept;
 
+  // Get an Arrow Array describing the row shapes
+  arrow::Result<std::shared_ptr<arrow::Array>> GetShapeArray() const noexcept;
+
   // Get ListArray offsets
   arrow::Result<std::vector<std::shared_ptr<arrow::Int32Array>>> GetOffsets()
       const noexcept;
@@ -100,7 +104,8 @@ struct ResultShapeData {
   // Create a ResultShapeData instance suitable for reading
   static arrow::Result<ResultShapeData> MakeRead(
       const casacore::TableColumn& column, const Selection& selection = Selection(),
-      const std::shared_ptr<arrow::Array>& result = nullptr);
+      const std::shared_ptr<arrow::Array>& result = nullptr,
+      bool allow_missing_rows = false);
 
   // Create a ResultShapeData instance suitable for writing
   static arrow::Result<ResultShapeData> MakeWrite(

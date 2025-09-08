@@ -168,6 +168,21 @@ def test_column_cases(column_case_table):
     assert "UNCONSTRAINED" not in T.column_names
 
 
+def test_row_shapes(column_case_table):
+    table = arcae.table(column_case_table)
+
+    assert isinstance(table.row_shapes("SCALAR"), pa.NullArray)
+    assert table.row_shapes("SCALAR").to_pylist() == [None, None, None]
+
+    assert table.row_shapes("VARIABLE").to_pylist() == [[2, 1, 3], [2, 2, 3], [2, 3, 3]]
+    assert table.row_shapes("VARIABLE", ([1, 2],)).to_pylist() == [[2, 2, 3], [2, 3, 3]]
+    assert table.row_shapes("VARIABLE", ([0],)).to_pylist() == [[2, 1, 3]]
+
+    assert table.row_shapes("FIXED").to_pylist() == [[4, 2], [4, 2], [4, 2]]
+    assert table.row_shapes("FIXED", ([1, 2],)).to_pylist() == [[4, 2], [4, 2]]
+    assert table.row_shapes("FIXED", ([0],)).to_pylist() == [[4, 2]]
+
+
 def test_complex_cases(complex_case_table):
     from arcae import config
 

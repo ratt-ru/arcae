@@ -7,6 +7,7 @@
 #include <numeric>
 #include <optional>
 #include <string>
+#include <vector>
 
 #include <casacore/casa/Arrays/IPosition.h>
 #include <casacore/casa/Utilities/DataType.h>
@@ -21,6 +22,9 @@
 
 #include "arcae/result_shape.h"
 #include "arcae/selection.h"
+#include "arrow/array/array_base.h"
+#include "arrow/array/array_nested.h"
+#include "arrow/buffer_builder.h"
 
 using ::arrow::Result;
 using ::arrow::Status;
@@ -65,12 +69,14 @@ Status ClipShape(const ColumnDesc& column_desc, IPosition& shape,
 
 // Create variably shaped row data
 Result<RowShapes> MakeRowData(const TableColumn& column, const Selection& selection,
-                              const std::optional<IPosition>& result_shape) {
+                              const std::optional<IPosition>& result_shape,
+                              bool allow_missing = false) {
   RowShapes shapes;
   const auto& column_desc = column.columnDesc();
 
   // Lambda that gets the shape from the column's row if 0 <= row < nrow
-  // If row < 0 or the row is missing
+  // If row < 0 or the row is missing and a result shape is present, that
+  // shape will be used
   auto GetClippedColumnShape = [&](auto r) -> Result<IPosition> {
     if (r >= decltype(r)(column.nrow())) {
       return Status::IndexError("Requested row ", r, " in column ",
@@ -78,17 +84,22 @@ Result<RowShapes> MakeRowData(const TableColumn& column, const Selection& select
                                 column.nrow());
     }
     // Get the shape if the row is positive and defined
-    // and clip it against the selection
+    // and clip against the selection
     if (r >= 0 && column.isDefined(r)) {
       auto shape = column.shape(r);
       ARROW_RETURN_NOT_OK(ClipShape(column_desc, shape, selection));
       return shape;
     }
 
+    // If there's a result shape use that instead
     if (result_shape) {
       auto shape = result_shape.value();
       return shape.getFirst(shape.size() - 1);
     }
+
+    // A positive row is missing at this point
+    // Return a degenerate shape if requested
+    if (r >= 0 && allow_missing) return IPosition();
 
     return Status::IndexError("Requested row ", r, " in column ",
                               column.columnDesc().name(),
@@ -335,7 +346,7 @@ Result<ResultShapeData> GetResultShapeData(const ColumnDesc& column_desc,
 
 // Check that the number of rows in the table
 // fit into the IndexType used by arcae
-arrow::Status CheckRowNumberLimit(const std::string& column, rownr_t nrows) {
+Status CheckRowNumberLimit(const std::string& column, rownr_t nrows) {
   if (nrows <= std::numeric_limits<IndexType>::max()) return Status::OK();
   return Status::IndexError("Number of rows ", nrows, " in column ", column,
                             " is too large for arcae's IndexType");
@@ -392,6 +403,45 @@ std::size_t ResultShapeData::nElements() const noexcept {
                          [](auto i, auto s) { return s.product() + i; });
 }
 
+Result<std::shared_ptr<arrow::Array>> ResultShapeData::GetShapeArray() const noexcept {
+  auto ndim = nDim() - 1;  // without row
+  auto nrow = nRows();
+
+  if (ndim == 0) return std::make_shared<arrow::NullArray>(std::int64_t(nrow));
+
+  auto builders = std::vector<arrow::Int32Builder>(ndim);
+  auto shape_data_builder = arrow::Int32Builder();
+
+  ARROW_RETURN_NOT_OK(shape_data_builder.Reserve(nrow * ndim));
+
+  if (IsFixed()) {
+    auto shape = GetShape();
+    for (std::size_t row = 0; row < nrow; ++row) {
+      for (std::size_t dim = 0; dim < ndim; ++dim) {
+        ARROW_RETURN_NOT_OK(shape_data_builder.Append(shape[dim]));
+      }
+    }
+    ARROW_ASSIGN_OR_RAISE(auto shape_values, shape_data_builder.Finish());
+    return arrow::FixedSizeListArray::FromArrays(shape_values, ndim);
+  } else {
+    auto null_nitmap_builder = arrow::TypedBufferBuilder<bool>();
+    ARROW_RETURN_NOT_OK(null_nitmap_builder.Reserve(nrow * ndim));
+    for (std::size_t row = 0; row < nrow; ++row) {
+      auto shape = GetRowShape(row);
+      ARROW_RETURN_NOT_OK(null_nitmap_builder.Append(shape.size() != 0));
+      if (shape.size() == 0) shape = IPosition(ndim, 0);
+      for (std::size_t dim = 0; dim < ndim; ++dim) {
+        ARROW_RETURN_NOT_OK(shape_data_builder.Append(shape[dim]));
+      }
+    }
+    ARROW_ASSIGN_OR_RAISE(auto nulls, null_nitmap_builder.Finish());
+    ARROW_ASSIGN_OR_RAISE(auto shape_values, shape_data_builder.Finish());
+    return arrow::FixedSizeListArray::FromArrays(shape_values, ndim, nulls);
+  }
+
+  return nullptr;
+}
+
 // Get ListArray offsets arrays
 Result<std::vector<std::shared_ptr<arrow::Int32Array>>> ResultShapeData::GetOffsets()
     const noexcept {
@@ -410,7 +460,7 @@ Result<std::vector<std::shared_ptr<arrow::Int32Array>>> ResultShapeData::GetOffs
 
   // Compute number of elements in each row by creating
   // a product over each dimension
-  auto BuildFn = [&](auto&& GetShapeFn) -> ::Status {
+  auto BuildFn = [&](auto&& GetShapeFn) -> Status {
     using ItType = std::tuple<std::ptrdiff_t, std::size_t>;
     for (std::size_t row = 0; row < nrow; ++row) {
       for (auto [dim, product] = ItType{ndim - 1, 1}; dim >= 0; --dim) {
@@ -440,7 +490,7 @@ Result<std::vector<std::shared_ptr<arrow::Int32Array>>> ResultShapeData::GetOffs
 
 Result<ResultShapeData> ResultShapeData::MakeRead(
     const TableColumn& column, const Selection& selection,
-    const std::shared_ptr<arrow::Array>& result) {
+    const std::shared_ptr<arrow::Array>& result, bool allow_missing_rows) {
   auto column_desc = column.columnDesc();
   auto column_name = column_desc.name();
   ARROW_RETURN_NOT_OK(CheckRowNumberLimit(column_name, column.nrow()));
@@ -467,45 +517,51 @@ Result<ResultShapeData> ResultShapeData::MakeRead(
   }
 
   // Get shapes of each row in the selection
-  ARROW_ASSIGN_OR_RAISE(auto shapes, MakeRowData(column, selection, result_shape));
-  auto shape = std::optional<IPosition>{std::nullopt};
+  ARROW_ASSIGN_OR_RAISE(auto shapes,
+                        MakeRowData(column, selection, result_shape, allow_missing_rows));
+  auto fixed_shape = std::optional<IPosition>{std::nullopt};
   int ndim = -1;
-  bool first = true;
-  bool shapes_equal = true;
+  bool shapes_equal = false;
 
   // Identify fixed shapes and varying dimensionality
   for (auto it = shapes.begin(); it != shapes.end(); ++it) {
-    if (first) {
-      shape = *it;
+    // Ignore length 0 shapes (missing rows)
+    if (it->size() == 0) continue;
+    if (!fixed_shape) {
+      fixed_shape = *it;
       ndim = it->size();
-      first = false;
+      shapes_equal = true;
     } else {
-      if (shapes.front().size() != it->size()) {
+      if (fixed_shape->size() != it->size()) {
         ndim = -1;
-        shape.reset();
+        fixed_shape.reset();
         shapes_equal = false;
         break;
       }
-      shapes_equal = shapes_equal && (shapes.front() == *it);
+      shapes_equal = shapes_equal && (*fixed_shape == *it);
     }
   }
 
   // The number of dimensions varies per row,
   // in practice. This case is not handled
   if (ndim == -1) {
-    return Status::NotImplemented("Column ", column_name, " has varying dimensions");
+    return Status::NotImplemented("Column ", column_name,
+                                  " dimensions vary "
+                                  "for the given row selection");
   }
+
+  bool missing_rows = std::accumulate(std::begin(shapes), std::end(shapes), false,
+                                      [&](auto i, auto v) { return i || v.size() == 0; });
 
   // Even though the column varies
   // the resultant shape after selection is fixed
-  // There's no need to clip the shape as this
-  // will have been done in MakeRowData
-  if (shapes_equal) {
-    assert(shape.has_value());
-    shape->append(IPosition({nselrow}));
-    ARROW_RETURN_NOT_OK(CheckShapeMatchesResult(column_name, *shape, result_shape));
-    ndim = shape->size();
-    return ResultShapeData{column_name, std::move(shape), std::size_t(ndim),
+  // There's no need to clip the shape as MakeRowData
+  // has already done this
+  if (shapes_equal && fixed_shape && !missing_rows) {
+    fixed_shape->append(IPosition({nselrow}));
+    ARROW_RETURN_NOT_OK(CheckShapeMatchesResult(column_name, *fixed_shape, result_shape));
+    ndim = fixed_shape->size();
+    return ResultShapeData{column_name, std::move(fixed_shape), std::size_t(ndim),
                            std::move(dtype), std::nullopt};
   }
 
