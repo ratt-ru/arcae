@@ -7,6 +7,7 @@
 #include <numeric>
 #include <optional>
 #include <string>
+#include <vector>
 
 #include <casacore/casa/Arrays/IPosition.h>
 #include <casacore/casa/Utilities/DataType.h>
@@ -21,6 +22,9 @@
 
 #include "arcae/result_shape.h"
 #include "arcae/selection.h"
+#include "arrow/array/array_base.h"
+#include "arrow/array/array_nested.h"
+#include "arrow/buffer_builder.h"
 
 using ::arrow::Result;
 using ::arrow::Status;
@@ -43,20 +47,7 @@ namespace {
 // Anonymous Read Functions
 //----------------------------------------------------------------------------
 
-// Get the shape for a particular row (row is excluded from the shape)
-// If, the supplied row is negative (-1) and a result_shape is supplied
-// the shape is derived from this source, otherwise the CASA shape is
-// used as the reference value
-Result<IPosition> GetTableRowShape(const TableColumn& column, IndexType r) {
-  if (r < 0 || r >= IndexType(column.nrow())) {
-    return Status::IndexError("Row ", r, " in column ", column.columnDesc().name(),
-                              " is out of bounds");
-  } else if (column.isDefined(r)) {
-    return column.shape(r);
-  }
-  return Status::IndexError("Row ", r, " in column ", column.columnDesc().name(),
-                            " is not defined");
-}
+bool IsDegenerateShape(const IPosition& shape) { return shape.size() == 0; }
 
 // Clips the shape against the selection
 Status ClipShape(const ColumnDesc& column_desc, IPosition& shape,
@@ -80,34 +71,43 @@ Status ClipShape(const ColumnDesc& column_desc, IPosition& shape,
 
 // Create variably shaped row data
 Result<RowShapes> MakeRowData(const TableColumn& column, const Selection& selection,
-                              const std::optional<IPosition>& result_shape) {
+                              const std::optional<IPosition>& result_shape,
+                              bool allow_missing = false) {
   RowShapes shapes;
   const auto& column_desc = column.columnDesc();
 
-  // Lambda that gets the shape from the column's row
-  // Clipping against the selection is performed
+  // Lambda that gets the shape from the column's row if 0 <= row < nrow
+  // If row < 0 or the row is missing and a result shape is present, that
+  // shape will be used
   auto GetClippedColumnShape = [&](auto r) -> Result<IPosition> {
-    ARROW_ASSIGN_OR_RAISE(auto shape, GetTableRowShape(column, r));
-    ARROW_RETURN_NOT_OK(ClipShape(column_desc, shape, selection));
-    return shape;
-  };
+    if (r >= decltype(r)(column.nrow())) {
+      return Status::IndexError("Requested row ", r, " in column ",
+                                column.columnDesc().name(), " >= column.nrow() ",
+                                column.nrow());
+    }
+    // Get the shape if the row is positive and defined
+    // and clip against the selection
+    if (r >= 0 && column.isDefined(r)) {
+      auto shape = column.shape(r);
+      ARROW_RETURN_NOT_OK(ClipShape(column_desc, shape, selection));
+      return shape;
+    }
 
-  // Lambda handling the more complex span case.
-  auto GetSpanShape = [&](auto r) -> Result<IPosition> {
-    // Standard case
-    if (r >= 0) return GetClippedColumnShape(r);
-
-    // Negative row indices mean that the shape should be derived
-    // from the result array, rather than the column row shape
-    // It's not necessary to clip by selection indices in this case
+    // If there's a result shape use that instead
     if (result_shape) {
-      const auto& shape = result_shape.value();
+      auto shape = result_shape.value();
       return shape.getFirst(shape.size() - 1);
     }
 
-    return Status::IndexError(
-        "Negative selection indices may only be used "
-        "in conjunction with a fixed shape result array");
+    // A positive row is missing at this point
+    // Return a degenerate shape if requested
+    if (r >= 0 && allow_missing) return IPosition();
+
+    return Status::IndexError("Requested row ", r, " in column ",
+                              column.columnDesc().name(),
+                              " was negative or missing. "
+                              "Inferring the row shape is impossible without "
+                              "a supplied result array");
   };
 
   // Get the row selection if provided
@@ -115,13 +115,13 @@ Result<RowShapes> MakeRowData(const TableColumn& column, const Selection& select
     auto span = selection.GetRowSpan();
     shapes.reserve(span.size());
     for (std::size_t r = 0; r < span.size(); ++r) {
-      ARROW_ASSIGN_OR_RAISE(auto shape, GetSpanShape(span[r]));
+      ARROW_ASSIGN_OR_RAISE(auto shape, GetClippedColumnShape(span[r]));
       shapes.emplace_back(std::move(shape));
     }
     // otherwise, the entire column
   } else {
     shapes.reserve(column.nrow());
-    for (std::size_t r = 0; r < column.nrow(); ++r) {
+    for (casacore::rownr_t r = 0; r < column.nrow(); ++r) {
       ARROW_ASSIGN_OR_RAISE(auto shape, GetClippedColumnShape(r));
       shapes.emplace_back(std::move(shape));
     }
@@ -320,7 +320,7 @@ Result<ResultShapeData> GetResultShapeData(const ColumnDesc& column_desc,
   // Convert the fixed shape
   if (shape_data.IsFixed()) {
     auto shape = shape_data.GetShape();
-    if (shape.size() == 0 || shape[0] != 2) {
+    if (IsDegenerateShape(shape) || shape[0] != 2) {
       return Status::Invalid("Arrow result data must supply pairs of values ",
                              "for complex valued column ", shape_data.GetName());
     }
@@ -334,7 +334,7 @@ Result<ResultShapeData> GetResultShapeData(const ColumnDesc& column_desc,
   // Modify the row shapes
   auto& shapes = shape_data.row_shapes_.value();
   for (std::size_t r = 0; r < shapes.size(); ++r) {
-    if (shapes[r].size() == 0 || shapes[r][0] != 2) {
+    if (IsDegenerateShape(shapes[r]) || shapes[r][0] != 2) {
       return Status::Invalid("Arrow result data must supply pairs of values ",
                              "for complex valued column ", shape_data.column_name_);
     }
@@ -348,7 +348,7 @@ Result<ResultShapeData> GetResultShapeData(const ColumnDesc& column_desc,
 
 // Check that the number of rows in the table
 // fit into the IndexType used by arcae
-arrow::Status CheckRowNumberLimit(const std::string& column, rownr_t nrows) {
+Status CheckRowNumberLimit(const std::string& column, rownr_t nrows) {
   if (nrows <= std::numeric_limits<IndexType>::max()) return Status::OK();
   return Status::IndexError("Number of rows ", nrows, " in column ", column,
                             " is too large for arcae's IndexType");
@@ -405,6 +405,45 @@ std::size_t ResultShapeData::nElements() const noexcept {
                          [](auto i, auto s) { return s.product() + i; });
 }
 
+Result<std::shared_ptr<arrow::Array>> ResultShapeData::GetShapeArray() const noexcept {
+  auto ndim = nDim() - 1;  // without row
+  auto nrow = nRows();
+
+  if (ndim == 0) return std::make_shared<arrow::NullArray>(std::int64_t(nrow));
+
+  auto builders = std::vector<arrow::Int32Builder>(ndim);
+  auto shape_data_builder = arrow::Int32Builder();
+
+  ARROW_RETURN_NOT_OK(shape_data_builder.Reserve(nrow * ndim));
+
+  if (IsFixed()) {
+    auto shape = GetShape();
+    for (std::size_t row = 0; row < nrow; ++row) {
+      for (int dim = ndim - 1; dim >= 0; --dim) {
+        ARROW_RETURN_NOT_OK(shape_data_builder.Append(shape[dim]));
+      }
+    }
+    ARROW_ASSIGN_OR_RAISE(auto shape_values, shape_data_builder.Finish());
+    return arrow::FixedSizeListArray::FromArrays(shape_values, ndim);
+  } else {
+    auto null_nitmap_builder = arrow::TypedBufferBuilder<bool>();
+    ARROW_RETURN_NOT_OK(null_nitmap_builder.Reserve(nrow * ndim));
+    for (std::size_t row = 0; row < nrow; ++row) {
+      auto shape = GetRowShape(row);
+      ARROW_RETURN_NOT_OK(null_nitmap_builder.Append(shape.size() != 0));
+      if (IsDegenerateShape(shape)) shape = IPosition(ndim, 0);
+      for (int dim = ndim - 1; dim >= 0; --dim) {
+        ARROW_RETURN_NOT_OK(shape_data_builder.Append(shape[dim]));
+      }
+    }
+    ARROW_ASSIGN_OR_RAISE(auto nulls, null_nitmap_builder.Finish());
+    ARROW_ASSIGN_OR_RAISE(auto shape_values, shape_data_builder.Finish());
+    return arrow::FixedSizeListArray::FromArrays(shape_values, ndim, nulls);
+  }
+
+  return nullptr;
+}
+
 // Get ListArray offsets arrays
 Result<std::vector<std::shared_ptr<arrow::Int32Array>>> ResultShapeData::GetOffsets()
     const noexcept {
@@ -423,7 +462,7 @@ Result<std::vector<std::shared_ptr<arrow::Int32Array>>> ResultShapeData::GetOffs
 
   // Compute number of elements in each row by creating
   // a product over each dimension
-  auto BuildFn = [&](auto&& GetShapeFn) -> ::Status {
+  auto BuildFn = [&](auto&& GetShapeFn) -> Status {
     using ItType = std::tuple<std::ptrdiff_t, std::size_t>;
     for (std::size_t row = 0; row < nrow; ++row) {
       for (auto [dim, product] = ItType{ndim - 1, 1}; dim >= 0; --dim) {
@@ -440,7 +479,10 @@ Result<std::vector<std::shared_ptr<arrow::Int32Array>>> ResultShapeData::GetOffs
 
   // Build the offset arrays
   if (!IsFixed()) {
-    ARROW_RETURN_NOT_OK(BuildFn([&](auto r, auto d) { return GetRowShape(r)[d]; }));
+    ARROW_RETURN_NOT_OK(BuildFn([&](auto r, auto d) {
+      const auto& row_shape = GetRowShape(r);
+      return IsDegenerateShape(row_shape) ? 0 : row_shape[d];
+    }));
   } else {
     ARROW_RETURN_NOT_OK(BuildFn([&](auto r, auto d) { return (*shape_)[d]; }));
   }
@@ -453,7 +495,7 @@ Result<std::vector<std::shared_ptr<arrow::Int32Array>>> ResultShapeData::GetOffs
 
 Result<ResultShapeData> ResultShapeData::MakeRead(
     const TableColumn& column, const Selection& selection,
-    const std::shared_ptr<arrow::Array>& result) {
+    const std::shared_ptr<arrow::Array>& result, bool allow_missing_rows) {
   auto column_desc = column.columnDesc();
   auto column_name = column_desc.name();
   ARROW_RETURN_NOT_OK(CheckRowNumberLimit(column_name, column.nrow()));
@@ -480,45 +522,58 @@ Result<ResultShapeData> ResultShapeData::MakeRead(
   }
 
   // Get shapes of each row in the selection
-  ARROW_ASSIGN_OR_RAISE(auto shapes, MakeRowData(column, selection, result_shape));
-  auto shape = std::optional<IPosition>{std::nullopt};
+  ARROW_ASSIGN_OR_RAISE(auto shapes,
+                        MakeRowData(column, selection, result_shape, allow_missing_rows));
+
+  auto missing_rows =
+      std::accumulate(std::begin(shapes), std::end(shapes), std::size_t(0),
+                      [&](auto i, auto s) { return i + int(IsDegenerateShape(s)); });
+
+  if (missing_rows == shapes.size()) {
+    return Status::Invalid("All rows missing in column ", column_name,
+                           " for the given row selection");
+  }
+
+  auto fixed_shape = std::optional<IPosition>{std::nullopt};
   int ndim = -1;
-  bool first = true;
-  bool shapes_equal = true;
+  bool shapes_equal = false;
 
   // Identify fixed shapes and varying dimensionality
   for (auto it = shapes.begin(); it != shapes.end(); ++it) {
-    if (first) {
-      shape = *it;
+    // Ignore length 0 shapes (missing rows)
+    if (it->size() == 0) continue;
+    if (!fixed_shape) {
+      fixed_shape = *it;
       ndim = it->size();
-      first = false;
+      shapes_equal = true;
     } else {
-      if (shapes.front().size() != it->size()) {
+      if (fixed_shape->size() != it->size()) {
         ndim = -1;
-        shape.reset();
+        fixed_shape.reset();
         shapes_equal = false;
         break;
       }
-      shapes_equal = shapes_equal && (shapes.front() == *it);
+      shapes_equal = shapes_equal && (*fixed_shape == *it);
     }
   }
 
   // The number of dimensions varies per row,
   // in practice. This case is not handled
   if (ndim == -1) {
-    return Status::NotImplemented("Column ", column_name, " has varying dimensions");
+    return Status::NotImplemented("Column ", column_name,
+                                  " dimensions vary "
+                                  "for the given row selection");
   }
 
   // Even though the column varies
   // the resultant shape after selection is fixed
-  // There's no need to clip the shape as this
-  // will have been done in MakeRowData
-  if (shapes_equal) {
-    assert(shape.has_value());
-    shape->append(IPosition({nselrow}));
-    ARROW_RETURN_NOT_OK(CheckShapeMatchesResult(column_name, *shape, result_shape));
-    ndim = shape->size();
-    return ResultShapeData{column_name, std::move(shape), std::size_t(ndim),
+  // There's no need to clip the shape as MakeRowData
+  // has already done this
+  if (shapes_equal && fixed_shape && missing_rows == 0) {
+    fixed_shape->append(IPosition({nselrow}));
+    ARROW_RETURN_NOT_OK(CheckShapeMatchesResult(column_name, *fixed_shape, result_shape));
+    ndim = fixed_shape->size();
+    return ResultShapeData{column_name, std::move(fixed_shape), std::size_t(ndim),
                            std::move(dtype), std::nullopt};
   }
 

@@ -2,6 +2,12 @@
 History
 =======
 
+X.Y.Z (DD-MM-YYYY)
+------------------
+* Add a ``table.row_shapes`` method that returns column row shapes
+  as an Arrow Array (:pr:`169`)
+* Impute missing rows from result shape (:pr:`169`)
+
 0.3.0 (21-06-2025)
 ------------------
 * Upgrade to pyarrow 21 (:pr:`160`)

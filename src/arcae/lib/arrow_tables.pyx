@@ -261,6 +261,24 @@ cdef class Table:
         with nogil:
             GetResultValue(self.c_table.get().PutColumn(cpp_column, carray, selection))
 
+    def row_shapes(
+        self,
+        column: str,
+        index: FullIndex | None = None
+     ) -> pa.Array:
+        """ Returns the row shapes for the given column and index.
+        Missing rows are nulled"""
+        cdef:
+            string cpp_column = tobytes(column)
+            CSelection selection = build_selection(index)
+
+        with nogil:
+            carray = GetResultValue(
+                self.c_table.get().GetRowShapes(cpp_column, selection)
+            )
+
+        return pyarrow_wrap_array(carray)
+
     def _numpy_to_arrow(self, data: np.ndarray) -> pa.array:
         """ Covert numpy array into a nested FixedSizeListArrays """
         shape = data.shape
