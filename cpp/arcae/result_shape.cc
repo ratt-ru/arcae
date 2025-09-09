@@ -119,7 +119,7 @@ Result<RowShapes> MakeRowData(const TableColumn& column, const Selection& select
     // otherwise, the entire column
   } else {
     shapes.reserve(column.nrow());
-    for (std::size_t r = 0; r < column.nrow(); ++r) {
+    for (casacore::rownr_t r = 0; r < column.nrow(); ++r) {
       ARROW_ASSIGN_OR_RAISE(auto shape, GetClippedColumnShape(r));
       shapes.emplace_back(std::move(shape));
     }
@@ -477,7 +477,10 @@ Result<std::vector<std::shared_ptr<arrow::Int32Array>>> ResultShapeData::GetOffs
 
   // Build the offset arrays
   if (!IsFixed()) {
-    ARROW_RETURN_NOT_OK(BuildFn([&](auto r, auto d) { return GetRowShape(r)[d]; }));
+    ARROW_RETURN_NOT_OK(BuildFn([&](auto r, auto d) {
+      const auto& row_shape = GetRowShape(r);
+      return row_shape.size() == 0 ? 0 : row_shape[d];
+    }));
   } else {
     ARROW_RETURN_NOT_OK(BuildFn([&](auto r, auto d) { return (*shape_)[d]; }));
   }
