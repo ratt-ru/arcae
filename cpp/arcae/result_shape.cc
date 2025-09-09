@@ -47,6 +47,8 @@ namespace {
 // Anonymous Read Functions
 //----------------------------------------------------------------------------
 
+bool IsDegenerateShape(const IPosition& shape) { return shape.size() == 0; }
+
 // Clips the shape against the selection
 Status ClipShape(const ColumnDesc& column_desc, IPosition& shape,
                  const Selection& selection) {
@@ -318,7 +320,7 @@ Result<ResultShapeData> GetResultShapeData(const ColumnDesc& column_desc,
   // Convert the fixed shape
   if (shape_data.IsFixed()) {
     auto shape = shape_data.GetShape();
-    if (shape.size() == 0 || shape[0] != 2) {
+    if (IsDegenerateShape(shape) || shape[0] != 2) {
       return Status::Invalid("Arrow result data must supply pairs of values ",
                              "for complex valued column ", shape_data.GetName());
     }
@@ -332,7 +334,7 @@ Result<ResultShapeData> GetResultShapeData(const ColumnDesc& column_desc,
   // Modify the row shapes
   auto& shapes = shape_data.row_shapes_.value();
   for (std::size_t r = 0; r < shapes.size(); ++r) {
-    if (shapes[r].size() == 0 || shapes[r][0] != 2) {
+    if (IsDegenerateShape(shapes[r]) || shapes[r][0] != 2) {
       return Status::Invalid("Arrow result data must supply pairs of values ",
                              "for complex valued column ", shape_data.column_name_);
     }
@@ -429,7 +431,7 @@ Result<std::shared_ptr<arrow::Array>> ResultShapeData::GetShapeArray() const noe
     for (std::size_t row = 0; row < nrow; ++row) {
       auto shape = GetRowShape(row);
       ARROW_RETURN_NOT_OK(null_nitmap_builder.Append(shape.size() != 0));
-      if (shape.size() == 0) shape = IPosition(ndim, 0);
+      if (IsDegenerateShape(shape)) shape = IPosition(ndim, 0);
       for (int dim = ndim - 1; dim >= 0; --dim) {
         ARROW_RETURN_NOT_OK(shape_data_builder.Append(shape[dim]));
       }
@@ -479,7 +481,7 @@ Result<std::vector<std::shared_ptr<arrow::Int32Array>>> ResultShapeData::GetOffs
   if (!IsFixed()) {
     ARROW_RETURN_NOT_OK(BuildFn([&](auto r, auto d) {
       const auto& row_shape = GetRowShape(r);
-      return row_shape.size() == 0 ? 0 : row_shape[d];
+      return IsDegenerateShape(row_shape) ? 0 : row_shape[d];
     }));
   } else {
     ARROW_RETURN_NOT_OK(BuildFn([&](auto r, auto d) { return (*shape_)[d]; }));
@@ -525,7 +527,7 @@ Result<ResultShapeData> ResultShapeData::MakeRead(
 
   auto missing_rows =
       std::accumulate(std::begin(shapes), std::end(shapes), std::size_t(0),
-                      [&](auto i, auto v) { return i + (v.size() == 0); });
+                      [&](auto i, auto s) { return i + int(IsDegenerateShape(s)); });
 
   if (missing_rows == shapes.size()) {
     return Status::Invalid("All rows missing in column ", column_name,
