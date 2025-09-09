@@ -74,173 +74,171 @@ jobs:
           cmake -S . -B build
           cmake --build build
 
-      - name: Execute C++ tests
-        run: |
-          cd build
-          ctest --verbose
+      - name: Fail
+        run: exit 1
 
       - name: Debug with tmate on failure
         if: ${{ failure() }}
         uses: mxschmitt/action-tmate@v3
 
 
-  build-wheels:
-    name: Build wheel for ${{ matrix.cpython }}-${{ matrix.os_short }}-${{ matrix.arch }}
-    runs-on: ${{ matrix.os }}
-    if: "!contains(github.event.head_commit.message, '[skip ci]')"
-    strategy:
-      fail-fast: false
-      matrix:
-        os: ["ubuntu-22.04", "macos-13", "macos-14", "ubuntu-22.04-arm"]
-        # https://peps.python.org/pep-0425
-        cpython: ["cp310", "cp311", "cp312", "cp313"]
-        is_main_or_release:
-          - ${{ contains(github.ref, 'main') || startsWith(github.ref, 'refs/tags')}}
-        # Avoid building all wheels in a PR
-        exclude:
-          - is_main_or_release: false
-            cpython: cp310
-          - is_main_or_release: false
-            cpython: cp311
-          - is_main_or_release: false
-            cpython: cp312
-        include:
-          - os: ubuntu-22.04
-            os_short: linux
-            arch: "x86_64"
-            triplet: "x64-linux-dynamic-cxx20-abi1-rel"
-            extra_build: "manylinux_x86_64"
-          - os: ubuntu-22.04-arm
-            os_short: linux
-            arch: "aarch64"
-            triplet: "arm64-linux-dynamic-cxx20-abi1-rel"
-            extra_build: "manylinux_aarch64"
-          - os: macos-13
-            os_short: macos
-            arch: "x86_64"
-            deployment_target: "13.0"
-            triplet: "x64-osx-dynamic-cxx20-abi1-rel"
-            extra_build: "macosx_x86_64"
-          - os: macos-14
-            os_short: macos
-            arch: "arm64"
-            deployment_target: "14.0"
-            triplet: "arm64-osx-dynamic-cxx20-abi1-rel"
-            extra_build: "macosx_arm64"
-    steps:
-      - name: Set up Python ${{ env.HOST_PYTHON_VERSION }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.HOST_PYTHON_VERSION }}
+  # build-wheels:
+  #   name: Build wheel for ${{ matrix.cpython }}-${{ matrix.os_short }}-${{ matrix.arch }}
+  #   runs-on: ${{ matrix.os }}
+  #   if: "!contains(github.event.head_commit.message, '[skip ci]')"
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       os: ["ubuntu-22.04", "macos-13", "macos-14", "ubuntu-22.04-arm"]
+  #       # https://peps.python.org/pep-0425
+  #       cpython: ["cp310", "cp311", "cp312", "cp313"]
+  #       is_main_or_release:
+  #         - ${{ contains(github.ref, 'main') || startsWith(github.ref, 'refs/tags')}}
+  #       # Avoid building all wheels in a PR
+  #       exclude:
+  #         - is_main_or_release: false
+  #           cpython: cp310
+  #         - is_main_or_release: false
+  #           cpython: cp311
+  #         - is_main_or_release: false
+  #           cpython: cp312
+  #       include:
+  #         - os: ubuntu-22.04
+  #           os_short: linux
+  #           arch: "x86_64"
+  #           triplet: "x64-linux-dynamic-cxx20-abi1-rel"
+  #           extra_build: "manylinux_x86_64"
+  #         - os: ubuntu-22.04-arm
+  #           os_short: linux
+  #           arch: "aarch64"
+  #           triplet: "arm64-linux-dynamic-cxx20-abi1-rel"
+  #           extra_build: "manylinux_aarch64"
+  #         - os: macos-13
+  #           os_short: macos
+  #           arch: "x86_64"
+  #           deployment_target: "13.0"
+  #           triplet: "x64-osx-dynamic-cxx20-abi1-rel"
+  #           extra_build: "macosx_x86_64"
+  #         - os: macos-14
+  #           os_short: macos
+  #           arch: "arm64"
+  #           deployment_target: "14.0"
+  #           triplet: "arm64-osx-dynamic-cxx20-abi1-rel"
+  #           extra_build: "macosx_arm64"
+  #   steps:
+  #     - name: Set up Python ${{ env.HOST_PYTHON_VERSION }}
+  #       uses: actions/setup-python@v5
+  #       with:
+  #         python-version: ${{ env.HOST_PYTHON_VERSION }}
 
-      - name: Upgrade pip and install virtualenv
-        run: python -m pip install -U pip virtualenv
+  #     - name: Upgrade pip and install virtualenv
+  #       run: python -m pip install -U pip virtualenv
 
-      - name: Checkout source
-        uses: actions/checkout@v5
+  #     - name: Checkout source
+  #       uses: actions/checkout@v5
 
-      - name: Set Common Build Environment Variable
-        env:
-          COMMON_ENV: >
-            CMAKE_ARGS=-DBUILD_TESTING=OFF
-            VCPKG_FORCE_SYSTEM_BINARIES=1
-            VCPKG_TARGET_TRIPLET=${{ matrix.triplet }}
-            VCPKG_INSTALLED_DIR=${{ env.VCPKG_INSTALLED_DIR }}
-            LD_LIBRARY_PATH=${{ env.VCPKG_INSTALLED_DIR }}/${{ matrix.triplet }}/lib
-        run: echo "CIBW_ENVIRONMENT_COMMON=$COMMON_ENV" >> $GITHUB_ENV
+  #     - name: Set Common Build Environment Variable
+  #       env:
+  #         COMMON_ENV: >
+  #           CMAKE_ARGS=-DBUILD_TESTING=OFF
+  #           VCPKG_FORCE_SYSTEM_BINARIES=1
+  #           VCPKG_TARGET_TRIPLET=${{ matrix.triplet }}
+  #           VCPKG_INSTALLED_DIR=${{ env.VCPKG_INSTALLED_DIR }}
+  #           LD_LIBRARY_PATH=${{ env.VCPKG_INSTALLED_DIR }}/${{ matrix.triplet }}/lib
+  #       run: echo "CIBW_ENVIRONMENT_COMMON=$COMMON_ENV" >> $GITHUB_ENV
 
-      - name: Run cibuildwheel
-        env:
-          CIBW_BUILD: ${{ matrix.cpython }}-${{ matrix.extra_build }}
-          CIBW_BUILD_FRONTEND: build
-          CIBW_ARCHS: ${{ matrix.arch }}
-          CIBW_BEFORE_ALL_LINUX: yum install -y zip flex bison gcc-gfortran
-          CIBW_BEFORE_ALL_MACOS: |
-            brew install python llvm
-            brew reinstall gcc
-          CIBW_BEFORE_BUILD_MACOS: |
-            export PATH="/opt/homebrew/opt/llvm/bin:$PATH"
-            export LDFLAGS="-L/opt/homebrew/opt/llvm/lib"
-            export CPPFLAGS="-I/opt/homebrew/opt/llvm/include"
-          CIBW_ENVIRONMENT: ${{ env.CIBW_ENVIRONMENT_COMMON }}
-          CIBW_ENVIRONMENT_MACOS: >
-            ${{ env.CIBW_ENVIRONMENT_COMMON }}
-            MACOSX_DEPLOYMENT_TARGET=${{ matrix.deployment_target }}
-          CIBW_MANYLINUX_X86_64_IMAGE: quay.io/pypa/manylinux_2_28_x86_64
-          CIBW_MANYLINUX_AARCH64_IMAGE: quay.io/pypa/manylinux_2_28_aarch64
-          CIBW_TEST_EXTRAS_LINUX: applications,test
-          CIBW_TEST_COMMAND: bash {package}/ci/scripts/run_tests.sh
-          CIBW_REPAIR_WHEEL_COMMAND_LINUX: >
-            auditwheel repair
-            -w {dest_dir} {wheel}
-            --exclude libarrow_python.so.2100
-            --exclude libarrow.so.2100
-          CIBW_REPAIR_WHEEL_COMMAND_MACOS: |
-            DYLD_LIBRARY_PATH=$LD_LIBRARY_PATH delocate-listdeps {wheel}
-            DYLD_LIBRARY_PATH=$LD_LIBRARY_PATH delocate-wheel \
-              --require-archs {delocate_archs} \
-              -w {dest_dir} \
-              -v {wheel} \
-              --exclude libarrow_python.2100.dylib \
-              --exclude libarrow.2100.dylib \
-              --ignore-missing-dependencies
-        uses: pypa/cibuildwheel@v3.1.4
+  #     - name: Run cibuildwheel
+  #       env:
+  #         CIBW_BUILD: ${{ matrix.cpython }}-${{ matrix.extra_build }}
+  #         CIBW_BUILD_FRONTEND: build
+  #         CIBW_ARCHS: ${{ matrix.arch }}
+  #         CIBW_BEFORE_ALL_LINUX: yum install -y zip flex bison gcc-gfortran
+  #         CIBW_BEFORE_ALL_MACOS: |
+  #           brew install python llvm
+  #           brew reinstall gcc
+  #         CIBW_BEFORE_BUILD_MACOS: |
+  #           export PATH="/opt/homebrew/opt/llvm/bin:$PATH"
+  #           export LDFLAGS="-L/opt/homebrew/opt/llvm/lib"
+  #           export CPPFLAGS="-I/opt/homebrew/opt/llvm/include"
+  #         CIBW_ENVIRONMENT: ${{ env.CIBW_ENVIRONMENT_COMMON }}
+  #         CIBW_ENVIRONMENT_MACOS: >
+  #           ${{ env.CIBW_ENVIRONMENT_COMMON }}
+  #           MACOSX_DEPLOYMENT_TARGET=${{ matrix.deployment_target }}
+  #         CIBW_MANYLINUX_X86_64_IMAGE: quay.io/pypa/manylinux_2_28_x86_64
+  #         CIBW_MANYLINUX_AARCH64_IMAGE: quay.io/pypa/manylinux_2_28_aarch64
+  #         CIBW_TEST_EXTRAS_LINUX: applications,test
+  #         CIBW_TEST_COMMAND: bash {package}/ci/scripts/run_tests.sh
+  #         CIBW_REPAIR_WHEEL_COMMAND_LINUX: >
+  #           auditwheel repair
+  #           -w {dest_dir} {wheel}
+  #           --exclude libarrow_python.so.2100
+  #           --exclude libarrow.so.2100
+  #         CIBW_REPAIR_WHEEL_COMMAND_MACOS: |
+  #           DYLD_LIBRARY_PATH=$LD_LIBRARY_PATH delocate-listdeps {wheel}
+  #           DYLD_LIBRARY_PATH=$LD_LIBRARY_PATH delocate-wheel \
+  #             --require-archs {delocate_archs} \
+  #             -w {dest_dir} \
+  #             -v {wheel} \
+  #             --exclude libarrow_python.2100.dylib \
+  #             --exclude libarrow.2100.dylib \
+  #             --ignore-missing-dependencies
+  #       uses: pypa/cibuildwheel@v3.1.4
 
-      - name: Upload wheel artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ env.ARTIFACT_NAME }}-${{ matrix.os_short }}-${{ matrix.cpython }}-${{ matrix.arch }}
-          path: ./wheelhouse/*.whl
+  #     - name: Upload wheel artifacts
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: ${{ env.ARTIFACT_NAME }}-${{ matrix.os_short }}-${{ matrix.cpython }}-${{ matrix.arch }}
+  #         path: ./wheelhouse/*.whl
 
-      # - name: Debug with tmate on failure
-      #   if: ${{ failure() }}
-      #   uses: mxschmitt/action-tmate@v3
+  #     # - name: Debug with tmate on failure
+  #     #   if: ${{ failure() }}
+  #     #   uses: mxschmitt/action-tmate@v3
 
-  upload-to-test-pypi:
-    name: Upload release to Test PyPI
-    needs: [build-sdist, build-wheels]
-    runs-on: ubuntu-latest
-    environment:
-      name: release-test
-    permissions:
-      id-token: write
-    steps:
-      - name: Download distribution artifacts
-        uses: actions/download-artifact@v5
-        with:
-          pattern: ${{ env.ARTIFACT_NAME }}-*
-          merge-multiple: true
-          path: dist
+  # upload-to-test-pypi:
+  #   name: Upload release to Test PyPI
+  #   needs: [build-sdist, build-wheels]
+  #   runs-on: ubuntu-latest
+  #   environment:
+  #     name: release-test
+  #   permissions:
+  #     id-token: write
+  #   steps:
+  #     - name: Download distribution artifacts
+  #       uses: actions/download-artifact@v5
+  #       with:
+  #         pattern: ${{ env.ARTIFACT_NAME }}-*
+  #         merge-multiple: true
+  #         path: dist
 
-      - name: List artifacts
-        run: ls -lh dist
+  #     - name: List artifacts
+  #       run: ls -lh dist
 
-      - name: Publish package distributions to Test PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          repository-url: https://test.pypi.org/legacy/
-          skip-existing: true
-        continue-on-error: true
+  #     - name: Publish package distributions to Test PyPI
+  #       uses: pypa/gh-action-pypi-publish@release/v1
+  #       with:
+  #         repository-url: https://test.pypi.org/legacy/
+  #         skip-existing: true
+  #       continue-on-error: true
 
-  upload-to-pypi:
-    name: Upload release to PyPI
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags')
-    needs: [build-sdist, build-wheels]
-    runs-on: ubuntu-latest
-    environment:
-      name: release
-    permissions:
-      id-token: write
-    steps:
-      - name: Download distribution artifacts
-        uses: actions/download-artifact@v5
-        with:
-          pattern: ${{ env.ARTIFACT_NAME }}-*
-          merge-multiple: true
-          path: dist
+  # upload-to-pypi:
+  #   name: Upload release to PyPI
+  #   if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags')
+  #   needs: [build-sdist, build-wheels]
+  #   runs-on: ubuntu-latest
+  #   environment:
+  #     name: release
+  #   permissions:
+  #     id-token: write
+  #   steps:
+  #     - name: Download distribution artifacts
+  #       uses: actions/download-artifact@v5
+  #       with:
+  #         pattern: ${{ env.ARTIFACT_NAME }}-*
+  #         merge-multiple: true
+  #         path: dist
 
-      - name: List artifacts
-        run: ls -lh dist
+  #     - name: List artifacts
+  #       run: ls -lh dist
 
-      - name: Publish package distributions to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+  #     - name: Publish package distributions to PyPI
+  #       uses: pypa/gh-action-pypi-publish@release/v1
