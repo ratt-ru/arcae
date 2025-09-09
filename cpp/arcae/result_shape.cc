@@ -519,6 +519,16 @@ Result<ResultShapeData> ResultShapeData::MakeRead(
   // Get shapes of each row in the selection
   ARROW_ASSIGN_OR_RAISE(auto shapes,
                         MakeRowData(column, selection, result_shape, allow_missing_rows));
+
+  auto missing_rows =
+      std::accumulate(std::begin(shapes), std::end(shapes), std::size_t(0),
+                      [&](auto i, auto v) { return i + (v.size() == 0); });
+
+  if (missing_rows == shapes.size()) {
+    return Status::Invalid("All rows missing in column ", column_name,
+                           " for the given row selection");
+  }
+
   auto fixed_shape = std::optional<IPosition>{std::nullopt};
   int ndim = -1;
   bool shapes_equal = false;
@@ -550,14 +560,11 @@ Result<ResultShapeData> ResultShapeData::MakeRead(
                                   "for the given row selection");
   }
 
-  bool missing_rows = std::accumulate(std::begin(shapes), std::end(shapes), false,
-                                      [&](auto i, auto v) { return i || v.size() == 0; });
-
   // Even though the column varies
   // the resultant shape after selection is fixed
   // There's no need to clip the shape as MakeRowData
   // has already done this
-  if (shapes_equal && fixed_shape && !missing_rows) {
+  if (shapes_equal && fixed_shape && missing_rows == 0) {
     fixed_shape->append(IPosition({nselrow}));
     ARROW_RETURN_NOT_OK(CheckShapeMatchesResult(column_name, *fixed_shape, result_shape));
     ndim = fixed_shape->size();
