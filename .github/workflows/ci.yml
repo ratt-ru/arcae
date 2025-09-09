@@ -74,12 +74,14 @@ jobs:
           cmake -S . -B build
           cmake --build build
 
-      - name: Fail
-        run: exit 1
+      - name: Execute C++ tests
+        run: |
+          cd build
+          ctest --verbose
 
-      - name: Debug with tmate on failure
-        if: ${{ failure() }}
-        uses: mxschmitt/action-tmate@v3
+      # - name: Debug with tmate on failure
+      #   if: ${{ failure() }}
+      #   uses: mxschmitt/action-tmate@v3
 
 
   build-wheels:
