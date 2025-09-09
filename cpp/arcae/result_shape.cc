@@ -417,7 +417,7 @@ Result<std::shared_ptr<arrow::Array>> ResultShapeData::GetShapeArray() const noe
   if (IsFixed()) {
     auto shape = GetShape();
     for (std::size_t row = 0; row < nrow; ++row) {
-      for (std::size_t dim = 0; dim < ndim; ++dim) {
+      for (int dim = ndim - 1; dim >= 0; --dim) {
         ARROW_RETURN_NOT_OK(shape_data_builder.Append(shape[dim]));
       }
     }
@@ -430,7 +430,7 @@ Result<std::shared_ptr<arrow::Array>> ResultShapeData::GetShapeArray() const noe
       auto shape = GetRowShape(row);
       ARROW_RETURN_NOT_OK(null_nitmap_builder.Append(shape.size() != 0));
       if (shape.size() == 0) shape = IPosition(ndim, 0);
-      for (std::size_t dim = 0; dim < ndim; ++dim) {
+      for (int dim = ndim - 1; dim >= 0; --dim) {
         ARROW_RETURN_NOT_OK(shape_data_builder.Append(shape[dim]));
       }
     }
