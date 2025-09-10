@@ -2,7 +2,7 @@
 History
 =======
 
-X.Y.Z (DD-MM-YYYY)
+0.3.1 (10-09-2025)
 ------------------
 * Replace deprecated appdirs with platformdirs (:pr:`172`)
 * Build all wheels for an architecture with a single cibuildwheel call (:pr:`171`)
