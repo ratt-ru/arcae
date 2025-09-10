@@ -59,7 +59,7 @@ def download_tau_ms(tau_ms_tar):
 
 @pytest.fixture(scope="session")
 def tau_ms_tar():
-    from appdirs import user_cache_dir
+    from platformdirs import user_cache_dir
 
     cache_dir = Path(user_cache_dir("arcae")) / "test-data"
     cache_dir.mkdir(parents=True, exist_ok=True)
