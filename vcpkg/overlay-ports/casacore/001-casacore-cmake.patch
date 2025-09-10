@@ -333,6 +333,22 @@ index 5602283c3..0219de46b 100644
  RUNTIME DESTINATION bin
  LIBRARY DESTINATION lib${LIB_SUFFIX}
  ARCHIVE DESTINATION lib${LIB_SUFFIX}
+diff --git a/ms/MeasurementSets/MSTableImpl.cc b/ms/MeasurementSets/MSTableImpl.cc
+index a5d3c4d56..bb7350442 100644
+--- a/ms/MeasurementSets/MSTableImpl.cc
++++ b/ms/MeasurementSets/MSTableImpl.cc
+@@ -321,9 +321,10 @@ void MSTableImpl::addKeyToDesc(TableDesc& td, const String& keyName,
+ //#	    keywordStandardComment(key);
+ 	break; 
+     default:
+-      cerr << "Data type: "<< keyDType << ", "<< keyName<< "not handled"<<endl;
++      // cerr << "Data type: "<< keyDType << ", "<< keyName<< "not handled"<<endl;
+       //	throw(AipsError ("MSTableImpl::addKeyToDesc(...) - "
+       //			 "Data type not handled"));
++			break;
+     }  
+ }
+ 
 diff --git a/msfits/CMakeLists.txt b/msfits/CMakeLists.txt
 index b8340e009..2acad1bb7 100644
 --- a/msfits/CMakeLists.txt

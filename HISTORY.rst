@@ -2,6 +2,10 @@
 History
 =======
 
+0.3.2 (DD-MM-2025)
+------------------
+* Disable overly aggressive casacore logging of non-standard data types (:pr:`173`)
+
 0.3.1 (10-09-2025)
 ------------------
 * Replace deprecated appdirs with platformdirs (:pr:`172`)
