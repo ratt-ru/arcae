@@ -4,6 +4,7 @@ History
 
 X.Y.Z (DD-MM-YYYY)
 ------------------
+* Replace deprecated appdirs with platformdirs (:pr:`172`)
 * Build all wheels for an architecture with a single cibuildwheel call (:pr:`171`)
 * Reintroduce vcpkg build artifact caching (:pr:`171`)
 * Add a ``table.row_shapes`` method that returns column row shapes
