@@ -384,8 +384,10 @@ Future<std::shared_ptr<Array>> ReadImpl(const std::shared_ptr<IsolatedTableProxy
                         const TableProxy& tp) mutable -> Result<ShapeResult> {
         ARROW_RETURN_NOT_OK(ColumnExists(tp.table(), column));
         auto table_column = TableColumn(tp.table(), column);
+        bool allow_missing_rows = !bool(result);
         ARROW_ASSIGN_OR_RAISE(auto shape_data,
-                              ResultShapeData::MakeRead(table_column, selection, result));
+                              ResultShapeData::MakeRead(table_column, selection, result,
+                                                        allow_missing_rows));
         return ShapeResult{std::make_shared<ResultShapeData>(std::move(shape_data)),
                            std::make_shared<Selection>(std::move(selection))};
       });
