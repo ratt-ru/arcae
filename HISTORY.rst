@@ -4,6 +4,7 @@ History
 
 0.3.2 (DD-MM-2025)
 ------------------
+* Pass allow_missing_rows depending on presence of result data (:pr:`174`)
 * Disable overly aggressive casacore logging of non-standard data types (:pr:`173`)
 
 0.3.1 (10-09-2025)
