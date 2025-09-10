@@ -4,6 +4,8 @@ History
 
 X.Y.Z (DD-MM-YYYY)
 ------------------
+* Build all wheels for an architecture with a single cibuildwheel call (:pr:`171`)
+* Reintroduce vcpkg build artifact caching (:pr:`171`)
 * Add a ``table.row_shapes`` method that returns column row shapes
   as an Arrow Array (:pr:`169`)
 * Impute missing rows from result shape (:pr:`169`)
