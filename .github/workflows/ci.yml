@@ -12,8 +12,11 @@ on:
 
 env:
   HOST_PYTHON_VERSION: "3.12"
+  VCPKG_BINARY_SOURCES: "clear;x-aws,${{ secrets.VCPKG_CACHE_URL }},readwrite"
   VCPKG_INSTALLED_DIR: /tmp/vcpkg_installed
   ARTIFACT_NAME: wheel
+  WHEEL_PYTHON_VERSIONS: "3.10 3.11 3.12 3.13"
+  PR_WHEEL_PYTHON_VERSIONS: "3.10 3.13"
 
 jobs:
   build-sdist:
@@ -44,6 +47,8 @@ jobs:
   cpp-tests:
     name: Execute C++ test cases
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
 
     env:
       VCPKG_TARGET_TRIPLET: "x64-linux-dynamic-cxx20-abi1-rel"
@@ -57,19 +62,21 @@ jobs:
         with:
           python-version: ${{ env.HOST_PYTHON_VERSION }}
 
-      - name: List directory structure
-        run: tree
-
       - name: Install C++ Compiler and cmake
         run: |
-          sudo apt update
-          sudo apt install build-essential cmake
+          sudo apt -y update
+          sudo apt -y install build-essential cmake
           python -m pip install -U pip
           python -m pip install pyarrow
 
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v5.0.0
+        with:
+          role-to-assume: ${{ secrets.GHA_ROLE_ARN }}
+          aws-region: af-south-1
+          output-env-credentials: true
+
       - name: Build C++ libraries and tests
-        env:
-          VCPKG_TARGET_TRIPLET: ${{ env.VCPKG_TARGET_TRIPLET }}
         run: |
           cmake -S . -B build
           cmake --build build
@@ -85,45 +92,37 @@ jobs:
 
 
   build-wheels:
-    name: Build wheel for ${{ matrix.cpython }}-${{ matrix.os_short }}-${{ matrix.arch }}
+    name: Build wheels for ${{ matrix.os_short }}-${{ matrix.arch }}
     runs-on: ${{ matrix.os }}
+    permissions:
+      id-token: write
     if: "!contains(github.event.head_commit.message, '[skip ci]')"
     strategy:
       fail-fast: false
       matrix:
         os: ["ubuntu-22.04", "macos-13", "macos-14", "ubuntu-22.04-arm"]
-        # https://peps.python.org/pep-0425
-        cpython: ["cp310", "cp311", "cp312", "cp313"]
         is_main_or_release:
           - ${{ contains(github.ref, 'main') || startsWith(github.ref, 'refs/tags')}}
-        # Avoid building all wheels in a PR
-        exclude:
-          - is_main_or_release: false
-            cpython: cp310
-          - is_main_or_release: false
-            cpython: cp311
-          - is_main_or_release: false
-            cpython: cp312
         include:
           - os: ubuntu-22.04
             os_short: linux
-            arch: "x86_64"
+            arch: x86_64
             triplet: "x64-linux-dynamic-cxx20-abi1-rel"
             extra_build: "manylinux_x86_64"
           - os: ubuntu-22.04-arm
             os_short: linux
-            arch: "aarch64"
+            arch: aarch64
             triplet: "arm64-linux-dynamic-cxx20-abi1-rel"
             extra_build: "manylinux_aarch64"
           - os: macos-13
             os_short: macos
-            arch: "x86_64"
+            arch: x86_64
             deployment_target: "13.0"
             triplet: "x64-osx-dynamic-cxx20-abi1-rel"
             extra_build: "macosx_x86_64"
           - os: macos-14
             os_short: macos
-            arch: "arm64"
+            arch: arm64
             deployment_target: "14.0"
             triplet: "arm64-osx-dynamic-cxx20-abi1-rel"
             extra_build: "macosx_arm64"
@@ -139,57 +138,52 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v5
 
-      - name: Set Common Build Environment Variable
+      - name: Construct CIBW_BUILD string
+        id: cibw-build
+        shell: bash
+        run: |
+          if [[ ${{ matrix.is_main_or_release }} == true ]]; then
+            WHEEL_VERSIONS="${{ env.WHEEL_PYTHON_VERSIONS }}"
+          else
+            WHEEL_VERSIONS="${{ env.PR_WHEEL_PYTHON_VERSIONS }}"
+          fi
+
+          CIBW_BUILD=""
+          for version in ${WHEEL_VERSIONS}; do
+            CP_VERSION=$(echo $version | sed 's/\.//g')
+            CIBW_BUILD="${CIBW_BUILD} cp${CP_VERSION}-${{ matrix.extra_build }}*"
+          done
+          echo "cibw_build=$CIBW_BUILD" >> $GITHUB_OUTPUT
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v5.0.0
+        with:
+          role-to-assume: ${{ secrets.GHA_ROLE_ARN }}
+          aws-region: af-south-1
+          output-env-credentials: true
+
+      - name: Run cibuildwheel
         env:
-          COMMON_ENV: >
+          CIBW_BUILD: ${{ steps.cibw-build.outputs.cibw_build }}
+          CIBW_ENVIRONMENT: >
+            VCPKG_BINARY_SOURCES="${{ env.VCPKG_BINARY_SOURCES }}"
+            AWS_REGION=${{ env.AWS_REGION }}
+            AWS_DEFAULT_REGION=${{ env.AWS_DEFAULT_REGION }}
+            AWS_ACCESS_KEY_ID=${{ env.AWS_ACCESS_KEY_ID }}
+            AWS_SECRET_ACCESS_KEY=${{ env.AWS_SECRET_ACCESS_KEY }}
+            AWS_SESSION_TOKEN=${{ env.AWS_SESSION_TOKEN }}
             CMAKE_ARGS=-DBUILD_TESTING=OFF
             VCPKG_FORCE_SYSTEM_BINARIES=1
             VCPKG_TARGET_TRIPLET=${{ matrix.triplet }}
             VCPKG_INSTALLED_DIR=${{ env.VCPKG_INSTALLED_DIR }}
             LD_LIBRARY_PATH=${{ env.VCPKG_INSTALLED_DIR }}/${{ matrix.triplet }}/lib
-        run: echo "CIBW_ENVIRONMENT_COMMON=$COMMON_ENV" >> $GITHUB_ENV
-
-      - name: Run cibuildwheel
-        env:
-          CIBW_BUILD: ${{ matrix.cpython }}-${{ matrix.extra_build }}
-          CIBW_BUILD_FRONTEND: build
-          CIBW_ARCHS: ${{ matrix.arch }}
-          CIBW_BEFORE_ALL_LINUX: yum install -y zip flex bison gcc-gfortran
-          CIBW_BEFORE_ALL_MACOS: |
-            brew install python llvm
-            brew reinstall gcc
-          CIBW_BEFORE_BUILD_MACOS: |
-            export PATH="/opt/homebrew/opt/llvm/bin:$PATH"
-            export LDFLAGS="-L/opt/homebrew/opt/llvm/lib"
-            export CPPFLAGS="-I/opt/homebrew/opt/llvm/include"
-          CIBW_ENVIRONMENT: ${{ env.CIBW_ENVIRONMENT_COMMON }}
-          CIBW_ENVIRONMENT_MACOS: >
-            ${{ env.CIBW_ENVIRONMENT_COMMON }}
             MACOSX_DEPLOYMENT_TARGET=${{ matrix.deployment_target }}
-          CIBW_MANYLINUX_X86_64_IMAGE: quay.io/pypa/manylinux_2_28_x86_64
-          CIBW_MANYLINUX_AARCH64_IMAGE: quay.io/pypa/manylinux_2_28_aarch64
-          CIBW_TEST_EXTRAS_LINUX: applications,test
-          CIBW_TEST_COMMAND: bash {package}/ci/scripts/run_tests.sh
-          CIBW_REPAIR_WHEEL_COMMAND_LINUX: >
-            auditwheel repair
-            -w {dest_dir} {wheel}
-            --exclude libarrow_python.so.2100
-            --exclude libarrow.so.2100
-          CIBW_REPAIR_WHEEL_COMMAND_MACOS: |
-            DYLD_LIBRARY_PATH=$LD_LIBRARY_PATH delocate-listdeps {wheel}
-            DYLD_LIBRARY_PATH=$LD_LIBRARY_PATH delocate-wheel \
-              --require-archs {delocate_archs} \
-              -w {dest_dir} \
-              -v {wheel} \
-              --exclude libarrow_python.2100.dylib \
-              --exclude libarrow.2100.dylib \
-              --ignore-missing-dependencies
         uses: pypa/cibuildwheel@v3.1.4
 
       - name: Upload wheel artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.ARTIFACT_NAME }}-${{ matrix.os_short }}-${{ matrix.cpython }}-${{ matrix.arch }}
+          name: ${{ env.ARTIFACT_NAME }}-${{ matrix.os_short }}-${{ matrix.arch }}
           path: ./wheelhouse/*.whl
 
       # - name: Debug with tmate on failure
