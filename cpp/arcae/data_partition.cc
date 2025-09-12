@@ -248,7 +248,7 @@ Result<std::vector<DataChunk>> MakeDataChunks(std::vector<SpanPairs>&& dim_spans
 
     // Compute flat offsets
     auto min_span = absl::MakeSpan(&shared->min_mem_index_[offset], ndim);
-    shared->flat_offsets_[chunk] = data_shape.FlatOffset(min_span);
+    ARROW_ASSIGN_OR_RAISE(shared->flat_offsets_[chunk], data_shape.FlatOffset(min_span));
 
     // Create the chunk
     chunks[chunk] = DataChunk{chunk, shared};
@@ -394,11 +394,11 @@ Result<DataPartition> DataPartition::Make(const Selection& selection,
   auto id_cache = std::vector<Index>{Index(result_shape.MaxDimensionSize())};
   std::iota(id_cache.back().begin(), id_cache.back().end(), 0);
   auto monotonic_ids = IndexSpan(id_cache.back());
-  auto ndim = result_shape.nDim();
+  ARROW_ASSIGN_OR_RAISE(auto result_ndim, result_shape.ConsistentNDim());
 
   // Generate disk and memory spans for the specified dimension
   auto GetSpanPair = [&](auto dim, auto dim_size) -> SpanPair {
-    if (auto dim_span = selection.FSpan(dim, ndim); dim_span.ok()) {
+    if (auto dim_span = selection.FSpan(dim, result_ndim); dim_span.ok()) {
       // Sort selection indices to create
       // disk and memory indices
       auto [disk_ids, mem_ids] = MakeSortedIndices(dim_span.ValueOrDie());
@@ -418,10 +418,10 @@ Result<DataPartition> DataPartition::Make(const Selection& selection,
   // over each dimension in FORTRAN order
   if (result_shape.IsFixed()) {
     std::vector<SpanPairs> dim_subspans;
-    dim_subspans.reserve(result_shape.nDim());
+    dim_subspans.reserve(result_ndim);
     const auto& shape = result_shape.GetShape();
-    auto row_dim = result_shape.nDim() - 1;
-    for (std::size_t d = 0; d < result_shape.nDim(); ++d) {
+    auto row_dim = result_ndim - 1;
+    for (int d = 0; d < result_ndim; ++d) {
       auto [disk_span, mem_span] = GetSpanPair(d, shape[d]);
       ARROW_ASSIGN_OR_RAISE(auto spans, MakeSubSpans(disk_span, mem_span, d == row_dim));
       dim_subspans.emplace_back(std::move(spans));
@@ -436,18 +436,18 @@ Result<DataPartition> DataPartition::Make(const Selection& selection,
 
   // In the varying case, start with the row dimension
   auto nrows = result_shape.nRows();
-  auto row_dim = result_shape.nDim() - 1;
+  auto row_dim = result_ndim - 1;
   auto [row_disk_span, row_mem_span] = GetSpanPair(row_dim, nrows);
   std::vector<SpanPairs> dim_spans;
   std::vector<bool> contiguous;
 
   for (std::size_t r = 0; r < nrows; ++r) {
     std::vector<SpanPairs> dim_subspans;
-    dim_subspans.reserve(result_shape.nDim());
+    dim_subspans.reserve(result_ndim);
     const auto& row_shape = result_shape.GetRowShape(r);
 
     // Create span pairs for the secondary dimensions
-    for (std::size_t dim = 0; dim < row_dim; ++dim) {
+    for (int dim = 0; dim < row_dim; ++dim) {
       auto [disk_span, mem_span] = GetSpanPair(dim, row_shape[dim]);
       ARROW_ASSIGN_OR_RAISE(auto spans, MakeSubSpans(disk_span, mem_span, false));
       dim_subspans.emplace_back(std::move(spans));

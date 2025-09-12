@@ -29,7 +29,6 @@ using ::arrow::Table;
 using ::casacore::JsonOut;
 using ::casacore::JsonParser;
 using ::casacore::Record;
-using ::casacore::TableColumn;
 using ::casacore::TableProxy;
 
 namespace arcae {
@@ -105,9 +104,8 @@ Result<std::shared_ptr<Array>> NewTableProxy::GetRowShapes(
                      const TableProxy& tp) -> Result<std::shared_ptr<Array>> {
         ARROW_RETURN_NOT_OK(detail::ColumnExists(tp.table(), column));
         auto table_column = casacore::TableColumn(tp.table(), column);
-        ARROW_ASSIGN_OR_RAISE(
-            auto shape_data,
-            ResultShapeData::MakeRead(table_column, selection, nullptr, true));
+        ARROW_ASSIGN_OR_RAISE(auto shape_data,
+                              ResultShapeData::MakeRead(table_column, selection, true));
         return shape_data.GetShapeArray();
       })
       .MoveResult();

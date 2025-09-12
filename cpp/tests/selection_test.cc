@@ -81,3 +81,26 @@ TEST(SelectionTests, BuilderFortranOrder) {
   EXPECT_EQ(sel[0][1], 1);
   EXPECT_EQ(sel[0][2], 2);
 }
+
+TEST(SelectionTests, TestSelectionMove) {
+  auto base = SelectionBuilder()
+                  .Add({0, 1, 2})
+                  .Add(std::vector<long>{1, 2, 3, 4})
+                  .Order('F')
+                  .Build();
+
+  auto sel = std::move(base);
+  EXPECT_EQ(sel.nIndices(), 2);
+  EXPECT_EQ(sel.Size(), 2);
+
+  EXPECT_EQ(sel[1].size(), 4);
+  EXPECT_EQ(sel[1][0], 1);
+  EXPECT_EQ(sel[1][1], 2);
+  EXPECT_EQ(sel[1][2], 3);
+  EXPECT_EQ(sel[1][3], 4);
+
+  EXPECT_EQ(sel[0].size(), 3);
+  EXPECT_EQ(sel[0][0], 0);
+  EXPECT_EQ(sel[0][1], 1);
+  EXPECT_EQ(sel[0][2], 2);
+}
