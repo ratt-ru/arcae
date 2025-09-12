@@ -352,7 +352,7 @@ std::size_t ResultShapeData::MaxDimensionSize() const noexcept {
 Result<std::size_t> ResultShapeData::FlatOffset(
     const absl::Span<const IndexType>& index) const noexcept {
   ARROW_ASSIGN_OR_RAISE(auto ndim, ConsistentNDim());
-  assert(index.size() == ndim);
+  assert(index.size() == std::size_t(ndim));
   std::size_t offset = 0;
 
   // Fixed case
