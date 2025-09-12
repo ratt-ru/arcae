@@ -13,6 +13,12 @@ NCORR = 4
 
 
 TABLE_DESC = {
+    "NAMES": {
+        "keywords": {},
+        "maxlen": 0,
+        "option": 0,
+        "valueType": "STRING",
+    },
     "DATA": {
         "_c_order": True,
         "comment": "DATA column",
@@ -58,6 +64,7 @@ def sanity():
     data = data.reshape(time.size, NCHAN, NCORR)
     data = data + data * 1j
     flag = np.random.randint(0, 2, size=(time.size, NCHAN, NCORR))
+    names = np.array([f"name-{i}" for i in range(time.size)])
 
     with ExitStack() as stack:
         # Write test data
@@ -72,6 +79,7 @@ def sanity():
         T.putcol("ANTENNA2", ant2)
         T.putcol("DATA", data)
         T.putcol("FLAG", flag)
+        T.putcol("NAMES", names)
 
         # Read and check equality
         assert_array_equal(T.getcol("TIME"), time)
@@ -79,3 +87,4 @@ def sanity():
         assert_array_equal(T.getcol("ANTENNA2"), ant2)
         assert_array_equal(T.getcol("DATA"), data)
         assert_array_equal(T.getcol("FLAG"), flag)
+        assert_array_equal(T.getcol("NAMES"), names)
