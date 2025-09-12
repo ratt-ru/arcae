@@ -350,14 +350,14 @@ Result<std::shared_ptr<Array>> MakeArray(const ResultShapeData& result_shape,
   // Introduce shape nesting
   if (result_shape.IsFixed() && strat == ConvertStrategy::FIXED) {
     // Exclude the row dimension
-    auto ndim = result_shape.nDim();
+    ARROW_ASSIGN_OR_RAISE(auto ndim, result_shape.ConsistentNDim());
     auto shape = result_shape.GetShape().getFirst(ndim - 1);
     for (auto dim : shape) {
       ARROW_ASSIGN_OR_RAISE(result, FixedSizeListArray::FromArrays(result, dim));
     }
   } else {
     ARROW_ASSIGN_OR_RAISE(auto offsets, result_shape.GetOffsets());
-    assert(offsets.size() == result_shape.nDim() - 1);
+    assert(int(offsets.size()) == result_shape.nDim() - 1);
     for (const auto& offset : offsets) {
       ARROW_ASSIGN_OR_RAISE(result, ListArray::FromArrays(*offset, *result));
     }
@@ -384,9 +384,19 @@ Future<std::shared_ptr<Array>> ReadImpl(const std::shared_ptr<IsolatedTableProxy
                         const TableProxy& tp) mutable -> Result<ShapeResult> {
         ARROW_RETURN_NOT_OK(ColumnExists(tp.table(), column));
         auto table_column = TableColumn(tp.table(), column);
-        ARROW_ASSIGN_OR_RAISE(
-            auto shape_data,
-            ResultShapeData::MakeRead(table_column, selection, result, bool(result)));
+
+        if (result) {
+          ARROW_ASSIGN_OR_RAISE(auto shape_data,
+                                ResultShapeData::FromArray(table_column, result));
+          ARROW_ASSIGN_OR_RAISE(
+              auto modified_selection,
+              shape_data.NegateMissingSelectedRows(table_column, selection));
+          return ShapeResult{std::make_shared<ResultShapeData>(std::move(shape_data)),
+                             std::make_shared<Selection>(std::move(modified_selection))};
+        }
+
+        ARROW_ASSIGN_OR_RAISE(auto shape_data,
+                              ResultShapeData::MakeRead(table_column, selection));
         return ShapeResult{std::make_shared<ResultShapeData>(std::move(shape_data)),
                            std::make_shared<Selection>(std::move(selection))};
       });

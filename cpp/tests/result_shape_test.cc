@@ -195,7 +195,7 @@ TEST_F(ColumnShapeTest, ReadVariable) {
 TEST_F(ColumnShapeTest, ReadSparseVariable) {
   auto var = GetArrayColumn<Complex>(table_proxy_.table(), "VAR_SPARSE");
   ASSERT_OK_AND_ASSIGN(auto shape_data,
-                       ResultShapeData::MakeRead(var, Selection(), nullptr, true));
+                       ResultShapeData::MakeRead(var, Selection(), true));
 
   EXPECT_EQ(shape_data.GetName(), "VAR_SPARSE");
   EXPECT_FALSE(shape_data.IsFixed());

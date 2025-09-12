@@ -7,7 +7,6 @@
 
 #include <arrow/util/logging.h>
 #include "arrow/status.h"
-#include "arrow/util/functional.h"
 #include "arrow/util/future.h"
 #include "arrow/util/thread_pool.h"
 
