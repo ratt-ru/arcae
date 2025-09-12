@@ -398,7 +398,7 @@ Future<std::shared_ptr<Array>> ReadImpl(const std::shared_ptr<IsolatedTableProxy
                              std::make_shared<Selection>(std::move(modified_selection))};
         }
 
-        // Otherwise we the ResultShapeData must be derived wholly from
+        // Otherwise the ResultShapeData must be derived wholly from
         // the contents of the column
         ARROW_ASSIGN_OR_RAISE(auto shape_data,
                               ResultShapeData::MakeRead(table_column, selection));
