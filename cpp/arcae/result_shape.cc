@@ -50,21 +50,52 @@ namespace {
 
 bool IsDegenerateShape(const IPosition& shape) { return shape.size() == 0; }
 
-// Clips the shape against the selection
-Status ClipShape(const ColumnDesc& column_desc, IPosition& shape,
-                 const Selection& selection) {
+Status ValidateCellShape(const ColumnDesc& column_desc, const IPosition& cell_shape,
+                         const IPosition& result_shape, const Selection& selection) {
+  // Check that the result shape does not exceed the cell shape
+  if (result_shape.size() != cell_shape.size()) {
+    return Status::Invalid("Result rank ", result_shape, " does not match ",
+                           " column rank ", cell_shape);
+  }
+
+  // Check non-row selection dimensions
   if (selection.Size() <= 1) return Status::OK();
-  for (std::size_t dim = 0; dim < shape.size(); ++dim) {
-    if (auto result = selection.FSpan(dim, shape.size() + 1); result.ok()) {
+  for (std::size_t dim = 0; dim < cell_shape.size(); ++dim) {
+    if (auto result = selection.FSpan(dim, cell_shape.size() + 1); result.ok()) {
       auto span = result.ValueOrDie();
+      if (ssize_t(span.size()) != result_shape[dim]) {
+        return Status::IndexError(
+            "Selection size ", span.size(), " does not match the result shape size ",
+            result_shape[dim], " in dimension ", dim, " ", result_shape, " ", cell_shape);
+      }
       for (auto i : span) {
-        if (i >= shape[dim]) {
+        if (i >= cell_shape[dim]) {
           return Status::IndexError("Selection index ", i, " exceeds dimension ", dim,
-                                    " of shape ", shape, " in column ",
+                                    " of shape ", cell_shape, " in column ",
                                     column_desc.name());
         }
       }
-      shape[dim] = span.size();
+    }
+  }
+  return Status::OK();
+}
+
+// Clips the shape against the selection
+Status ClipCellShape(const ColumnDesc& column_desc, IPosition& cell_shape,
+                     const Selection& selection) {
+  // Check non-row selection dimensions
+  if (selection.Size() <= 1) return Status::OK();
+  for (std::size_t dim = 0; dim < cell_shape.size(); ++dim) {
+    if (auto result = selection.FSpan(dim, cell_shape.size() + 1); result.ok()) {
+      auto span = result.ValueOrDie();
+      for (auto i : span) {
+        if (i >= cell_shape[dim]) {
+          return Status::IndexError("Selection index ", i, " exceeds dimension ", dim,
+                                    " of shape ", cell_shape, " in column ",
+                                    column_desc.name());
+        }
+      }
+      cell_shape[dim] = span.size();
     }
   }
   return Status::OK();
@@ -90,7 +121,7 @@ Result<RowShapes> MakeRowData(const TableColumn& column, const Selection& select
     if (r >= 0) {
       if (column.isDefined(r)) {
         auto shape = column.shape(r);
-        ARROW_RETURN_NOT_OK(ClipShape(column_desc, shape, selection));
+        ARROW_RETURN_NOT_OK(ClipCellShape(column_desc, shape, selection));
         return shape;
       }
       if (allow_missing_rows) return IPosition();
@@ -488,23 +519,54 @@ Result<Selection> ResultShapeData::NegateMissingSelectedRows(const TableColumn& 
     return Status::NotImplemented(
         "Checking selections against non fixed-shape result data");
 
+  // Get the result shape with and without the row dimension
+  auto result_shape = GetShape();
+  auto cell_result_shape = result_shape.getFirst(result_shape.size() - 1);
+  auto column_desc = column.columnDesc();
+
+  // Fixed case
+  if (column_desc.isFixedShape()) {
+    ARROW_RETURN_NOT_OK(ValidateCellShape(column_desc, column_desc.shape(),
+                                          cell_result_shape, selection));
+    return selection;
+  };
+
+  // Variably shaped colum case
+  // Perform an initial pass, checking for missing
+  // rows and whether the column shape matches the
+  // selection and result shape.
+  // This avoids a possibly large O(row) allocation
   bool has_span = selection.HasRowSpan();
   auto nrow = IndexType(column.nrow());
   bool all_rows_present = true;
 
+  auto CheckNrOfRows = [&](auto r) -> Status {
+    if (r == nRows()) return Status::OK();
+    return Status::IndexError("Number of rows in the result shape ", nRows(),
+                              " does not match the number of rows ", r, " in the ",
+                              has_span ? "selection." : "column.");
+  };
+
   if (has_span) {
-    for (auto r : selection.GetRowSpan()) {
-      if (r >= 0 && r < nrow && !column.isDefined(r)) {
-        all_rows_present = false;
-        break;
-      };
+    auto span = selection.GetRowSpan();
+    ARROW_RETURN_NOT_OK(CheckNrOfRows(span.size()));
+    for (auto r : span) {
+      if (r >= 0 && r < nrow) {
+        if (column.isDefined(r)) {
+          ARROW_RETURN_NOT_OK(ValidateCellShape(column_desc, column.shape(r),
+                                                cell_result_shape, selection));
+        } else
+          all_rows_present = false;
+      }
     }
   } else {
+    ARROW_RETURN_NOT_OK(CheckNrOfRows(std::size_t(nrow)));
     for (IndexType r = 0; r < nrow; ++r) {
-      if (!column.isDefined(r)) {
+      if (column.isDefined(r)) {
+        ARROW_RETURN_NOT_OK(ValidateCellShape(column_desc, column.shape(r),
+                                              cell_result_shape, selection));
+      } else
         all_rows_present = false;
-        break;
-      }
     }
   }
 
@@ -522,11 +584,6 @@ Result<Selection> ResultShapeData::NegateMissingSelectedRows(const TableColumn& 
     rows.resize(column.nrow());
     std::iota(std::begin(rows), std::end(rows), 0);
   }
-
-  if (rows.size() != nRows())
-    return Status::IndexError("Number of rows in the result shape ", nRows(),
-                              " does not match the number of rows ", rows.size(),
-                              " in the ", has_span ? "selection." : "column.");
 
   for (auto it = std::begin(rows); it != std::end(rows); ++it) {
     if (*it >= nrow || (*it >= 0 && !column.isDefined(*it))) *it = -1;
@@ -568,7 +625,7 @@ Result<ResultShapeData> ResultShapeData::MakeRead(const TableColumn& column,
   // Fixed shape, easy case
   if (column_desc.isFixedShape()) {
     auto shape = column_desc.shape();
-    ARROW_RETURN_NOT_OK(ClipShape(column_desc, shape, selection));
+    ARROW_RETURN_NOT_OK(ClipCellShape(column_desc, shape, selection));
     shape.append(IPosition({nselrow}));
     auto ndim = int(shape.size());
     return ResultShapeData{std::move(column_name), std::move(shape), ndim,
