@@ -532,13 +532,11 @@ Result<Selection> ResultShapeData::NegateMissingSelectedRows(const TableColumn& 
   };
 
   // Variably shaped colum case
-  // Perform an initial pass, checking for missing
-  // rows and whether the column shape matches the
-  // selection and result shape.
-  // This avoids a possibly large O(row) allocation
+  // Possibly redefine the selection if rows are missing
   bool has_span = selection.HasRowSpan();
   auto nrow = IndexType(column.nrow());
-  bool all_rows_present = true;
+  Index rows;
+  bool selection_modified = false;
 
   auto CheckNrOfRows = [&](auto r) -> Status {
     if (r == nRows()) return Status::OK();
@@ -550,51 +548,40 @@ Result<Selection> ResultShapeData::NegateMissingSelectedRows(const TableColumn& 
   if (has_span) {
     auto span = selection.GetRowSpan();
     ARROW_RETURN_NOT_OK(CheckNrOfRows(span.size()));
-    for (auto r : span) {
-      if (r >= 0 && r < nrow) {
-        if (column.isDefined(r)) {
-          ARROW_RETURN_NOT_OK(ValidateCellShape(column_desc, column.shape(r),
-                                                cell_result_shape, selection));
-        } else
-          all_rows_present = false;
-      }
-    }
-  } else {
-    ARROW_RETURN_NOT_OK(CheckNrOfRows(std::size_t(nrow)));
-    for (IndexType r = 0; r < nrow; ++r) {
-      if (column.isDefined(r)) {
-        ARROW_RETURN_NOT_OK(ValidateCellShape(column_desc, column.shape(r),
-                                              cell_result_shape, selection));
-      } else
-        all_rows_present = false;
-    }
-  }
-
-  if (all_rows_present) return selection;
-
-  // Redefine the selection for the missing rows
-  Index rows;
-
-  if (has_span) {
-    // We've been given a row span, check that
-    auto span = selection.GetRowSpan();
     rows.resize(span.size());
     std::copy(std::begin(span), std::end(span), std::begin(rows));
   } else {
-    rows.resize(column.nrow());
+    ARROW_RETURN_NOT_OK(CheckNrOfRows(std::size_t(nrow)));
+    rows.resize(nrow);
     std::iota(std::begin(rows), std::end(rows), 0);
   }
 
-  for (auto it = std::begin(rows); it != std::end(rows); ++it) {
-    if (*it >= nrow || (*it >= 0 && !column.isDefined(*it))) *it = -1;
+  for (std::size_t i = 0; i < rows.size(); ++i) {
+    auto r = rows[i];
+    if (r < 0) continue;
+    if (r >= nrow)
+      return Status::IndexError("Row ", r, " in selection is >= nrow ", nrow,
+                                " in column ", column_desc.name());
+    if (column.isDefined(r)) {
+      ARROW_RETURN_NOT_OK(
+          ValidateCellShape(column_desc, column.shape(r), cell_result_shape, selection));
+    } else {
+      // Undefined row, change selection to indicate no read should take place
+      // and indicate missing rows are present
+      rows[i] = -1;
+      selection_modified = true;
+    }
   }
+
+  // No modification, return original selection
+  if (!selection_modified) return selection;
 
   // Add the modified rows
   auto builder = SelectionBuilder();
   builder.Order('C');
   builder.Add(std::move(rows));
 
-  // Add secondary selection dimensions
+  // Copy secondary selection dimensions
   for (std::size_t d = 1; d < selection.Size(); ++d) {
     if (auto res = selection.CSpan(d); res.ok()) {
       auto span = res.ValueOrDie();
@@ -602,8 +589,7 @@ Result<Selection> ResultShapeData::NegateMissingSelectedRows(const TableColumn& 
     }
   }
 
-  auto new_selection = builder.Build();
-  return new_selection;
+  return builder.Build();
 }
 
 Result<ResultShapeData> ResultShapeData::FromArray(
