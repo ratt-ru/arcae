@@ -266,7 +266,7 @@ arrow::Result<std::shared_ptr<Buffer>> GetResultBufferOrAllocate(
   ARROW_ASSIGN_OR_RAISE(auto casa_type_size, CasaDataTypeSize(casa_type));
   auto nbytes = nelements * casa_type_size;
   if (result) return GetResultBuffer(result, nbytes);
-  ARROW_ASSIGN_OR_RAISE(auto allocation, arrow::AllocateBuffer(nbytes, casa_type_size));
+  ARROW_ASSIGN_OR_RAISE(auto allocation, arrow::AllocateBuffer(nbytes));
 
   if (IsPrimitiveType(casa_type)) {
     return std::shared_ptr<Buffer>(std::move(allocation));
