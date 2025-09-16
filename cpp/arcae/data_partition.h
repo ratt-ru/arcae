@@ -196,11 +196,19 @@ struct DataChunk {
 
   // Does the chunk refer to negative disk indices
   bool IsEmpty() const noexcept;
+
+  // Print some debugging information about this chunk
+  std::string ToString() const;
 };
 
-// A partition of the data into a series
-// of chunks that can be independently processed
+// A DataPartition is a mapping between indices on disk
+// and indices in memory. The partition is split into
+// multiple chunks, where each chunk represents a contiguous
+// read of data from disk.
 struct DataPartition {
+  // Construct a DataPartition from a selection object describing indices of
+  // data within a column on disk and a result_shape object describing the
+  // layout of the source/destination of data within memory.
   static arrow::Result<DataPartition> Make(const Selection& selection,
                                            const ResultShapeData& result_shape);
 

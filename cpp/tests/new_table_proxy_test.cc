@@ -9,6 +9,7 @@
 #include <string>
 
 #include <arrow/api.h>
+#include <arrow/array/array_base.h>
 #include <arrow/array/array_nested.h>
 #include <arrow/compute/cast.h>
 #include <arrow/result.h>
@@ -635,6 +636,8 @@ class VariableProxyTest : public ::testing::TestWithParam<Parametrization> {
     auto table_desc = TableDesc(MS::requiredTableDesc());
     auto var_data_column_desc = ArrayColumnDesc<Complex>("VAR_DATA", 2);
     table_desc.addColumn(var_data_column_desc);
+    auto var_sparse_data_column_desc = ArrayColumnDesc<Complex>("VAR_SPARSE_DATA", 2);
+    table_desc.addColumn(var_sparse_data_column_desc);
     auto var_str_data_column_desc = ArrayColumnDesc<String>("VAR_STRING_DATA", 2);
     table_desc.addColumn(var_str_data_column_desc);
 
@@ -887,6 +890,92 @@ TEST_F(VariableProxyTest, NegativeSelection) {
         } else {
           auto real = RealValue(row, chan, corr);
           EXPECT_EQ(buffer[buf_i], Complex(real, real));
+        }
+      }
+    }
+    // Advance row offset within the output buffer
+    row_offset += chans.size() * corrs.size();
+  }
+
+  // All values in the output have been considered
+  EXPECT_EQ(row_offset, buffer.size());
+}
+
+TEST_F(VariableProxyTest, MissingSelection) {
+  ASSERT_OK_AND_ASSIGN(auto ntp, OpenTable());
+
+  // The column is completely empty
+  ASSERT_NOT_OK(ntp->GetRowShapes("VAR_SPARSE_DATA"));
+
+  // Derive minimum viable dimension size.
+  casacore::IPosition min_shape(kNDim, std::numeric_limits<ssize_t>::max());
+  min_shape[2] = nRow();  // row dimension is trivial
+  for (const auto& shape : row_shapes_) {
+    EXPECT_EQ(shape.size(), kNDim - 1);
+    for (std::size_t d = 0; d < shape.size(); ++d) {
+      min_shape[d] = std::min(min_shape[d], shape[d]);
+    }
+  }
+
+  EXPECT_EQ(min_shape, IPosition({3, 14, 4}));
+
+  // Create a selection with negative indices
+  Index rows(min_shape[2]);
+  Index chans(min_shape[1]);
+  Index corrs(min_shape[0]);
+
+  std::iota(std::begin(rows), std::end(rows), 0);
+  std::iota(std::begin(chans), std::end(chans), 0);
+  std::iota(std::begin(corrs), std::end(corrs), 0);
+
+  std::array<IndexType, 2> missing_rows = {1, 3};
+  for (auto r : missing_rows) rows[r] = -1;
+
+  auto selection = SelectionBuilder().Order('F').Add(rows).Build();
+
+  ASSERT_OK_AND_ASSIGN(auto test_data, ntp->GetColumn("VAR_DATA", {}));
+  ASSERT_OK(ntp->PutColumn("VAR_SPARSE_DATA", test_data, selection));
+  ASSERT_OK_AND_ASSIGN(auto row_shapes, ntp->GetRowShapes("VAR_SPARSE_DATA"));
+
+  std::shared_ptr<arrow::Array> result;
+  std::vector<float> values(rows.size() * chans.size() * corrs.size() * 2,
+                            kDefaultRealValue);
+  arrow::ArrayFromVector<arrow::FloatType>(arrow::float32(), values, &result);
+  ASSERT_OK_AND_ASSIGN(result, arrow::FixedSizeListArray::FromArrays(result, 2));
+  ASSERT_OK_AND_ASSIGN(result,
+                       arrow::FixedSizeListArray::FromArrays(result, corrs.size()));
+  ASSERT_OK_AND_ASSIGN(result,
+                       arrow::FixedSizeListArray::FromArrays(result, chans.size()));
+  EXPECT_EQ(result->length(), rows.size());
+  ASSERT_OK_AND_ASSIGN(auto data, ntp->GetColumn("VAR_SPARSE_DATA", {}, result));
+
+  // Get the underlying buffer containing the complex values
+  auto buffer = data->data()
+                    ->child_data[0]  // chan
+                    ->child_data[0]  // corr
+                    ->child_data[0]  // complex pair
+                    ->buffers[1]     // value buffer
+                    ->span_as<Complex>();
+
+  std::size_t row_offset = 0;
+
+  // Check that the expected value at the selected disk indices
+  // matches the buffer values
+  for (std::size_t r = 0; r < rows.size(); ++r) {
+    auto row = rows[r];
+    EXPECT_TRUE(row < IndexType(nRow()));  // sanity
+    for (std::size_t ch = 0; ch < chans.size(); ++ch) {
+      auto chan = chans[ch];
+      for (std::size_t co = 0; co < corrs.size(); ++co) {
+        auto corr = corrs[co];
+        auto buf_i = row_offset + ch * corrs.size() + co;
+        if (row < 0 || chan < 0 || corr < 0) {
+          EXPECT_EQ(buffer[buf_i], Complex(kDefaultRealValue, kDefaultRealValue))
+              << row << ' ' << chan << ' ' << corr;
+        } else {
+          auto real = RealValue(row, chan, corr);
+          EXPECT_EQ(buffer[buf_i], Complex(real, real))
+              << row << ' ' << chan << ' ' << corr;
         }
       }
     }

@@ -17,15 +17,15 @@
 #include <casacore/tables/Tables/ColumnDesc.h>
 #include <casacore/tables/Tables/TableColumn.h>
 
+#include <arrow/array/array_base.h>
+#include <arrow/array/array_nested.h>
+#include <arrow/buffer_builder.h>
 #include <arrow/result.h>
 #include <arrow/status.h>
 #include <arrow/type_fwd.h>
 
 #include "arcae/result_shape.h"
 #include "arcae/selection.h"
-#include "arrow/array/array_base.h"
-#include "arrow/array/array_nested.h"
-#include "arrow/buffer_builder.h"
 
 using ::arrow::Result;
 using ::arrow::Status;
@@ -300,15 +300,14 @@ Result<ResultShapeData> GetArrowResultShapeData(
   if (fixed_shape) {
     // C-ORDER to FORTRAN-ORDER
     auto casa_shape = IPosition(ndim, 0);
-    for (int dim = 0; dim < ndim; ++dim) {
-      casa_shape[ndim - dim - 1] = shape[dim];
-    }
-
+    for (int dim = 0; dim < ndim; ++dim) casa_shape[ndim - dim - 1] = shape[dim];
     return ResultShapeData{column_desc.name(), std::make_optional(casa_shape), ndim,
                            column_desc.dataType(), std::nullopt};
   }
 
   ARROW_ASSIGN_OR_RAISE(auto row_shapes, GetRowShapes(data, ndim));
+  for (std::size_t r = 0; r < row_shapes.size(); ++r)
+    std::reverse(std::begin(row_shapes[r]), std::end(row_shapes[r]));
   return ResultShapeData{column_desc.name(), std::nullopt, ndim, column_desc.dataType(),
                          std::move(row_shapes)};
 }
@@ -343,7 +342,7 @@ Result<ResultShapeData> GetResultShapeData(const ColumnDesc& column_desc,
                            shape_data.dtype_, std::nullopt};
   }
 
-  // Modify the row shapes
+  // Modify row shapes in place
   auto& shapes = shape_data.row_shapes_.value();
   for (std::size_t r = 0; r < shapes.size(); ++r) {
     if (IsDegenerateShape(shapes[r]) || shapes[r][0] != 2) {
@@ -689,6 +688,12 @@ Result<ResultShapeData> ResultShapeData::MakeWrite(
   // Check the row dimension against the selection
   if (selection.HasRowSpan()) {
     const auto& row_span = selection.GetRowSpan();
+    if (row_span.size() != shape_data.nRows()) {
+      return Status::IndexError("Row selection size ", row_span.size(),
+                                " does not match the number of rows",
+                                " in the result shape ", shape_data.nRows());
+    }
+
     if (row_span.size() > column.nrow()) {
       return Status::IndexError("Row selection size ", row_span.size(),
                                 " exceeds the number of rows", " in the result shape ",
@@ -706,8 +711,7 @@ Result<ResultShapeData> ResultShapeData::MakeWrite(
   }
 
   // Check secondary dimensions against the selection
-  ARROW_ASSIGN_OR_RAISE(std::ptrdiff_t row_dim, shape_data.ConsistentNDim());
-  --row_dim;
+  auto row_dim = shape_ndim - 1;
   // No secondary dimensions, exit early
   if (row_dim <= 0) return shape_data;
 
@@ -733,8 +737,7 @@ Result<ResultShapeData> ResultShapeData::MakeWrite(
     ARROW_ASSIGN_OR_RAISE(auto ndim, shape_data.ConsistentNDim());
     for (std::ptrdiff_t dim = 0; dim < row_dim; ++dim) {
       if (auto res = selection.FSpan(dim, ndim); res.ok()) {
-        auto span = res.ValueOrDie();
-        ARROW_RETURN_NOT_OK(CheckSelectionAgainstShape(span, shape, dim));
+        ARROW_RETURN_NOT_OK(CheckSelectionAgainstShape(res.ValueOrDie(), shape, dim));
       }
     }
   } else {
@@ -753,8 +756,8 @@ Result<ResultShapeData> ResultShapeData::MakeWrite(
         auto row_shape = column.shape(row);
         for (std::ptrdiff_t dim = 0; dim < row_dim; ++dim) {
           if (auto res = selection.FSpan(dim, shape_ndim); res.ok()) {
-            auto span = res.ValueOrDie();
-            ARROW_RETURN_NOT_OK(CheckSelectionAgainstShape(span, row_shape, dim));
+            ARROW_RETURN_NOT_OK(
+                CheckSelectionAgainstShape(res.ValueOrDie(), row_shape, dim));
           }
         }
       } else {
@@ -762,7 +765,10 @@ Result<ResultShapeData> ResultShapeData::MakeWrite(
         // Set the row shape from the shape of the result,
         // taking any maximum selection into account
         auto row_shape = [&]() -> casacore::IPosition {
-          if (!shape_data.IsFixed()) return shape_data.GetRowShape(row);
+          // r is used here as we want the shape from
+          // the row in the result shape, as opposed to
+          // the output location on disk
+          if (!shape_data.IsFixed()) return shape_data.GetRowShape(r);
           auto shape = shape_data.GetShape();
           return shape.getFirst(shape.size() - 1);
         }();
