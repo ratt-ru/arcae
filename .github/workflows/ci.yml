@@ -108,7 +108,7 @@ jobs:
         run: |
           brew update
           brew install ninja
-          brew reinstall gcc
+          brew reinstall gcc  # Needed for gfortran
           python -m pip install -U pip
           python -m pip install pyarrow
 
