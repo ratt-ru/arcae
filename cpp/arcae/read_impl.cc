@@ -77,6 +77,16 @@ namespace {
 static constexpr char kArcaeMetadata[] = "__arcae_metadata__";
 static constexpr char kCasaDescriptorKey[] = "__casa_descriptor__";
 
+// Allocators generally require a power of 2 when requesting aligned allocationg
+// For example, Arrow can use mimalloc which fails to allocate
+// if the alignment is not a power of 2
+// https://microsoft.github.io/mimalloc/group__aligned.html
+std::size_t GetSafeAlignment(std::size_t type_size) {
+  bool is_power_of_two = (type_size & (type_size - 1)) == 0;
+  if (type_size == 0 || !is_power_of_two) return arrow::kDefaultBufferAlignment;
+  return type_size;
+}
+
 // Functor implementing dispatch of disk reading functionality
 struct ReadCallback {
   // Column name
@@ -266,10 +276,7 @@ arrow::Result<std::shared_ptr<Buffer>> GetResultBufferOrAllocate(
   ARROW_ASSIGN_OR_RAISE(auto casa_type_size, CasaDataTypeSize(casa_type));
   auto nbytes = nelements * casa_type_size;
   if (result) return GetResultBuffer(result, nbytes);
-  // Arrow can use mimalloc which fails to allocate
-  // if the alignment is not a power of 2
-  // https://microsoft.github.io/mimalloc/group__aligned.html
-  auto alignment = casa_type_size % 2 ? casa_type_size : arrow::kDefaultBufferAlignment;
+  auto alignment = GetSafeAlignment(casa_type_size);
   ARROW_ASSIGN_OR_RAISE(auto allocation, arrow::AllocateBuffer(nbytes, alignment));
 
   if (IsPrimitiveType(casa_type)) {

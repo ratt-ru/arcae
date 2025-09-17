@@ -4,12 +4,12 @@ History
 
 0.3.2 (DD-MM-2025)
 ------------------
+* Default arrow allocation alignment if type size is not a power of 2 (:pr:`176`, :pr:`177`)
 * Support missing column rows when result arrays are supplied during reads (:pr:`174`)
 * Correct setting the shapes of missing column row rows during writes of
   variably shaped data (:pr:`174`)
 * Fixes a data partitioning bug where the shape for a particular row was
   associated with a raw index into the result shape, instead of a memory index (:pr:`174`)
-* Default arrow allocation alignment if type size is not a power of 2 (:pr:`176`)
 * Disable overly aggressive casacore logging of non-standard data types (:pr:`173`)
 
 0.3.1 (10-09-2025)
