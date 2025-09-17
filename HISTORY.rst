@@ -4,6 +4,9 @@ History
 
 0.3.2 (DD-MM-2025)
 ------------------
+* Address tar.extractall filter warning (:pr:`179`)
+* Represent scalar column shapes as an array of uint8's composed of 1s (:pr:`179`)
+* Defer to ColumnDesc.ndim if inference from row shapes fails for variably shaped columns (:pr:`179`)
 * Run C++ test suite on macos (:pr:`178`)
 * Default arrow allocation alignment if type size is not a power of 2 (:pr:`176`, :pr:`177`)
 * Support missing column rows when result arrays are supplied during reads (:pr:`174`)

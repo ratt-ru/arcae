@@ -421,7 +421,14 @@ Result<std::shared_ptr<arrow::Array>> ResultShapeData::GetShapeArray() const noe
   --ndim;  // without row
   auto nrow = nRows();
 
-  if (ndim == 0) return std::make_shared<arrow::NullArray>(std::int64_t(nrow));
+  if (ndim == 0) {
+    auto shape_builder = arrow::UInt8Builder();
+    ARROW_RETURN_NOT_OK(shape_builder.Reserve(nrow));
+    for (std::size_t i = 0; i < nrow; ++i) {
+      ARROW_RETURN_NOT_OK(shape_builder.Append(1));
+    }
+    return shape_builder.Finish();
+  }
 
   auto builders = std::vector<arrow::Int32Builder>(ndim);
   auto shape_data_builder = arrow::Int32Builder();
@@ -617,7 +624,13 @@ Result<ResultShapeData> ResultShapeData::MakeRead(const TableColumn& column,
                            std::move(dtype), std::nullopt};
   }
 
-  // Get shapes of each row in the selection
+  // Variably shaped case
+  // Get shapes of each row in the selection and try to infer the
+  // shapes and dimensionality from this data.
+  // We prefer this instead of trusting ColumnDesc.ndim()
+  // because the column may be configured for varying dimensionality/rank,
+  // even though the actual row shapes may have the same dimensionality.
+  // (which we would like to handle. I'm looking at you wsclean MODEL_DATA columns)
   ARROW_ASSIGN_OR_RAISE(auto shapes, MakeRowData(column, selection, allow_missing_rows));
 
   auto missing_rows =
@@ -657,11 +670,19 @@ Result<ResultShapeData> ResultShapeData::MakeRead(const TableColumn& column,
   // has already done this
   if (shapes_equal && fixed_shape && missing_rows == 0) {
     fixed_shape->append(IPosition({nselrow}));
-    auto ndim = int(fixed_shape->size());
+    ndim = int(fixed_shape->size());
     return ResultShapeData{column_name, std::move(fixed_shape), ndim, std::move(dtype),
                            std::nullopt};
   }
 
+  // If it wasn't possible to derive the dimensionality
+  // from the row shapes we now defer to the column descriptor
+  if (ndim == -1) {
+    ndim = column_desc.ndim();
+    if (ndim >= 0) ++ndim;
+  }
+
+  // The most general case:
   // Shapes and their rank may vary per row and rows may be missing
   return ResultShapeData{column_name, std::nullopt, ndim, std::move(dtype),
                          std::move(shapes)};
