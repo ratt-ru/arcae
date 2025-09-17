@@ -74,7 +74,7 @@ def tau_ms(tau_ms_tar, tmp_path_factory):
     msdir = tmp_path_factory.mktemp("tau-ms")
 
     with tarfile.open(tau_ms_tar) as tar:
-        tar.extractall(msdir)
+        tar.extractall(msdir, filter="data")
 
     return str(msdir / TAU_MS)
 
