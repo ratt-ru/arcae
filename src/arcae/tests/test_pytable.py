@@ -172,7 +172,7 @@ def test_row_shapes(column_case_table):
     table = arcae.table(column_case_table)
 
     assert isinstance(table.row_shapes("SCALAR"), pa.UInt8Array)
-    assert table.row_shapes("SCALAR").to_pylist() == [0, 0, 0]
+    assert table.row_shapes("SCALAR").to_pylist() == [1, 1, 1]
 
     assert isinstance(table.row_shapes("VARIABLE"), pa.FixedSizeListArray)
     assert table.row_shapes("VARIABLE").to_pylist() == [[3, 1, 2], [3, 2, 2], [3, 3, 2]]

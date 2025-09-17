@@ -425,7 +425,7 @@ Result<std::shared_ptr<arrow::Array>> ResultShapeData::GetShapeArray() const noe
     auto shape_builder = arrow::UInt8Builder();
     ARROW_RETURN_NOT_OK(shape_builder.Reserve(nrow));
     for (std::size_t i = 0; i < nrow; ++i) {
-      ARROW_RETURN_NOT_OK(shape_builder.Append(0));
+      ARROW_RETURN_NOT_OK(shape_builder.Append(1));
     }
     return shape_builder.Finish();
   }
