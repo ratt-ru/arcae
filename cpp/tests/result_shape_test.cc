@@ -1,4 +1,5 @@
 #include <arrow/json/from_string.h>
+#include <arrow/testing/builder.h>
 #include <arrow/testing/gtest_util.h>
 #include <arrow/type_fwd.h>
 
@@ -36,11 +37,9 @@ using casacore::Complex;
 using casacore::DataType;
 using MS = casacore::MeasurementSet;
 using MSColumns = casacore::MSMainEnums::PredefinedColumns;
-using casacore::Record;
 using casacore::SetupNewTable;
 using casacore::Table;
 using casacore::TableDesc;
-using casacore::TableLock;
 using casacore::TableProxy;
 using casacore::TiledColumnStMan;
 using IPos = casacore::IPosition;
@@ -53,7 +52,7 @@ static constexpr std::size_t kncorr = 2;
 
 namespace {
 
-class ColumnShapeTest : public ::testing::Test {
+class ResultShapeTest : public ::testing::Test {
  protected:
   TableProxy table_proxy_;
   std::string table_name_;
@@ -136,7 +135,7 @@ class ColumnShapeTest : public ::testing::Test {
   }
 };
 
-TEST_F(ColumnShapeTest, ReadFixed) {
+TEST_F(ResultShapeTest, ReadFixed) {
   auto fixed = GetArrayColumn<Complex>(table_proxy_.table(), "MODEL_DATA");
   ASSERT_OK_AND_ASSIGN(auto shape_data, ResultShapeData::MakeRead(fixed));
 
@@ -150,7 +149,7 @@ TEST_F(ColumnShapeTest, ReadFixed) {
   ASSERT_OK_AND_ASSIGN(auto offsets, shape_data.GetOffsets());
 }
 
-TEST_F(ColumnShapeTest, ReadFixedSelection) {
+TEST_F(ResultShapeTest, ReadFixedSelection) {
   auto fixed = GetArrayColumn<Complex>(table_proxy_.table(), "MODEL_DATA");
   auto sel = SelectionBuilder::FromInit({{0, 1}});
   ASSERT_OK_AND_ASSIGN(auto shape_data, ResultShapeData::MakeRead(fixed, sel));
@@ -177,7 +176,7 @@ TEST_F(ColumnShapeTest, ReadFixedSelection) {
   ASSERT_OK_AND_ASSIGN(offsets, shape_data.GetOffsets());
 }
 
-TEST_F(ColumnShapeTest, ReadVariable) {
+TEST_F(ResultShapeTest, ReadVariable) {
   auto var = GetArrayColumn<Complex>(table_proxy_.table(), "VAR_DATA");
   ASSERT_OK_AND_ASSIGN(auto shape_data, ResultShapeData::MakeRead(var));
 
@@ -192,10 +191,10 @@ TEST_F(ColumnShapeTest, ReadVariable) {
   ASSERT_OK_AND_ASSIGN(auto offsets, shape_data.GetOffsets());
 }
 
-TEST_F(ColumnShapeTest, ReadSparseVariable) {
+TEST_F(ResultShapeTest, ReadSparseVariable) {
   auto var = GetArrayColumn<Complex>(table_proxy_.table(), "VAR_SPARSE");
   ASSERT_OK_AND_ASSIGN(auto shape_data,
-                       ResultShapeData::MakeRead(var, Selection(), nullptr, true));
+                       ResultShapeData::MakeRead(var, Selection(), true));
 
   EXPECT_EQ(shape_data.GetName(), "VAR_SPARSE");
   EXPECT_FALSE(shape_data.IsFixed());
@@ -210,7 +209,32 @@ TEST_F(ColumnShapeTest, ReadSparseVariable) {
   ASSERT_OK_AND_ASSIGN(auto offsets, shape_data.GetOffsets());
 }
 
-TEST_F(ColumnShapeTest, ReadVariableSelection) {
+TEST_F(ResultShapeTest, NegateSparseVariable) {
+  auto var = GetArrayColumn<Complex>(table_proxy_.table(), "VAR_SPARSE");
+
+  // Create a result array filled with a default value
+  std::shared_ptr<arrow::Array> result;
+  std::vector<float> values(knrow * knchan * kncorr * 2, 0.0);
+  arrow::ArrayFromVector<arrow::FloatType>(arrow::float32(), values, &result);
+  ASSERT_OK_AND_ASSIGN(result, arrow::FixedSizeListArray::FromArrays(result, 2));
+  ASSERT_OK_AND_ASSIGN(result, arrow::FixedSizeListArray::FromArrays(result, kncorr));
+  ASSERT_OK_AND_ASSIGN(result, arrow::FixedSizeListArray::FromArrays(result, knchan));
+  EXPECT_EQ(result->length(), knrow);
+
+  ASSERT_OK_AND_ASSIGN(auto shape_data, ResultShapeData::FromArray(var, result));
+  ASSERT_OK_AND_ASSIGN(auto selection,
+                       shape_data.NegateMissingSelectedRows(var, Selection()));
+  EXPECT_TRUE(selection.HasRowSpan());
+  auto span = selection.GetRowSpan();
+  for (std::size_t r = 0; r < span.size(); ++r) {
+    if (r == 1 || r == 7)
+      EXPECT_EQ(span[r], -1);
+    else
+      EXPECT_EQ(span[r], r);
+  }
+}
+
+TEST_F(ResultShapeTest, ReadVariableSelection) {
   auto var = GetArrayColumn<Complex>(table_proxy_.table(), "VAR_DATA");
   auto sel = SelectionBuilder::FromInit({{0, 1}});
   ASSERT_OK_AND_ASSIGN(auto shape_data, ResultShapeData::MakeRead(var, sel));
@@ -250,7 +274,7 @@ TEST_F(ColumnShapeTest, ReadVariableSelection) {
   ASSERT_OK_AND_ASSIGN(offsets, shape_data.GetOffsets());
 }
 
-TEST_F(ColumnShapeTest, WriteFixed) {
+TEST_F(ResultShapeTest, WriteFixed) {
   auto fixed = GetArrayColumn<Complex>(table_proxy_.table(), "MODEL_DATA");
   auto dtype = arrow::fixed_size_list(
       arrow::fixed_size_list(arrow::fixed_size_list(arrow::float32(), 2), 2), 2);
@@ -271,7 +295,7 @@ TEST_F(ColumnShapeTest, WriteFixed) {
   ASSERT_OK_AND_ASSIGN(auto offsets, shape_data.GetOffsets());
 }
 
-TEST_F(ColumnShapeTest, WriteVariable) {
+TEST_F(ResultShapeTest, WriteVariable) {
   auto var = GetArrayColumn<Complex>(table_proxy_.table(), "VAR_DATA");
   auto dtype = arrow::list(arrow::list(arrow::list(arrow::float32())));
 
