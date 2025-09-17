@@ -2,7 +2,7 @@
 History
 =======
 
-0.3.2 (DD-MM-2025)
+0.3.2 (17-09-2025)
 ------------------
 * Address tar.extractall filter warning (:pr:`179`)
 * Represent scalar column shapes as an array of uint8's composed of 1s (:pr:`179`)
