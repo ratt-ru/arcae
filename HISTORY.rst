@@ -4,6 +4,7 @@ History
 
 0.3.2 (DD-MM-2025)
 ------------------
+* Run C++ test suite on macos (:pr:`178`)
 * Default arrow allocation alignment if type size is not a power of 2 (:pr:`176`, :pr:`177`)
 * Support missing column rows when result arrays are supplied during reads (:pr:`174`)
 * Correct setting the shapes of missing column row rows during writes of

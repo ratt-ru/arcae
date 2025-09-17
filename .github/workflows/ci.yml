@@ -44,15 +44,13 @@ jobs:
           name: ${{ env.ARTIFACT_NAME }}-source
           path: ./dist/*.tar.gz
 
-  cpp-tests:
-    name: Execute C++ test cases
+  ubuntu-cpp-tests:
+    name: Execute C++ test cases on ubuntu
     runs-on: ubuntu-latest
     permissions:
       id-token: write
-
     env:
       VCPKG_TARGET_TRIPLET: "x64-linux-dynamic-cxx20-abi1-rel"
-
     steps:
       - name: Checkout source
         uses: actions/checkout@v5
@@ -66,6 +64,51 @@ jobs:
         run: |
           sudo apt -y update
           sudo apt -y install build-essential cmake
+          python -m pip install -U pip
+          python -m pip install pyarrow
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v5.0.0
+        with:
+          role-to-assume: ${{ secrets.GHA_ROLE_ARN }}
+          aws-region: af-south-1
+          output-env-credentials: true
+
+      - name: Build C++ libraries and tests
+        run: |
+          cmake -S . -B build
+          cmake --build build
+
+      - name: Execute C++ tests
+        run: |
+          cd build
+          ctest --verbose
+
+      # - name: Debug with tmate on failure
+      #   if: ${{ failure() }}
+      #   uses: mxschmitt/action-tmate@v3
+
+  macos-cpp-tests:
+    name: Execute C++ test cases on macos
+    runs-on: macos-15
+    permissions:
+      id-token: write
+    env:
+      VCPKG_TARGET_TRIPLET: "arm64-osx-dynamic-cxx20-abi1-rel"
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v5
+
+      - name: Set up Python ${{ env.HOST_PYTHON_VERSION }}
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.HOST_PYTHON_VERSION }}
+
+      - name: Install C++ Compiler and cmake
+        run: |
+          brew update
+          brew install ninja
+          brew reinstall gcc  # Needed for gfortran
           python -m pip install -U pip
           python -m pip install pyarrow
 
