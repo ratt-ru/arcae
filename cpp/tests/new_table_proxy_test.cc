@@ -904,8 +904,13 @@ TEST_F(VariableProxyTest, NegativeSelection) {
 TEST_F(VariableProxyTest, MissingSelection) {
   ASSERT_OK_AND_ASSIGN(auto ntp, OpenTable());
 
+  ASSERT_OK_AND_ASSIGN(auto empty_shapes, ntp->GetRowShapes("VAR_SPARSE_DATA"));
+  auto fsl = std::dynamic_pointer_cast<arrow::FixedSizeListArray>(empty_shapes);
+  EXPECT_TRUE(fsl);
   // The column is completely empty
-  ASSERT_NOT_OK(ntp->GetRowShapes("VAR_SPARSE_DATA"));
+  EXPECT_EQ(fsl->length(), fsl->null_count());
+  // ndim == 2
+  EXPECT_EQ(fsl->list_type()->list_size(), 2);
 
   // Derive minimum viable dimension size.
   casacore::IPosition min_shape(kNDim, std::numeric_limits<ssize_t>::max());
