@@ -6,6 +6,28 @@ History
 ------------------
 * Implement write-locking (:pr:`162`)
 
+0.3.2 (17-09-2025)
+------------------
+* Address tar.extractall filter warning (:pr:`179`)
+* Represent scalar column shapes as an array of uint8's composed of 1s (:pr:`179`)
+* Defer to ColumnDesc.ndim if inference from row shapes fails for variably shaped columns (:pr:`179`)
+* Run C++ test suite on macos (:pr:`178`)
+* Default arrow allocation alignment if type size is not a power of 2 (:pr:`176`, :pr:`177`)
+* Support missing column rows when result arrays are supplied during reads (:pr:`174`)
+* Correct setting the shapes of missing column row rows during writes of
+  variably shaped data (:pr:`174`)
+* Fixes a data partitioning bug where the shape for a particular row was
+  associated with a raw index into the result shape, instead of a memory index (:pr:`174`)
+* Disable overly aggressive casacore logging of non-standard data types (:pr:`173`)
+
+0.3.1 (10-09-2025)
+------------------
+* Replace deprecated appdirs with platformdirs (:pr:`172`)
+* Build all wheels for an architecture with a single cibuildwheel call (:pr:`171`)
+* Reintroduce vcpkg build artifact caching (:pr:`171`)
+* Add a ``table.row_shapes`` method that returns column row shapes
+  as an Arrow Array (:pr:`169`)
+* Impute missing rows from result shape (:pr:`169`)
 
 0.3.0 (21-06-2025)
 ------------------

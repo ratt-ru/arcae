@@ -1,6 +1,7 @@
 #include "arcae/new_table_proxy.h"
 
 #include <iterator>
+#include <memory>
 #include <sstream>
 
 #include <arrow/api.h>
@@ -14,8 +15,12 @@
 #include <casacore/tables/Tables/TableProxy.h>
 
 #include "arcae/read_impl.h"
+#include "arcae/result_shape.h"
+#include "arcae/selection.h"
 #include "arcae/table_utils.h"
 #include "arcae/write_impl.h"
+
+using ::arcae::detail::ResultShapeData;
 
 using ::arrow::Array;
 using ::arrow::Result;
@@ -87,6 +92,26 @@ Result<std::shared_ptr<Array>> NewTableProxy::GetColumn(
     const std::string& column, const detail::Selection& selection,
     const std::shared_ptr<Array>& result) const {
   return ReadImpl(itp_, column, selection, result).MoveResult();
+}
+
+Result<std::shared_ptr<Array>> NewTableProxy::GetRowShapes(
+    const std::string& column, const detail::Selection& selection) const {
+  if (selection.Size() > 1) {
+    return arrow::Status::NotImplemented(
+        "GetRowShapes with selection of secondary dimensions. "
+        "Select on row only");
+  }
+
+  return itp_
+      ->RunAsync([column = column, selection = selection](
+                     const TableProxy& tp) -> Result<std::shared_ptr<Array>> {
+        ARROW_RETURN_NOT_OK(detail::ColumnExists(tp.table(), column));
+        auto table_column = casacore::TableColumn(tp.table(), column);
+        ARROW_ASSIGN_OR_RAISE(auto shape_data,
+                              ResultShapeData::MakeRead(table_column, selection, true));
+        return shape_data.GetShapeArray();
+      })
+      .MoveResult();
 }
 
 Result<std::string> NewTableProxy::Name() const {

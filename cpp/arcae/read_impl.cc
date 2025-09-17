@@ -77,6 +77,16 @@ namespace {
 static constexpr char kArcaeMetadata[] = "__arcae_metadata__";
 static constexpr char kCasaDescriptorKey[] = "__casa_descriptor__";
 
+// Allocators generally require a power of 2 when requesting aligned allocationg
+// For example, Arrow can use mimalloc which fails to allocate
+// if the alignment is not a power of 2
+// https://microsoft.github.io/mimalloc/group__aligned.html
+std::size_t GetSafeAlignment(std::size_t type_size) {
+  bool is_power_of_two = (type_size & (type_size - 1)) == 0;
+  if (type_size == 0 || !is_power_of_two) return arrow::kDefaultBufferAlignment;
+  return type_size;
+}
+
 // Functor implementing dispatch of disk reading functionality
 struct ReadCallback {
   // Column name
@@ -266,7 +276,8 @@ arrow::Result<std::shared_ptr<Buffer>> GetResultBufferOrAllocate(
   ARROW_ASSIGN_OR_RAISE(auto casa_type_size, CasaDataTypeSize(casa_type));
   auto nbytes = nelements * casa_type_size;
   if (result) return GetResultBuffer(result, nbytes);
-  ARROW_ASSIGN_OR_RAISE(auto allocation, arrow::AllocateBuffer(nbytes, casa_type_size));
+  auto alignment = GetSafeAlignment(casa_type_size);
+  ARROW_ASSIGN_OR_RAISE(auto allocation, arrow::AllocateBuffer(nbytes, alignment));
 
   if (IsPrimitiveType(casa_type)) {
     return std::shared_ptr<Buffer>(std::move(allocation));
@@ -350,14 +361,14 @@ Result<std::shared_ptr<Array>> MakeArray(const ResultShapeData& result_shape,
   // Introduce shape nesting
   if (result_shape.IsFixed() && strat == ConvertStrategy::FIXED) {
     // Exclude the row dimension
-    auto ndim = result_shape.nDim();
+    ARROW_ASSIGN_OR_RAISE(auto ndim, result_shape.ConsistentNDim());
     auto shape = result_shape.GetShape().getFirst(ndim - 1);
     for (auto dim : shape) {
       ARROW_ASSIGN_OR_RAISE(result, FixedSizeListArray::FromArrays(result, dim));
     }
   } else {
     ARROW_ASSIGN_OR_RAISE(auto offsets, result_shape.GetOffsets());
-    assert(offsets.size() == result_shape.nDim() - 1);
+    assert(int(offsets.size()) == result_shape.nDim() - 1);
     for (const auto& offset : offsets) {
       ARROW_ASSIGN_OR_RAISE(result, ListArray::FromArrays(*offset, *result));
     }
@@ -384,8 +395,24 @@ Future<std::shared_ptr<Array>> ReadImpl(const std::shared_ptr<IsolatedTableProxy
                         const TableProxy& tp) mutable -> Result<ShapeResult> {
         ARROW_RETURN_NOT_OK(ColumnExists(tp.table(), column));
         auto table_column = TableColumn(tp.table(), column);
+
+        // If a result array is supplied we can derive ResultShapeData from it
+        // Also iterate over the selected rows and negate any missing rows as
+        // this elides reads in these cases
+        if (result) {
+          ARROW_ASSIGN_OR_RAISE(auto shape_data,
+                                ResultShapeData::FromArray(table_column, result));
+          ARROW_ASSIGN_OR_RAISE(
+              auto modified_selection,
+              shape_data.NegateMissingSelectedRows(table_column, selection));
+          return ShapeResult{std::make_shared<ResultShapeData>(std::move(shape_data)),
+                             std::make_shared<Selection>(std::move(modified_selection))};
+        }
+
+        // Otherwise the ResultShapeData must be derived wholly from
+        // the contents of the column
         ARROW_ASSIGN_OR_RAISE(auto shape_data,
-                              ResultShapeData::MakeRead(table_column, selection, result));
+                              ResultShapeData::MakeRead(table_column, selection));
         return ShapeResult{std::make_shared<ResultShapeData>(std::move(shape_data)),
                            std::make_shared<Selection>(std::move(selection))};
       });

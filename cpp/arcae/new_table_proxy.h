@@ -70,6 +70,10 @@ class NewTableProxy {
                                 const std::shared_ptr<arrow::Array>& data,
                                 const detail::Selection& selection = {}) const;
 
+  // Get the row shapes for the given column and row selection
+  arrow::Result<std::shared_ptr<arrow::Array>> GetRowShapes(
+      const std::string& column, const detail::Selection& selection = {}) const;
+
   // Return the URL of this table
   arrow::Result<std::string> Name() const;
 
@@ -88,7 +92,6 @@ class NewTableProxy {
   // Add a column to the table
   arrow::Result<bool> AddColumns(const std::string& json_columndescs,
                                  const std::string& json_dminfo = {});
-
   // Get a pointer to the IsolatedTableProxy
   std::shared_ptr<detail::IsolatedTableProxy> Proxy() const { return itp_; }
 

@@ -16,6 +16,8 @@
 #include <casacore/tables/Tables/TableColumn.h>
 
 #include "arcae/selection.h"
+#include "arrow/array/array_base.h"
+#include "arrow/status.h"
 
 namespace arcae {
 namespace detail {
@@ -45,15 +47,24 @@ using RowShapes = std::vector<casacore::IPosition>;
 struct ResultShapeData {
   std::string column_name_;
   std::optional<casacore::IPosition> shape_;
-  std::size_t ndim_;
+  int ndim_;
   casacore::DataType dtype_;
   std::optional<RowShapes> row_shapes_;
 
   // Return the Column Name
   const std::string& GetName() const noexcept { return column_name_; }
 
+  // Return number of dimensions, if they are >= 0
+  // else an error status
+  arrow::Result<int> ConsistentNDim() const {
+    if (ndim_ >= 0) return ndim_;
+    return arrow::Status::Invalid("Result shape dimensions are not consistent");
+  }
+
   // Return the Number of Dimensions in the Column
-  std::size_t nDim() const noexcept { return ndim_; }
+  // Prefer ConsistentNDim for code where row shapes
+  // are assumed to have the same rank
+  int nDim() const noexcept { return ndim_; }
 
   // Number of Rows in the Shape
   std::size_t nRows() const noexcept {
@@ -66,7 +77,8 @@ struct ResultShapeData {
   std::size_t MaxDimensionSize() const noexcept;
 
   // Obtain the flat offset at the specified
-  std::size_t FlatOffset(const absl::Span<const IndexType>& index) const noexcept;
+  arrow::Result<std::size_t> FlatOffset(
+      const absl::Span<const IndexType>& index) const noexcept;
 
   // Is the result shape fixed?
   bool IsFixed() const noexcept { return shape_.has_value(); }
@@ -93,14 +105,26 @@ struct ResultShapeData {
   // Get the number of elements in the result
   std::size_t nElements() const noexcept;
 
+  // Get an Arrow Array describing the row shapes
+  arrow::Result<std::shared_ptr<arrow::Array>> GetShapeArray() const noexcept;
+
   // Get ListArray offsets
   arrow::Result<std::vector<std::shared_ptr<arrow::Int32Array>>> GetOffsets()
       const noexcept;
 
+  // For any degenerate shapes representing missing rows in the ResultShapeData object
+  // convert the associated row in the selection to -1
+  arrow::Result<Selection> NegateMissingSelectedRows(const casacore::TableColumn& column,
+                                                     const Selection& selection);
+
   // Create a ResultShapeData instance suitable for reading
-  static arrow::Result<ResultShapeData> MakeRead(
-      const casacore::TableColumn& column, const Selection& selection = Selection(),
-      const std::shared_ptr<arrow::Array>& result = nullptr);
+  static arrow::Result<ResultShapeData> MakeRead(const casacore::TableColumn& column,
+                                                 const Selection& selection = Selection(),
+                                                 bool allow_missing_rows = false);
+
+  // Create a ResultShapeData instance from an array
+  static arrow::Result<ResultShapeData> FromArray(
+      const casacore::TableColumn& column, const std::shared_ptr<arrow::Array>& data);
 
   // Create a ResultShapeData instance suitable for writing
   static arrow::Result<ResultShapeData> MakeWrite(

@@ -261,7 +261,7 @@ Result<std::shared_ptr<Buffer>> ExtractBufferOrCopyValues(
     auto flat_strings = std::dynamic_pointer_cast<arrow::StringArray>(flat_array);
     if (!flat_strings) return Status::Invalid("Cast to StringArray");
     auto nbytes = sizeof(String) * flat_strings->length();
-    ARROW_ASSIGN_OR_RAISE(auto allocation, arrow::AllocateBuffer(nbytes, sizeof(String)));
+    ARROW_ASSIGN_OR_RAISE(auto allocation, arrow::AllocateBuffer(nbytes));
     auto span = allocation->mutable_span_as<String>();
     assert(span.size() == decltype(span.size())(flat_strings->length()));
     for (std::size_t i = 0; i < span.size(); ++i) {

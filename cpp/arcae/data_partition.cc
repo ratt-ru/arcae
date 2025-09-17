@@ -248,7 +248,7 @@ Result<std::vector<DataChunk>> MakeDataChunks(std::vector<SpanPairs>&& dim_spans
 
     // Compute flat offsets
     auto min_span = absl::MakeSpan(&shared->min_mem_index_[offset], ndim);
-    shared->flat_offsets_[chunk] = data_shape.FlatOffset(min_span);
+    ARROW_ASSIGN_OR_RAISE(shared->flat_offsets_[chunk], data_shape.FlatOffset(min_span));
 
     // Create the chunk
     chunks[chunk] = DataChunk{chunk, shared};
@@ -311,79 +311,88 @@ bool DataChunk::IsEmpty() const noexcept {
   }
   return nElements() == 0;
 }
-
 // Commented out debugging function
-// std::string
-// DataChunk::ToString() const {
-//   std::ostringstream oss;
-//   oss << '\n';
-//   bool first_dim = true;
-//   std::size_t nelements = 1;
-//   auto dim_spans = DimensionSpans();
-//   for(std::size_t d = 0; d < dim_spans.size(); ++d) {
-//     if(!first_dim) oss << ' ';
-//     first_dim = false;
-//     oss << '[';
-//     bool first_index = true;
-//     nelements *= dim_spans[d].mem.size();
-//     for(auto i: dim_spans[d].mem) {
-//       if(!first_index) oss << ',';
-//       first_index = false;
-//       oss << std::to_string(i);
-//     }
-//     oss << ']';
-//   }
+std::string DataChunk::ToString() const {
+  std::ostringstream oss;
+  oss << '\n';
+  bool first_dim = true;
+  std::size_t nelements = 1;
+  auto dim_spans = DimensionSpans();
+  for (std::size_t d = 0; d < dim_spans.size(); ++d) {
+    if (!first_dim) oss << ' ';
+    first_dim = false;
+    oss << '[';
+    bool first_index = true;
+    nelements *= dim_spans[d].mem.size();
+    for (auto i : dim_spans[d].mem) {
+      if (!first_index) oss << ',';
+      first_index = false;
+      oss << std::to_string(i);
+    }
+    oss << ']';
+  }
 
-//   oss << '\n';
+  oss << '\n';
 
-//   first_dim = true;
-//   for(std::size_t d = 0; d < dim_spans.size(); ++d) {
-//     if(!first_dim) oss << ' ';
-//     first_dim = false;
-//     oss << '[';
-//     bool first_index = true;
-//     for(auto i: dim_spans[d].disk) {
-//       if(!first_index) oss << ',';
-//       first_index = false;
-//       oss << std::to_string(i);
-//     }
-//     oss << ']';
-//   }
+  first_dim = true;
+  for (std::size_t d = 0; d < dim_spans.size(); ++d) {
+    if (!first_dim) oss << ' ';
+    first_dim = false;
+    oss << '[';
+    bool first_index = true;
+    for (auto i : dim_spans[d].disk) {
+      if (!first_index) oss << ',';
+      first_index = false;
+      oss << std::to_string(i);
+    }
+    oss << ']';
+  }
 
-//   oss << '\n';
+  oss << '\n';
 
-//   first_dim = true;
-//   auto chunk_strides = ChunkStrides();
-//   oss << '[';
-//   for(auto cs: chunk_strides) {
-//     if(!first_dim) oss << ',';
-//     first_dim = false;
-//     oss << std::to_string(cs);
-//   }
+  first_dim = true;
+  auto chunk_strides = ChunkStrides();
+  oss << '[';
+  for (auto cs : chunk_strides) {
+    if (!first_dim) oss << ',';
+    first_dim = false;
+    oss << std::to_string(cs);
+  }
 
-//   oss << ']' << '\n';
+  oss << ']' << '\n';
 
-//   first_dim = true;
-//   auto buf_strides = BufferStrides();
-//   oss << '[';
-//   for(auto bs: buf_strides) {
-//     if(!first_dim) oss << ',';
-//     first_dim = false;
-//     oss << std::to_string(bs);
-//   }
+  first_dim = true;
+  auto buf_strides = BufferStrides();
+  oss << '[';
+  for (auto bs : buf_strides) {
+    if (!first_dim) oss << ',';
+    first_dim = false;
+    oss << std::to_string(bs);
+  }
 
-//   oss << ']' << '\n';
+  oss << ']' << '\n';
 
-//   oss << '\n';
-//   oss << "row slicer:" << GetRowSlicer() << '\n';
-//   oss << "sec slicer:" << GetSectionSlicer() << '\n';
-//   oss << " elements: " + std::to_string(nelements);
-//   oss << " offset: " + std::to_string(FlatOffset());
-//   oss << " contiguous: ";
-//   oss << (IsContiguous() ? 'Y' : 'N');
+  oss << '\n';
 
-//   return oss.str();
-// }
+  first_dim = true;
+  auto ref_rows = ReferenceRows();
+  oss << "row slicer: [";
+  for (auto r : ref_rows.rowVector()) {
+    if (!first_dim) oss << ',';
+    first_dim = false;
+    oss << r;
+  }
+  oss << "] \n";
+
+  // oss << "row slicer:" << ReferenceRows() << '\n';
+  oss << "sec slicer:" << SectionSlicer() << '\n';
+  oss << " elements: " + std::to_string(nelements);
+  oss << " offset: " + std::to_string(FlatOffset());
+  oss << " contiguous: ";
+  oss << (IsContiguous() ? 'Y' : 'N');
+
+  return oss.str();
+}
 
 Result<DataPartition> DataPartition::Make(const Selection& selection,
                                           const ResultShapeData& result_shape) {
@@ -394,11 +403,11 @@ Result<DataPartition> DataPartition::Make(const Selection& selection,
   auto id_cache = std::vector<Index>{Index(result_shape.MaxDimensionSize())};
   std::iota(id_cache.back().begin(), id_cache.back().end(), 0);
   auto monotonic_ids = IndexSpan(id_cache.back());
-  auto ndim = result_shape.nDim();
+  ARROW_ASSIGN_OR_RAISE(auto result_ndim, result_shape.ConsistentNDim());
 
   // Generate disk and memory spans for the specified dimension
   auto GetSpanPair = [&](auto dim, auto dim_size) -> SpanPair {
-    if (auto dim_span = selection.FSpan(dim, ndim); dim_span.ok()) {
+    if (auto dim_span = selection.FSpan(dim, result_ndim); dim_span.ok()) {
       // Sort selection indices to create
       // disk and memory indices
       auto [disk_ids, mem_ids] = MakeSortedIndices(dim_span.ValueOrDie());
@@ -418,10 +427,10 @@ Result<DataPartition> DataPartition::Make(const Selection& selection,
   // over each dimension in FORTRAN order
   if (result_shape.IsFixed()) {
     std::vector<SpanPairs> dim_subspans;
-    dim_subspans.reserve(result_shape.nDim());
+    dim_subspans.reserve(result_ndim);
     const auto& shape = result_shape.GetShape();
-    auto row_dim = result_shape.nDim() - 1;
-    for (std::size_t d = 0; d < result_shape.nDim(); ++d) {
+    auto row_dim = result_ndim - 1;
+    for (int d = 0; d < result_ndim; ++d) {
       auto [disk_span, mem_span] = GetSpanPair(d, shape[d]);
       ARROW_ASSIGN_OR_RAISE(auto spans, MakeSubSpans(disk_span, mem_span, d == row_dim));
       dim_subspans.emplace_back(std::move(spans));
@@ -436,18 +445,20 @@ Result<DataPartition> DataPartition::Make(const Selection& selection,
 
   // In the varying case, start with the row dimension
   auto nrows = result_shape.nRows();
-  auto row_dim = result_shape.nDim() - 1;
+  auto row_dim = result_ndim - 1;
   auto [row_disk_span, row_mem_span] = GetSpanPair(row_dim, nrows);
   std::vector<SpanPairs> dim_spans;
   std::vector<bool> contiguous;
 
   for (std::size_t r = 0; r < nrows; ++r) {
     std::vector<SpanPairs> dim_subspans;
-    dim_subspans.reserve(result_shape.nDim());
-    const auto& row_shape = result_shape.GetRowShape(r);
+    dim_subspans.reserve(result_ndim);
+    // The result shape aligns with the row memory indices
+    // so we obtain the row shape through indirection
+    const auto& row_shape = result_shape.GetRowShape(row_mem_span[r]);
 
     // Create span pairs for the secondary dimensions
-    for (std::size_t dim = 0; dim < row_dim; ++dim) {
+    for (int dim = 0; dim < row_dim; ++dim) {
       auto [disk_span, mem_span] = GetSpanPair(dim, row_shape[dim]);
       ARROW_ASSIGN_OR_RAISE(auto spans, MakeSubSpans(disk_span, mem_span, false));
       dim_subspans.emplace_back(std::move(spans));

@@ -13,7 +13,6 @@ classifiers = [
     "Programming Language :: Python :: 3"
 ]
 dependencies = [
-    "appdirs",
     "numpy >= 2.0.0",
     "pyarrow == 21.0.0"
 ]
@@ -29,6 +28,7 @@ dev = [
 ]
 test = [
     "duckdb",
+    "platformdirs",
     "pytest >= 7.0.0",
     "python-casacore >= 3.5.0; sys_platform == 'linux' and platform_machine == 'x86_64' and python_version<'3.14'",
     "requests"
@@ -48,7 +48,7 @@ requires = [
     "pyarrow == 21.0.0"]
 build-backend = "scikit_build_core.build"
 
-[tools.setuptools.packages]
+[tool.setuptools.packages]
 find = {}
 
 [tool.scikit-build]
@@ -56,3 +56,40 @@ find = {}
 cmake.version = ">=3.26.1"
 cmake.build-type = "RelWithDebInfo"
 install.strip = false
+
+[tool.cibuildwheel]
+build-frontend = "build"
+manylinux-x86_64-image = "manylinux_2_28"
+manylinux-aarch64-image = "manylinux_2_28"
+test-command = "{package}/ci/scripts/run-tests.sh"
+
+[tool.cibuildwheel.linux]
+before-all = "{package}/ci/scripts/before-all-linux.sh"
+test-extras = ["applications", "test"]
+
+repair-wheel-command = """
+auditwheel repair \
+    -w {dest_dir} {wheel} \
+    --exclude libarrow_python.so.2100 \
+    --exclude libarrow.so.2100
+"""
+
+[tool.cibuildwheel.macos]
+before-all = "{package}/ci/scripts/before-all-macos.sh"
+
+before-build = """
+export PATH="/opt/homebrew/opt/llvm/bin:$PATH"
+export LDFLAGS="-L/opt/homebrew/opt/llvm/lib"
+export CPPFLAGS="-I/opt/homebrew/opt/llvm/include"
+"""
+
+repair-wheel-command = """
+DYLD_LIBRARY_PATH=$LD_LIBRARY_PATH delocate-listdeps {wheel}
+DYLD_LIBRARY_PATH=$LD_LIBRARY_PATH delocate-wheel \
+    --require-archs {delocate_archs} \
+    -w {dest_dir} \
+    -v {wheel} \
+    --exclude libarrow_python.2100.dylib \
+    --exclude libarrow.2100.dylib \
+    --ignore-missing-dependencies
+"""
