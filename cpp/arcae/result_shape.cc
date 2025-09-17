@@ -657,10 +657,12 @@ Result<ResultShapeData> ResultShapeData::MakeRead(const TableColumn& column,
   // has already done this
   if (shapes_equal && fixed_shape && missing_rows == 0) {
     fixed_shape->append(IPosition({nselrow}));
-    auto ndim = int(fixed_shape->size());
+    ndim = int(fixed_shape->size());
     return ResultShapeData{column_name, std::move(fixed_shape), ndim, std::move(dtype),
                            std::nullopt};
   }
+
+  if (ndim == -1) ndim = column_desc.ndim();
 
   // Shapes and their rank may vary per row and rows may be missing
   return ResultShapeData{column_name, std::nullopt, ndim, std::move(dtype),
