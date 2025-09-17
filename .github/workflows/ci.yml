@@ -108,6 +108,7 @@ jobs:
         run: |
           brew update
           brew install ninja
+          brew reinstall gcc
           python -m pip install -U pip
           python -m pip install pyarrow
 
