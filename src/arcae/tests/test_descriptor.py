@@ -31,20 +31,20 @@ def test_ms_and_weather_subtable(tmp_path_factory):
 
     # Basic descriptor
     table_desc = ms_descriptor("WEATHER", complete=False)
-    with Table.ms_from_descriptor(str(ms), "WEATHER", table_desc) as W:
+    with Table.ms_from_descriptor(str(ms), "WEATHER", table_desc=table_desc) as W:
         assert (ms / "WEATHER").exists()
         assert W.columns() == ["ANTENNA_ID", "INTERVAL", "TIME"]
 
     # Add a column to the basic descriptor
     table_desc = ms_descriptor("WEATHER", complete=False)
     table_desc["BLAH"] = table_desc["TIME"].copy()
-    with Table.ms_from_descriptor(str(ms), "WEATHER", table_desc) as W:
+    with Table.ms_from_descriptor(str(ms), "WEATHER", table_desc=table_desc) as W:
         assert (ms / "WEATHER").exists()
         assert W.columns() == ["ANTENNA_ID", "BLAH", "INTERVAL", "TIME"]
 
     # Complete descriptor
     table_desc = ms_descriptor("WEATHER", complete=True)
-    with Table.ms_from_descriptor(str(ms), "WEATHER", table_desc) as W:
+    with Table.ms_from_descriptor(str(ms), "WEATHER", table_desc=table_desc) as W:
         assert (ms / "WEATHER").exists()
         assert W.columns() == [
             "ANTENNA_ID",

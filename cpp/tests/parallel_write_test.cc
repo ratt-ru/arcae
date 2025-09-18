@@ -1,3 +1,17 @@
+// This test case is something of a curiosity in that it tests
+// writing to a Tiled Storage Manager at tile boundaries from multiple threads.
+// (In practice, arcae only writes from a single thread at a time).
+// This test fails if the writes cross boundaries (race condition) and
+// this only works if auto locking is turned on. Without auto locking,
+// one tends to see ""FilebufIO::readBlock - incorrect number of bytes" on
+// with respect to "table.f0", the Tiled Storage Manager header.
+
+// Currently, we speculate this is due to internal lock mismatches. See:
+// 1. CAS-13609 in https://casadocs.readthedocs.io/en/v6.4.3/changelog.html
+// 2. https://keflavich.github.io/blog/casa-reading-incorrect-number-of-bytes-wmpi.html
+
+#include <memory>
+
 #include <arcae/isolated_table_proxy.h>
 #include <arcae/new_table_proxy.h>
 #include <arcae/table_factory.h>
@@ -8,17 +22,18 @@
 #include <casacore/ms/MeasurementSets/MeasurementSet.h>
 #include <casacore/tables/Tables.h>
 
+#include <casacore/casa/IO/FileLocker.h>
 #include <casacore/tables/Tables/TableLock.h>
 #include <casacore/tables/Tables/TableProxy.h>
 #include <gtest/gtest.h>
 
 #include <tests/test_utils.h>
-#include <memory>
 
 using ::arrow::Result;
 
 using ::arcae::detail::IsolatedTableProxy;
 
+using LockType = ::casacore::FileLocker::LockType;
 using ::casacore::Array;
 using ::casacore::ArrayColumn;
 using ::casacore::ArrayColumnDesc;
@@ -78,10 +93,10 @@ class WriteTests : public ::testing::Test {
 
   arrow::Result<std::shared_ptr<IsolatedTableProxy>> OpenTable() {
     return IsolatedTableProxy::Make([name = table_name_]() {
-      auto lock = TableLock(TableLock::LockOption::AutoLocking);
+      auto lock = TableLock(TableLock::LockOption::UserLocking);
       auto lockoptions = Record();
-      lockoptions.define("option", "nolock");
-      lockoptions.define("internal", lock.interval());
+      lockoptions.define("option", "auto");
+      lockoptions.define("interval", lock.interval());
       lockoptions.define("maxwait", casacore::Int(lock.maxWait()));
       auto tp = std::make_shared<TableProxy>(name, lockoptions, Table::Old);
       tp->reopenRW();
@@ -122,13 +137,13 @@ TEST_F(WriteTests, Parallel) {
 
                   try {
                     column.putColumnRange(Slice(start, nrow), data);
-                    table.flush();
                   } catch (std::exception& e) {
                     return arrow::Status::Invalid("Write failed ", e.what());
                   }
 
                   return true;
-                });
+                },
+                LockType::None);
           }));
 
       futures.push_back(result);
@@ -156,6 +171,8 @@ TEST_F(WriteTests, Parallel) {
           auto table_column = TableColumn(table, "MODEL_DATA");
           const auto& column_desc = table_column.columnDesc();
           auto column = ArrayColumn<CasaComplex>(table_column);
+          table.lock(false, 0);
+          std::shared_ptr<void> result(nullptr, [&](...) { table.unlock(); });
 
           try {
             return column.getColumnRange(Slice(start, nrow));

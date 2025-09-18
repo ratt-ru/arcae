@@ -2,6 +2,10 @@
 History
 =======
 
+0.4.0 (DD-MM-YYYY)
+------------------
+* Implement write-locking (:pr:`162`)
+
 0.3.2 (17-09-2025)
 ------------------
 * Address tar.extractall filter warning (:pr:`179`)
