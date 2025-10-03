@@ -24,7 +24,7 @@ COMPARE = False
 THREADS = 16
 INSTANCES = THREADS
 STEP = 10
-MS_PARAMS = {"row": 100 * STEP, "chan": 1024, "corr": 4}
+MS_PARAMS = {"row": 10000 * STEP, "chan": 1024, "corr": 4}
 
 
 @pytest.mark.skipif(not pytest_benchmark, reason="pytest-benchmark not installed")
