@@ -2,6 +2,10 @@
 History
 =======
 
+X.Y.Z (DD-MM-YYYY)
+------------------
+* Update multithreaded benchmarks to use the newer API (:pr:`181`)
+
 0.3.2 (17-09-2025)
 ------------------
 * Address tar.extractall filter warning (:pr:`179`)
