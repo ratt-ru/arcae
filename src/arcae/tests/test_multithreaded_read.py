@@ -1,4 +1,6 @@
 import concurrent.futures as cf
+import os
+import sys
 
 import numpy as np
 import pytest
@@ -25,6 +27,23 @@ THREADS = 16
 INSTANCES = THREADS
 STEP = 10
 MS_PARAMS = {"row": 10000 * STEP, "chan": 1024, "corr": 4}
+DROP_CACHES = True
+
+
+def maybe_drop_caches():
+    if not DROP_CACHES:
+        print("Disk caches were not dropped. This benchmark may not be accurate.")
+        return
+
+    if sys.platform != "linux":
+        raise NotImplementedError("Dropping caches on {sys.platform}")
+
+    if os.geteuid() != 0:
+        raise RuntimeError("Need to run as root to drop caches")
+
+    os.sync()
+    with open("/proc/sys/vm/drop_caches", "w") as f:
+        f.write("3\n")
 
 
 @pytest.mark.skipif(not pytest_benchmark, reason="pytest-benchmark not installed")
@@ -57,4 +76,4 @@ def test_singlefile_multithread_read(ramp_ms, benchmark):
 
     with cf.ThreadPoolExecutor(THREADS) as pool:
         print("Benchmarking starts")
-        benchmark(test_, pool)
+        benchmark.pedantic(test_, args=(pool,), setup=maybe_drop_caches, rounds=10)
