@@ -1,6 +1,6 @@
 [project]
 name = "arcae"
-version = "0.3.2"
+version = "0.3.3"
 authors = [
     {name = "Simon Perkins", email = "simon.perkins@gmail.com"}
 ]
