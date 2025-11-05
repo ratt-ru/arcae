@@ -2,7 +2,7 @@
 History
 =======
 
-X.Y.Z (DD-MM-YYYY)
+0.3.3 (05-11-2025)
 ------------------
 * Deprecate python 3.10 support (:pr:`187`)
 * Support python 3.14 (:pr:`187`)
