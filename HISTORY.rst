@@ -4,6 +4,9 @@ History
 
 X.Y.Z (DD-MM-YYYY)
 ------------------
+* Deprecate python 3.10 support (:pr:`187`)
+* Support python 3.14 (:pr:`187`)
+* Upgrade to pyarrow 22 (:pr:`187`)
 * Update multithreaded benchmarks to use the newer API (:pr:`181`, :pr:`182`)
 
 0.3.2 (17-09-2025)
