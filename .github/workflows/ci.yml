@@ -39,7 +39,7 @@ jobs:
         run: python -m build --sdist
 
       - name: Upload wheel artifacts
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: ${{ env.ARTIFACT_NAME }}-source
           path: ./dist/*.tar.gz
@@ -224,7 +224,7 @@ jobs:
         uses: pypa/cibuildwheel@v3.3.0
 
       - name: Upload wheel artifacts
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: ${{ env.ARTIFACT_NAME }}-${{ matrix.os_short }}-${{ matrix.arch }}
           path: ./wheelhouse/*.whl
