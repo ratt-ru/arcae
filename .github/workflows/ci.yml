@@ -45,7 +45,7 @@ jobs:
           path: ./dist/*.tar.gz
 
   ubuntu-cpp-tests:
-    name: Execute C++ test cases on ubuntu
+    name: Execute ubuntu x86_64 C++ test cases
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -89,7 +89,7 @@ jobs:
       #   uses: mxschmitt/action-tmate@v3
 
   macos-cpp-tests:
-    name: Execute C++ test cases on macos
+    name: Execute macos arm64 C++ test cases
     runs-on: macos-15
     permissions:
       id-token: write
@@ -135,7 +135,7 @@ jobs:
 
 
   build-wheels:
-    name: Build wheels for ${{ matrix.os_short }}-${{ matrix.arch }}
+    name: Build ${{ matrix.os_short }}-${{ matrix.arch }} wheels
     runs-on: ${{ matrix.os }}
     permissions:
       id-token: write
