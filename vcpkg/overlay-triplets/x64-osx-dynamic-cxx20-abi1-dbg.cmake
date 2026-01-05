@@ -9,6 +9,7 @@ set(CMAKE_CXX_EXTENSIONS Off)
 
 set(VCPKG_C_FLAGS "${VCPKG_C_FLAGS}")
 set(VCPKG_CXX_FLAGS "${VCPKG_CXX_FLAGS} -D_GLIBCXX_USE_CXX11_ABI=1")
+set(VCPKG_LINKER_FLAGS "${VCPKG_LINKER_FLAGS} -Wl,-headerpad_max_install_names")
 # Add compiler specific debug flags here too
 
 set(VCPKG_CMAKE_SYSTEM_NAME Darwin)

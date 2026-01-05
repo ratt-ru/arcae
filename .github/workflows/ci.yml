@@ -45,7 +45,7 @@ jobs:
           path: ./dist/*.tar.gz
 
   ubuntu-cpp-tests:
-    name: Execute C++ test cases on ubuntu
+    name: Execute ubuntu x86_64 C++ test cases
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -89,7 +89,7 @@ jobs:
       #   uses: mxschmitt/action-tmate@v3
 
   macos-cpp-tests:
-    name: Execute C++ test cases on macos
+    name: Execute macos arm64 C++ test cases
     runs-on: macos-15
     permissions:
       id-token: write
@@ -135,7 +135,7 @@ jobs:
 
 
   build-wheels:
-    name: Build wheels for ${{ matrix.os_short }}-${{ matrix.arch }}
+    name: Build ${{ matrix.os_short }}-${{ matrix.arch }} wheels
     runs-on: ${{ matrix.os }}
     permissions:
       id-token: write
@@ -143,7 +143,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ["ubuntu-22.04", "macos-13", "macos-14", "ubuntu-22.04-arm"]
+        os: ["ubuntu-22.04", "macos-15-intel", "macos-14", "ubuntu-22.04-arm"]
         is_main_or_release:
           - ${{ contains(github.ref, 'main') || startsWith(github.ref, 'refs/tags')}}
         include:
@@ -157,10 +157,10 @@ jobs:
             arch: aarch64
             triplet: "arm64-linux-dynamic-cxx20-abi1-rel"
             extra_build: "manylinux_aarch64"
-          - os: macos-13
+          - os: macos-15-intel
             os_short: macos
             arch: x86_64
-            deployment_target: "13.0"
+            deployment_target: "15.0"
             triplet: "x64-osx-dynamic-cxx20-abi1-rel"
             extra_build: "macosx_x86_64"
           - os: macos-14

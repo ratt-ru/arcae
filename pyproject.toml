@@ -42,7 +42,7 @@ Repository = "https://github.com/ratt-ru/arcae"
 
 [build-system]
 requires = [
-    "cython>=3.0.2, < 3.0.10",
+    "cython>=3.2.0",
     "scikit-build-core",
     "numpy >= 2.0.0",
     "pyarrow == 22.0.0"]
