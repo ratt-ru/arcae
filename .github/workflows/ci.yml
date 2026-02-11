@@ -15,8 +15,8 @@ env:
   VCPKG_BINARY_SOURCES: "clear;x-aws,${{ secrets.VCPKG_CACHE_URL }},readwrite"
   VCPKG_INSTALLED_DIR: /tmp/vcpkg_installed
   ARTIFACT_NAME: wheel
-  WHEEL_PYTHON_VERSIONS: "3.10 3.11 3.12 3.13"
-  PR_WHEEL_PYTHON_VERSIONS: "3.10 3.13"
+  WHEEL_PYTHON_VERSIONS: "3.11 3.12 3.13 3.14"
+  PR_WHEEL_PYTHON_VERSIONS: "3.11 3.14"
 
 jobs:
   build-sdist:
@@ -33,19 +33,19 @@ jobs:
         run: python -m pip install -U pip build
 
       - name: Checkout source
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Build source distribution
         run: python -m build --sdist
 
       - name: Upload wheel artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ${{ env.ARTIFACT_NAME }}-source
           path: ./dist/*.tar.gz
 
   ubuntu-cpp-tests:
-    name: Execute C++ test cases on ubuntu
+    name: Execute ubuntu x86_64 C++ test cases
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -53,7 +53,7 @@ jobs:
       VCPKG_TARGET_TRIPLET: "x64-linux-dynamic-cxx20-abi1-rel"
     steps:
       - name: Checkout source
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Set up Python ${{ env.HOST_PYTHON_VERSION }}
         uses: actions/setup-python@v6
@@ -68,7 +68,7 @@ jobs:
           python -m pip install pyarrow
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v5.0.0
+        uses: aws-actions/configure-aws-credentials@v5.1.1
         with:
           role-to-assume: ${{ secrets.GHA_ROLE_ARN }}
           aws-region: af-south-1
@@ -89,7 +89,7 @@ jobs:
       #   uses: mxschmitt/action-tmate@v3
 
   macos-cpp-tests:
-    name: Execute C++ test cases on macos
+    name: Execute macos arm64 C++ test cases
     runs-on: macos-15
     permissions:
       id-token: write
@@ -97,7 +97,7 @@ jobs:
       VCPKG_TARGET_TRIPLET: "arm64-osx-dynamic-cxx20-abi1-rel"
     steps:
       - name: Checkout source
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Set up Python ${{ env.HOST_PYTHON_VERSION }}
         uses: actions/setup-python@v6
@@ -113,7 +113,7 @@ jobs:
           python -m pip install pyarrow
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v5.0.0
+        uses: aws-actions/configure-aws-credentials@v5.1.1
         with:
           role-to-assume: ${{ secrets.GHA_ROLE_ARN }}
           aws-region: af-south-1
@@ -135,7 +135,7 @@ jobs:
 
 
   build-wheels:
-    name: Build wheels for ${{ matrix.os_short }}-${{ matrix.arch }}
+    name: Build ${{ matrix.os_short }}-${{ matrix.arch }} wheels
     runs-on: ${{ matrix.os }}
     permissions:
       id-token: write
@@ -143,7 +143,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ["ubuntu-22.04", "macos-13", "macos-14", "ubuntu-22.04-arm"]
+        os: ["ubuntu-22.04", "macos-15-intel", "macos-14", "ubuntu-22.04-arm"]
         is_main_or_release:
           - ${{ contains(github.ref, 'main') || startsWith(github.ref, 'refs/tags')}}
         include:
@@ -157,10 +157,10 @@ jobs:
             arch: aarch64
             triplet: "arm64-linux-dynamic-cxx20-abi1-rel"
             extra_build: "manylinux_aarch64"
-          - os: macos-13
+          - os: macos-15-intel
             os_short: macos
             arch: x86_64
-            deployment_target: "13.0"
+            deployment_target: "15.0"
             triplet: "x64-osx-dynamic-cxx20-abi1-rel"
             extra_build: "macosx_x86_64"
           - os: macos-14
@@ -179,7 +179,7 @@ jobs:
         run: python -m pip install -U pip virtualenv
 
       - name: Checkout source
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Construct CIBW_BUILD string
         id: cibw-build
@@ -199,7 +199,7 @@ jobs:
           echo "cibw_build=$CIBW_BUILD" >> $GITHUB_OUTPUT
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v5.0.0
+        uses: aws-actions/configure-aws-credentials@v5.1.1
         with:
           role-to-assume: ${{ secrets.GHA_ROLE_ARN }}
           aws-region: af-south-1
@@ -221,10 +221,10 @@ jobs:
             VCPKG_INSTALLED_DIR=${{ env.VCPKG_INSTALLED_DIR }}
             LD_LIBRARY_PATH=${{ env.VCPKG_INSTALLED_DIR }}/${{ matrix.triplet }}/lib
             MACOSX_DEPLOYMENT_TARGET=${{ matrix.deployment_target }}
-        uses: pypa/cibuildwheel@v3.1.4
+        uses: pypa/cibuildwheel@v3.3.0
 
       - name: Upload wheel artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ${{ env.ARTIFACT_NAME }}-${{ matrix.os_short }}-${{ matrix.arch }}
           path: ./wheelhouse/*.whl
@@ -243,7 +243,7 @@ jobs:
       id-token: write
     steps:
       - name: Download distribution artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v7
         with:
           pattern: ${{ env.ARTIFACT_NAME }}-*
           merge-multiple: true
@@ -270,7 +270,7 @@ jobs:
       id-token: write
     steps:
       - name: Download distribution artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v7
         with:
           pattern: ${{ env.ARTIFACT_NAME }}-*
           merge-multiple: true

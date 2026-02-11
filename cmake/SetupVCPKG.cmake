@@ -48,8 +48,7 @@ set(CMAKE_TOOLCHAIN_FILE
 set(VCPKG_OVERLAY_TRIPLETS ${CMAKE_SOURCE_DIR}/vcpkg/overlay-triplets)
 set(VCPKG_OVERLAY_PORTS
     ${CMAKE_SOURCE_DIR}/vcpkg/overlay-ports/casacore
-    ${CMAKE_SOURCE_DIR}/vcpkg/overlay-ports/cfitsio
-    ${CMAKE_SOURCE_DIR}/vcpkg/overlay-ports/wcslib)
+    ${CMAKE_SOURCE_DIR}/vcpkg/overlay-ports/cfitsio)
 
 # Discover or infer the vcpkg target triplet
 if(DEFINED ENV{VCPKG_TARGET_TRIPLET})

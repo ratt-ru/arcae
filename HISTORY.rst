@@ -6,6 +6,21 @@ History
 ------------------
 * Implement write-locking (:pr:`162`)
 
+X.Y.Z (DD-MM-YYYY)
+------------------
+* Upgrade to vcpkg 2025.12.12 (:pr:`193`)
+* Remove overlay port for unmaintained wcslib 8.3 (:pr:`193`)
+* Fix casacore version in overlay port (:pr:`193`)
+* Upgrade to macos-15-intel runners for x86_64 builds (:pr:`193`)
+* Upgrade to cython \>= 3.2.0 (:pr:`193`)
+
+0.3.3 (05-11-2025)
+------------------
+* Deprecate python 3.10 support (:pr:`187`)
+* Support python 3.14 (:pr:`187`)
+* Upgrade to pyarrow 22 (:pr:`187`)
+* Update multithreaded benchmarks to use the newer API (:pr:`181`, :pr:`182`)
+
 0.3.2 (17-09-2025)
 ------------------
 * Address tar.extractall filter warning (:pr:`179`)

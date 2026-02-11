@@ -1,9 +1,6 @@
 {
     "dependencies": [
-        {
-            "name": "abseil",
-            "features": ["cxx17"]
-        },
+        "abseil",
         {
             "name": "casacore",
             "default-features": false,
