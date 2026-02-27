@@ -2,7 +2,7 @@
 History
 =======
 
-X.Y.Z (DD-MM-YYYY)
+0.5.0 (27-02-2026)
 ------------------
 * Upgrade to pyarrow 23.0.1 (:pr:`196`)
 * Upgrade to vcpkg 2025.12.12 (:pr:`193`)
