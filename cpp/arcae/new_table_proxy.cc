@@ -24,6 +24,7 @@ using ::arcae::detail::ResultShapeData;
 
 using ::arrow::Array;
 using ::arrow::Result;
+using ::arrow::Status;
 using ::arrow::Table;
 
 using LockType = ::casacore::FileLocker::LockType;

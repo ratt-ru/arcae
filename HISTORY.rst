@@ -6,6 +6,11 @@ X.Y.Z (DD-MM-YYYY)
 ------------------
 * Implement write-locking (:pr:`162`)
 
+0.5.1 (02-03-2026)
+------------------
+* Add an ``arcae.safe_multithreaded_writes`` function indicating whether writing
+  from multiple threads is safe (:pr:`199`)
+
 0.5.0 (27-02-2026)
 ------------------
 * Upgrade to pyarrow 23.0.1 (:pr:`196`)

@@ -9,6 +9,10 @@
 
 namespace arcae {
 
+// Returns OK if safe multi-threaded write support is
+// generally available
+arrow::Status SafeMultiThreadedWrites();
+
 class Configuration {
  private:
   std::map<std::string, std::string> kvmap_;

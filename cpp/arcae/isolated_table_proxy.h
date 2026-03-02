@@ -282,6 +282,8 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
   // threads will produce race conditions in the underlying casacore layer
   std::shared_ptr<IsolatedTableProxy> SpawnWriter();
 
+  std::size_t nInstances() const { return proxy_pools_.size(); }
+
  protected:
   IsolatedTableProxy() = default;
   IsolatedTableProxy(const IsolatedTableProxy& rhs) = delete;
