@@ -104,23 +104,39 @@ Multi-threaded read support
 When opening a CASA table, arcae can open multiple instances
 of the table in separate threads and multiplex
 read operations over them. This mode of operation is intended
-to saturate the number of I/O requests in-flight:
+to saturate the number of I/O requests in-flight by submitting
+read operations from multiple threads:
 
 .. code-block:: python
 
+  import concurrent.futures as cf
+
   table = arcae.table("/path/to/measurementset.ms", ninstances=8, readonly=True)
+  with cf.ThreadPoolExecutor(max_workers=8) as pool:
+    nrow = table.nrow()
+    futures = []
+    for start_row in range(0, nrow, 10_000):
+    nrow = min(10_000, nrow - start_row)
+      futures.append(pool.submit(table.getcol, "DATA", startrow=start_row, nrow=nrow))
+
+    with cf.as_completed(futures):
+      ...
 
 Multi-threaded write support
 ----------------------------
-Generally speaking, writing to a table when multiple threads/instances
-are opened is not a safe operation and arcae will error if this is attempted.
+Generally speaking, writing to a table when multiple instances
+are opened is an unsafe operation. Arcae will error if this is attempted.
 Future versions of arcae may support this.
-In the meantime, the presence of this ability can be inspected
-via the following function:
+In the meantime, the support for this ability can be inspected via the following function:
 
 .. code-block:: python
 
   arcae.safe_multithreaded_writes()
+
+  table = arcae.table("/path/to/measurementset.ms", ninstances=8, readonly=False)
+  table.putcol("DATA", ...)  # Fails, ninstances=1
+
+This means that write support is only available when ``ninstances=1``
 
 Exporting Measurement Sets to Arrow Parquet Datasets
 ----------------------------------------------------
