@@ -227,6 +227,8 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
 
   std::shared_ptr<casacore::TableProxy> Proxy() const { return nullptr; }
 
+  std::size_t nInstances() const { return proxy_pools_.size(); }
+
  protected:
   IsolatedTableProxy() = default;
   IsolatedTableProxy(const IsolatedTableProxy& rhs) = delete;

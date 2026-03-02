@@ -24,6 +24,7 @@ using ::arcae::detail::ResultShapeData;
 
 using ::arrow::Array;
 using ::arrow::Result;
+using ::arrow::Status;
 using ::arrow::Table;
 
 using ::casacore::JsonOut;
@@ -114,6 +115,7 @@ Result<std::shared_ptr<Array>> NewTableProxy::GetRowShapes(
 Result<bool> NewTableProxy::PutColumn(const std::string& column,
                                       const std::shared_ptr<Array>& data,
                                       const detail::Selection& selection) const {
+  ARROW_RETURN_NOT_OK(SafeMultithreadedWrites());
   return WriteImpl(itp_, column, data, selection).MoveResult();
 }
 
@@ -148,6 +150,7 @@ Result<std::size_t> NewTableProxy::nRows() const {
 }
 
 Result<bool> NewTableProxy::AddRows(std::size_t nrows) {
+  ARROW_RETURN_NOT_OK(SafeMultithreadedWrites());
   return itp_
       ->RunAsync([nrows = nrows](TableProxy& tp) {
         detail::MaybeReopenRW(tp);
@@ -159,6 +162,7 @@ Result<bool> NewTableProxy::AddRows(std::size_t nrows) {
 
 Result<bool> NewTableProxy::AddColumns(const std::string& json_columndescs,
                                        const std::string& json_dminfo) {
+  ARROW_RETURN_NOT_OK(SafeMultithreadedWrites());
   return itp_
       ->RunAsync([json_columndescs = json_columndescs,
                   json_dminfo = json_dminfo](TableProxy& tp) {
@@ -172,5 +176,11 @@ Result<bool> NewTableProxy::AddColumns(const std::string& json_columndescs,
 }
 
 Result<bool> NewTableProxy::Close() { return itp_->Close(); }
+
+Status NewTableProxy::SafeMultithreadedWrites() const {
+  if (itp_->nInstances() == 1) return Status::OK();
+  return Status::NotImplemented("Write support when number of table instances ",
+                                itp_->nInstances(), " is greater than one");
+}
 
 }  // namespace arcae
