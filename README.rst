@@ -124,19 +124,19 @@ read operations from multiple threads:
 
 Multi-threaded write support
 ----------------------------
-Generally speaking, writing to a table when multiple instances
-are opened is an unsafe operation. Arcae will error if this is attempted.
+arcae only supports writing when a single instance of the table is opened (``ninstances=1``).
+Writing to a table when multiple instances are opened is an unsafe operation
+and arcae will error if this is attempted.
 Future versions of arcae may support this.
-In the meantime, the support for this ability can be inspected via the following function:
+In the meantime, the support for this ability can be inspected via the
+``arcae.safe_multithread_writes`` function:
 
 .. code-block:: python
 
-  arcae.safe_multithreaded_writes()
+  assert not arcae.safe_multithreaded_writes()
 
   table = arcae.table("/path/to/measurementset.ms", ninstances=8, readonly=False)
-  table.putcol("DATA", ...)  # Fails, ninstances=1
-
-This means that write support is only available when ``ninstances=1``
+  table.putcol("DATA", ...)  # Fails, ninstances > 1
 
 Exporting Measurement Sets to Arrow Parquet Datasets
 ----------------------------------------------------
