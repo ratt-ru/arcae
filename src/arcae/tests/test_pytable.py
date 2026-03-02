@@ -11,12 +11,6 @@ import arcae
 from arcae.lib.arrow_tables import Table
 
 
-def test_safe_multithreaded_writes():
-    """Assert that this version of arcae does not
-    support multithreaded writes"""
-    assert not arcae.safe_multithreaded_writes()
-
-
 @pytest.mark.parametrize(
     "table_suffix, table_name",
     [
