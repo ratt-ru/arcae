@@ -42,6 +42,7 @@ cdef extern from "arcae/service_locator.h" namespace "arcae" nogil:
         CConfiguration & configuration" ServiceLocator::configuration"()
 
 cdef extern from "arcae/configuration.h" namespace "arcae" nogil:
+    CStatus SafeMultiThreadedWrites()
     cdef cppclass CConfiguration" arcae::Configuration":
         void Set" Configuration::Set"(const string & key, string value)
         CResult[string] Get" Configuration::Get"(const string & key)

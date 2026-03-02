@@ -40,6 +40,7 @@ from arcae.lib.arrow_tables cimport (
     CSelectionBuilder,
     CTaql,
     PartitionMerge,
+    SafeMultiThreadedWrites,
     IndexType)
 
 
@@ -57,6 +58,10 @@ def ms_descriptor(table: str, complete: bool = False) -> Dict:
         table_desc = GetResultValue(CMSDescriptor(ctable, complete))
 
     return json.loads(frombytes(table_desc))
+
+
+def safe_multithreaded_writes() -> bool:
+    return SafeMultiThreadedWrites().ok()
 
 
 cdef CSelection build_selection(index: FullIndex = None):

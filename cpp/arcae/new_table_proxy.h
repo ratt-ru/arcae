@@ -98,6 +98,11 @@ class NewTableProxy {
   // Close the table
   arrow::Result<bool> Close();
 
+ protected:
+  // Returns true if multithreaded writes are supported
+  // by this NewTableProxy
+  arrow::Status SafeMultithreadedWrites() const;
+
  private:
   std::shared_ptr<detail::IsolatedTableProxy> itp_;
 };
