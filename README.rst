@@ -98,6 +98,30 @@ with added support for some `NumPy Advanced Indexing <numpy_advanced_indexing_>`
 See the test cases for further use cases.
 
 
+Multi-threaded read support
+---------------------------
+
+When opening a CASA table, arcae can open multiple instances
+of the table in separate threads and multiplex
+read operations over them. This mode of operation is intended
+to saturate the number of I/O requests in-flight:
+
+.. code-block:: python
+
+  table = arcae.table("/path/to/measurementset.ms", ninstances=8, readonly=True)
+
+Multi-threaded write support
+----------------------------
+Generally speaking, writing to a table when multiple threads/instances
+are opened is not a safe operation and arcae will error if this is attempted.
+Future versions of arcae may support this.
+In the meantime, the presence of this ability can be inspected
+via the following function:
+
+.. code-block:: python
+
+  arcae.safe_multithreaded_writes()
+
 Exporting Measurement Sets to Arrow Parquet Datasets
 ----------------------------------------------------
 
