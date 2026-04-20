@@ -2,6 +2,10 @@
 History
 =======
 
+X.Y.Z (DD-MM-YYYY)
+------------------
+* Implement write-locking (:pr:`162`)
+
 0.5.1 (02-03-2026)
 ------------------
 * Add an ``arcae.safe_multithreaded_writes`` function indicating whether writing

@@ -139,6 +139,844 @@ index 12229f902..a15e5080b 100644
  
  
  // <summary>Base class for all Casacore library errors</summary>
+diff --git a/casa/IO/FileLocker.cc b/casa/IO/FileLocker.cc
+index b55c080d8..d3a6f0120 100644
+--- a/casa/IO/FileLocker.cc
++++ b/casa/IO/FileLocker.cc
+@@ -24,157 +24,288 @@
+ //#                        Charlottesville, VA 22903-2475 USA
+ 
+ #include <casacore/casa/IO/FileLocker.h>
+-#include <casacore/casa/BasicSL/String.h>
+-#include <casacore/casa/iostream.h>
++
+ #include <unistd.h>
+ #include <fcntl.h>
+ #include <errno.h>
+-#include <casacore/casa/string.h>
++
++#include <cassert>
++#include <cerrno>
++#include <cstring>
++#include <numeric>
++#include <thread>
++#include <utility>
++#include <stdexcept>
++
++#include <casacore/casa/aipstype.h>
++#include <casacore/casa/BasicSL/String.h>
++#include <casacore/casa/IO/FiledesIO.h>
++
++
++using namespace std::chrono_literals;
+ 
+ //# Locking is not supported on Cray compute nodes.
+ #if defined(AIPS_CRAY_PGI)  &&  !defined(AIPS_NOFILELOCK)
+ # define AIPS_NOFILELOCK 1
+ #endif
+ 
++namespace {
++
++template <typename Fn>
++struct Finally {
++    Fn fn;
++    bool enabled = true;
++    ~Finally() { if (enabled) fn(); };
++};
++
++template <typename Fn>
++auto finally(Fn && fn) {
++    return Finally<Fn>{std::forward<Fn>(fn), true};
++}
++
++} // namespace
+ 
+ namespace casacore { //# NAMESPACE CASACORE - BEGIN
+ 
+ FileLocker::FileLocker()
+-: itsFD          (-1),
+-  itsError       (0),
+-  itsStart       (0),
+-  itsLength      (0),
+-  itsMsgShown    (False),
+-  itsReadLocked  (False),
+-  itsWriteLocked (False)
++: itsFD              (-1),
++  itsError           (0),
++  itsStart           (0),
++  itsLength          (0),
++  itsMsgShown        (False),
++  itsModifyingFcntlLock   (false),
++  itsWantsWriteLock  (0),
++  itsLockType        ({{std::this_thread::get_id(), None}})
+ {}
+ 
+ FileLocker::FileLocker (int fd, uInt start, uInt length)
+-: itsFD          (fd),
+-  itsError       (0),
+-  itsStart       (start),
+-  itsLength      (length),
+-  itsMsgShown    (False),
+-  itsReadLocked  (False),
+-  itsWriteLocked (False)
++: itsFD              (fd),
++  itsError           (0),
++  itsStart           (start),
++  itsLength          (length),
++  itsMsgShown        (False),
++  itsModifyingFcntlLock   (false),
++  itsWantsWriteLock  (0),
++  itsLockType        ({{std::this_thread::get_id(), None}})
+ {}
+ 
+-FileLocker::~FileLocker()
++FileLocker::FileLocker(FileLocker&& rhs) :
++    itsFD(std::exchange(rhs.itsFD, -1)),
++    itsError(std::exchange(rhs.itsError, 0)),
++    itsStart(std::exchange(rhs.itsStart, 0)),
++    itsLength(std::exchange(rhs.itsLength, 0)),
++    itsModifyingFcntlLock(std::exchange(rhs.itsModifyingFcntlLock, false)),
++    itsWantsWriteLock(std::exchange(rhs.itsWantsWriteLock, 0)),
++    itsLockType(std::move(rhs.itsLockType))
+ {}
+ 
+-Bool FileLocker::acquire (LockType type, uInt nattempts)
++FileLocker& FileLocker::operator=(FileLocker&& rhs) {
++    if (this != &rhs) {
++        std::swap(itsFD, rhs.itsFD);
++        std::swap(itsError, rhs.itsError);
++        std::swap(itsStart, rhs.itsStart);
++        std::swap(itsLength, rhs.itsLength);
++        std::swap(itsModifyingFcntlLock, rhs.itsModifyingFcntlLock);
++        std::swap(itsWantsWriteLock, rhs.itsWantsWriteLock);
++        std::swap(itsLockType, rhs.itsLockType);
++    }
++    return *this;
++}
++
++FileLocker::~FileLocker()
+ {
++}
++
++
++// A conflicting lock may result in EAGAIN or EACCESS, depending
++// on the POSIX implementation. ENLOCK is deemed to arise from
++// NFS systems where statd or lockd daemons are not running
++bool ShouldRetry(int err) {
++    auto result = err == EAGAIN || err == EACCES;
++
++    // Treat ENOLCK as success in an NFS context
++    #if defined(AIPS_LINUX) || defined(AIPS_DARWIN)
++    result = result || err == ENOLCK;
++    #endif
++    return result;
++}
++
++
++Bool FileLocker::fcntlAquire(RecursiveMutexLock & state_lock, LockType type, uInt nattempts) {
++    #if defined(AIPS_NOFILELOCK)
++    return True;
++    #endif
++
++    if (type == None) return True;
++
++    struct flock lock;
++    lock.l_type = decltype(lock.l_type)(type == Read ? F_RDLCK : F_WRLCK);
++    lock.l_whence = SEEK_SET;
++    lock.l_start = itsStart;
++    lock.l_len = itsLength;
++
+     itsError = 0;
+-    // Always success if locking is not supported.
+-#if defined(AIPS_NOFILELOCK)
+-    itsReadLocked = True;
+-    if (!itsWriteLocked  &&  type == Write) {
+-        itsWriteLocked = True;
++
++    for (uInt a = 0; a < nattempts + 1; ++a) {
++        if (fcntl(itsFD, F_SETLK, &lock) != -1) return True;
++        itsError = errno;
++        if(ShouldRetry(itsError)) {
++            itsError = 0;
++            state_lock.unlock();
++            std::this_thread::sleep_for(1s);
++            state_lock.lock();
++        }
+     }
+-    return True;
+-#else
+-    struct flock ls;
+-    ls.l_whence = SEEK_SET;
+-    ls.l_start  = itsStart;
+-    ls.l_len    = itsLength;
+-    ls.l_type   = F_WRLCK;
+-    // When a read-lock is acquired, it may release an existing write-lock.
+-    // We do not want that to happen, so when it is write-locked, test
+-    // if the write-lock is still valid.
+-    if (type == Read) {
+-        if (itsWriteLocked) {
+-  	    if (fcntl (itsFD, F_SETLK, &ls) != -1) {
+-///	    cout << "kept " << itsReadLocked << ' ' <<itsWriteLocked <<
+-///	      ' '<<itsStart<<' '<<itsLength<<endl;
+-	        return True;
+-	    }
+-	    itsWriteLocked = False;
+-	}
+-	ls.l_type = F_RDLCK;
++
++    return False;
++}
++
++Bool FileLocker::hasLock (LockType type) const
++{
++    RecursiveMutexLock lock(itsStateMutex);
++    auto tid = std::this_thread::get_id();
++    LockType thread_lock_type = None;
++    if (auto it = itsLockType.find(tid); it != std::end(itsLockType)) thread_lock_type = it->second;
++    switch (thread_lock_type) {
++        // In the original implementation, a write lock implies a read lock
++        // Retain this logic so that other casacore table logic works
++        case Write: return type == Write || type == Read;
++        case Read: return type == Read;
++        default: break;
+     }
+-    if (nattempts == 0) {
+-	// Wait until lock succeeds.
+-	if (fcntl (itsFD, F_SETLKW, &ls) != -1) {
+-	    itsReadLocked = True;
+-	    if (type == Write) {
+-		itsWriteLocked = True;
+-	    }
+-///	    cout << "acquired " << itsReadLocked << ' ' <<itsWriteLocked <<
+-///	      ' '<<itsStart<<' '<<itsLength<<endl;
+-	    return True;
+-	}
+-	itsError = errno;
++
++    return False;
++}
++
++
++std::size_t FileLocker::numLocks(LockType type) const {
++    return std::accumulate(
++        std::begin(itsLockType), std::end(itsLockType), std::size_t{0},
++        [&](auto i, auto tl) { return i + int(tl.second == type); }
++    );
++}
++
++Bool FileLocker::acquire (LockType requested_lock_type, uInt nattempts)
++{
++    RecursiveMutexLock state_lock(itsStateMutex);
++    // Notify waiting threads of state change on exit
++    auto defer_notify = finally([&](...) { itsCondVar.notify_all(); });
++    auto AllLocks = [this]() -> std::size_t { return numLocks(Read) + numLocks(Write); };
++    auto tid = std::this_thread::get_id();
++    auto thread_lock_type = None;
++    if (auto it = itsLockType.find(tid); it != std::end(itsLockType)) thread_lock_type = it->second;
++
++    switch(requested_lock_type) {
++        case None:
++            // None was patched in, casacore shouldn't be passing it in
++            // and neither should anyone else for that matter.
++            throw std::runtime_error("None passed to FileLocker::acquire");
++        case Write: {
++            // This thread already has a write lock, return early
++            if (thread_lock_type == Write) return True;
++            // Signal that we want a write lock
++            itsWantsWriteLock += 1;
++            // To acquire a Write Lock, we wait until:
++            // 1. no other threads are acquiring a lock, and
++            // 2. no other thread wants a write lock, and
++            // 3. this is the only read-locked thread (upgrade) or
++            //    there are no other read or write locked threads
++            itsCondVar.wait(state_lock, [&]() {
++                return !itsModifyingFcntlLock && AllLocks() == (thread_lock_type == Read ? 1 : 0);
++            });
++            assert(thread_lock_type == None || thread_lock_type == Read);
++            // Signal lock acquisition
++            itsLockType.insert_or_assign(tid, Write);
++            itsModifyingFcntlLock = true;
++            break;
++        }
++        case Read: {
++            // This thread already has a read lock, return early
++            if (thread_lock_type == Read) return True;
++            // To acquire a read lock, wait until:
++            // 1. no other threads are acquiring, and
++            // 2. no other thread wants a write lock, and
++            // 3. this is the only write-locked thread (downgrade) or
++            //    there are no write-locked threads
++            itsCondVar.wait(state_lock, [&]() {
++                return !itsModifyingFcntlLock && itsWantsWriteLock == 0 &&
++                numLocks(Write) == (thread_lock_type == Write ? 1 : 0);
++            });
++            assert(thread_lock_type == None || thread_lock_type == Write);
++            // Another thread has acquired the posix read lock, we simply upgrade
++            // this thread's lock type and return
++            if (thread_lock_type == None && numLocks(Read) > 0) {
++                itsLockType.insert_or_assign(tid, Read);
++                return True;
++            }
++            // Signal lock acquisition
++            itsLockType.insert_or_assign(tid, Read);
++            itsModifyingFcntlLock = true;
++            break;
++        }
+     }
+-    // Do finite number of attempts. Wait 1 second between each attempt.
+-    for (uInt i=0; i<nattempts; i++) {
+-	if (fcntl (itsFD, F_SETLK, &ls) != -1) {
+-	    itsError = 0;
+-	    itsReadLocked = True;
+-	    if (type == Write) {
+-		itsWriteLocked = True;
+-	    }
+-///	    cout << "acquired " << itsReadLocked << ' ' <<itsWriteLocked <<
+-///	      ' '<<itsStart<<' '<<itsLength<<endl;
+-	    return True;
+-	}
+-	// If locking fails, there is usually something wrong with locking
+-        // over NFS because the statd or lockd deamons are not running.
+-	// Hence locks on NFS files result in ENOLCK. Treat it as success.
+-	// Issue a message if hit for the first time.
+-#if defined(AIPS_LINUX) || defined(AIPS_DARWIN)
+-	if (errno == ENOLCK) {
+-	    itsError = 0;
+-	    itsReadLocked = True;
+-	    if (type == Write) {
+-		itsWriteLocked = True;
+-	    }
+-	    if (!itsMsgShown) {
+-	      itsMsgShown = True;
+-	      cerr << "*** The ENOLCK error was returned by the kernel." << endl;
+-              cerr << "*** It usually means that a lock for an NFS file could not be" << endl;
+-              cerr << "*** obtained, maybe because the statd or lockd daemon is not running." << endl;
+-	    }
+-	    return True;
+-	}
+-#endif
+-	itsError = errno;
+-	if (errno != EAGAIN  &&  errno != EACCES) {
+-	    i = nattempts;                             // exit the loop
+-	}
+-	if (i < nattempts-1) {
+-	    sleep (1);
+-	}
++
++    auto result = fcntlAquire(state_lock, requested_lock_type, nattempts);
++
++    // Lock acquisition has finished
++    itsModifyingFcntlLock = false;
++
++    switch(requested_lock_type) {
++        case None:
++            throw std::runtime_error("None passed to FileLocker::acquire");
++        case Write: {
++            // Restore original lock type on failure
++            if(!result) itsLockType.insert_or_assign(tid, thread_lock_type);
++            // A write lock is no longer desired
++            itsWantsWriteLock -= 1;
++            break;
++        }
++        case Read: {
++            // Restore original lock type on failure
++            if(!result) itsLockType.insert_or_assign(tid, thread_lock_type);
++            break;
++        }
+     }
+-    itsWriteLocked = False;
+-    // Note that the system keeps a lock per file and not per fd.
+-    // So if the same file is opened in the same process and unlocked
+-    // at the same place, the read lock for this fd is also released.
+-    // If we think we hold a read lock, determine if we still hold it.
+-    // We certainly do not if we asked for a read lock.
+-    // If asked for a write lock, we might still hold it.
+-    // One attempt is enough to see if we indeed can get a read lock.
+-    if (itsReadLocked) {
+-        itsReadLocked = False;
+-	if (type == Write) {
+-	    ls.l_type = F_RDLCK;
+-	    if (fcntl (itsFD, F_SETLK, &ls) != -1) {
+-	        itsReadLocked = True;
+-	    }
+-	}
++
++    return result;
++}
++
++Bool FileLocker::release() {
++    RecursiveMutexLock state_lock(itsStateMutex);
++    auto tid = std::this_thread::get_id();
++    auto lock_type = None;
++    if (auto it = itsLockType.find(tid); it != std::end(itsLockType)) lock_type = it->second;
++    if (lock_type == None) return True;
++
++    // Notify waiting threads of state change on exit
++    auto defer_notify = finally([&](...) { itsCondVar.notify_all(); });
++
++    assert(numLocks(lock_type) >= 1);
++
++    // We're not the last lock of this type
++    // Update the lock type and return success
++    if (numLocks(lock_type) > 1) {
++        itsLockType.insert_or_assign(tid, None);
++        return True;
+     }
+-///    cout << "failed " << itsReadLocked << ' ' <<itsWriteLocked<<' '<<type<<
+-///	      ' '<<itsStart<<' '<<itsLength<<endl;
+-    return False;
+-#endif
++
++    // Wait until no one else is modifying the lock
++    itsCondVar.wait(state_lock, [&]() { return itsModifyingFcntlLock == false; });
++
++    itsModifyingFcntlLock = true;
++    auto result = fcntlRelease();
++    // On successful lock release, update the lock type
++    if (result) itsLockType.insert_or_assign(tid, None);
++    itsModifyingFcntlLock = false;
++    return result;
+ }
+ 
++
+ // Release a lock.
+-Bool FileLocker::release()
++Bool FileLocker::fcntlRelease()
+ {
+-///    cout << "released " << itsReadLocked << ' ' <<itsWriteLocked<<
+-///	      ' '<<itsStart<<' '<<itsLength<<endl;
+-    itsReadLocked  = False;
+-    itsWriteLocked = False;
++    ///    cout << "released " << itsReadLocked << ' ' <<itsWriteLocked<<
++    ///	      ' '<<itsStart<<' '<<itsLength<<endl;
+     itsError = 0;
+ #if defined(AIPS_NOFILELOCK)
+     return True;
+@@ -185,7 +316,7 @@ Bool FileLocker::release()
+     ls.l_start  = itsStart;
+     ls.l_len    = itsLength;
+     if (fcntl (itsFD, F_SETLK, &ls) != -1) {
+-	return True;
++    	return True;
+     }
+ #if defined(AIPS_LINUX) || defined(AIPS_DARWIN)
+     if (errno == ENOLCK) {
+@@ -215,17 +346,22 @@ Bool FileLocker::canLock (uInt& pid, LockType type)
+     pid = 0;
+     itsError = 0;
+     struct flock ls;
+-    if (type == Write) {
+-	ls.l_type = F_WRLCK;
+-    }else{
+-	ls.l_type = F_RDLCK;
++    switch (type) {
++        case Write:
++            ls.l_type = F_WRLCK;
++            break;
++        case Read:
++            ls.l_type = F_RDLCK;
++            break;
++        case None:
++            return False;
+     }
+     ls.l_whence = SEEK_SET;
+     ls.l_start  = itsStart;
+     ls.l_len    = itsLength;
+     if (fcntl (itsFD, F_GETLK, &ls) != -1) {
+         pid = ls.l_pid;
+-	return  (ls.l_type == F_UNLCK);
++    	return  (ls.l_type == F_UNLCK);
+     }
+     itsError = errno;
+     return False;
+@@ -234,11 +370,11 @@ Bool FileLocker::canLock (uInt& pid, LockType type)
+ 
+ String FileLocker::lastMessage() const
+ {
+-    if (itsError == 0) {
+-	return "";
+-    }
+-    return strerror(itsError);
++    std::string msg;
++    if (itsError == 0) return msg;
++    msg.reserve(1024);
++    strerror_r(itsError, msg.data(), msg.capacity());
++    return msg;
+ }
+ 
+ } //# NAMESPACE CASACORE - END
+-
+diff --git a/casa/IO/FileLocker.h b/casa/IO/FileLocker.h
+index 250f5bfe5..43b0441ff 100644
+--- a/casa/IO/FileLocker.h
++++ b/casa/IO/FileLocker.h
+@@ -28,6 +28,11 @@
+ 
+ 
+ //# Includes
++#include <condition_variable>
++#include <mutex>
++#include <thread>
++#include <unordered_map>
++
+ #include <casacore/casa/aips.h>
+ 
+ namespace casacore { //# NAMESPACE CASACORE - BEGIN
+@@ -94,7 +99,9 @@ public:
+ 	// Acquire a read lock.
+ 	Read,
+ 	// Acquire a write lock.
+-	Write
++	Write,
++    //
++    None,
+     };
+ 
+     // Default constructor creates an invalid fd.
+@@ -105,6 +112,8 @@ public:
+     // The segment is given by start and length. Length=0 means till the
+     // end of the file.
+     explicit FileLocker (int fd, uInt start=0, uInt length=0);
++    FileLocker(FileLocker && rhs);
++    FileLocker& operator=(FileLocker&& rhs);
+ 
+     ~FileLocker();
+ 
+@@ -129,7 +138,7 @@ public:
+     // Test if the process has a lock for read or write on the file.
+     Bool hasLock (LockType = Write) const;
+ 
+-    // Get the fd in use.
++    // Get the original file descriptor.
+     int fd() const;
+ 
+     // Get the last error.
+@@ -138,21 +147,26 @@ public:
+     // Get the message belonging to the last error.
+     String lastMessage() const;
+ 
++    std::size_t numLocks(LockType type) const;
++
++protected:
++    using RecursiveMutexLock = std::unique_lock<std::recursive_mutex>;
++
++    Bool fcntlAquire(RecursiveMutexLock & state_lock, LockType type = Write, uInt nattempts = 0);
++    Bool fcntlRelease();
+ private:
+     int    itsFD;
+     int    itsError;
+     int    itsStart;
+     int    itsLength;
+     Bool   itsMsgShown;           /// temporary for SUSE 6.1
+-    Bool   itsReadLocked;
+-    Bool   itsWriteLocked;
++    bool   itsModifyingFcntlLock;
++    int    itsWantsWriteLock;
++    std::unordered_map<std::thread::id, LockType> itsLockType;
++    mutable std::recursive_mutex itsStateMutex;
++    std::condition_variable_any itsCondVar;
+ };
+ 
+-
+-inline Bool FileLocker::hasLock (LockType type) const
+-{
+-    return (type == Write  ?  itsWriteLocked : itsReadLocked);
+-}
+ inline int FileLocker::fd() const
+ {
+     return itsFD;
+diff --git a/casa/IO/LockFile.cc b/casa/IO/LockFile.cc
+index 0f853c520..b4e083701 100644
+--- a/casa/IO/LockFile.cc
++++ b/casa/IO/LockFile.cc
+@@ -23,6 +23,15 @@
+ //#                        520 Edgemont Road
+ //#                        Charlottesville, VA 22903-2475 USA
+ 
++#include <cassert>
++#include <cstring>
++#include <cerrno>
++#include <memory>
++#include <mutex>
++#include <stdexcept>
++#include <thread>
++#include <unordered_map>
++
+ 
+ #include <casacore/casa/IO/LockFile.h>
+ #include <casacore/casa/IO/FiledesIO.h>
+@@ -69,6 +78,51 @@
+ 
+ namespace casacore { //# NAMESPACE CASACORE - BEGIN
+ 
++
++namespace {
++
++struct FileDescriptorLease {
++    int fd;
++    int counts;
++    std::unique_ptr<std::mutex> io_mutex;
++};
++
++using FDCache = std::unordered_map<String, FileDescriptorLease>;
++
++std::recursive_mutex & fd_cache_mutex() {
++    static std::recursive_mutex m;
++    return m;
++}
++
++FDCache & fd_cache() {
++    static FDCache cache;
++    return cache;
++}
++
++std::mutex & GetIOMutex(const String & name) {
++    std::lock_guard<std::recursive_mutex> lock(fd_cache_mutex());
++    auto it = fd_cache().find(name);
++    if (it == std::end(fd_cache()))
++        throw std::runtime_error("io_mutex not available");
++    return *it->second.io_mutex;
++}
++
++Int HashThreadId() {
++    auto tid_hash = std::hash<std::thread::id>()(std::this_thread::get_id());
++    static_assert(sizeof(tid_hash) % SIZEINT == 0, "size_t isn't a multiple of a word");
++    static_assert(sizeof(Int) % SIZEINT == 0, "Int isn't a multiple of a word");
++    constexpr int hash_words = sizeof(tid_hash) / SIZEINT;
++    constexpr int Int_words = sizeof(Int) / SIZEINT;
++    static_assert((hash_words % Int_words) == 0, "sizeof(size_t) doesn't divide sizeof(Int) perfectly");
++    Int hash = 0;
++    const Int * p = reinterpret_cast<const Int *>(&tid_hash);
++    for (int i = 0; i < hash_words; ++i) hash ^= p[i];
++    return hash;
++}
++
++}  // namespace {
++
++
+ LockFile::LockFile (const String& fileName, double inspectInterval,
+ 		    Bool create, Bool setRequestFlag, Bool mustExist,
+ 		    uInt seqnr, Bool permLocking, Bool noLocking)
+@@ -84,50 +138,64 @@ LockFile::LockFile (const String& fileName, double inspectInterval,
+     AlwaysAssert (SIZEINT == CanonicalConversion::canonicalSize (static_cast<Int*>(0)),
+ 		  AipsError);
+     itsName = Path(fileName).absoluteName();
+-    //# If needed, create the file if it does not exist yet.
+-    //# If the flag is set, it is allowed that the file does not
+-    //# exist and cannot be created. In that case it is assumed that
+-    //# later on each locking request is successful (without doing actual
+-    //# locking).
+-    if (!noLocking  &&  !create) {
+-      File f (itsName);
+-      if (! f.exists()) {
+-        if (!f.canCreate()  &&  !mustExist) {
+-          return;    // Acceptable that lock file does not exist
++
++    std::unique_lock<std::recursive_mutex> cache_lock(fd_cache_mutex());
++    auto it = fd_cache().find(itsName);
++    if (it == std::end(fd_cache())) {
++        // Create the cache entry with fd set to -1
++        // This will be updated later
++        auto fd_lease = FileDescriptorLease{-1, 1, std::make_unique<std::mutex>()};
++        it = fd_cache().emplace(itsName, std::move(fd_lease)).first;
++
++        //# If needed, create the file if it does not exist yet.
++        //# If the flag is set, it is allowed that the file does not
++        //# exist and cannot be created. In that case it is assumed that
++        //# later on each locking request is successful (without doing actual
++        //# locking).
++        if (!noLocking  &&  !create) {
++            File f (itsName);
++            if (! f.exists()) {
++                if (!f.canCreate()  &&  !mustExist) {
++                    return;    // Acceptable that lock file does not exist
++                }
++                create = True;
++            }
+         }
+-        create = True;
+-      }
+-    }
+-    //# Open the lock file as read/write if it exists.
+-    //# If it did not succeed, open as readonly.
+-    //# For noLocking, it does not need to exist.
+-    int fd = -1;
+-    if (!create) {
+-      fd = FiledesIO::open (itsName.chars(), True, False);
+-      if (fd == -1) {
+-        fd = FiledesIO::open (itsName.chars(), False, !noLocking);
+-        itsWritable  = False;
+-        itsAddToList = False;
+-      }
+-    } else if (!noLocking) {
+-      //# Create a new file with world write access.
+-      //# Initialize the values in it.
+-      fd = FiledesIO::create (itsName.chars(), 0666);
+-      putReqId (fd);
++        //# Open the lock file as read/write if it exists.
++        //# If it did not succeed, open as readonly.
++        //# For noLocking, it does not need to exist.
++        if (!create) {
++            it->second.fd = FiledesIO::open (itsName.chars(), True, False);
++            if (it->second.fd == -1) {
++                it->second.fd = FiledesIO::open (itsName.chars(), False, !noLocking);
++                itsWritable  = False;
++                itsAddToList = False;
++            }
++
++        } else if (!noLocking) {
++            //# Create a new file with world write access.
++            //# Initialize the values in it.
++            it->second.fd = FiledesIO::create (itsName.chars(), 0666);
++            putReqId (it->second.fd);
++        }
++
++    } else {
++        ++it->second.counts;
+     }
+-    if (fd >= 0) {
++
++    if (it->second.fd >= 0) {
+       //# Create FileLocker objects for this lock file.
+       //# The first one is for read/write locks.
+       //# The second one is to set the file to "in use" and to tell if
+       //# permanent locking is used.
+-      itsLocker = FileLocker (fd, 4*seqnr, 1);
++      itsLocker = FileLocker (it->second.fd, 4*seqnr, 1);
+       if (permLocking) {
+-        itsUseLocker = FileLocker (fd, 4*seqnr+1, 2);
++        itsUseLocker = FileLocker (it->second.fd, 4*seqnr+1, 2);
+       } else {
+-        itsUseLocker = FileLocker (fd, 4*seqnr+1, 1);
++        itsUseLocker = FileLocker (it->second.fd, 4*seqnr+1, 1);
+       }
+       if (!noLocking) {
+-        itsFileIO.reset (new FiledesIO (fd, itsName));
++        itsFileIO.reset (new FiledesIO (it->second.fd, itsName));
+         // Set the file to in use by acquiring a read lock.
+         itsUseLocker.acquire (FileLocker::Read, 1);
+       }
+@@ -136,10 +204,16 @@ LockFile::LockFile (const String& fileName, double inspectInterval,
+ 
+ LockFile::~LockFile()
+ {
+-    int fd = itsLocker.fd();
+-    if (fd >= 0) {
+-	FiledesIO::close (fd);
+-    }
++    // Close file descriptor once all leases have expired
++    std::lock_guard<std::recursive_mutex> lock(fd_cache_mutex());
++    auto it = fd_cache().find(itsName);
++    // No record, just return
++    if (it == std::end(fd_cache())) return;
++    // This isn't the last lease on the fd
++    if (--it->second.counts > 0) return;
++    // Close any valid fd and remove from cache
++    if (it->second.fd >= 0) FiledesIO::close (it->second.fd);
++    fd_cache().erase(it);
+ }
+ 
+ Bool LockFile::isMultiUsed()
+@@ -239,6 +313,7 @@ void LockFile::getInfo (MemoryIO& info)
+ {
+     // Do nothing if no locking.
+     if (itsLocker.fd() < 0) {
++        info.seek(Int64(0));
+         return;
+     }
+     // The lock file contains:
+@@ -246,6 +321,7 @@ void LockFile::getInfo (MemoryIO& info)
+     // - thereafter the length of the info (as a uInt)
+     // - thereafter the entire info
+     uChar buffer[2048];
++    std::lock_guard<std::mutex> io_lock(GetIOMutex(itsName));
+     // Read the first part of the file.
+     traceLSEEK (itsLocker.fd(), 0, SEEK_SET);
+     uInt leng = ::read (itsLocker.fd(), buffer, sizeof(buffer));
+@@ -284,6 +360,7 @@ void LockFile::putInfo (const MemoryIO& info) const
+     if (itsLocker.fd() < 0  ||  !itsWritable  ||  infoLeng == 0) {
+ 	return;
+     }
++    std::lock_guard<std::mutex> io_lock(GetIOMutex(itsName));
+     // Write the info into the lock file preceeded by its length.
+     uChar buffer[1024];
+     uInt leng = CanonicalConversion::fromLocal (buffer, infoLeng);
+@@ -307,6 +384,7 @@ void LockFile::putInfo (const MemoryIO& info) const
+ Int LockFile::getNrReqId() const
+ {
+     uChar buffer[8];
++    std::lock_guard<std::mutex> io_lock(GetIOMutex(itsName));
+     uInt leng = tracePREAD (itsLocker.fd(), buffer, SIZEINT, 0);
+     return getInt (buffer, leng, 0);
+ }
+@@ -339,7 +417,7 @@ void LockFile::addReqId()
+ 	inx = NRREQID-1;
+     }
+     itsReqId[0] = inx+1;
+-    itsReqId[2*inx+1] = itsPid;
++    itsReqId[2*inx+1] = HashThreadId();
+     itsReqId[2*inx+2] = itsHostId;
+     putReqId (itsLocker.fd());
+ }
+@@ -352,7 +430,7 @@ void LockFile::removeReqId()
+     //# can happen when a process with an outstanding request died.
+     Int nr = itsReqId[0];
+     for (i=0; i<nr; i++) {
+-	if (Int(itsPid) == itsReqId[2*i+1]
++	if (HashThreadId() == itsReqId[2*i+1]
+         &&  Int(itsHostId) == itsReqId[2*i+2]) {
+ 	    break;
+ 	}
+@@ -368,13 +446,14 @@ void LockFile::removeReqId()
+ void LockFile::putReqId (int fd) const
+ {
+     if (itsAddToList) {
+-	uChar buffer[SIZEREQID];
+-	uInt leng = CanonicalConversion::fromLocal (buffer,
++    	uChar buffer[SIZEREQID];
++	    uInt leng = CanonicalConversion::fromLocal (buffer,
+ 						    itsReqId.storage(),
+ 						    itsReqId.nelements());
++        std::lock_guard<std::mutex> io_lock(GetIOMutex(itsName));
+         AlwaysAssert(tracePWRITE(fd, (Char *)buffer, leng, 0) == Int(leng),
+                      AipsError);
+-	fsync (fd);
++	    fsync (fd);
+     }
+ }
+ 
+@@ -382,6 +461,7 @@ void LockFile::getReqId()
+ {
+     int fd = itsLocker.fd();
+     uChar buffer[SIZEREQID];
++    std::lock_guard<std::mutex> io_lock(GetIOMutex(itsName));
+     if (tracePREAD(fd, buffer, SIZEREQID, 0) > 0) {
+ 	CanonicalConversion::fromLocal (buffer,
+ 					itsReqId.storage(),
+@@ -436,4 +516,8 @@ uInt LockFile::showLock (uInt& pid, Bool& permLocked, const String& fileName)
+     return result;
+ }
+ 
++std::size_t LockFile::numLocks(FileLocker::LockType lock_type) const {
++    return itsLocker.numLocks(lock_type);
++}
++
+ } //# NAMESPACE CASACORE - END
+diff --git a/casa/IO/LockFile.h b/casa/IO/LockFile.h
+index 57c57db79..f21246f61 100644
+--- a/casa/IO/LockFile.h
++++ b/casa/IO/LockFile.h
+@@ -280,6 +280,10 @@ public:
+     // be opened.
+     static uInt showLock (uInt& pid, Bool& permLocked, const String& fileName);
+ 
++    // Returns the number of locks hold of the given type
++    // Not thread-safe
++    std::size_t numLocks(FileLocker::LockType lock_type) const;
++
+ private:
+     // The copy constructor cannot be used (its semantics are too difficult).
+     LockFile (const LockFile&);
 diff --git a/casa/Json/JsonOut.h b/casa/Json/JsonOut.h
 index b5229c57d..66596d273 100644
 --- a/casa/Json/JsonOut.h
@@ -564,36 +1402,21 @@ index 32ab695fc..ef2dff8db 100644
  // <linkto class=RefRows>RefRows</linkto> object,
  // especially if the RefRows object contains slices.
 diff --git a/tables/Tables/TableProxy.cc b/tables/Tables/TableProxy.cc
-index f65cf26dd..75268a528 100644
+index f65cf26dd..5577655c5 100644
 --- a/tables/Tables/TableProxy.cc
 +++ b/tables/Tables/TableProxy.cc
-@@ -97,7 +97,7 @@ TableProxy::TableProxy (const String& tableName,
-   if (nrow < 0) {
-     nrow = 0;
-   }
--  
-+
-   TableDesc tabdesc;
-   String message;
-   if (!makeTableDesc (tableDesc, tabdesc, message)) {
-@@ -111,7 +111,7 @@ TableProxy::TableProxy (const String& tableName,
+@@ -224,9 +224,9 @@ String TableProxy::endianFormat() const
+   return "little";
  }
  
- TableProxy::TableProxy (const Vector<String>& tableNames,
--			const Vector<String>& concatenateSubTableNames, 
-+			const Vector<String>& concatenateSubTableNames,
- 			const Record& lockOptions,
- 			int option)
+-void TableProxy::lock (Bool mode, Int nattempts)
++Bool TableProxy::lock (Bool mode, Int nattempts)
  {
-@@ -128,7 +128,7 @@ TableProxy::TableProxy (const Vector<String>& tableNames,
- 	     subNames.begin());
-   table_p = Table (tabs, subNames);
+-  table_p.lock (mode, nattempts);
++  return table_p.lock (mode, nattempts);
  }
-- 
-+
- TableProxy::TableProxy (const std::vector<TableProxy>& tables,
- 			const Vector<String>& concatenateSubTableNames,
- 			int, int, int)
+ 
+ void TableProxy::unlock()
 @@ -271,6 +271,9 @@ Record TableProxy::lockOptions()
        option = "autonoread";
      }
@@ -604,37 +1427,6 @@ index f65cf26dd..75268a528 100644
    default:
      option = "unknown";
    }
-@@ -285,9 +288,9 @@ Bool TableProxy::isMultiUsed (Bool checkSubTables)
-   return table_p.isMultiUsed (checkSubTables);
- }
- 
--String TableProxy::toAscii (const String& asciiFile, 
--                            const String& headerFile, 
--                            const Vector<String>& columns, 
-+String TableProxy::toAscii (const String& asciiFile,
-+                            const String& headerFile,
-+                            const Vector<String>& columns,
-                             const String& sep,
-                             const Vector<Int>& precision,
-                             Bool useBrackets)
-@@ -313,7 +316,7 @@ String TableProxy::toAscii (const String& asciiFile,
-   for (Int j=0; j<ncols; j++) {
-     col_is_good[j] = getColInfo (colNames[j], useBrackets,
-                                  col_type[j], message);
--    // Remember last good column 
-+    // Remember last good column
-     if (col_is_good[j]) {
-       last_good_col = j;
-     }
-@@ -931,7 +934,7 @@ Record TableProxy::getTableDesc(const TableDesc & tabdesc, Bool cOrder)
-       rec.defineRecord (columnDescription.name(),
-                 recordColumnDesc (columnDescription, cOrder));
-     }
--    
-+
-     // Convert hypercolumns
-     rec.defineRecord ("_define_hypercolumn_",
-         recordHCDesc (tabdesc));
 @@ -1172,7 +1175,7 @@ Record TableProxy::getVarColumn (const String& columnName,
    char namebuf[22];
    for (Int64 i=0; i<nrows; i++) {
@@ -644,138 +1436,6 @@ index f65cf26dd..75268a528 100644
      if (tabcol.isDefined(row)) {
        getValueFromTable(columnName, row, 1, 1, False).toRecord (rec, namebuf);
      } else {
-@@ -2158,7 +2161,7 @@ ValueHolder TableProxy::getValueFromTable (const String& colName,
-   }
-   if (isScalar) {
-     switch (dtype) {
--    case TpBool: 
-+    case TpBool:
-       {
- 	ScalarColumn<Bool> ac(table_p,colName);
- 	if (isCell) {
-@@ -2170,7 +2173,7 @@ ValueHolder TableProxy::getValueFromTable (const String& colName,
-       break;
-     case TpUChar:
-       {
--	ScalarColumn<uChar> ac(table_p,colName); 
-+	ScalarColumn<uChar> ac(table_p,colName);
- 	if (isCell) {
- 	  return ValueHolder (ac(rownr));
- 	}else{
-@@ -2180,7 +2183,7 @@ ValueHolder TableProxy::getValueFromTable (const String& colName,
-       break;
-     case TpShort:
-       {
--	ScalarColumn<Short> ac(table_p,colName); 
-+	ScalarColumn<Short> ac(table_p,colName);
- 	if (isCell) {
- 	  return ValueHolder (ac(rownr));
- 	}else{
-@@ -2190,7 +2193,7 @@ ValueHolder TableProxy::getValueFromTable (const String& colName,
-       break;
-     case TpUShort:
-       {
--	ScalarColumn<uShort> ac(table_p,colName); 
-+	ScalarColumn<uShort> ac(table_p,colName);
- 	if (isCell) {
- 	  return ValueHolder (ac(rownr));
- 	}else{
-@@ -2200,17 +2203,17 @@ ValueHolder TableProxy::getValueFromTable (const String& colName,
-       break;
-     case TpInt:
-       {
--	ScalarColumn<Int> ac(table_p,colName); 
-+	ScalarColumn<Int> ac(table_p,colName);
- 	if (isCell) {
- 	  return ValueHolder (ac(rownr));
--	}else{ 
-+	}else{
- 	  return ValueHolder (ac.getColumnRange(Slice(rownr, nrow, incr)));
- 	}
-       }
-       break;
-     case TpUInt:
-       {
--	ScalarColumn<uInt> ac(table_p,colName); 
-+	ScalarColumn<uInt> ac(table_p,colName);
- 	if (isCell) {
- 	  return ValueHolder (ac(rownr));
- 	}else{
-@@ -2220,17 +2223,17 @@ ValueHolder TableProxy::getValueFromTable (const String& colName,
-       break;
-     case TpInt64:
-       {
--	ScalarColumn<Int64> ac(table_p,colName); 
-+	ScalarColumn<Int64> ac(table_p,colName);
- 	if (isCell) {
- 	  return ValueHolder (ac(rownr));
--	}else{ 
-+	}else{
- 	  return ValueHolder (ac.getColumnRange(Slice(rownr, nrow, incr)));
- 	}
-       }
-       break;
-     case TpFloat:
-       {
--	ScalarColumn<Float> ac(table_p,colName); 
-+	ScalarColumn<Float> ac(table_p,colName);
- 	if (isCell) {
- 	  return ValueHolder (ac(rownr));
- 	}else{
-@@ -2240,7 +2243,7 @@ ValueHolder TableProxy::getValueFromTable (const String& colName,
-       break;
-     case TpDouble:
-       {
--	ScalarColumn<Double> ac(table_p,colName); 
-+	ScalarColumn<Double> ac(table_p,colName);
- 	if (isCell) {
- 	  return ValueHolder (ac(rownr));
- 	}else{
-@@ -2250,7 +2253,7 @@ ValueHolder TableProxy::getValueFromTable (const String& colName,
-       break;
-     case TpComplex:
-       {
--	ScalarColumn<Complex> ac(table_p,colName); 
-+	ScalarColumn<Complex> ac(table_p,colName);
- 	if (isCell) {
- 	  return ValueHolder (ac(rownr));
- 	}else{
-@@ -2260,7 +2263,7 @@ ValueHolder TableProxy::getValueFromTable (const String& colName,
-       break;
-     case TpDComplex:
-       {
--	ScalarColumn<DComplex> ac(table_p,colName); 
-+	ScalarColumn<DComplex> ac(table_p,colName);
- 	if (isCell) {
- 	  return ValueHolder (ac(rownr));
- 	}else{
-@@ -2270,7 +2273,7 @@ ValueHolder TableProxy::getValueFromTable (const String& colName,
-       break;
-     case TpString:
-       {
--	ScalarColumn<String> ac(table_p,colName); 
-+	ScalarColumn<String> ac(table_p,colName);
- 	if (isCell) {
- 	  return ValueHolder (ac(rownr));
- 	}else{
-@@ -2280,7 +2283,7 @@ ValueHolder TableProxy::getValueFromTable (const String& colName,
-       break;
-     case TpRecord:
-       {
--	ScalarColumn<TableRecord> ac(table_p,colName); 
-+	ScalarColumn<TableRecord> ac(table_p,colName);
- 	if (isCell) {
- 	  // Transform a TableRecord into a Record.
- 	  return ValueHolder (ac(rownr).toRecord());
-@@ -2862,7 +2865,7 @@ void TableProxy::putValueInTable (const String& colName,
-   DataType type = table_p.tableDesc().columnDesc(colName).dataType();
-   if (isScalar) {
-     switch (type) {
--    case TpBool: 
-+    case TpBool:
-       {
- 	ScalarColumn<Bool> col(table_p, colName);
- 	if (isCell) {
 @@ -3403,10 +3406,12 @@ TableLock TableProxy::makeLockOptions (const Record& options)
      opt = TableLock::PermanentLocking;
    } else if (str == "permanentwait") {
@@ -790,3 +1450,16 @@ index f65cf26dd..75268a528 100644
    }
    if (options.nfields() == 1) {
      return TableLock(opt);
+diff --git a/tables/Tables/TableProxy.h b/tables/Tables/TableProxy.h
+index 5b4c539dd..7d885c52d 100644
+--- a/tables/Tables/TableProxy.h
++++ b/tables/Tables/TableProxy.h
+@@ -198,7 +198,7 @@ public:
+   String endianFormat() const;
+ 
+   // Acquire a (read or write) lock on the table.
+-  void lock (Bool mode, Int nattempts);
++  Bool lock (Bool mode, Int nattempts);
+ 
+   // Release a lock on the table.
+   void unlock();
