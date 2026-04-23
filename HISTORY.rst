@@ -2,6 +2,10 @@
 History
 =======
 
+X.Y.Z (DD-MM-YYYY)
+------------------
+* Pin pyarrow to 23.0.1 in C++ test cases (:pr:`204`)
+
 0.5.1 (02-03-2026)
 ------------------
 * Add an ``arcae.safe_multithreaded_writes`` function indicating whether writing
