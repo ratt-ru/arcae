@@ -18,7 +18,8 @@ add_custom_command(
 python_add_library(arrow_tables MODULE WITH_SOABI arrow_tables.cc)
 
 target_link_libraries(arrow_tables PUBLIC arcae PkgConfig::casacore)
-target_link_directories(arrow_tables PUBLIC ${PYARROW_LIBDIRS})
+string(REPLACE " " ";" _PYARROW_LIBDIRS ${PYARROW_LIBDIRS})
+target_link_directories(arrow_tables PUBLIC ${_PYARROW_LIBDIRS})
 target_include_directories(arrow_tables PUBLIC
                             PkgConfig::casacore
                             absl::span
