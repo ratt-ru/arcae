@@ -4,6 +4,7 @@ History
 
 X.Y.Z (DD-MM-YYYY)
 ------------------
+* Split PYARROW_LIBDIRS into a list before passing to target_link_directories (:pr:`209`)
 * Pin pyarrow to 23.0.1 in C++ test cases (:pr:`204`)
 
 0.5.1 (02-03-2026)
