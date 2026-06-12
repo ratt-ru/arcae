@@ -50,7 +50,7 @@ jobs:
     permissions:
       id-token: write
     env:
-      VCPKG_TARGET_TRIPLET: "x64-linux-dynamic-cxx20-abi1-rel"
+      VCPKG_TARGET_TRIPLET: "x64-linux-cxx20-abi1-rel"
     steps:
       - name: Checkout source
         uses: actions/checkout@v6
@@ -65,10 +65,10 @@ jobs:
           sudo apt -y update
           sudo apt -y install build-essential cmake
           python -m pip install -U pip
-          python -m pip install pyarrow
+          python -m pip install pyarrow==23.0.1
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v6.0.0
+        uses: aws-actions/configure-aws-credentials@v6.2.0
         with:
           role-to-assume: ${{ secrets.GHA_ROLE_ARN }}
           aws-region: af-south-1
@@ -94,7 +94,7 @@ jobs:
     permissions:
       id-token: write
     env:
-      VCPKG_TARGET_TRIPLET: "arm64-osx-dynamic-cxx20-abi1-rel"
+      VCPKG_TARGET_TRIPLET: "arm64-osx-cxx20-abi1-rel"
     steps:
       - name: Checkout source
         uses: actions/checkout@v6
@@ -110,10 +110,10 @@ jobs:
           brew install ninja
           brew reinstall gcc  # Needed for gfortran
           python -m pip install -U pip
-          python -m pip install pyarrow
+          python -m pip install pyarrow==23.0.1
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v6.0.0
+        uses: aws-actions/configure-aws-credentials@v6.2.0
         with:
           role-to-assume: ${{ secrets.GHA_ROLE_ARN }}
           aws-region: af-south-1
@@ -150,24 +150,24 @@ jobs:
           - os: ubuntu-22.04
             os_short: linux
             arch: x86_64
-            triplet: "x64-linux-dynamic-cxx20-abi1-rel"
+            triplet: "x64-linux-cxx20-abi1-rel"
             extra_build: "manylinux_x86_64"
           - os: ubuntu-22.04-arm
             os_short: linux
             arch: aarch64
-            triplet: "arm64-linux-dynamic-cxx20-abi1-rel"
+            triplet: "arm64-linux-cxx20-abi1-rel"
             extra_build: "manylinux_aarch64"
           - os: macos-15-intel
             os_short: macos
             arch: x86_64
             deployment_target: "15.0"
-            triplet: "x64-osx-dynamic-cxx20-abi1-rel"
+            triplet: "x64-osx-cxx20-abi1-rel"
             extra_build: "macosx_x86_64"
           - os: macos-14
             os_short: macos
             arch: arm64
             deployment_target: "14.0"
-            triplet: "arm64-osx-dynamic-cxx20-abi1-rel"
+            triplet: "arm64-osx-cxx20-abi1-rel"
             extra_build: "macosx_arm64"
     steps:
       - name: Set up Python ${{ env.HOST_PYTHON_VERSION }}
@@ -199,7 +199,7 @@ jobs:
           echo "cibw_build=$CIBW_BUILD" >> $GITHUB_OUTPUT
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v6.0.0
+        uses: aws-actions/configure-aws-credentials@v6.2.0
         with:
           role-to-assume: ${{ secrets.GHA_ROLE_ARN }}
           aws-region: af-south-1
@@ -221,7 +221,7 @@ jobs:
             VCPKG_INSTALLED_DIR=${{ env.VCPKG_INSTALLED_DIR }}
             LD_LIBRARY_PATH=${{ env.VCPKG_INSTALLED_DIR }}/${{ matrix.triplet }}/lib
             MACOSX_DEPLOYMENT_TARGET=${{ matrix.deployment_target }}
-        uses: pypa/cibuildwheel@v3.3.1
+        uses: pypa/cibuildwheel@v4.0.0
 
       - name: Upload wheel artifacts
         uses: actions/upload-artifact@v7

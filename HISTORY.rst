@@ -6,6 +6,12 @@ X.Y.Z (DD-MM-YYYY)
 ------------------
 * Implement write-locking (:pr:`162`)
 
+0.5.2 (12-06-2026)
+------------------
+* Build arcae as a static library with minimal symbol exports (:pr:`211`, :pr:`212`)
+* Split PYARROW_LIBDIRS into a list before passing to target_link_directories (:pr:`209`, :pr:`210`)
+* Pin pyarrow to 23.0.1 in C++ test cases (:pr:`204`)
+
 0.5.1 (02-03-2026)
 ------------------
 * Add an ``arcae.safe_multithreaded_writes`` function indicating whether writing

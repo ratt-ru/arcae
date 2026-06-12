@@ -1,5 +1,5 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 62c340407..8f151f2a0 100644
+index 62c3404..8f151f2 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -354,11 +354,6 @@ endif (_usebison STREQUAL YES)
@@ -81,7 +81,7 @@ index 62c340407..8f151f2a0 100644
  message (STATUS "CMAKE_SYSTEM .......... = ${CMAKE_SYSTEM}")
 diff --git a/Config.cmake.in b/Config.cmake.in
 new file mode 100644
-index 000000000..8c9ad12aa
+index 0000000..8c9ad12
 --- /dev/null
 +++ b/Config.cmake.in
 @@ -0,0 +1,5 @@
@@ -91,7 +91,7 @@ index 000000000..8c9ad12aa
 +
 +check_required_components(@PROJECT_NAME@)
 diff --git a/casa/CMakeLists.txt b/casa/CMakeLists.txt
-index 950752c6a..d4c35cb69 100644
+index 950752c..d4c35cb 100644
 --- a/casa/CMakeLists.txt
 +++ b/casa/CMakeLists.txt
 @@ -15,7 +15,9 @@ set (
@@ -127,7 +127,7 @@ index 950752c6a..d4c35cb69 100644
  ARCHIVE DESTINATION lib${LIB_SUFFIX}
  LIBRARY PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
 diff --git a/casa/Exceptions/Error.h b/casa/Exceptions/Error.h
-index 12229f902..a15e5080b 100644
+index 12229f9..a15e508 100644
 --- a/casa/Exceptions/Error.h
 +++ b/casa/Exceptions/Error.h
 @@ -91,7 +91,7 @@ namespace casacore { //# NAMESPACE CASACORE - BEGIN
@@ -978,7 +978,7 @@ index 57c57db79..f21246f61 100644
      // The copy constructor cannot be used (its semantics are too difficult).
      LockFile (const LockFile&);
 diff --git a/casa/Json/JsonOut.h b/casa/Json/JsonOut.h
-index b5229c57d..66596d273 100644
+index b5229c5..66596d2 100644
 --- a/casa/Json/JsonOut.h
 +++ b/casa/Json/JsonOut.h
 @@ -103,7 +103,7 @@ namespace casacore { //# NAMESPACE CASACORE - BEGIN
@@ -1013,7 +1013,7 @@ index b5229c57d..66596d273 100644
      // It indents with the length of the name (including quotes and colon)
      // with a maximum of 20 spaces.
 diff --git a/cmake/FindFFTW3.cmake b/cmake/FindFFTW3.cmake
-index 886f3bebb..66d117674 100644
+index 886f3be..66d1176 100644
 --- a/cmake/FindFFTW3.cmake
 +++ b/cmake/FindFFTW3.cmake
 @@ -58,15 +58,6 @@ foreach(_comp ${_components})
@@ -1033,7 +1033,7 @@ index 886f3bebb..66d117674 100644
  # find_package_handle_standard_args().
  set(_check_list)
 diff --git a/coordinates/CMakeLists.txt b/coordinates/CMakeLists.txt
-index 783ac1d45..5871327d3 100644
+index 783ac1d..5871327 100644
 --- a/coordinates/CMakeLists.txt
 +++ b/coordinates/CMakeLists.txt
 @@ -31,6 +31,7 @@ init_pch_support(casa_coordinates ${top_level_headers})
@@ -1045,7 +1045,7 @@ index 783ac1d45..5871327d3 100644
  ARCHIVE DESTINATION lib${LIB_SUFFIX}
  LIBRARY PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
 diff --git a/derivedmscal/CMakeLists.txt b/derivedmscal/CMakeLists.txt
-index ff8da2a3e..232e5b93f 100644
+index ff8da2a..232e5b9 100644
 --- a/derivedmscal/CMakeLists.txt
 +++ b/derivedmscal/CMakeLists.txt
 @@ -19,6 +19,7 @@ init_pch_support(casa_derivedmscal ${top_level_headers})
@@ -1057,23 +1057,24 @@ index ff8da2a3e..232e5b93f 100644
  ARCHIVE DESTINATION lib${LIB_SUFFIX}
  LIBRARY PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
 diff --git a/fits/CMakeLists.txt b/fits/CMakeLists.txt
-index 65b888eec..b70f532a3 100644
+index 65b888e..47cf365 100644
 --- a/fits/CMakeLists.txt
 +++ b/fits/CMakeLists.txt
-@@ -30,7 +30,11 @@ FITS.h
+@@ -30,14 +30,19 @@ FITS.h
  
  init_pch_support(casa_fits ${top_level_headers})
  
 -target_link_libraries (casa_fits casa_measures ${CFITSIO_LIBRARIES} ${CASACORE_ARCH_LIBS})
 +find_package(ZLIB REQUIRED)
-+
+ 
+-add_subdirectory (apps)
 +target_link_libraries (casa_fits
 +    PUBLIC casa_measures ${CFITSIO_LIBRARIES} ${CASACORE_ARCH_LIBS}
 +    PRIVATE ZLIB::ZLIB)
++
++# apps subdirectory disabled (arcae static monolith build)
  
- add_subdirectory (apps)
- 
-@@ -38,6 +42,7 @@ add_subdirectory (apps)
+ #the tests
  add_subdirectory (FITS/test ${EXCL_ALL})
  
  install (TARGETS casa_fits
@@ -1082,7 +1083,7 @@ index 65b888eec..b70f532a3 100644
  ARCHIVE DESTINATION lib${LIB_SUFFIX}
  LIBRARY PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
 diff --git a/fits/apps/CMakeLists.txt b/fits/apps/CMakeLists.txt
-index b2e422000..45dde2e82 100644
+index b2e4220..45dde2e 100644
 --- a/fits/apps/CMakeLists.txt
 +++ b/fits/apps/CMakeLists.txt
 @@ -1,4 +1,5 @@
@@ -1093,10 +1094,15 @@ index b2e422000..45dde2e82 100644
 +target_link_libraries (fits2table PUBLIC casa_fits ${CASACORE_ARCH_LIBS} PRIVATE ZLIB::ZLIB)
  install(TARGETS fits2table)
 diff --git a/images/CMakeLists.txt b/images/CMakeLists.txt
-index 20f5d0ac4..45258eb68 100644
+index 20f5d0a..39db9bd 100644
 --- a/images/CMakeLists.txt
 +++ b/images/CMakeLists.txt
-@@ -82,6 +82,7 @@ add_subdirectory (apps)
+@@ -78,10 +78,11 @@ casa_lattices
+ ${CASACORE_ARCH_LIBS}
+ )
+ 
+-add_subdirectory (apps)
++# apps subdirectory disabled (arcae static monolith build)
  
  install (
  TARGETS casa_images
@@ -1105,7 +1111,7 @@ index 20f5d0ac4..45258eb68 100644
  ARCHIVE DESTINATION lib${LIB_SUFFIX}
  LIBRARY PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
 diff --git a/lattices/CMakeLists.txt b/lattices/CMakeLists.txt
-index dccca16d5..29465d734 100644
+index dccca16..29465d7 100644
 --- a/lattices/CMakeLists.txt
 +++ b/lattices/CMakeLists.txt
 @@ -77,6 +77,7 @@ ${CASACORE_ARCH_LIBS}
@@ -1117,7 +1123,7 @@ index dccca16d5..29465d734 100644
  ARCHIVE DESTINATION lib${LIB_SUFFIX}
  LIBRARY PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
 diff --git a/meas/CMakeLists.txt b/meas/CMakeLists.txt
-index a2c9d5639..d3b5b6591 100644
+index a2c9d56..d3b5b65 100644
 --- a/meas/CMakeLists.txt
 +++ b/meas/CMakeLists.txt
 @@ -30,6 +30,7 @@ init_pch_support(casa_meas ${top_level_headers})
@@ -1129,10 +1135,15 @@ index a2c9d5639..d3b5b6591 100644
  LIBRARY DESTINATION lib${LIB_SUFFIX}
  ARCHIVE DESTINATION lib${LIB_SUFFIX}
 diff --git a/measures/CMakeLists.txt b/measures/CMakeLists.txt
-index 6b2e42b85..ec522eeb4 100644
+index 6b2e42b..a6dc175 100644
 --- a/measures/CMakeLists.txt
 +++ b/measures/CMakeLists.txt
-@@ -82,6 +82,7 @@ add_subdirectory (apps)
+@@ -78,10 +78,11 @@ init_pch_support(casa_measures ${top_level_headers})
+ 
+ target_link_libraries (casa_measures casa_tables casa_scimath ${CASACORE_ARCH_LIBS})
+ 
+-add_subdirectory (apps)
++# apps subdirectory disabled (arcae static monolith build)
  
  install (
  TARGETS casa_measures
@@ -1141,7 +1152,7 @@ index 6b2e42b85..ec522eeb4 100644
  ARCHIVE DESTINATION lib${LIB_SUFFIX}
  LIBRARY PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
 diff --git a/mirlib/CMakeLists.txt b/mirlib/CMakeLists.txt
-index 0703a5d1d..46f26840f 100644
+index 0703a5d..46f2684 100644
 --- a/mirlib/CMakeLists.txt
 +++ b/mirlib/CMakeLists.txt
 @@ -22,6 +22,7 @@ target_link_libraries (casa_mirlib casa_casa ${CASACORE_ARCH_LIBS})
@@ -1153,7 +1164,7 @@ index 0703a5d1d..46f26840f 100644
  LIBRARY DESTINATION lib${LIB_SUFFIX}
  ARCHIVE DESTINATION lib${LIB_SUFFIX}
 diff --git a/ms/CMakeLists.txt b/ms/CMakeLists.txt
-index 5602283c3..0219de46b 100644
+index 5602283..ee08a8d 100644
 --- a/ms/CMakeLists.txt
 +++ b/ms/CMakeLists.txt
 @@ -1,5 +1,5 @@
@@ -1163,8 +1174,12 @@ index 5602283c3..0219de46b 100644
  #
  
  set (
-@@ -176,6 +176,7 @@ ${CASACORE_ARCH_LIBS}
- add_subdirectory (apps)
+@@ -173,9 +173,10 @@ casa_ms casa_measures
+ ${CASACORE_ARCH_LIBS}
+ )
+ 
+-add_subdirectory (apps)
++# apps subdirectory disabled (arcae static monolith build)
  
  install (TARGETS casa_ms
 +EXPORT casacore
@@ -1172,7 +1187,7 @@ index 5602283c3..0219de46b 100644
  LIBRARY DESTINATION lib${LIB_SUFFIX}
  ARCHIVE DESTINATION lib${LIB_SUFFIX}
 diff --git a/ms/MeasurementSets/MSTableImpl.cc b/ms/MeasurementSets/MSTableImpl.cc
-index a5d3c4d56..bb7350442 100644
+index a5d3c4d..bb73504 100644
 --- a/ms/MeasurementSets/MSTableImpl.cc
 +++ b/ms/MeasurementSets/MSTableImpl.cc
 @@ -321,9 +321,10 @@ void MSTableImpl::addKeyToDesc(TableDesc& td, const String& keyName,
@@ -1188,10 +1203,15 @@ index a5d3c4d56..bb7350442 100644
  }
  
 diff --git a/msfits/CMakeLists.txt b/msfits/CMakeLists.txt
-index b8340e009..2acad1bb7 100644
+index b8340e0..6b434d3 100644
 --- a/msfits/CMakeLists.txt
 +++ b/msfits/CMakeLists.txt
-@@ -36,6 +36,7 @@ add_subdirectory (apps)
+@@ -32,10 +32,11 @@ init_pch_support(casa_msfits ${top_level_headers})
+ 
+ target_link_libraries (casa_msfits casa_ms casa_fits ${CASACORE_ARCH_LIBS})
+ 
+-add_subdirectory (apps)
++# apps subdirectory disabled (arcae static monolith build)
  
  install (
  TARGETS casa_msfits
@@ -1200,7 +1220,7 @@ index b8340e009..2acad1bb7 100644
  ARCHIVE DESTINATION lib${LIB_SUFFIX}
  LIBRARY PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
 diff --git a/python/CMakeLists-cmake3.14.txt b/python/CMakeLists-cmake3.14.txt
-index 7c981f734..1ce6b4d6c 100644
+index 7c981f7..1ce6b4d 100644
 --- a/python/CMakeLists-cmake3.14.txt
 +++ b/python/CMakeLists-cmake3.14.txt
 @@ -63,6 +63,7 @@ Converters/PycArray.tcc
@@ -1212,7 +1232,7 @@ index 7c981f734..1ce6b4d6c 100644
  LIBRARY DESTINATION lib${LIB_SUFFIX}
  ARCHIVE DESTINATION lib${LIB_SUFFIX}
 diff --git a/python/CMakeLists-older-cmake.txt b/python/CMakeLists-older-cmake.txt
-index 96411e7d9..e145da3bb 100644
+index 96411e7..e145da3 100644
 --- a/python/CMakeLists-older-cmake.txt
 +++ b/python/CMakeLists-older-cmake.txt
 @@ -90,6 +90,7 @@ Converters/PycArray.tcc
@@ -1224,7 +1244,7 @@ index 96411e7d9..e145da3bb 100644
  LIBRARY DESTINATION lib${LIB_SUFFIX}
  ARCHIVE DESTINATION lib${LIB_SUFFIX}
 diff --git a/python3/CMakeLists-cmake3.14.txt b/python3/CMakeLists-cmake3.14.txt
-index 921c4c30c..e5746d119 100644
+index 921c4c3..e5746d1 100644
 --- a/python3/CMakeLists-cmake3.14.txt
 +++ b/python3/CMakeLists-cmake3.14.txt
 @@ -54,6 +54,7 @@ add_library (casa_python3
@@ -1236,7 +1256,7 @@ index 921c4c30c..e5746d119 100644
  LIBRARY DESTINATION lib${LIB_SUFFIX}
  ARCHIVE DESTINATION lib${LIB_SUFFIX}
 diff --git a/python3/CMakeLists-older-cmake.txt b/python3/CMakeLists-older-cmake.txt
-index 8a42cc905..5fe0999ca 100644
+index 8a42cc9..5fe0999 100644
 --- a/python3/CMakeLists-older-cmake.txt
 +++ b/python3/CMakeLists-older-cmake.txt
 @@ -84,6 +84,7 @@ add_library (casa_python3
@@ -1248,7 +1268,7 @@ index 8a42cc905..5fe0999ca 100644
  LIBRARY DESTINATION lib${LIB_SUFFIX}
  ARCHIVE DESTINATION lib${LIB_SUFFIX}
 diff --git a/scimath/CMakeLists.txt b/scimath/CMakeLists.txt
-index b7f2900f1..999981164 100644
+index b7f2900..9999811 100644
 --- a/scimath/CMakeLists.txt
 +++ b/scimath/CMakeLists.txt
 @@ -62,6 +62,7 @@ else (FFTW3_FOUND)
@@ -1260,7 +1280,7 @@ index b7f2900f1..999981164 100644
  ARCHIVE DESTINATION lib${LIB_SUFFIX}
  LIBRARY PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_WRITE GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
 diff --git a/scimath_f/CMakeLists.txt b/scimath_f/CMakeLists.txt
-index 69bd4d757..8e6aa8d8a 100644
+index 69bd4d7..8e6aa8d 100644
 --- a/scimath_f/CMakeLists.txt
 +++ b/scimath_f/CMakeLists.txt
 @@ -50,6 +50,7 @@ target_link_libraries (casa_scimath_f casa_tables ${LAPACK_LIBRARIES} ${BLAS_LIB
@@ -1272,7 +1292,7 @@ index 69bd4d757..8e6aa8d8a 100644
  ARCHIVE DESTINATION lib${LIB_SUFFIX}
  LIBRARY PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
 diff --git a/tables/CMakeLists.txt b/tables/CMakeLists.txt
-index 31cf24353..92a2f33ce 100644
+index 31cf243..611f89a 100644
 --- a/tables/CMakeLists.txt
 +++ b/tables/CMakeLists.txt
 @@ -241,11 +241,18 @@ TaQL.h
@@ -1288,7 +1308,8 @@ index 31cf24353..92a2f33ce 100644
 +  endif(ADIOS2_FOUND)
 +endif(MPI_FOUND)
  
- add_subdirectory (apps)
+-add_subdirectory (apps)
++# apps subdirectory disabled (arcae static monolith build)
  
  install (TARGETS casa_tables
 +EXPORT casacore
@@ -1296,7 +1317,7 @@ index 31cf24353..92a2f33ce 100644
  ARCHIVE DESTINATION lib${LIB_SUFFIX}
  LIBRARY PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
 diff --git a/tables/Tables/PlainTable.cc b/tables/Tables/PlainTable.cc
-index 2a41c4f62..fb088a3c5 100644
+index 2a41c4f..fb088a3 100644
 --- a/tables/Tables/PlainTable.cc
 +++ b/tables/Tables/PlainTable.cc
 @@ -45,7 +45,7 @@
@@ -1309,7 +1330,7 @@ index 2a41c4f62..fb088a3c5 100644
  PlainTable::PlainTable (SetupNewTable& newtab, rownr_t nrrow, Bool initialize,
                          const TableLock& lockOptions, int endianFormat,
 diff --git a/tables/Tables/PlainTable.h b/tables/Tables/PlainTable.h
-index 3179d8eb6..c0a0ee406 100644
+index 3179d8e..c0a0ee4 100644
 --- a/tables/Tables/PlainTable.h
 +++ b/tables/Tables/PlainTable.h
 @@ -312,7 +312,7 @@ private:
@@ -1322,7 +1343,7 @@ index 3179d8eb6..c0a0ee406 100644
  
  
 diff --git a/tables/Tables/RefRows.cc b/tables/Tables/RefRows.cc
-index 957b3e1b0..f80a977b7 100644
+index 957b3e1..f80a977 100644
 --- a/tables/Tables/RefRows.cc
 +++ b/tables/Tables/RefRows.cc
 @@ -38,17 +38,24 @@ RefRows::RefRows (const Vector<rownr_t>& rowNumbers, Bool isSliced,
@@ -1355,7 +1376,7 @@ index 957b3e1b0..f80a977b7 100644
      if (itsSliced) {
  	AlwaysAssert (itsNrows%3 == 0, AipsError);
 diff --git a/tables/Tables/RefRows.h b/tables/Tables/RefRows.h
-index 32ab695fc..ef2dff8db 100644
+index 32ab695..ef2dff8 100644
 --- a/tables/Tables/RefRows.h
 +++ b/tables/Tables/RefRows.h
 @@ -50,12 +50,12 @@ class Slicer;
