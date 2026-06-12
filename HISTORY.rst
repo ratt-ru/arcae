@@ -2,7 +2,7 @@
 History
 =======
 
-X.Y.Z (DD-MM-YYYY)
+0.5.2 (12-06-2026)
 ------------------
 * Build arcae as a static library with minimal symbol exports (:pr:`211`, :pr:`212`)
 * Split PYARROW_LIBDIRS into a list before passing to target_link_directories (:pr:`209`, :pr:`210`)
