@@ -7,9 +7,6 @@ import numpy as np
 import pytest
 import requests
 
-ct = pytest.importorskip("casacore.tables")
-
-
 TAU_MS = "HLTau_B6cont.calavg.tav300s"
 TAU_MS_TAR = f"{TAU_MS}.tar.xz"
 TAU_MS_TAR_HASH = "fc2ce9261817dfd88bbdd244c8e9e58ae0362173938df6ef2a587b1823147f70"
@@ -108,6 +105,7 @@ def partitioned_dataset(tau_ms, tmp_path_factory):
 
 @pytest.fixture
 def sorting_table(tmp_path_factory):
+    ct = pytest.importorskip("casacore.tables")
     path = tmp_path_factory.mktemp("column_cases")
     table_name = os.path.join(str(path), "test.ms")
 
@@ -150,6 +148,7 @@ def sorting_table(tmp_path_factory):
 
 @pytest.fixture
 def column_case_table(tmp_path_factory):
+    ct = pytest.importorskip("casacore.tables")
     path = tmp_path_factory.mktemp("column_cases")
 
     # Table descriptor
@@ -295,6 +294,7 @@ def column_case_table(tmp_path_factory):
 
 @pytest.fixture
 def complex_case_table(tmp_path_factory):
+    ct = pytest.importorskip("casacore.tables")
     path = tmp_path_factory.mktemp("complex_cases")
 
     table_desc = [
@@ -328,6 +328,7 @@ def complex_case_table(tmp_path_factory):
 
 @pytest.fixture
 def getcol_table(tmp_path_factory):
+    ct = pytest.importorskip("casacore.tables")
     path = tmp_path_factory.mktemp("getcol_cases")
 
     table_desc = [
@@ -429,6 +430,7 @@ NCORR = 4
 
 @pytest.fixture(scope="session", params=[{"row": NROW, "chan": NCHAN, "corr": NCORR}])
 def ramp_ms(request, tmp_path_factory):
+    ct = pytest.importorskip("casacore.tables")
     path = tmp_path_factory.mktemp("generate_ramp_ms")
     dims = request.param
 
