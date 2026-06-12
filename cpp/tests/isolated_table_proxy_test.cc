@@ -65,7 +65,7 @@ class IsolatedTableProxyTest : public ::testing::Test {
     return IsolatedTableProxy::Make([name = table_name_]() {
       auto lock = TableLock(TableLock::LockOption::AutoLocking);
       auto lockoptions = Record();
-      lockoptions.define("option", "nolock");
+      lockoptions.define("option", "user");
       lockoptions.define("internal", lock.interval());
       lockoptions.define("maxwait", casacore::Int(lock.maxWait()));
       return std::make_shared<TableProxy>(name, lockoptions, Table::Old);
