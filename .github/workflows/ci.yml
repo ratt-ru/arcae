@@ -50,7 +50,7 @@ jobs:
     permissions:
       id-token: write
     env:
-      VCPKG_TARGET_TRIPLET: "x64-linux-dynamic-cxx20-abi1-rel"
+      VCPKG_TARGET_TRIPLET: "x64-linux-cxx20-abi1-rel"
     steps:
       - name: Checkout source
         uses: actions/checkout@v6
@@ -94,7 +94,7 @@ jobs:
     permissions:
       id-token: write
     env:
-      VCPKG_TARGET_TRIPLET: "arm64-osx-dynamic-cxx20-abi1-rel"
+      VCPKG_TARGET_TRIPLET: "arm64-osx-cxx20-abi1-rel"
     steps:
       - name: Checkout source
         uses: actions/checkout@v6
@@ -150,24 +150,24 @@ jobs:
           - os: ubuntu-22.04
             os_short: linux
             arch: x86_64
-            triplet: "x64-linux-dynamic-cxx20-abi1-rel"
+            triplet: "x64-linux-cxx20-abi1-rel"
             extra_build: "manylinux_x86_64"
           - os: ubuntu-22.04-arm
             os_short: linux
             arch: aarch64
-            triplet: "arm64-linux-dynamic-cxx20-abi1-rel"
+            triplet: "arm64-linux-cxx20-abi1-rel"
             extra_build: "manylinux_aarch64"
           - os: macos-15-intel
             os_short: macos
             arch: x86_64
             deployment_target: "15.0"
-            triplet: "x64-osx-dynamic-cxx20-abi1-rel"
+            triplet: "x64-osx-cxx20-abi1-rel"
             extra_build: "macosx_x86_64"
           - os: macos-14
             os_short: macos
             arch: arm64
             deployment_target: "14.0"
-            triplet: "arm64-osx-dynamic-cxx20-abi1-rel"
+            triplet: "arm64-osx-cxx20-abi1-rel"
             extra_build: "macosx_arm64"
     steps:
       - name: Set up Python ${{ env.HOST_PYTHON_VERSION }}
