@@ -4,6 +4,7 @@ History
 
 X.Y.Z (DD-MM-YYYY)
 ------------------
+* Build arcae as a static library with minimal symbol exports (:pr:`211`)
 * Split PYARROW_LIBDIRS into a list before passing to target_link_directories (:pr:`209`, :pr:`210`)
 * Pin pyarrow to 23.0.1 in C++ test cases (:pr:`204`)
 

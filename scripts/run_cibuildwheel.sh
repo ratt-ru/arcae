@@ -46,7 +46,7 @@ export CIBW_BUILD=$CPYTHON_VERSION-$MANYLINUX_PLATFORM
 export CIBW_BUILD_FRONTEND=build
 export CIBW_BEFORE_ALL_LINUX="yum install -y zip flex bison gcc-gfortran"
 export CIBW_MANYLINUX_X86_64_IMAGE="quay.io/pypa/manylinux_2_28_x86_64"
-export VCPKG_TARGET_TRIPLET=x64-linux-dynamic-cxx20-abi1-rel
+export VCPKG_TARGET_TRIPLET=x64-linux-cxx20-abi1-rel
 export CIBW_ENVIRONMENT_LINUX="\
 CMAKE_ARGS=-DBUILD_TESTING=OFF \
 VCPKG_DEFAULT_BINARY_CACHE=/host$VCPKG_HOST_BINARY_CACHE \
@@ -61,7 +61,7 @@ export CIBW_REPAIR_WHEEL_COMMAND_LINUX="auditwheel repair -w {dest_dir} {wheel} 
 # $ docker run -it --rm cibw-debug /bin/bash
 export CIBW_TEST_SKIP="*"
 export CIBW_TEST_EXTRAS=
-export CIBW_TEST_COMMAND=bash {package}/ci/scripts/run-tests.sh
+export CIBW_TEST_COMMAND="bash {package}/ci/scripts/run-tests.sh"
 export CIBW_VERBOSITY=3
 
 echo "Creating VCPKG Binary Cache in $VCPKG_HOST_BINARY_CACHE"

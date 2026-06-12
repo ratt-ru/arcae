@@ -1,0 +1,6 @@
+{
+  global:
+    PyInit_arrow_tables;
+  local:
+    *;
+};

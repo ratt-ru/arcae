@@ -1,9 +1,9 @@
-import multiprocessing as mp
 import os
 import tarfile
 from hashlib import sha256
 from pathlib import Path
 
+import numpy as np
 import pytest
 import requests
 
@@ -103,9 +103,10 @@ def partitioned_dataset(tau_ms, tmp_path_factory):
     return dsdir
 
 
-def generate_sorting_table(path):
-    import pyrap.tables as pt
-
+@pytest.fixture
+def sorting_table(tmp_path_factory):
+    ct = pytest.importorskip("casacore.tables")
+    path = tmp_path_factory.mktemp("column_cases")
     table_name = os.path.join(str(path), "test.ms")
 
     create_table_query = f"""
@@ -133,7 +134,7 @@ def generate_sorting_table(path):
     state = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 
     # Create the table
-    with pt.taql(create_table_query) as ms:
+    with ct.taql(create_table_query) as ms:
         ms.putcol("FIELD_ID", field)
         ms.putcol("DATA_DESC_ID", ddid)
         ms.putcol("ANTENNA1", ant1)
@@ -146,15 +147,9 @@ def generate_sorting_table(path):
 
 
 @pytest.fixture
-def sorting_table(tmp_path_factory):
-    return casa_table_at_path(
-        generate_sorting_table, tmp_path_factory.mktemp("column_cases")
-    )
-
-
-def generate_column_cases_table(path):
-    import numpy as np
-    import pyrap.tables as pt
+def column_case_table(tmp_path_factory):
+    ct = pytest.importorskip("casacore.tables")
+    path = tmp_path_factory.mktemp("column_cases")
 
     # Table descriptor
     table_desc = [
@@ -272,11 +267,11 @@ def generate_column_cases_table(path):
         },
     ]
 
-    table_desc = pt.maketabdesc(table_desc)
+    table_desc = ct.maketabdesc(table_desc)
     table_name = os.path.join(path, "test.table")
     nrow = 3
 
-    with pt.table(table_name, table_desc, nrow=nrow, ack=False) as T:
+    with ct.table(table_name, table_desc, nrow=nrow, ack=False) as T:
         for i in range(nrow):
             T.putcell("VARIABLE", i, np.full((3, 1 + i, 2), i))
             T.putcell("FIXED", i, np.full((2, 4), i))
@@ -297,24 +292,10 @@ def generate_column_cases_table(path):
     return table_name
 
 
-def casa_table_at_path(factory, *args):
-    with mp.get_context("spawn").Pool(1) as pool:
-        try:
-            return pool.apply_async(factory, args).get()
-        except ImportError as e:
-            pytest.importorskip(e.name)
-
-
 @pytest.fixture
-def column_case_table(tmp_path_factory):
-    return casa_table_at_path(
-        generate_column_cases_table, tmp_path_factory.mktemp("column_cases")
-    )
-
-
-def generate_complex_case_table(path):
-    import numpy as np
-    import pyrap.tables as pt
+def complex_case_table(tmp_path_factory):
+    ct = pytest.importorskip("casacore.tables")
+    path = tmp_path_factory.mktemp("complex_cases")
 
     table_desc = [
         {
@@ -334,11 +315,11 @@ def generate_complex_case_table(path):
         }
     ]
 
-    table_desc = pt.maketabdesc(table_desc)
+    table_desc = ct.maketabdesc(table_desc)
     table_name = os.path.join(path, "test.table")
     nrow = 3
 
-    with pt.table(table_name, table_desc, nrow=nrow, ack=False) as T:
+    with ct.table(table_name, table_desc, nrow=nrow, ack=False) as T:
         for i in range(nrow):
             T.putcell("COMPLEX", i, np.full((2, 4), i))
 
@@ -346,15 +327,9 @@ def generate_complex_case_table(path):
 
 
 @pytest.fixture
-def complex_case_table(tmp_path_factory):
-    return casa_table_at_path(
-        generate_complex_case_table, tmp_path_factory.mktemp("complex_cases")
-    )
-
-
-def generate_getcol_table(path):
-    import numpy as np
-    import pyrap.tables as pt
+def getcol_table(tmp_path_factory):
+    ct = pytest.importorskip("casacore.tables")
+    path = tmp_path_factory.mktemp("getcol_cases")
 
     table_desc = [
         {
@@ -430,11 +405,11 @@ def generate_getcol_table(path):
         },
     ]
 
-    table_desc = pt.maketabdesc(table_desc)
+    table_desc = ct.maketabdesc(table_desc)
     table_name = os.path.join(path, "test.table")
     nrow = 3
 
-    with pt.table(table_name, table_desc, nrow=nrow, ack=False) as T:
+    with ct.table(table_name, table_desc, nrow=nrow, ack=False) as T:
         for i in range(nrow):
             T.putcell("COMPLEX_DATA", i, np.full((2, 4), i + i * 1j))
             T.putcell("FLOAT_DATA", i, np.full((2, 4), i))
@@ -447,22 +422,17 @@ def generate_getcol_table(path):
     return table_name
 
 
-@pytest.fixture
-def getcol_table(tmp_path_factory):
-    return casa_table_at_path(
-        generate_getcol_table, tmp_path_factory.mktemp("getcol_cases")
-    )
-
-
 STEP = 1024
 NROW = 100 * STEP
 NCHAN = 1024
 NCORR = 4
 
 
-def generate_ramp_ms(path, dims):
-    import numpy as np
-    import pyrap.tables as pt
+@pytest.fixture(scope="session", params=[{"row": NROW, "chan": NCHAN, "corr": NCORR}])
+def ramp_ms(request, tmp_path_factory):
+    ct = pytest.importorskip("casacore.tables")
+    path = tmp_path_factory.mktemp("generate_ramp_ms")
+    dims = request.param
 
     nrow = dims.get("row", NROW)
     nchan = dims.get("chan", NCHAN)
@@ -493,10 +463,10 @@ def generate_ramp_ms(path, dims):
         },
     ]
 
-    table_desc = pt.maketabdesc(table_desc)
+    table_desc = ct.maketabdesc(table_desc)
     table_name = os.path.join(path, "test.table")
 
-    with pt.table(table_name, table_desc, nrow=nrow, ack=False) as T:
+    with ct.table(table_name, table_desc, nrow=nrow, ack=False) as T:
         for startrow in range(0, nrow, STEP):
             local_nrow = min(STEP, nrow - startrow)
 
@@ -509,10 +479,3 @@ def generate_ramp_ms(path, dims):
             T.putcol("TIME", row_data, startrow=startrow, nrow=local_nrow)
 
     return table_name
-
-
-@pytest.fixture(scope="session", params=[{"row": NROW, "chan": NCHAN, "corr": NCORR}])
-def ramp_ms(request, tmp_path_factory):
-    return casa_table_at_path(
-        generate_ramp_ms, tmp_path_factory.mktemp("generate_ramp_ms"), request.param
-    )
