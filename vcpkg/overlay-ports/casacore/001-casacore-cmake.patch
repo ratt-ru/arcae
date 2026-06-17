@@ -98,8 +98,7 @@ index 950752c..d4c35cb 100644
  parser_inputs
  JsonGram
  )
-- 
-+
+  
 +find_package(ZLIB REQUIRED)
 +
  foreach (src ${parser_inputs})
@@ -140,7 +139,7 @@ index 12229f9..a15e508 100644
  
  // <summary>Base class for all Casacore library errors</summary>
 diff --git a/casa/IO/FileLocker.cc b/casa/IO/FileLocker.cc
-index b55c080d8..d3a6f0120 100644
+index b55c080..9a95006 100644
 --- a/casa/IO/FileLocker.cc
 +++ b/casa/IO/FileLocker.cc
 @@ -24,157 +24,288 @@
@@ -543,25 +542,14 @@ index b55c080d8..d3a6f0120 100644
 -Bool FileLocker::release()
 +Bool FileLocker::fcntlRelease()
  {
--///    cout << "released " << itsReadLocked << ' ' <<itsWriteLocked<<
--///	      ' '<<itsStart<<' '<<itsLength<<endl;
+ ///    cout << "released " << itsReadLocked << ' ' <<itsWriteLocked<<
+ ///	      ' '<<itsStart<<' '<<itsLength<<endl;
 -    itsReadLocked  = False;
 -    itsWriteLocked = False;
-+    ///    cout << "released " << itsReadLocked << ' ' <<itsWriteLocked<<
-+    ///	      ' '<<itsStart<<' '<<itsLength<<endl;
      itsError = 0;
  #if defined(AIPS_NOFILELOCK)
      return True;
-@@ -185,7 +316,7 @@ Bool FileLocker::release()
-     ls.l_start  = itsStart;
-     ls.l_len    = itsLength;
-     if (fcntl (itsFD, F_SETLK, &ls) != -1) {
--	return True;
-+    	return True;
-     }
- #if defined(AIPS_LINUX) || defined(AIPS_DARWIN)
-     if (errno == ENOLCK) {
-@@ -215,17 +346,22 @@ Bool FileLocker::canLock (uInt& pid, LockType type)
+@@ -215,10 +346,15 @@ Bool FileLocker::canLock (uInt& pid, LockType type)
      pid = 0;
      itsError = 0;
      struct flock ls;
@@ -581,14 +569,6 @@ index b55c080d8..d3a6f0120 100644
      }
      ls.l_whence = SEEK_SET;
      ls.l_start  = itsStart;
-     ls.l_len    = itsLength;
-     if (fcntl (itsFD, F_GETLK, &ls) != -1) {
-         pid = ls.l_pid;
--	return  (ls.l_type == F_UNLCK);
-+    	return  (ls.l_type == F_UNLCK);
-     }
-     itsError = errno;
-     return False;
 @@ -234,11 +370,11 @@ Bool FileLocker::canLock (uInt& pid, LockType type)
  
  String FileLocker::lastMessage() const
@@ -686,7 +666,7 @@ index 250f5bfe5..43b0441ff 100644
  {
      return itsFD;
 diff --git a/casa/IO/LockFile.cc b/casa/IO/LockFile.cc
-index 0f853c520..b4e083701 100644
+index 0f853c5..4bb74bd 100644
 --- a/casa/IO/LockFile.cc
 +++ b/casa/IO/LockFile.cc
 @@ -23,6 +23,15 @@
@@ -927,24 +907,14 @@ index 0f853c520..b4e083701 100644
          &&  Int(itsHostId) == itsReqId[2*i+2]) {
  	    break;
  	}
-@@ -368,13 +446,14 @@ void LockFile::removeReqId()
- void LockFile::putReqId (int fd) const
- {
-     if (itsAddToList) {
--	uChar buffer[SIZEREQID];
--	uInt leng = CanonicalConversion::fromLocal (buffer,
-+    	uChar buffer[SIZEREQID];
-+	    uInt leng = CanonicalConversion::fromLocal (buffer,
+@@ -372,6 +450,7 @@ void LockFile::putReqId (int fd) const
+ 	uInt leng = CanonicalConversion::fromLocal (buffer,
  						    itsReqId.storage(),
  						    itsReqId.nelements());
 +        std::lock_guard<std::mutex> io_lock(GetIOMutex(itsName));
          AlwaysAssert(tracePWRITE(fd, (Char *)buffer, leng, 0) == Int(leng),
                       AipsError);
--	fsync (fd);
-+	    fsync (fd);
-     }
- }
- 
+ 	fsync (fd);
 @@ -382,6 +461,7 @@ void LockFile::getReqId()
  {
      int fd = itsLocker.fd();
@@ -981,15 +951,6 @@ diff --git a/casa/Json/JsonOut.h b/casa/Json/JsonOut.h
 index b5229c5..66596d2 100644
 --- a/casa/Json/JsonOut.h
 +++ b/casa/Json/JsonOut.h
-@@ -103,7 +103,7 @@ namespace casacore { //# NAMESPACE CASACORE - BEGIN
-   // </motivation>
-   //
-   //# <todo asof="1996/03/10">
--  //#   <li> 
-+  //#   <li>
-   //# </todo>
- 
-   class JsonOut
 @@ -174,6 +174,10 @@ namespace casacore { //# NAMESPACE CASACORE - BEGIN
      void put (const DComplex& value);
      void put (const char* value);
@@ -1167,13 +1128,6 @@ diff --git a/ms/CMakeLists.txt b/ms/CMakeLists.txt
 index 5602283..ee08a8d 100644
 --- a/ms/CMakeLists.txt
 +++ b/ms/CMakeLists.txt
-@@ -1,5 +1,5 @@
- #
--# CASA MeasurementSets 
-+# CASA MeasurementSets
- #
- 
- set (
 @@ -173,9 +173,10 @@ casa_ms casa_measures
  ${CASACORE_ARCH_LIBS}
  )
@@ -1362,9 +1316,8 @@ index 957b3e1..f80a977 100644
  {
    init (RowNumbers(rowNumbers), isSliced, collapse);
  }
--  
+   
 -void RefRows::init (const Vector<rownr_t>& rowNumbers, Bool isSliced,
-+
 +void RefRows::init (Vector<rownr_t> rowNumbers, Bool isSliced,
                      Bool collapse)
  {
@@ -1379,21 +1332,6 @@ diff --git a/tables/Tables/RefRows.h b/tables/Tables/RefRows.h
 index 32ab695..ef2dff8 100644
 --- a/tables/Tables/RefRows.h
 +++ b/tables/Tables/RefRows.h
-@@ -50,12 +50,12 @@ class Slicer;
- //   <li> <linkto class=Vector>Vector</linkto>
- // </prerequisite>
- 
--// <synopsis> 
-+// <synopsis>
- // RefRows is used to hold the row numbers forming a view on another
- // table. It contains a vector which can hold the row numbers in 2 ways:
- // <ol>
- // <li> As a normal series of row numbers. This is used by e.g. class
--//  <linkto class=RefTable>RefTable</linkto> 
-+//  <linkto class=RefTable>RefTable</linkto>
- // <li> As a series of Slices. In this case 3 subsequent entries
- //  in the vector are used to represent start, end, and increment.
- //  This is used by a function like <src>ScalarColumn::getColumnRange</src>.
 @@ -92,6 +92,9 @@ public:
      // individual row numbers to the slice form (to save memory).
      RefRows (const Vector<rownr_t>& rowNumbers, Bool isSliced = False,
@@ -1413,15 +1351,6 @@ index 32ab695..ef2dff8 100644
                 Bool collapse);
  
      // Fill the itsNrows variable.
-@@ -175,7 +178,7 @@ private:
- //   <li> <linkto class=RefRows>RefRows</linkto>
- // </prerequisite>
- 
--// <synopsis> 
-+// <synopsis>
- // RefRowsSliceIter is useful to iterate through a
- // <linkto class=RefRows>RefRows</linkto> object,
- // especially if the RefRows object contains slices.
 diff --git a/tables/Tables/TableProxy.cc b/tables/Tables/TableProxy.cc
 index f65cf26dd..5577655c5 100644
 --- a/tables/Tables/TableProxy.cc
