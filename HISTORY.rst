@@ -2,6 +2,10 @@
 History
 =======
 
+X.Y.Z (DD-MM-YYYY)
+------------------
+* Restrict pytest to ``< 9.0.0`` (:pr:`214`)
+
 0.5.2 (12-06-2026)
 ------------------
 * Build arcae as a static library with minimal symbol exports (:pr:`211`, :pr:`212`)
