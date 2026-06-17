@@ -4,6 +4,7 @@ History
 
 X.Y.Z (DD-MM-YYYY)
 ------------------
+* Remove extraneous whitespace in casacore patch (:pr:`215`)
 * Introduce ``pytest != 9.1.0`` version restriction (:pr:`214`)
 
 0.5.2 (12-06-2026)
