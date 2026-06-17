@@ -4,7 +4,7 @@ History
 
 X.Y.Z (DD-MM-YYYY)
 ------------------
-* Restrict pytest to ``< 9.0.0`` (:pr:`214`)
+* Introduce ``pytest != 9.1.0`` version restriction (:pr:`214`)
 
 0.5.2 (12-06-2026)
 ------------------
