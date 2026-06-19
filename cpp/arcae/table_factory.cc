@@ -69,17 +69,9 @@ static constexpr char kMain[] = "MAIN";
 // This requires user locking: under auto locking casacore retains the lock
 // across operations, and a retained reader lock on one instance deadlocks the
 // (now in-process) multi-reader/single-writer coordination that serialises a
-// writer on instance 0 against readers on the others. Coerce the auto locking
-// options to their user-locking equivalents so arcae's explicit locks fully
-// control lock lifetime.
+// writer on instance 0 against readers on the others. Coerce to a user lock.
 void CoerceToUserLocking(casacore::Record& lock_record) {
-  if (!lock_record.isDefined("option")) return;
-  auto option = lock_record.asString("option");
-  if (option == "auto") {
-    lock_record.define("option", "user");
-  } else if (option == "autonoread") {
-    lock_record.define("option", "usernoread");
-  }
+  lock_record.define("option", "user");
 }
 
 }  // namespace
