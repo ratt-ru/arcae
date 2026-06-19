@@ -64,6 +64,24 @@ namespace {
 /// Table and subtable names
 static constexpr char kMain[] = "MAIN";
 
+// arcae confines each casacore Table to its own thread and acquires/releases a
+// lock around every operation (see IsolatedTableProxy::MaybeLockAndFinalise).
+// This requires user locking: under auto locking casacore retains the lock
+// across operations, and a retained reader lock on one instance deadlocks the
+// (now in-process) multi-reader/single-writer coordination that serialises a
+// writer on instance 0 against readers on the others. Coerce the auto locking
+// options to their user-locking equivalents so arcae's explicit locks fully
+// control lock lifetime.
+void CoerceToUserLocking(casacore::Record& lock_record) {
+  if (!lock_record.isDefined("option")) return;
+  auto option = lock_record.asString("option");
+  if (option == "auto") {
+    lock_record.define("option", "user");
+  } else if (option == "autonoread") {
+    lock_record.define("option", "usernoread");
+  }
+}
+
 }  // namespace
 
 Result<std::shared_ptr<NewTableProxy>> OpenTable(const std::string& filename,
@@ -72,6 +90,7 @@ Result<std::shared_ptr<NewTableProxy>> OpenTable(const std::string& filename,
   return NewTableProxy::Make(
       [&filename, &readonly, &json_lockoptions]() -> Result<std::shared_ptr<TableProxy>> {
         auto lock_record = JsonParser::parse(json_lockoptions).toRecord();
+        CoerceToUserLocking(lock_record);
         try {
           auto proxy = std::make_shared<TableProxy>(filename, lock_record,
                                                     Table::TableOption::Old);

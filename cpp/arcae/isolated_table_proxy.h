@@ -295,7 +295,12 @@ class IsolatedTableProxy : public std::enable_shared_from_this<IsolatedTableProx
     for (std::size_t i = 0; i < proxy_pools_.size(); ++i) {
       auto future = arrow::DeferNotOk(
           GetPool(i)->Submit([this, i = i, fn = fwd_functor]() -> ResultType {
-            return std::invoke(fn, *GetProxy(i));
+            // Hold a read lock on the source proxy while the functor runs.
+            // Under user locking, casacore requires the source table to be
+            // locked while e.g. a TAQL command builds a reference table from it.
+            auto proxy = this->GetProxy(i);
+            MaybeLockAndFinalise lock(proxy, CasaLockType::Read);
+            return std::invoke(fn, *proxy);
           }));
 
       ARROW_ASSIGN_OR_RAISE(auto table_proxy, future.MoveResult());

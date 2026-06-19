@@ -1,12 +1,13 @@
-// This test case is something of a curiosity in that it tests
-// writing to a Tiled Storage Manager at tile boundaries from multiple threads.
-// (In practice, arcae only writes from a single thread at a time).
-// This test fails if the writes cross boundaries (race condition) and
-// this only works if auto locking is turned on. Without auto locking,
-// one tends to see ""FilebufIO::readBlock - incorrect number of bytes" on
-// with respect to "table.f0", the Tiled Storage Manager header.
-
-// Currently, we speculate this is due to internal lock mismatches. See:
+// This test case writes to a Tiled Storage Manager at tile boundaries from
+// multiple threads, each through its own IsolatedTableProxy over the same
+// table. (In practice, arcae only writes from a single thread at a time.)
+//
+// Each write takes an explicit user-locking write lock (LockType::Write), so
+// the patched FileLocker's shared LockState serialises the writers in-process
+// (multi-reader/single-writer). This both prevents the Tiled Storage Manager
+// header corruption that an unsynchronised version exhibits ("FilebufIO::
+// readBlock - incorrect number of bytes" against "table.f0") and exercises the
+// cross-instance write-lock coordination. See:
 // 1. CAS-13609 in https://casadocs.readthedocs.io/en/v6.4.3/changelog.html
 // 2. https://keflavich.github.io/blog/casa-reading-incorrect-number-of-bytes-wmpi.html
 
@@ -95,7 +96,7 @@ class WriteTests : public ::testing::Test {
     return IsolatedTableProxy::Make([name = table_name_]() {
       auto lock = TableLock(TableLock::LockOption::UserLocking);
       auto lockoptions = Record();
-      lockoptions.define("option", "auto");
+      lockoptions.define("option", "user");
       lockoptions.define("interval", lock.interval());
       lockoptions.define("maxwait", casacore::Int(lock.maxWait()));
       auto tp = std::make_shared<TableProxy>(name, lockoptions, Table::Old);
@@ -143,7 +144,7 @@ TEST_F(WriteTests, Parallel) {
 
                   return true;
                 },
-                LockType::None);
+                LockType::Write);
           }));
 
       futures.push_back(result);
