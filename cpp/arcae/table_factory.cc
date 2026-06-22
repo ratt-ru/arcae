@@ -64,6 +64,16 @@ namespace {
 /// Table and subtable names
 static constexpr char kMain[] = "MAIN";
 
+// arcae confines each casacore Table to its own thread and acquires/releases a
+// lock around every operation (see IsolatedTableProxy::MaybeLockAndFinalise).
+// This requires user locking: under auto locking casacore retains the lock
+// across operations, and a retained reader lock on one instance deadlocks the
+// (now in-process) multi-reader/single-writer coordination that serialises a
+// writer on instance 0 against readers on the others. Coerce to a user lock.
+void CoerceToUserLocking(casacore::Record& lock_record) {
+  lock_record.define("option", "user");
+}
+
 }  // namespace
 
 Result<std::shared_ptr<NewTableProxy>> OpenTable(const std::string& filename,
@@ -72,6 +82,7 @@ Result<std::shared_ptr<NewTableProxy>> OpenTable(const std::string& filename,
   return NewTableProxy::Make(
       [&filename, &readonly, &json_lockoptions]() -> Result<std::shared_ptr<TableProxy>> {
         auto lock_record = JsonParser::parse(json_lockoptions).toRecord();
+        CoerceToUserLocking(lock_record);
         try {
           auto proxy = std::make_shared<TableProxy>(filename, lock_record,
                                                     Table::TableOption::Old);
@@ -86,6 +97,7 @@ Result<std::shared_ptr<NewTableProxy>> OpenTable(const std::string& filename,
 
 Result<std::shared_ptr<NewTableProxy>> DefaultMS(const std::string& name,
                                                  const std::string& subtable,
+                                                 std::size_t ninstances,
                                                  const std::string& json_table_desc,
                                                  const std::string& json_dminfo) {
   // Upper case subtable name
@@ -101,11 +113,13 @@ Result<std::shared_ptr<NewTableProxy>> DefaultMS(const std::string& name,
     modname.append(usubtable);
   }
 
-  ARROW_ASSIGN_OR_RAISE(
-      auto setup_new_table,
-      DefaultMSFactory(modname, usubtable, json_table_desc, json_dminfo));
+  auto MakeMS = [name = name, modname = modname, usubtable = usubtable,
+                 json_table_desc = json_table_desc,
+                 json_dminfo = json_dminfo]() -> Result<std::shared_ptr<TableProxy>> {
+    ARROW_ASSIGN_OR_RAISE(
+        auto setup_new_table,
+        DefaultMSFactory(modname, usubtable, json_table_desc, json_dminfo));
 
-  return NewTableProxy::Make([&]() -> Result<std::shared_ptr<TableProxy>> {
     // MAIN Measurement Set case
     if (usubtable.empty() || usubtable == kMain) {
       auto ms = MeasurementSet(setup_new_table);
@@ -172,7 +186,9 @@ Result<std::shared_ptr<NewTableProxy>> DefaultMS(const std::string& name,
     // Link the table against the Measurement Set
     ms.rwKeywordSet().defineTable(usubtable, subtable->table());
     return subtable;
-  });
+  };
+
+  return NewTableProxy::Make(std::move(MakeMS), ninstances);
 }
 
 // Execute a TAQL query on the supplied tables
