@@ -3,8 +3,8 @@ include(vcpkg_find_fortran)
 vcpkg_from_github(
     OUT_SOURCE_PATH src
     REPO "casacore/casacore"
-    REF "v3.7.1"
-    SHA512 990262f5f64fb84a4af71add715972cf7aa24c09a7acd903a3a8526f482ccba84da1c54dc9d2bf151bfdb824be811a39cdc740852da86c584373183d48a00822
+    REF "v3.8.1"
+    SHA512 41d4463432033995d0e85632faa07c2fedc820a810f593d2aad5144706a41482296200730fc0b99d5ad962b7ffbfb55c0b67a123d0f49f0e8f774cfbd8d9c9f4
     PATCHES
         001-casacore-cmake.patch
 )
