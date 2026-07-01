@@ -53,27 +53,60 @@ const std::shared_ptr<ThreadPool>& IsolatedTableProxy::GetPool(
   return proxy_pools_[instance].io_pool_;
 }
 
+std::shared_ptr<IsolatedTableProxy> IsolatedTableProxy::SpawnWriter() {
+  // Create an IsolatedTableProxy that serialises writes to a single
+  // table instance (and thread).
+  // A custom deleter that releases resources (proxies and pools)
+  // that are actually managed by the parent ITP
+  std::shared_ptr<IsolatedTableProxy> itp(new IsolatedTableProxy(), [](auto* p) {
+    p->proxy_pools_.clear();
+    p->dependencies_.clear();
+    p->is_closed_ = true;
+    delete p;
+  });
+  itp->dependencies_.emplace_back(shared_from_this());
+  // Using the first instance means that writes can still work after
+  // non-syncable operations like AddColumns
+  auto instance = 0;  // GetInstance();
+  itp->proxy_pools_.push_back(proxy_pools_[instance]);
+  itp->is_closed_ = false;
+  return itp;
+}
+
 Status IsolatedTableProxy::CheckClosed() const {
   if (!is_closed_) return Status::OK();
   return Status::Invalid("TableProxy is closed");
 }
 
 Result<bool> IsolatedTableProxy::Close() {
-  if (!is_closed_) {
-    std::shared_ptr<void> defer_close(nullptr, [this](...) { this->is_closed_ = true; });
-    std::vector<Future<bool>> results;
-    results.reserve(proxy_pools_.size());
-    for (auto& [proxy, pool] : proxy_pools_) {
-      results.push_back(arrow::DeferNotOk(pool->Submit([tp = proxy]() {
+  if (is_closed_) return false;
+  // Mark closed on scope exit, regardless of how the close tasks fare.
+  std::shared_ptr<void> defer_close(nullptr, [this](...) { this->is_closed_ = true; });
+  std::vector<Future<bool>> results;
+  results.reserve(proxy_pools_.size());
+  for (auto& [proxy, pool] : proxy_pools_) {
+    results.push_back(arrow::DeferNotOk(pool->Submit([tp = proxy]() -> Result<bool> {
+      // flush/close may throw casacore::AipsError; an exception escaping a
+      // pool task would terminate the process, so convert it to a Status.
+      try {
+        tp->flush(false);
         tp->close();
-        return true;
-      })));
-    }
-    auto all_done = arrow::All(results);
-    all_done.Wait();
-    return true;
+      } catch (const std::exception& e) {
+        return Status::Invalid("Error closing table: ", e.what());
+      }
+      return true;
+    })));
   }
-  return false;
+  auto all_done = arrow::All(results);
+  ARROW_ASSIGN_OR_RAISE(auto outcomes, all_done.MoveResult());
+  // Drain any late-scheduled continuations (e.g. Then callbacks) so that
+  // members are not destroyed while a pool task may still reference them.
+  for (auto& pp : proxy_pools_) pp.io_pool_->WaitForIdle();
+  // Surface the first close failure, if any (still leaving the proxy closed).
+  for (const auto& outcome : outcomes) {
+    ARROW_RETURN_NOT_OK(outcome.status());
+  }
+  return true;
 }
 
 IsolatedTableProxy::~IsolatedTableProxy() {
