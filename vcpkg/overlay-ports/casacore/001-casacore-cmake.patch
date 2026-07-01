@@ -1,8 +1,8 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 62c3404..8f151f2 100644
+index 7401224..97388fd 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -354,11 +354,6 @@ endif (_usebison STREQUAL YES)
+@@ -361,11 +361,6 @@ endif (_usebison STREQUAL YES)
  if (_uselapack STREQUAL YES)
      find_package (BLAS REQUIRED)
      find_package (LAPACK REQUIRED)
@@ -14,17 +14,17 @@ index 62c3404..8f151f2 100644
  endif (_uselapack STREQUAL YES)
  if (_usefits STREQUAL YES)
      find_package (CFITSIO 3.030 REQUIRED) # Should pad to three decimal digits
-@@ -400,11 +395,15 @@ if (HDF5_FOUND)
+@@ -410,11 +405,15 @@ if (HDF5_FOUND)
      add_definitions(-DHAVE_HDF5)
  endif (HDF5_FOUND)
  
--include_directories (${FFTW3_INCLUDE_DIRS})
+-include_directories (SYSTEM ${FFTW3_INCLUDE_DIRS})
 -add_definitions(-DHAVE_FFTW3)
 -if (NOT FFTW3_DISABLE_THREADS)
 -    add_definitions(-DHAVE_FFTW3_THREADS)
 -endif (NOT FFTW3_DISABLE_THREADS)
 +if (BUILD_FFTW3)
-+    include_directories (${FFTW3_INCLUDE_DIRS})
++    include_directories (SYSTEM ${FFTW3_INCLUDE_DIRS})
 +    add_definitions(-DHAVE_FFTW3)
 +    if (NOT FFTW3_DISABLE_THREADS)
 +        add_definitions(-DHAVE_FFTW3_THREADS)
@@ -35,7 +35,7 @@ index 62c3404..8f151f2 100644
  
  if (DL_FOUND)
      add_definitions(-DHAVE_DL)
-@@ -557,8 +556,41 @@ endforeach (module)
+@@ -567,8 +566,41 @@ endforeach (module)
  
  # Install pkg-config support file
  CONFIGURE_FILE("casacore.pc.in" "casacore.pc" @ONLY)
@@ -91,20 +91,21 @@ index 0000000..8c9ad12
 +
 +check_required_components(@PROJECT_NAME@)
 diff --git a/casa/CMakeLists.txt b/casa/CMakeLists.txt
-index 950752c..d4c35cb 100644
+index 60fa2b6..a573d61 100644
 --- a/casa/CMakeLists.txt
 +++ b/casa/CMakeLists.txt
 @@ -15,7 +15,9 @@ set (
  parser_inputs
  JsonGram
  )
-  
+- 
++
 +find_package(ZLIB REQUIRED)
 +
  foreach (src ${parser_inputs})
      if (BISON_VERSION VERSION_LESS 3.0)
-         BISON_TARGET (${src} Json/${src}.yy ${CMAKE_CURRENT_BINARY_DIR}/${src}.ycc COMPILE_FLAGS "-y -p ${src}")
-@@ -291,16 +293,18 @@ find_library(libm m)
+         set(EXTRA_BISON_FLAGS "-p ${src}")
+@@ -294,16 +296,18 @@ find_library(libm m)
  
  target_link_libraries (
  casa_casa
@@ -139,7 +140,7 @@ index 12229f9..a15e508 100644
  
  // <summary>Base class for all Casacore library errors</summary>
 diff --git a/casa/Json/JsonOut.h b/casa/Json/JsonOut.h
-index b5229c5..66596d2 100644
+index b5229c5..7250d93 100644
 --- a/casa/Json/JsonOut.h
 +++ b/casa/Json/JsonOut.h
 @@ -174,6 +174,10 @@ namespace casacore { //# NAMESPACE CASACORE - BEGIN
@@ -246,10 +247,10 @@ index b2e4220..45dde2e 100644
 +target_link_libraries (fits2table PUBLIC casa_fits ${CASACORE_ARCH_LIBS} PRIVATE ZLIB::ZLIB)
  install(TARGETS fits2table)
 diff --git a/images/CMakeLists.txt b/images/CMakeLists.txt
-index 20f5d0a..39db9bd 100644
+index 5ff84c3..4602bb1 100644
 --- a/images/CMakeLists.txt
 +++ b/images/CMakeLists.txt
-@@ -78,10 +78,11 @@ casa_lattices
+@@ -83,10 +83,11 @@ casa_lattices
  ${CASACORE_ARCH_LIBS}
  )
  
@@ -287,7 +288,7 @@ index a2c9d56..d3b5b65 100644
  LIBRARY DESTINATION lib${LIB_SUFFIX}
  ARCHIVE DESTINATION lib${LIB_SUFFIX}
 diff --git a/measures/CMakeLists.txt b/measures/CMakeLists.txt
-index 6b2e42b..a6dc175 100644
+index 91285e3..696a859 100644
 --- a/measures/CMakeLists.txt
 +++ b/measures/CMakeLists.txt
 @@ -78,10 +78,11 @@ init_pch_support(casa_measures ${top_level_headers})
@@ -304,10 +305,10 @@ index 6b2e42b..a6dc175 100644
  ARCHIVE DESTINATION lib${LIB_SUFFIX}
  LIBRARY PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
 diff --git a/mirlib/CMakeLists.txt b/mirlib/CMakeLists.txt
-index 0703a5d..46f2684 100644
+index b8b6aac..0b71077 100644
 --- a/mirlib/CMakeLists.txt
 +++ b/mirlib/CMakeLists.txt
-@@ -22,6 +22,7 @@ target_link_libraries (casa_mirlib casa_casa ${CASACORE_ARCH_LIBS})
+@@ -27,6 +27,7 @@ target_link_libraries (casa_mirlib casa_casa ${CASACORE_ARCH_LIBS})
  
  install (
  TARGETS casa_mirlib
@@ -316,10 +317,10 @@ index 0703a5d..46f2684 100644
  LIBRARY DESTINATION lib${LIB_SUFFIX}
  ARCHIVE DESTINATION lib${LIB_SUFFIX}
 diff --git a/ms/CMakeLists.txt b/ms/CMakeLists.txt
-index 5602283..ee08a8d 100644
+index 850ab87..9ba0db0 100644
 --- a/ms/CMakeLists.txt
 +++ b/ms/CMakeLists.txt
-@@ -173,9 +173,10 @@ casa_ms casa_measures
+@@ -189,9 +189,10 @@ casa_ms casa_measures
  ${CASACORE_ARCH_LIBS}
  )
  
@@ -364,54 +365,6 @@ index b8340e0..6b434d3 100644
  LIBRARY DESTINATION lib${LIB_SUFFIX}
  ARCHIVE DESTINATION lib${LIB_SUFFIX}
  LIBRARY PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
-diff --git a/python/CMakeLists-cmake3.14.txt b/python/CMakeLists-cmake3.14.txt
-index 7c981f7..1ce6b4d 100644
---- a/python/CMakeLists-cmake3.14.txt
-+++ b/python/CMakeLists-cmake3.14.txt
-@@ -63,6 +63,7 @@ Converters/PycArray.tcc
- target_link_libraries (casa_python casa_casa ${PYTHON2_Boost_LIBRARIES} ${PYTHON2_LIBRARIES} ${CASACORE_ARCH_LIBS})
- 
- install (TARGETS casa_python
-+EXPORT casacore
- RUNTIME DESTINATION bin
- LIBRARY DESTINATION lib${LIB_SUFFIX}
- ARCHIVE DESTINATION lib${LIB_SUFFIX}
-diff --git a/python/CMakeLists-older-cmake.txt b/python/CMakeLists-older-cmake.txt
-index 96411e7..e145da3 100644
---- a/python/CMakeLists-older-cmake.txt
-+++ b/python/CMakeLists-older-cmake.txt
-@@ -90,6 +90,7 @@ Converters/PycArray.tcc
- target_link_libraries (casa_python casa_casa ${PYTHON2_Boost_LIBRARIES} ${PYTHON2_LIBRARIES} ${CASACORE_ARCH_LIBS})
- 
- install (TARGETS casa_python
-+EXPORT casacore
- RUNTIME DESTINATION bin
- LIBRARY DESTINATION lib${LIB_SUFFIX}
- ARCHIVE DESTINATION lib${LIB_SUFFIX}
-diff --git a/python3/CMakeLists-cmake3.14.txt b/python3/CMakeLists-cmake3.14.txt
-index 921c4c3..e5746d1 100644
---- a/python3/CMakeLists-cmake3.14.txt
-+++ b/python3/CMakeLists-cmake3.14.txt
-@@ -54,6 +54,7 @@ add_library (casa_python3
- target_link_libraries (casa_python3 casa_casa ${PYTHON3_Boost_LIBRARIES} ${PYTHON3_LIBRARIES})
- 
- install (TARGETS casa_python3
-+EXPORT casacore
- RUNTIME DESTINATION bin
- LIBRARY DESTINATION lib${LIB_SUFFIX}
- ARCHIVE DESTINATION lib${LIB_SUFFIX}
-diff --git a/python3/CMakeLists-older-cmake.txt b/python3/CMakeLists-older-cmake.txt
-index 8a42cc9..5fe0999 100644
---- a/python3/CMakeLists-older-cmake.txt
-+++ b/python3/CMakeLists-older-cmake.txt
-@@ -84,6 +84,7 @@ add_library (casa_python3
- target_link_libraries (casa_python3 casa_casa ${PYTHON3_Boost_LIBRARIES} ${PYTHON3_LIBRARIES})
- 
- install (TARGETS casa_python3
-+EXPORT casacore
- RUNTIME DESTINATION bin
- LIBRARY DESTINATION lib${LIB_SUFFIX}
- ARCHIVE DESTINATION lib${LIB_SUFFIX}
 diff --git a/scimath/CMakeLists.txt b/scimath/CMakeLists.txt
 index b7f2900..9999811 100644
 --- a/scimath/CMakeLists.txt
@@ -437,10 +390,10 @@ index 69bd4d7..8e6aa8d 100644
  ARCHIVE DESTINATION lib${LIB_SUFFIX}
  LIBRARY PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
 diff --git a/tables/CMakeLists.txt b/tables/CMakeLists.txt
-index 31cf243..611f89a 100644
+index 59feaec..cd87055 100644
 --- a/tables/CMakeLists.txt
 +++ b/tables/CMakeLists.txt
-@@ -241,11 +241,18 @@ TaQL.h
+@@ -258,15 +258,22 @@ TaQL.h
  
  init_pch_support(casa_tables ${top_level_headers})
  
@@ -452,6 +405,10 @@ index 31cf243..611f89a 100644
 +    target_link_libraries(casa_tables adios2::adios2)
 +  endif(ADIOS2_FOUND)
 +endif(MPI_FOUND)
+ if(BUILD_SISCO)
+   target_link_libraries (casa_tables ${LibDeflate_LIBRARY})
+   target_include_directories(casa_tables PUBLIC ${LibDeflate_INCLUDE_DIR})
+ endif(BUILD_SISCO)
  
 -add_subdirectory (apps)
 +# apps subdirectory disabled (arcae static monolith build)
@@ -462,7 +419,7 @@ index 31cf243..611f89a 100644
  ARCHIVE DESTINATION lib${LIB_SUFFIX}
  LIBRARY PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
 diff --git a/tables/Tables/PlainTable.cc b/tables/Tables/PlainTable.cc
-index 2a41c4f..fb088a3 100644
+index f8f7653..fe1c079 100644
 --- a/tables/Tables/PlainTable.cc
 +++ b/tables/Tables/PlainTable.cc
 @@ -45,7 +45,7 @@
@@ -475,12 +432,12 @@ index 2a41c4f..fb088a3 100644
  PlainTable::PlainTable (SetupNewTable& newtab, rownr_t nrrow, Bool initialize,
                          const TableLock& lockOptions, int endianFormat,
 diff --git a/tables/Tables/PlainTable.h b/tables/Tables/PlainTable.h
-index 3179d8e..c0a0ee4 100644
+index 5742020..c5c5f8e 100644
 --- a/tables/Tables/PlainTable.h
 +++ b/tables/Tables/PlainTable.h
-@@ -312,7 +312,7 @@ private:
-                                        //# False = little endian canonical
+@@ -316,7 +316,7 @@ private:
      TSMOption      tsmOption_p;
+     Bool           changeTiledDataOnly_; //# Allow updates to data in existing tiled columns
      //# cache of open (plain) tables
 -    static TableCache theirTableCache;
 +    static thread_local TableCache theirTableCache;
@@ -488,7 +445,7 @@ index 3179d8e..c0a0ee4 100644
  
  
 diff --git a/tables/Tables/RefRows.cc b/tables/Tables/RefRows.cc
-index 957b3e1..f80a977 100644
+index 957b3e1..0d57066 100644
 --- a/tables/Tables/RefRows.cc
 +++ b/tables/Tables/RefRows.cc
 @@ -38,17 +38,24 @@ RefRows::RefRows (const Vector<rownr_t>& rowNumbers, Bool isSliced,
@@ -520,7 +477,7 @@ index 957b3e1..f80a977 100644
      if (itsSliced) {
  	AlwaysAssert (itsNrows%3 == 0, AipsError);
 diff --git a/tables/Tables/RefRows.h b/tables/Tables/RefRows.h
-index 32ab695..ef2dff8 100644
+index 32ab695..f1f738e 100644
 --- a/tables/Tables/RefRows.h
 +++ b/tables/Tables/RefRows.h
 @@ -92,6 +92,9 @@ public:
@@ -543,7 +500,7 @@ index 32ab695..ef2dff8 100644
  
      // Fill the itsNrows variable.
 diff --git a/tables/Tables/TableProxy.cc b/tables/Tables/TableProxy.cc
-index f65cf26..75268a5 100644
+index f65cf26..3f806cd 100644
 --- a/tables/Tables/TableProxy.cc
 +++ b/tables/Tables/TableProxy.cc
 @@ -271,6 +271,9 @@ Record TableProxy::lockOptions()
@@ -556,15 +513,6 @@ index f65cf26..75268a5 100644
    default:
      option = "unknown";
    }
-@@ -1172,7 +1175,7 @@ Record TableProxy::getVarColumn (const String& columnName,
-   char namebuf[22];
-   for (Int64 i=0; i<nrows; i++) {
-     // Add the result to the record with field name formed from 1-based rownr.
--    snprintf (namebuf, sizeof(namebuf), "r%lli", row+1);
-+    sprintf (namebuf, "r%lli", row+1);
-     if (tabcol.isDefined(row)) {
-       getValueFromTable(columnName, row, 1, 1, False).toRecord (rec, namebuf);
-     } else {
 @@ -3403,10 +3406,12 @@ TableLock TableProxy::makeLockOptions (const Record& options)
      opt = TableLock::PermanentLocking;
    } else if (str == "permanentwait") {

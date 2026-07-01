@@ -106,9 +106,11 @@ jobs:
 
       - name: Install C++ Compiler and cmake
         run: |
-          brew update
-          brew install ninja
-          brew reinstall gcc  # Needed for gfortran
+          bash ci/scripts/before-all-macos.sh
+          # casacore >= 3.8 needs bison >= 3; macOS ships system bison 2.3.
+          # Homebrew bison/flex are keg-only, so prepend them to PATH.
+          echo "$(brew --prefix bison)/bin" >> "$GITHUB_PATH"
+          echo "$(brew --prefix flex)/bin" >> "$GITHUB_PATH"
           python -m pip install -U pip
           python -m pip install pyarrow==23.0.1
 
