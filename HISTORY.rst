@@ -4,6 +4,7 @@ History
 
 X.Y.Z (DD-MM-YYYY)
 ------------------
+* Upgrade to casacore 3.8.1 (:pr:`218`)
 * Remove extraneous whitespace in casacore patch (:pr:`215`)
 * Introduce ``pytest != 9.1.0`` version restriction (:pr:`214`)
 
