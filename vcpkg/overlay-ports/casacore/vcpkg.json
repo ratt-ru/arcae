@@ -9,6 +9,7 @@
     "cfitsio",
     "gsl",
     "lapack",
+    "libdeflate",
     {
       "name": "openblas",
       "default-features": false
