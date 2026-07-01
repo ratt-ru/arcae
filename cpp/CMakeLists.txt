@@ -36,6 +36,35 @@ else()
     set(CASACORE_LINK_GROUP "$<LINK_GROUP:RESCAN,${_casa_group}>")
 endif()
 
+# casa_scimath_f is a Fortran archive whose objects reference the gfortran
+# runtime (_gfortran_*), but the static casacore CONFIG targets don't propagate
+# it through their link interface. Only the fully-linked C++ test executables
+# need this resolved: the Python extension is a shared module whose Fortran-
+# calling code paths are never exercised at import, so it links (and imports)
+# fine with the symbols left undefined. We therefore expose the Fortran runtime
+# to the tests subdirectory (see cpp/tests/CMakeLists.txt) rather than putting
+# it on arcae's PUBLIC interface, which would drag the gcc runtime (emutls_w,
+# gfortran, quadmath, ...) into the module too. Guarded by check_language so
+# machines without a Fortran compiler (which don't need one, since casacore is
+# prebuilt by vcpkg) still configure.
+include(CheckLanguage)
+check_language(Fortran)
+if(CMAKE_Fortran_COMPILER)
+    enable_language(Fortran)
+    # Both the libraries AND their directories are needed: on macOS the gcc
+    # runtime (libemutls_w.a etc.) lives in Homebrew's keg-only path, which the
+    # clang linker doesn't search by default.
+    set(FORTRAN_RUNTIME_LIBS ${CMAKE_Fortran_IMPLICIT_LINK_LIBRARIES})
+    set(FORTRAN_RUNTIME_DIRS ${CMAKE_Fortran_IMPLICIT_LINK_DIRECTORIES})
+else()
+    message(WARNING
+        "No Fortran compiler found; the gfortran runtime will not be added to "
+        "the C++ test executables' link. Linking them may fail with undefined "
+        "_gfortran_* references.")
+    set(FORTRAN_RUNTIME_LIBS "")
+    set(FORTRAN_RUNTIME_DIRS "")
+endif()
+
 add_library(arcae STATIC
     arcae/configuration.cc
     arcae/descriptor.cc
