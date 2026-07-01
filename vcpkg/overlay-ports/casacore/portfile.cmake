@@ -55,6 +55,12 @@ vcpkg_cmake_configure(
         -DBUILD_TESTING=OFF
         -DUSE_PCH=OFF
         -DCMAKE_CXX_STANDARD=20
+        # Pass the vcpkg-acquired flex/bison to casacore's own find_package
+        # calls. casacore 3.8 requires bison >= 3; without these, its
+        # find_package(BISON 3) picks up the system bison (e.g. macOS's 2.3)
+        # and configuration fails.
+        -DBISON_EXECUTABLE=${BISON}
+        -DFLEX_EXECUTABLE=${FLEX}
         ${fortran_args}
 )
 

@@ -36,6 +36,27 @@ else()
     set(CASACORE_LINK_GROUP "$<LINK_GROUP:RESCAN,${_casa_group}>")
 endif()
 
+# casa_scimath_f is a Fortran archive whose objects reference the gfortran
+# runtime (_gfortran_*), but the static casacore CONFIG targets don't propagate
+# it through their link interface. The Python extension is a shared library, so
+# Linux tolerates the unresolved symbols at link time; the fully-linked C++ test
+# executables do not. Discover the Fortran implicit link libraries and add them
+# to arcae's link interface. Guarded by check_language so machines without a
+# Fortran compiler (which don't need one, since casacore is prebuilt by vcpkg)
+# still configure.
+include(CheckLanguage)
+check_language(Fortran)
+if(CMAKE_Fortran_COMPILER)
+    enable_language(Fortran)
+    set(FORTRAN_RUNTIME_LIBS ${CMAKE_Fortran_IMPLICIT_LINK_LIBRARIES})
+else()
+    message(WARNING
+        "No Fortran compiler found; the gfortran runtime will not be added to "
+        "the link interface. Linking the C++ test executables may fail with "
+        "undefined _gfortran_* references.")
+    set(FORTRAN_RUNTIME_LIBS "")
+endif()
+
 add_library(arcae STATIC
     arcae/configuration.cc
     arcae/descriptor.cc
@@ -56,7 +77,7 @@ target_compile_options(arcae PRIVATE
     -fvisibility=hidden -fvisibility-inlines-hidden)
 string(REPLACE " " ";" _PYARROW_LIBDIRS "${PYARROW_LIBDIRS}")
 target_link_directories(arcae PUBLIC ${_PYARROW_LIBDIRS})
-target_link_libraries(arcae PUBLIC arrow absl::span "${CASACORE_LINK_GROUP}")
+target_link_libraries(arcae PUBLIC arrow absl::span "${CASACORE_LINK_GROUP}" ${FORTRAN_RUNTIME_LIBS})
 target_include_directories(arcae PUBLIC
     ${CASACORE_PC_INCLUDE_DIRS}
     ${PYARROW_INCLUDE}
