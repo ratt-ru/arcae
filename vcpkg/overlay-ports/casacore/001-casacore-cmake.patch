@@ -1454,7 +1454,7 @@ index 32ab695..f1f738e 100644
  
      // Fill the itsNrows variable.
 diff --git a/tables/Tables/TableProxy.cc b/tables/Tables/TableProxy.cc
-index f65cf26..c9b0374 100644
+index f65cf26..3f806cd 100644
 --- a/tables/Tables/TableProxy.cc
 +++ b/tables/Tables/TableProxy.cc
 @@ -224,9 +224,9 @@ String TableProxy::endianFormat() const
